@@ -1,0 +1,7 @@
+{
+  "id": "chill",
+  "name": "Chill",
+  "tracks": [
+    {"title": "Lofi 1", "uri": "https://example.com/1"}
+  ]
+}

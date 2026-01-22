@@ -1,0 +1,6 @@
+discord.py>=2.3.0
+aiohttp
+python-dotenv
+asyncpg
+pytest
+pytest-asyncio

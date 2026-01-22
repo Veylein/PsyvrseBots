@@ -1,0 +1,27 @@
+# Python dependencies for Villicus
+
+discord.py
+aiohttp
+SQLAlchemy
+python-dotenv
+fastapi
+Pillow
+psutil
+pytest
+# Async SQLite helper for lightweight persistence
+aiosqlite
+# Web / OAuth support
+uvicorn
+httpx
+Jinja2
+python-multipart
+itsdangerous
+aiohttp
+# Async test support
+pytest-asyncio
+aioredis
+redis
+PyJWT
+# For NLP/ML (optional, comment out if not used)
+# spacy
+# scikit-learn

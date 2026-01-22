@@ -1,0 +1,9 @@
+discord.py>=2.4.0
+yt-dlp
+aiohttp
+python-dotenv
+pydantic
+asyncpg
+# Test dependencies
+pytest
+pytest-asyncio
