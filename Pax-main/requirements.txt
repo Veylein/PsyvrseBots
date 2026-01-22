@@ -1,6 +1,0 @@
-fastapi
-uvicorn
-discord.py
-asyncpg
-deep-translator
-aiohttp

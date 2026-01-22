@@ -2,7 +2,7 @@
 # Villicus main entry point
 import asyncio
 import sys
-from bot import start_bot
+from bot.bot import start_bot
 
 def main():
     print("[Villicus] Starting main...")
