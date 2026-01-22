@@ -1,0 +1,6 @@
+[submodule "Conditor-Bot"]
+	path = Conditor-Bot
+	url = https://github.com/Veylein/Conditor
+[submodule "Ludus-Bot"]
+	path = Ludus-Bot
+	url = https://github.com/Veylein/Ludus
