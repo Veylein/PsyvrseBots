@@ -13,5 +13,12 @@ class SetupCog(commands.Cog):
 
 
 async def setup_sync(bot: commands.Bot):
-    # Add the cog instance; app commands defined on the cog will be registered when the tree is synced
-    bot.add_cog(SetupCog(bot))
+    # Add the cog instance; also register cog app-commands with the CommandTree
+    cog = SetupCog(bot)
+    bot.add_cog(cog)
+    try:
+        # Register any app commands defined on the cog immediately
+        bot.tree.add_cog(cog)
+    except Exception:
+        # some versions or states may raise if commands already registered
+        pass

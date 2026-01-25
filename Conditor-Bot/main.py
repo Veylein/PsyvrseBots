@@ -29,7 +29,19 @@ def main():
 		logging.info("Conditor connected, running setup_sync and syncing commands...")
 		try:
 			await setup_sync(bot)
-			await bot.tree.sync()
+			# allow a fast guild sync for development: set COND_GUILD_ID to a guild id to sync there
+			guild_id = os.environ.get("COND_GUILD_ID")
+			if guild_id:
+				try:
+					from discord import Object
+					obj = Object(id=int(guild_id))
+					await bot.tree.sync(guild=obj)
+					logging.info(f"Synced commands to dev guild {guild_id}")
+				except Exception:
+					logging.exception("Failed to sync to dev guild, falling back to global sync")
+					await bot.tree.sync()
+			else:
+				await bot.tree.sync()
 			logging.info(f"Conditor ready — {bot.user} (id: {bot.user.id})")
 		except Exception:
 			logging.exception("Failed to register commands on ready")
