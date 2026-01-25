@@ -4,6 +4,35 @@ from typing import Dict
 from .templates.loader import load_default_template
 from .parser import TemplateParser
 from .creator import CreationPipeline
+from discord import ui
+
+
+class _PreviewConfirmView(ui.View):
+    def __init__(self, plan, pipeline, timeout: int = 120):
+        super().__init__(timeout=timeout)
+        self.plan = plan
+        self.pipeline = pipeline
+        self.result = None
+
+    @ui.button(label="Create server", style=discord.ButtonStyle.green)
+    async def create(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.defer(thinking=True)
+        try:
+            report = await self.pipeline.execute(self.plan, actor=interaction.user)
+        except Exception as exc:
+            await interaction.followup.send(f"Creation failed: {exc}", ephemeral=True)
+            self.result = False
+            self.stop()
+            return
+        await interaction.followup.send(f"Conditor completed setup. Created {report['summary']}", ephemeral=True)
+        self.result = True
+        self.stop()
+
+    @ui.button(label="Cancel", style=discord.ButtonStyle.grey)
+    async def cancel(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.send_message("Cancelled setup.", ephemeral=True)
+        self.result = False
+        self.stop()
 
 
 class SetupModalStep1(ui.Modal):
@@ -93,11 +122,19 @@ class SetupModalStep3(ui.Modal):
         parser = TemplateParser(template)
         plan = parser.generate(self.state, actor_id=str(interaction.user.id))
 
-        pipeline = CreationPipeline(interaction.guild)
-        try:
-            report = await pipeline.execute(plan, actor=interaction.user)
-        except Exception as exc:
-            await interaction.followup.send(f"Conditor failed: {exc}", ephemeral=True)
-            return
+        # send a deterministic preview and ask the user to confirm
+        summary = plan.get('summary', '')
+        preview_lines = [f"**Preview:** {summary}"]
+        # show first categories and channel counts
+        for c in plan.get('categories', [])[:6]:
+            preview_lines.append(f"- {c['name']}: {len(c['channels'])} channels")
 
-        await interaction.followup.send(f"Conditor completed setup. Created {report['summary']}", ephemeral=True)
+        preview_text = "\n".join(preview_lines)
+
+        pipeline = CreationPipeline(interaction.guild)
+        view = _PreviewConfirmView(plan, pipeline)
+        await interaction.followup.send(preview_text, ephemeral=True, view=view)
+        # Wait until user interacts or view times out
+        await view.wait()
+        if view.result is None:
+            await interaction.followup.send("Preview timed out — setup cancelled.", ephemeral=True)
