@@ -1,8 +1,16 @@
 import os
+import sys
 import logging
+from pathlib import Path
 
-from src.conditor.bot import create_bot
-from src.conditor.commands.setup import setup_sync
+# Ensure Conditor package (Conditor-Bot/src) is importable when running this script
+BASE = Path(__file__).parent.resolve()
+SRC = str(BASE / "src")
+if SRC not in sys.path:
+	sys.path.insert(0, SRC)
+
+from conditor.bot import create_bot
+from conditor.commands.setup import setup_sync
 
 
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +26,7 @@ def main():
 
 	@bot.event
 	async def on_ready():
-		# Register cogs and sync application commands when the bot becomes ready
+		logging.info("Conditor connected, running setup_sync and syncing commands...")
 		try:
 			await setup_sync(bot)
 			await bot.tree.sync()
