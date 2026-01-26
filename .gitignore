@@ -1,0 +1,17 @@
+# Virtualenv
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment files
+.env
+youtubecookies.txt
+
+# Node
+node_modules/
+
+# OS
+Thumbs.db
+.DS_Store
