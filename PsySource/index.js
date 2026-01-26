@@ -31,6 +31,26 @@ const {
 
 const SILENCE_OK = String(SILENCE_SUCCESS).toLowerCase() === 'true'
 
+// Validate important environment variables early to fail fast with clear messages
+function isPlaceholder(value) {
+  if (!value) return true
+  const s = String(value).toLowerCase()
+  return /your_|example|replace|xxx|changeme/.test(s)
+}
+
+const requiredEnv = {
+  PSYVERSE_TOKEN,
+  LOG_CHANNEL,
+  RENDER_WEBHOOK_SECRET,
+}
+
+const missing = Object.entries(requiredEnv).filter(([_k, v]) => isPlaceholder(v)).map(([k]) => k)
+if (missing.length) {
+  console.error('Missing or placeholder environment variables:', missing.join(', '))
+  console.error('Please update the .env file with real values before starting the bot.')
+  process.exit(1)
+}
+
 // Colors
 const COLORS = {
   succeeded: 0x2ecc71, // green
@@ -221,7 +241,7 @@ app.post('/render-webhook', async (req, res) => {
 
     const channel = await client.channels.fetch(LOG_CHANNEL).catch(e => null)
     if (!channel) {
-      console.error('Failed to fetch channel with id', DISCORD_CHANNEL_ID)
+      console.error('Failed to fetch channel with id', LOG_CHANNEL)
       return res.status(500).send('Discord channel not available')
     }
 
