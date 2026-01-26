@@ -4,7 +4,7 @@
 #  - psy-source (Node) runs the PsySource webhook bot
 
 services:
-  - type: web
+  - type: worker
     name: psyvrse-launcher
     env: python
     plan: free

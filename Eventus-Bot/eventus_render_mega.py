@@ -75,14 +75,25 @@ def init_db():
     c.execute("""
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
+        username TEXT,
         activity_score INTEGER DEFAULT 0,
         momentum INTEGER DEFAULT 0,
         streak INTEGER DEFAULT 0,
         last_active TEXT,
         topic_influence REAL DEFAULT 0,
-        multi_channel_presence INTEGER DEFAULT 0
+        multi_channel_presence TEXT DEFAULT ''
     )
     """)
+    # Ensure legacy databases receive the `username` column
+    # (SQLite supports simple ADD COLUMN operations)
+    c.execute("PRAGMA table_info('users')")
+    cols = [r[1] for r in c.fetchall()]
+    if 'username' not in cols:
+        try:
+            c.execute("ALTER TABLE users ADD COLUMN username TEXT")
+            logging.info('Added missing column `username` to users table')
+        except Exception as e:
+            logging.exception('Failed to add username column to users table: %s', e)
     # Events table: recurrence, RSVP details, analytics
     c.execute("""
     CREATE TABLE IF NOT EXISTS events (
