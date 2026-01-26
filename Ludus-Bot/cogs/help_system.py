@@ -77,81 +77,25 @@ class HelpSystem(commands.Cog):
         # Attempt to build a command list from cogs or known categories
         e = discord.Embed(title=f"Help — {category}", color=discord.Color.green())
         lines = []
-        # Map CAT_LIST names to cog names heuristically
         lower_cat = category.lower()
         for cog_name, cog in bot.cogs.items():
-            if lower_cat in cog_name.lower() or any(lower_cat in alias.lower() for alias in [cog_name]):
-                # list public commands from this cog
+            if lower_cat in cog_name.lower():
                 for cmd in cog.get_commands():
-                    from __future__ import annotations
-                    import discord
-                    from discord.ext import commands
-                    from typing import List
+                    help_text = getattr(cmd, 'help', '') or ''
+                    lines.append(f"`{cmd.name}` — {help_text}")
 
-                    CAT_LIST = [
-                        ("Economy", "💰"), ("Gambling", "🎰"), ("Board Games", "🎲"),
-                        ("Card Games", "🃏"), ("Minigames", "🎮"), ("Puzzle Games", "🧩"),
-                        ("Arcade", "👾"), ("Fishing+", "🎣"), ("Farming", "🚜"),
-                        ("Social", "👥"), ("Pets", "🐾"), ("Profile", "👤"), ("Admin", "⚡"), ("Owner", "👑")
-                    ]
+        e.description = "\n".join(lines) if lines else "No commands found for this category."
+        return e
 
 
-                    class HelpView(discord.ui.View):
-                        def __init__(self, pages: List[discord.Embed], timeout: int = 120):
-                            super().__init__(timeout=timeout)
-                            self.pages = pages
-                            self.index = 0
-
-                        def current(self):
-                            return self.pages[self.index]
-
-                        @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
-                        async def prev(self, b, i):
-                            self.index = (self.index - 1) % len(self.pages)
-                            await i.response.edit_message(embed=self.current(), view=self)
-
-                        @discord.ui.button(label="Next", style=discord.ButtonStyle.primary)
-                        async def next(self, b, i):
-                            self.index = (self.index + 1) % len(self.pages)
-                            await i.response.edit_message(embed=self.current(), view=self)
-
-
-                    class HelpSystem(commands.Cog):
-                        """Unified help system: prefix-only scaffold to avoid duplicate slash registration."""
-
-                        def __init__(self, bot: commands.Bot):
-                            self.bot = bot
-
-                        async def help_prefix(self, ctx, *, category: str = None):
-                            if not category:
-                                await ctx.send(embed=self._category_list_embed())
-                                return
-                            await ctx.send(embed=self._category_detail_embed(category.title()))
-
-                        def _category_list_embed(self) -> discord.Embed:
-                            e = discord.Embed(title="Ludus Help — Categories", color=discord.Color.blurple())
-                            lines = [f"{emoji} **{name}**" for name, emoji in CAT_LIST]
-                            e.description = "\n".join(lines)
-                            e.set_footer(text="Use L!help <category> to view commands")
-                            return e
-
-                        def _category_detail_embed(self, category: str) -> discord.Embed:
-                            e = discord.Embed(title=f"Help — {category}", color=discord.Color.green())
-                            e.add_field(name="Overview", value=f"Commands and guides for {category}.")
-                            e.add_field(name="How to use", value="Use L!<command> or slash equivalents in the server.")
-                            e.set_footer(text="Contact the server owner for custom configs")
-                            return e
-
-
-                    async def setup(bot: commands.Bot):
-                        if bot.get_cog('HelpSystem') is not None:
-                            return
-                        await bot.add_cog(HelpSystem(bot))
-                        # Register prefix `help` only if not already present to avoid conflicts
-                        try:
-                            if bot.get_command('help') is None:
-                                cog = bot.get_cog('HelpSystem')
-                                if cog:
-                                    bot.add_command(commands.Command(cog.help_prefix, name='help'))
-                        except Exception:
-                            pass
+async def setup(bot: commands.Bot):
+    if bot.get_cog('HelpSystem') is not None:
+        return
+    await bot.add_cog(HelpSystem(bot))
+    try:
+        if bot.get_command('help') is None:
+            cog = bot.get_cog('HelpSystem')
+            if cog:
+                bot.add_command(commands.Command(cog.help_prefix, name='help'))
+    except Exception:
+        pass
