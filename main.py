@@ -36,6 +36,7 @@ ENTRY_CANDIDATES = [
     "bot.py",
     "run.py",
     "start.py",
+    "index.js",
 ]
 
 
@@ -73,10 +74,14 @@ async def run_bot(folder: Path, entry: Path):
     env = os.environ.copy()
     env = load_env(folder / ".env", env)
 
-    cmd = [sys.executable, str(entry.resolve())]
+    # If the entry is a Node.js script, run it with `node`
+    if entry.suffix == '.js':
+        cmd = ["node", str(entry.resolve())]
+    else:
+        cmd = [sys.executable, str(entry.resolve())]
 
-    # Conditor REQUIRES --run
-    if folder.name.lower() == "conditor":
+    # Conditor REQUIRES --run (python-only)
+    if entry.suffix != '.js' and folder.name.lower() == "conditor":
         cmd.append("--run")
 
     print(f"\n=== Starting {folder.name} ===")
