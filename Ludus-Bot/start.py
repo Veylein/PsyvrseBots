@@ -9,8 +9,13 @@ ENTRY_CANDIDATES = ("main.py", "bot.py", "run.py", "start.py")
 def find_entry(folder: Path):
     for name in ENTRY_CANDIDATES:
         p = folder / name
-        if p.exists():
-            return p
+        # avoid returning this wrapper script itself
+        try:
+            if p.exists() and p.resolve() != Path(__file__).resolve():
+                return p
+        except Exception:
+            if p.exists() and p.name != Path(__file__).name:
+                return p
     # fallback: look for any python file with 'bot' or 'main' in the name
     for p in folder.glob('*.py'):
         if 'bot' in p.name.lower() or 'main' in p.name.lower():
