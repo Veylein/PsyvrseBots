@@ -15,7 +15,6 @@
 import express from 'express'
 import dotenv from 'dotenv'
 import crypto from 'crypto'
-import fetch from 'node-fetch'
 import { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } from 'discord.js'
 
 dotenv.config()

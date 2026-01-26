@@ -1,0 +1,25 @@
+# Render service definitions: split into a Python launcher and a Node service
+# Deploy this repository to Render and Render will create two services:
+#  - psyvrse-launcher (Python) runs the unified launcher
+#  - psy-source (Node) runs the PsySource webhook bot
+
+services:
+  - type: web
+    name: psyvrse-launcher
+    env: python
+    plan: free
+    root: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    autoDeploy: true
+
+  - type: web
+    name: psy-source
+    env: node
+    plan: free
+    root: PsySource
+    # Prefer reproducible installs if you commit a package-lock.json
+    # If you do NOT have a lockfile, Render will run `npm install` instead.
+    buildCommand: npm ci --production --no-audit --no-fund
+    startCommand: npm start
+    autoDeploy: true
