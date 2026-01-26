@@ -108,22 +108,23 @@ class EventOS(commands.Cog):
         best_time = random.choice(["18:00", "20:00", "21:00", "19:00"])
         await ctx.send(f"Suggested best time for event: {best_time}")
 
-            @commands.command(name="create_event_thread")
-            async def create_event_thread_cmd(self, ctx, event_id: int):
-                """Create a thread for an event."""
-                perms = ctx.author.guild_permissions
-                if not (perms.manage_guild or perms.manage_events):
-                    await ctx.send("You need 'Manage Events' or 'Manage Server' permission.")
-                    return
-                thread = await ctx.channel.create_thread(name=f"Event {event_id} Discussion")
-                await ctx.send(f"Thread created: {thread.mention}")
-        @commands.command(name="setprefix")
-        @commands.has_permissions(manage_guild=True)
-        async def setprefix_cmd(self, ctx, prefix: str):
-            """Change the bot prefix for this server."""
-            from eventus_render_mega import set_guild_prefix
-            set_guild_prefix(ctx.guild.id, prefix)
-            await ctx.send(f"Prefix updated to `{prefix}`.")
+    @commands.command(name="create_event_thread")
+    async def create_event_thread_cmd(self, ctx, event_id: int):
+        """Create a thread for an event."""
+        perms = ctx.author.guild_permissions
+        if not (perms.manage_guild or perms.manage_events):
+            await ctx.send("You need 'Manage Events' or 'Manage Server' permission.")
+            return
+        thread = await ctx.channel.create_thread(name=f"Event {event_id} Discussion")
+        await ctx.send(f"Thread created: {thread.mention}")
+
+    @commands.command(name="setprefix")
+    @commands.has_permissions(manage_guild=True)
+    async def setprefix_cmd(self, ctx, prefix: str):
+        """Change the bot prefix for this server."""
+        from eventus_render_mega import set_guild_prefix
+        set_guild_prefix(ctx.guild.id, prefix)
+        await ctx.send(f"Prefix updated to `{prefix}`.")
     def __init__(self, bot):
         self.bot = bot
 

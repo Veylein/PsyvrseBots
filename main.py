@@ -102,17 +102,30 @@ async def run_bot(folder: Path, entry: Path):
 async def main():
     processes = []
 
-    folders = {f.name: f for f in BASE_DIR.iterdir() if f.is_dir()}
+    dir_folders = [f for f in BASE_DIR.iterdir() if f.is_dir()]
+
+    def find_folder_by_name(target: str):
+        t = target.lower()
+        # exact match first
+        for f in dir_folders:
+            if f.name.lower() == t:
+                return f
+        # common suffix/prefix variants
+        for f in dir_folders:
+            if t in f.name.lower():
+                return f
+        # not found
+        return None
 
     for bot_name in BOT_ORDER:
-        folder = folders.get(bot_name)
+        folder = find_folder_by_name(bot_name)
         if not folder:
             print(f"[skip] {bot_name} not found")
             continue
 
         entry = find_entry(folder)
         if not entry:
-            print(f"[skip] {bot_name}: no entry file")
+            print(f"[skip] {bot_name}: no entry file in {folder.name}")
             continue
 
         proc = await run_bot(folder, entry)
