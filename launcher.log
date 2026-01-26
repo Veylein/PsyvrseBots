@@ -1,14 +1,52 @@
 
 === Starting Conditor-Bot ===
-Command: c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Scripts\python.exe C:\Users\brodr\OneDrive\Documents\PsyvrseBots\Conditor-Bot\main.py
-[Conditor-Bot] usage: conditor [-h] (--dry-run | --run)
-[Conditor-Bot] conditor: error: one of the arguments --dry-run --run is required
+Command: c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Scripts\python.exe C:\Users\brodr\OneDrive\Documents\PsyvrseBots\Conditor-Bot\main.py --run
+[Conditor-Bot] 2026-01-26 00:45:46,969 WARNING discord.client: PyNaCl is not installed, voice will NOT be supported
+[Conditor-Bot] [2026-01-26 00:45:46] [INFO    ] discord.client: logging in using static token
+[Conditor-Bot] 2026-01-26 00:45:46,971 INFO discord.client: logging in using static token
+[Conditor-Bot] 2026-01-26 00:45:47,178 ERROR root: Bot terminated with an exception
+[Conditor-Bot] Traceback (most recent call last):
+[Conditor-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\http.py", line 839, in static_login
+[Conditor-Bot]     data = await self.request(Route('GET', '/users/@me'))
+[Conditor-Bot]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[Conditor-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\http.py", line 773, in request
+[Conditor-Bot]     raise HTTPException(response, data)
+[Conditor-Bot] discord.errors.HTTPException: 401 Unauthorized (error code: 0): 401: Unauthorized
+[Conditor-Bot] 
+[Conditor-Bot] The above exception was the direct cause of the following exception:
+[Conditor-Bot] 
+[Conditor-Bot] Traceback (most recent call last):
+[Conditor-Bot]   File "C:\Users\brodr\OneDrive\Documents\PsyvrseBots\Conditor-Bot\main.py", line 84, in run_bot
+[Conditor-Bot]     bot.run(token)
+[Conditor-Bot]     ~~~~~~~^^^^^^^
+[Conditor-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\client.py", line 929, in run
+[Conditor-Bot]     asyncio.run(runner())
+[Conditor-Bot]     ~~~~~~~~~~~^^^^^^^^^^
+[Conditor-Bot]   File "C:\Python314\Lib\asyncio\runners.py", line 204, in run
+[Conditor-Bot]     return runner.run(main)
+[Conditor-Bot]            ~~~~~~~~~~^^^^^^
+[Conditor-Bot]   File "C:\Python314\Lib\asyncio\runners.py", line 127, in run
+[Conditor-Bot]     return self._loop.run_until_complete(task)
+[Conditor-Bot]            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+[Conditor-Bot]   File "C:\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+[Conditor-Bot]     return future.result()
+[Conditor-Bot]            ~~~~~~~~~~~~~^^
+[Conditor-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\client.py", line 918, in runner
+[Conditor-Bot]     await self.start(token, reconnect=reconnect)
+[Conditor-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\client.py", line 846, in start
+[Conditor-Bot]     await self.login(token)
+[Conditor-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\client.py", line 675, in login
+[Conditor-Bot]     data = await self.http.static_login(token)
+[Conditor-Bot]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[Conditor-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\http.py", line 843, in static_login
+[Conditor-Bot]     raise LoginFailure('Improper token has been passed.') from exc
+[Conditor-Bot] discord.errors.LoginFailure: Improper token has been passed.
 
 === Starting Sonus-Bot ===
 Command: c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Scripts\python.exe C:\Users\brodr\OneDrive\Documents\PsyvrseBots\Sonus-Bot\main.py
-[Sonus-Bot] 2026-01-26 00:27:52,711 | INFO | src.bot | Registered event module: src.events.interaction_create
-[Sonus-Bot] 2026-01-26 00:27:52,712 | INFO | src.bot | Registered event module: src.events.ready
-[Sonus-Bot] 2026-01-26 00:27:52,713 | INFO | src.bot | Registered event module: src.events.voice_state_update
+[Sonus-Bot] 2026-01-26 00:45:52,577 | INFO | src.bot | Registered event module: src.events.interaction_create
+[Sonus-Bot] 2026-01-26 00:45:52,578 | INFO | src.bot | Registered event module: src.events.ready
+[Sonus-Bot] 2026-01-26 00:45:52,579 | INFO | src.bot | Registered event module: src.events.voice_state_update
 [Sonus-Bot] Traceback (most recent call last):
 [Sonus-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\http.py", line 839, in static_login
 [Sonus-Bot]     data = await self.request(Route('GET', '/users/@me'))
@@ -54,55 +92,21 @@ Command: c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Scripts\python.exe 
 
 === Starting Eventus-Bot ===
 Command: c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Scripts\python.exe C:\Users\brodr\OneDrive\Documents\PsyvrseBots\Eventus-Bot\start.py
-[Eventus-Bot] [2026-01-26 00:28:38,727] INFO:eventus: Logging initialized at INFO
-[Eventus-Bot] [2026-01-26 00:28:38,729] INFO:discord.client: logging in using static token
+[Eventus-Bot] [2026-01-26 00:46:04,577] INFO:eventus: Logging initialized at INFO
+[Eventus-Bot] [2026-01-26 00:46:04,577] INFO:discord.client: logging in using static token
+Task exception was never retrieved
+future: <Task finished name='Task-9' coro=<run_bot.<locals>.stream() done, defined at c:\Users\brodr\OneDrive\Documents\PsyvrseBots\main.py:115> exception=UnicodeEncodeError('charmap', '[Eventus-Bot] \u274c Bot crashed: Improper token has been passed.', 14, 15, 'character maps to <undefined>')>
+Traceback (most recent call last):
+  File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\main.py", line 118, in stream
+    print(f"[{folder.name}] {line.decode().rstrip()}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u274c' in position 14: character maps to <undefined>
 
 === Starting Pax-Bot ===
 Command: c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Scripts\python.exe C:\Users\brodr\OneDrive\Documents\PsyvrseBots\Pax-Bot\start.py
-[Eventus-Bot] Traceback (most recent call last):
-[Eventus-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\http.py", line 839, in static_login
-[Eventus-Bot]     data = await self.request(Route('GET', '/users/@me'))
-[Eventus-Bot]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[Eventus-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\http.py", line 773, in request
-[Eventus-Bot]     raise HTTPException(response, data)
-[Eventus-Bot] discord.errors.HTTPException: 401 Unauthorized (error code: 0): 401: Unauthorized
-[Eventus-Bot] 
-[Eventus-Bot] The above exception was the direct cause of the following exception:
-[Eventus-Bot] 
-[Eventus-Bot] Traceback (most recent call last):
-[Eventus-Bot]   File "C:\Users\brodr\OneDrive\Documents\PsyvrseBots\Eventus-Bot\start.py", line 16, in main
-[Eventus-Bot]     await eventus_render_mega.bot.start(os.getenv("EVENTUS_TOKEN"))
-[Eventus-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\client.py", line 846, in start
-[Eventus-Bot]     await self.login(token)
-[Eventus-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\client.py", line 675, in login
-[Eventus-Bot]     data = await self.http.static_login(token)
-[Eventus-Bot]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[Eventus-Bot]   File "c:\Users\brodr\OneDrive\Documents\PsyvrseBots\.venv\Lib\site-packages\discord\http.py", line 843, in static_login
-[Eventus-Bot]     raise LoginFailure('Improper token has been passed.') from exc
-[Eventus-Bot] discord.errors.LoginFailure: Improper token has been passed.
-[Eventus-Bot] 
-[Eventus-Bot] During handling of the above exception, another exception occurred:
-[Eventus-Bot] 
-[Eventus-Bot] Traceback (most recent call last):
-[Eventus-Bot]   File "C:\Users\brodr\OneDrive\Documents\PsyvrseBots\Eventus-Bot\start.py", line 25, in <module>
-[Eventus-Bot]     asyncio.run(main())
-[Eventus-Bot]     ~~~~~~~~~~~^^^^^^^^
-[Eventus-Bot]   File "C:\Python314\Lib\asyncio\runners.py", line 204, in run
-[Eventus-Bot]     return runner.run(main)
-[Eventus-Bot]            ~~~~~~~~~~^^^^^^
-[Eventus-Bot]   File "C:\Python314\Lib\asyncio\runners.py", line 127, in run
-[Eventus-Bot]     return self._loop.run_until_complete(task)
-[Eventus-Bot]            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
-[Eventus-Bot]   File "C:\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
-[Eventus-Bot]     return future.result()
-[Eventus-Bot]            ~~~~~~~~~~~~~^^
-[Eventus-Bot]   File "C:\Users\brodr\OneDrive\Documents\PsyvrseBots\Eventus-Bot\start.py", line 18, in main
-[Eventus-Bot]     print("\u274c Bot crashed:", e)
-[Eventus-Bot]     ~~~~~^^^^^^^^^^^^^^^^^^^^^^
-[Eventus-Bot]   File "C:\Python314\Lib\encodings\cp1252.py", line 19, in encode
-[Eventus-Bot]     return codecs.charmap_encode(input,self.errors,encoding_table)[0]
-[Eventus-Bot]            ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[Eventus-Bot] UnicodeEncodeError: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
 [Pax-Bot] [Pax-Bot] no runnable entry found in Pax-Bot; nothing to start.
 
 === Starting Ludus-Bot ===

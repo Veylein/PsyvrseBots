@@ -74,6 +74,22 @@ async def run_bot(folder: Path, entry: Path):
     env = os.environ.copy()
     env = load_env(folder / ".env", env)
 
+    # Force UTF-8 IO for subprocesses to avoid Windows encoding errors
+    env.setdefault('PYTHONUTF8', '1')
+    env.setdefault('PYTHONIOENCODING', 'utf-8')
+
+    # Ensure Python subprocesses can import local packages by adding
+    # the folder and its `src` subfolder to PYTHONPATH.
+    pythonpath = env.get('PYTHONPATH', '')
+    parts = []
+    parts.append(str(folder))
+    src_dir = folder / 'src'
+    if src_dir.exists():
+        parts.append(str(src_dir))
+    if pythonpath:
+        parts.append(pythonpath)
+    env['PYTHONPATH'] = os.pathsep.join(parts)
+
     # If the entry is a Node.js script, run it with `node`
     if entry.suffix == '.js':
         cmd = ["node", str(entry.resolve())]
