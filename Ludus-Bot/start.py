@@ -1,48 +1,26 @@
-"""Minimal Ludus-Bot startup script.
-Checks for `LUDUS_TOKEN` and runs a lightweight discord.py bot for health.
-Replace with full implementation as needed.
-"""
+"""Ludus-Bot startup script: loads .env, checks LUDUS_TOKEN, and launches bot.py as a subprocess."""
 import os
 import sys
-import logging
+import subprocess
 
 try:
     import dotenv
-    from discord.ext import commands
-except Exception:
-    print("Missing runtime dependencies (dotenv, discord). Install requirements.")
-    raise
+except ImportError:
+    print("Missing dependency: python-dotenv. Please install requirements.")
+    sys.exit(1)
 
 dotenv.load_dotenv()
-logging.basicConfig(level=logging.INFO, format='[Ludus-Bot] %(message)s')
 
-TOKEN = os.environ.get('LUDUS_TOKEN')
-if not TOKEN:
-    logging.error('LUDUS_TOKEN not set. Create a Ludus-Bot/.env from Ludus-Bot/.env.example')
-    sys.exit(2)
-
-intents = None
-try:
-    import discord
-    intents = discord.Intents.default()
-    intents.message_content = True
-except Exception:
-    intents = None
-
-bot = commands.Bot(command_prefix='!', intents=intents)
-
-
-@bot.event
-async def on_ready():
-    print(f"[Ludus-Bot] Ready as {bot.user} (id: {bot.user.id})")
-
+if not os.environ.get('LUDUS_TOKEN'):
+    print('LUDUS_TOKEN not set! Please add it to your .env file or environment variables.')
+    sys.exit(1)
 
 def main():
+    # Always launch bot.py as a subprocess
     try:
-        bot.run(TOKEN)
+        subprocess.run([sys.executable, 'bot.py'], check=True)
     except Exception as e:
-        logging.exception('Bot failed to start: %s', e)
-
+        print(f"[Ludus-Bot] Failed to launch bot.py: {e}")
 
 if __name__ == '__main__':
     main()
