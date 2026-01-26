@@ -6,7 +6,6 @@ from pathlib import Path
 
 """
 Unified Discord Bot Launcher
-
 Launch order (intentional, staggered):
 1. Conditor  (core / setup)
 2. Sonus     (audio)
