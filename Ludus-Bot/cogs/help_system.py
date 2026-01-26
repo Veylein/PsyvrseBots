@@ -38,7 +38,8 @@ class HelpSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    help_group = app_commands.Group(name="help", description="Help and documentation")
+    # Use a distinct group name to avoid colliding with other `/help` registrations
+    help_group = app_commands.Group(name="help_cat", description="Help and documentation")
 
     async def help_prefix(self, ctx, *, category: str = None):
         if not category:

@@ -12,8 +12,10 @@ logger = setup_logger(__name__)
 
 
 def register(bot: commands.Bot):
-    @bot.command(name='audiotest')
-    async def _audiotest(ctx: commands.Context, *, query: str):
+    # Avoid defining `audiotest` if it already exists (play.py also defines it)
+    if bot.get_command('audiotest') is None:
+        @bot.command(name='audiotest')
+        async def _audiotest(ctx: commands.Context, *, query: str):
         """Test yt-dlp extraction and FFmpeg probe for a URL or query."""
         await ctx.send('Testing extraction...')
         loop = asyncio.get_running_loop()
@@ -72,11 +74,12 @@ def register(bot: commands.Bot):
             await ctx.send(f'FFmpeg probe failed: {e}')
             logger.exception('audiotest ffmpeg probe failed for %s', query)
 
-    @bot.tree.command(name='audiotest')
-    async def _audiotest_slash(interaction: discord.Interaction, query: str):
-        await interaction.response.defer()
-        ctx = await commands.Context.from_interaction(interaction)
-        await _audiotest(ctx, query=query)
+    if bot.tree.get_command('audiotest') is None:
+        @bot.tree.command(name='audiotest')
+        async def _audiotest_slash(interaction: discord.Interaction, query: str):
+            await interaction.response.defer()
+            ctx = await commands.Context.from_interaction(interaction)
+            await _audiotest(ctx, query=query)
 
     @bot.command(name='postlogs')
     async def _postlogs(ctx: commands.Context, lines: int = 200):

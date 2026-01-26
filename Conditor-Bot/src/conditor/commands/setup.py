@@ -22,3 +22,9 @@ async def setup_sync(bot: commands.Bot):
     except Exception:
         # some versions or states may raise if commands already registered
         pass
+    try:
+        # Diagnostic log for command registration
+        slash_count = sum(1 for _ in bot.tree.walk_commands())
+        logging.getLogger(__name__).info(f"Conditor: registered setup cog. Slash commands now: {slash_count}")
+    except Exception:
+        logging.getLogger(__name__).exception("Conditor: failed to enumerate slash commands after setup_sync")

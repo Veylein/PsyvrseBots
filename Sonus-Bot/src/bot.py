@@ -145,6 +145,30 @@ def create_bot():
                 logger.exception("Failed to enumerate registered commands for diagnostics")
         except Exception:
             logger.exception("❌ Failed to sync slash commands")
+        # Diagnostic: check ffmpeg availability and log counts
+        try:
+            import asyncio, shutil
+
+            ffmpeg_path = shutil.which('ffmpeg') or shutil.which('avconv')
+            if ffmpeg_path:
+                logger.info(f"FFmpeg found at: {ffmpeg_path}")
+            else:
+                # try to run `ffmpeg -version` to be sure
+                proc = await asyncio.create_subprocess_exec('ffmpeg', '-version', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                out, err = await proc.communicate()
+                if proc.returncode == 0:
+                    logger.info("FFmpeg is available (version check succeeded)")
+                else:
+                    logger.warning("FFmpeg not found or not executable in PATH; audio playback may fail")
+        except Exception:
+            logger.exception("FFmpeg diagnostic check failed")
+
+        try:
+            slash_count = sum(1 for _ in bot.tree.walk_commands())
+            prefix_count = len(bot.commands)
+            logger.info(f"Command counts - slash: {slash_count}, prefix: {prefix_count}")
+        except Exception:
+            logger.exception("Failed to enumerate commands for diagnostics")
 
     # Add as an event listener without overwriting any existing on_ready handlers
     bot.add_listener(_on_ready_internal, "on_ready")
