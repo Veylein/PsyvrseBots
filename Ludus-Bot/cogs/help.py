@@ -415,7 +415,9 @@ async def setup(bot):
     await bot.add_cog(cog)
     try:
         # `help_slash` is an app command defined on the cog; add it to the tree explicitly
-        bot.tree.add_command(cog.help_slash)
+        existing = bot.tree.get_command('help')
+        if existing is None:
+            bot.tree.add_command(cog.help_slash)
     except Exception:
         # If it fails, the cog may already have registered app commands — ignore
         pass

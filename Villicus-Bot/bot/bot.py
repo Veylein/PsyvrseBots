@@ -89,56 +89,48 @@ async def start_bot():
     bot = commands.Bot(command_prefix=get_dynamic_prefix, intents=intents, help_command=None)
 
     try:
-        print("[Villicus] Importing cogs...")
-        from . import (
-            config_cog, moderation_cog, help_cog, mod_commands_cog, ticket_cog, leveling_cog,
-            actionlog_cog, antinuke_cog, autoresponder_cog, autorole_cog, avatar_cog, calculator_cog, clean_cog, color_cog, deafen_cog, embed_cog, emoji_cog, forms_cog, giveaway_cog, info_cog, lock_cog, nick_cog, owner_cog, purge_cog, reminder_cog, roleinfo_cog, servertag_cog, slowmode_cog, translate_cog, userinfo_cog, warnings_cog, welcome_cog, automessage_cog, automod_cog, invite_tracker_cog, polls_cog, reactionroles_cog, perfectlog_cog, appeals_cog, welcomemedia_cog, serverbackup_cog, rule_cog, smartautomod_cog, rule_analytics_cog
-        )
-        # Add all cogs
-        await bot.add_cog(config_cog.ConfigCog(bot))
-        await bot.add_cog(moderation_cog.ModerationCog(bot))
-        await bot.add_cog(help_cog.HelpCog(bot))
-        await bot.add_cog(mod_commands_cog.ModCommandsCog(bot))
-        await bot.add_cog(ticket_cog.TicketCog(bot))
-        await bot.add_cog(leveling_cog.LevelingCog(bot))
-        await bot.add_cog(actionlog_cog.ActionLogCog(bot))
-        await bot.add_cog(antinuke_cog.AntiNukeCog(bot))
-        await bot.add_cog(autoresponder_cog.AutoresponderCog(bot))
-        await bot.add_cog(autorole_cog.AutoroleCog(bot))
-        await bot.add_cog(avatar_cog.AvatarCog(bot))
-        await bot.add_cog(calculator_cog.CalculatorCog(bot))
-        await bot.add_cog(clean_cog.CleanCog(bot))
-        await bot.add_cog(color_cog.ColorCog(bot))
-        await bot.add_cog(deafen_cog.DeafenCog(bot))
-        await bot.add_cog(embed_cog.EmbedCog(bot))
-        await bot.add_cog(emoji_cog.EmojiCog(bot))
-        await bot.add_cog(forms_cog.FormsCog(bot))
-        await bot.add_cog(giveaway_cog.GiveawayCog(bot))
-        await bot.add_cog(info_cog.InfoCog(bot))
-        await bot.add_cog(lock_cog.LockCog(bot))
-        await bot.add_cog(nick_cog.NickCog(bot))
-        await bot.add_cog(owner_cog.OwnerCog(bot))
-        await bot.add_cog(purge_cog.PurgeCog(bot))
-        await bot.add_cog(reminder_cog.ReminderCog(bot))
-        await bot.add_cog(roleinfo_cog.RoleInfoCog(bot))
-        await bot.add_cog(servertag_cog.ServerTagCog(bot))
-        await bot.add_cog(slowmode_cog.SlowmodeCog(bot))
-        await bot.add_cog(translate_cog.TranslateCog(bot))
-        await bot.add_cog(userinfo_cog.UserInfoCog(bot))
-        await bot.add_cog(warnings_cog.WarningsCog(bot))
-        await bot.add_cog(welcome_cog.WelcomeCog(bot))
-        await bot.add_cog(automessage_cog.AutoMessageCog(bot))
-        await bot.add_cog(automod_cog.AutoModCog(bot))
-        await bot.add_cog(invite_tracker_cog.InviteTrackerCog(bot))
-        await bot.add_cog(polls_cog.PollsCog(bot))
-        await bot.add_cog(reactionroles_cog.ReactionRolesCog(bot))
-        await bot.add_cog(perfectlog_cog.PerfectLogCog(bot))
-        await bot.add_cog(appeals_cog.AppealsCog(bot))
-        await bot.add_cog(welcomemedia_cog.WelcomeMediaCog(bot))
-        await bot.add_cog(serverbackup_cog.ServerBackupCog(bot))
-        await bot.add_cog(rule_cog.RuleCog(bot))
-        await bot.add_cog(smartautomod_cog.SmartAutoModCog(bot, rule_cog=bot.get_cog("RuleCog"), analytics_cog=bot.get_cog("RuleAnalyticsCog")))
-        await bot.add_cog(rule_analytics_cog.RuleAnalyticsCog(bot))
+        print("[Villicus] Importing cogs dynamically...")
+        import importlib, inspect
+
+        cog_names = [
+            'config_cog', 'moderation_cog', 'help_cog', 'mod_commands_cog', 'ticket_cog', 'leveling_cog',
+            'actionlog_cog', 'antinuke_cog', 'autoresponder_cog', 'autorole_cog', 'avatar_cog', 'calculator_cog',
+            'clean_cog', 'color_cog', 'deafen_cog', 'embed_cog', 'emoji_cog', 'forms_cog', 'giveaway_cog', 'info_cog',
+            'lock_cog', 'nick_cog', 'owner_cog', 'purge_cog', 'reminder_cog', 'roleinfo_cog', 'servertag_cog',
+            'slowmode_cog', 'translate_cog', 'userinfo_cog', 'warnings_cog', 'welcome_cog', 'automessage_cog',
+            'automod_cog', 'invite_tracker_cog', 'polls_cog', 'reactionroles_cog', 'perfectlog_cog', 'appeals_cog',
+            'welcomemedia_cog', 'serverbackup_cog', 'rule_cog', 'smartautomod_cog', 'rule_analytics_cog'
+        ]
+
+        modules = []
+        for name in cog_names:
+            try:
+                mod = importlib.import_module(f'bot.{name}')
+                modules.append(mod)
+            except ModuleNotFoundError:
+                print(f"[Villicus] Cog module not found: {name} (skipping)")
+
+        # Prefer module-level async setup(bot) if present; otherwise find the first Cog subclass
+        for mod in modules:
+            try:
+                if hasattr(mod, 'setup'):
+                    setup_fn = getattr(mod, 'setup')
+                    if inspect.iscoroutinefunction(setup_fn):
+                        await setup_fn(bot)
+                        continue
+                # find Cog subclass
+                for _, obj in inspect.getmembers(mod, inspect.isclass):
+                    try:
+                        if issubclass(obj, commands.Cog) and obj is not commands.Cog:
+                            await bot.add_cog(obj(bot))
+                            break
+                    except Exception:
+                        continue
+            except Exception as e:
+                print(f"[Villicus] Failed to load cog from module {mod.__name__}: {e}")
+                import traceback
+                traceback.print_exc()
+        print("[Villicus] Cog import complete")
     except Exception as e:
         import traceback
         print(f"[Villicus] Cog import/add error: {e}")
