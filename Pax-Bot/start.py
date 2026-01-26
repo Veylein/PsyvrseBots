@@ -1,37 +1,47 @@
+"""Minimal Pax-Bot startup script.
+Checks for `PAX_TOKEN` and runs a lightweight discord.py bot for health.
+Replace with full implementation as needed.
+"""
+import os
 import sys
-from pathlib import Path
-import runpy
+import logging
 
-BASE = Path(__file__).parent
-ENTRY_CANDIDATES = ("main.py", "bot.py", "run.py", "start.py")
+try:
+    import dotenv
+    from discord.ext import commands
+except Exception:
+    print("Missing runtime dependencies (dotenv, discord). Install requirements.")
+    raise
+
+dotenv.load_dotenv()
+logging.basicConfig(level=logging.INFO, format='[Pax-Bot] %(message)s')
+
+TOKEN = os.environ.get('PAX_TOKEN')
+if not TOKEN:
+    logging.error('PAX_TOKEN not set. Create a Pax-Bot/.env from Pax-Bot/.env.example')
+    sys.exit(2)
+
+intents = None
+try:
+    import discord
+    intents = discord.Intents.default()
+    intents.message_content = True
+except Exception:
+    intents = None
+
+bot = commands.Bot(command_prefix='!', intents=intents)
 
 
-def find_entry(folder: Path):
-    for name in ENTRY_CANDIDATES:
-        p = folder / name
-        # avoid returning this wrapper script itself
-        try:
-            if p.exists() and p.resolve() != Path(__file__).resolve():
-                return p
-        except Exception:
-            # on unusual filesystems, fallback to simple exists
-            if p.exists() and p.name != Path(__file__).name:
-                return p
-    # fallback: look for any python file with 'bot' or 'main' in the name
-    for p in folder.glob('*.py'):
-        if 'bot' in p.name.lower() or 'main' in p.name.lower():
-            return p
-    return None
+@bot.event
+async def on_ready():
+    print(f"[Pax-Bot] Ready as {bot.user} (id: {bot.user.id})")
 
 
 def main():
-    entry = find_entry(BASE)
-    if not entry:
-        print("[Pax-Bot] no runnable entry found in Pax-Bot; nothing to start.")
-        sys.exit(0)
-
-    print(f"[Pax-Bot] launching {entry.name}")
-    runpy.run_path(str(entry), run_name='__main__')
+    try:
+        bot.run(TOKEN)
+    except Exception as e:
+        logging.exception('Bot failed to start: %s', e)
 
 
 if __name__ == '__main__':

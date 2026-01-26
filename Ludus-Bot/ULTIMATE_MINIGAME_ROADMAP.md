@@ -1,0 +1,248 @@
+# Ludus Ultimate Minigame Roadmap
+
+## Classic Games
+- Tic-Tac-Toe
+- Connect Four
+- Hangman
+- Minesweeper
+- Chess
+- Checkers
+- Sudoku
+- Wordle
+- Anagrams
+- Memory
+- Simon Says
+- Blackjack
+- Poker
+- Uno
+- Go Fish
+- War
+- Slots
+- Roulette
+- Rock Paper Scissors
+- Trivia
+- 8ball
+- Darts
+- Bowling
+- Bingo
+- Snake
+- Pong
+- Battleship
+- Mastermind
+- Othello
+- Reversi
+- Ludo
+- Dominoes
+- Jenga
+- Yahtzee
+- Pictionary
+- Drawing Guess
+- Emoji Blitz
+- Pattern Memory
+- Speed Math
+- Speed Typing
+- Fast Clicker
+- Reflex Test
+- Button Masher
+- Rapid Fire
+- Category Game
+- Rhyme Time
+- Acronym Game
+- Compound Words
+- Storyteller
+- Emoji Story
+- Alliteration Challenge
+- Palindrome Hunt
+- Quiz Master
+- Math Battle
+- Would You Rather
+- Reverse Word
+- Sequencer
+- Color Match
+- Calculator Game
+- Countdown Game
+
+## Social & Party Games
+- Bartender
+- Whisky Lab
+- Mafia
+- Werewolf
+- Spyfall
+- Secret Hitler
+- Codenames
+- Truth or Dare
+- Never Have I Ever
+- Confessions
+- Roast Battle
+- Compliment Chain
+- Meme Battle
+- Caption This
+- Roast Me
+- Compliment Me
+- Icebreaker
+- Would You Rather (Party)
+- Hot Potato
+- King of the Hill
+- Musical Chairs
+- Charades
+- Karaoke
+- Rap Battle
+- Drawing Battle
+- Guess the Song
+- Guess the Movie
+- Guess the Meme
+- Guess the Emoji
+- Guess the Sound
+- Guess the Number
+- Guess the Word
+- Guess the Color
+- Guess the Animal
+- Guess the Flag
+- Guess the Country
+- Guess the Logo
+- Guess the Food
+- Guess the Drink
+- Guess the Quote
+- Guess the Character
+- Guess the Game
+- Guess the Streamer
+- Guess the YouTuber
+- Guess the Anime
+- Guess the Pokemon
+- Guess the Superhero
+- Guess the Villain
+- Guess the Weapon
+- Guess the Car
+- Guess the Sport
+- Guess the Athlete
+- Guess the Celebrity
+- Guess the Artist
+- Guess the Song Lyric
+- Guess the Book
+- Guess the TV Show
+- Guess the Commercial
+- Guess the Ad
+- Guess the App
+- Guess the Website
+- Guess the Brand
+- Guess the Slogan
+- Guess the Company
+- Guess the Product
+- Guess the Invention
+- Guess the Scientist
+- Guess the Historical Figure
+- Guess the Year
+- Guess the Date
+- Guess the Event
+- Guess the Holiday
+- Guess the Season
+- Guess the Month
+- Guess the Day
+- Guess the Time
+- Guess the Weather
+- Guess the Temperature
+- Guess the Feeling
+- Guess the Mood
+- Guess the Emotion
+- Guess the Sound Effect
+- Guess the Instrument
+- Guess the Chord
+- Guess the Note
+- Guess the Scale
+- Guess the Key
+- Guess the BPM
+- Guess the Genre
+- Guess the Album
+- Guess the Cover Art
+- Guess the Music Video
+- Guess the Dance
+- Guess the Move
+- Guess the Trick
+- Guess the Magic
+- Guess the Illusion
+- Guess the Riddle
+- Guess the Puzzle
+- Guess the Pattern
+- Guess the Sequence
+- Guess the Order
+- Guess the Rule
+- Guess the Law
+- Guess the Principle
+- Guess the Theory
+- Guess the Formula
+- Guess the Equation
+- Guess the Calculation
+- Guess the Solution
+- Guess the Answer
+- Guess the Question
+- Guess the Statement
+- Guess the Fact
+- Guess the Lie
+- Guess the Truth
+- Guess the Secret
+- Guess the Mystery
+- Guess the Surprise
+- Guess the Twist
+- Guess the Ending
+- Guess the Beginning
+- Guess the Middle
+- Guess the Plot
+- Guess the Character Arc
+- Guess the Motivation
+- Guess the Goal
+- Guess the Obstacle
+- Guess the Conflict
+- Guess the Resolution
+- Guess the Theme
+- Guess the Message
+- Guess the Moral
+- Guess the Lesson
+- Guess the Quote
+- Guess the Reference
+- Guess the Allusion
+- Guess the Parody
+- Guess the Satire
+- Guess the Irony
+- Guess the Sarcasm
+- Guess the Pun
+- Guess the Joke
+- Guess the Meme
+- Guess the Trend
+- Guess the Challenge
+- Guess the Hashtag
+- Guess the Emoji
+- Guess the Sticker
+- Guess the Reaction
+- Guess the GIF
+- Guess the Video
+- Guess the Clip
+- Guess the Stream
+- Guess the Highlight
+- Guess the Moment
+- Guess the Memory
+- Guess the Flashback
+- Guess the Dream
+- Guess the Nightmare
+- Guess the Fantasy
+- Guess the Reality
+- Guess the Illusion
+- Guess the Delusion
+- Guess the Hallucination
+- Guess the Vision
+- Guess the Prophecy
+- Guess the Prediction
+- Guess the Forecast
+- Guess the Guess
+
+## Skill, Luck, and Challenge Games
+- ... (and hundreds more, to be filled in as we go)
+
+## Badges & Achievements
+- 100+ secret, rare, event, and skill badges (to be defined)
+
+## Social, Economy, and Customization
+- Trading, gifting, shop, inventory, collectibles, profile themes, backgrounds, and more
+
+---
+
+This is just the start. The codebase will be scaffolded for rapid addition of new minigames, badges, and features. Let me know which category or game to implement next, or if you want to see the code structure for rapid expansion!

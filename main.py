@@ -115,7 +115,18 @@ async def run_bot(folder: Path, entry: Path):
     async def stream():
         assert proc.stdout
         async for line in proc.stdout:
-            print(f"[{folder.name}] {line.decode().rstrip()}")
+            # Decode bytes defensively and write to stdout.buffer using utf-8
+            try:
+                text = line.decode('utf-8')
+            except Exception:
+                text = line.decode('utf-8', 'replace')
+            out = f"[{folder.name}] {text.rstrip()}\n".encode('utf-8', errors='replace')
+            try:
+                sys.stdout.buffer.write(out)
+                sys.stdout.buffer.flush()
+            except Exception:
+                # Fallback to print if buffer isn't available
+                print(out.decode('utf-8', 'replace'), end='')
 
     asyncio.create_task(stream())
     return proc

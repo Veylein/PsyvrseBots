@@ -1,0 +1,5 @@
+{
+  "info": "This is a template economy file. User balances will be stored here.",
+  "persistent_storage_notice": "On cloud deployments (Render), this file will reset unless you use Render Disks or a database.",
+  "users": {}
+}

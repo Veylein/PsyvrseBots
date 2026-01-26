@@ -1,0 +1,318 @@
+{
+  "achievements": [
+    {
+      "id": "first_dragon",
+      "name": "Dragon Tamer",
+      "description": "Obtain the legendary Dragon pet",
+      "emoji": "🐉",
+      "category": "Collection",
+      "tier": "legendary",
+      "reward_chi": 5000,
+      "hidden": false
+    },
+    {
+      "id": "tier3_garden",
+      "name": "Master Gardener",
+      "description": "Upgrade your garden to Tier 3",
+      "emoji": "🌸",
+      "category": "Collection",
+      "tier": "epic",
+      "reward_chi": 2000,
+      "hidden": false
+    },
+    {
+      "id": "first_duel_win",
+      "name": "First Blood",
+      "description": "Win your first duel",
+      "emoji": "⚔️",
+      "category": "Combat",
+      "tier": "common",
+      "reward_chi": 500,
+      "hidden": false
+    },
+    {
+      "id": "duel_champion",
+      "name": "Duel Champion",
+      "description": "Win 10 duels",
+      "emoji": "🏆",
+      "category": "Combat",
+      "tier": "epic",
+      "reward_chi": 3000,
+      "hidden": false
+    },
+    {
+      "id": "duel_master",
+      "name": "Duel Master",
+      "description": "Win 50 duels",
+      "emoji": "👑",
+      "category": "Combat",
+      "tier": "legendary",
+      "reward_chi": 10000,
+      "hidden": false
+    },
+    {
+      "id": "first_rebirth",
+      "name": "Reborn",
+      "description": "Complete your first rebirth",
+      "emoji": "♻️",
+      "category": "Economy",
+      "tier": "rare",
+      "reward_chi": 1500,
+      "hidden": false
+    },
+    {
+      "id": "rebirth_master",
+      "name": "Cycle of Eternity",
+      "description": "Reach 10 rebirths",
+      "emoji": "🔁",
+      "category": "Economy",
+      "tier": "legendary",
+      "reward_chi": 15000,
+      "hidden": false
+    },
+    {
+      "id": "millionaire",
+      "name": "Chi Millionaire",
+      "description": "Accumulate 1,000,000 total chi",
+      "emoji": "💎",
+      "category": "Economy",
+      "tier": "epic",
+      "reward_chi": 5000,
+      "hidden": false
+    },
+    {
+      "id": "team_founder",
+      "name": "Team Founder",
+      "description": "Create your own team",
+      "emoji": "🛡️",
+      "category": "Social",
+      "tier": "rare",
+      "reward_chi": 1000,
+      "hidden": false
+    },
+    {
+      "id": "team_loyal",
+      "name": "Loyal Member",
+      "description": "Be in the same team for 30 days",
+      "emoji": "🤝",
+      "category": "Social",
+      "tier": "epic",
+      "reward_chi": 2500,
+      "hidden": false
+    },
+    {
+      "id": "artifact_collector",
+      "name": "Artifact Collector",
+      "description": "Collect 10 artifacts",
+      "emoji": "✨",
+      "category": "Collection",
+      "tier": "epic",
+      "reward_chi": 3000,
+      "hidden": false
+    },
+    {
+      "id": "legendary_artifact",
+      "name": "Legendary Finder",
+      "description": "Obtain a Tier 5 legendary artifact",
+      "emoji": "🌟",
+      "category": "Collection",
+      "tier": "legendary",
+      "reward_chi": 7500,
+      "hidden": false
+    },
+    {
+      "id": "all_pets",
+      "name": "Pet Master",
+      "description": "Collect all 5 pets (Ox, Snake, Tiger, Panda, Dragon)",
+      "emoji": "🐾",
+      "category": "Collection",
+      "tier": "legendary",
+      "reward_chi": 12000,
+      "hidden": false
+    },
+    {
+      "id": "boss_slayer",
+      "name": "Boss Slayer",
+      "description": "Defeat your first boss",
+      "emoji": "💀",
+      "category": "Combat",
+      "tier": "rare",
+      "reward_chi": 1200,
+      "hidden": false
+    },
+    {
+      "id": "boss_hunter",
+      "name": "Boss Hunter",
+      "description": "Defeat 10 bosses",
+      "emoji": "⚡",
+      "category": "Combat",
+      "tier": "epic",
+      "reward_chi": 4000,
+      "hidden": false
+    },
+    {
+      "id": "quest_master",
+      "name": "Quest Master",
+      "description": "Complete 50 quests",
+      "emoji": "📜",
+      "category": "Mastery",
+      "tier": "epic",
+      "reward_chi": 3500,
+      "hidden": false
+    },
+    {
+      "id": "legendary_weapon",
+      "name": "Legendary Armament",
+      "description": "Purchase your first legendary weapon",
+      "emoji": "⚔️",
+      "category": "Collection",
+      "tier": "rare",
+      "reward_chi": 1500,
+      "hidden": false
+    },
+    {
+      "id": "arsenal_complete",
+      "name": "Complete Arsenal",
+      "description": "Own all 10 legendary weapons",
+      "emoji": "🗡️",
+      "category": "Collection",
+      "tier": "legendary",
+      "reward_chi": 20000,
+      "hidden": false
+    },
+    {
+      "id": "potion_master",
+      "name": "Alchemist",
+      "description": "Craft 25 potions",
+      "emoji": "🧪",
+      "category": "Mastery",
+      "tier": "rare",
+      "reward_chi": 1800,
+      "hidden": false
+    },
+    {
+      "id": "rift_survivor",
+      "name": "Rift Survivor",
+      "description": "Defeat The Rifter boss",
+      "emoji": "🌀",
+      "category": "Combat",
+      "tier": "legendary",
+      "reward_chi": 8000,
+      "hidden": false
+    },
+    {
+      "id": "pet_trainer",
+      "name": "Pet Trainer",
+      "description": "Train your pet to level 10",
+      "emoji": "💪",
+      "category": "Mastery",
+      "tier": "rare",
+      "reward_chi": 1500,
+      "hidden": false
+    },
+    {
+      "id": "garden_harvest_100",
+      "name": "Harvest Master",
+      "description": "Harvest 100 plants from your garden",
+      "emoji": "🌾",
+      "category": "Mastery",
+      "tier": "rare",
+      "reward_chi": 1200,
+      "hidden": false
+    },
+    {
+      "id": "secret_explorer",
+      "name": "Secrets Unveiled",
+      "description": "Discover a hidden secret in the bot",
+      "emoji": "🔍",
+      "category": "Exploration",
+      "tier": "legendary",
+      "reward_chi": 10000,
+      "hidden": true
+    },
+    {
+      "id": "early_bird",
+      "name": "Early Bird",
+      "description": "Be one of the first 10 users to join the bot",
+      "emoji": "🐦",
+      "category": "Social",
+      "tier": "legendary",
+      "reward_chi": 5000,
+      "hidden": false
+    },
+    {
+      "id": "daily_devotee",
+      "name": "Daily Devotee",
+      "description": "Earn chi for 30 consecutive days",
+      "emoji": "📅",
+      "category": "Mastery",
+      "tier": "epic",
+      "reward_chi": 4000,
+      "hidden": false
+    },
+    {
+      "id": "trading_tycoon",
+      "name": "Trading Tycoon",
+      "description": "Complete 50 trades with other users",
+      "emoji": "🤝",
+      "category": "Social",
+      "tier": "epic",
+      "reward_chi": 3000,
+      "hidden": false
+    },
+    {
+      "id": "hp_maxed",
+      "name": "Unbreakable",
+      "description": "Upgrade your max HP to 3000+",
+      "emoji": "❤️",
+      "category": "Mastery",
+      "tier": "epic",
+      "reward_chi": 3500,
+      "hidden": false
+    }
+  ],
+  "categories": {
+    "Combat": {
+      "emoji": "⚔️",
+      "description": "Battle achievements"
+    },
+    "Exploration": {
+      "emoji": "🗺️",
+      "description": "Discover new places"
+    },
+    "Collection": {
+      "emoji": "📦",
+      "description": "Collect items and pets"
+    },
+    "Social": {
+      "emoji": "👥",
+      "description": "Team and community achievements"
+    },
+    "Economy": {
+      "emoji": "💰",
+      "description": "Chi and wealth milestones"
+    },
+    "Mastery": {
+      "emoji": "🎯",
+      "description": "Skill and dedication"
+    }
+  },
+  "tiers": {
+    "common": {
+      "emoji": "⚪",
+      "color": 10197915
+    },
+    "rare": {
+      "emoji": "🔵",
+      "color": 3447003
+    },
+    "epic": {
+      "emoji": "🟣",
+      "color": 10181046
+    },
+    "legendary": {
+      "emoji": "🟡",
+      "color": 15844367
+    }
+  }
+}

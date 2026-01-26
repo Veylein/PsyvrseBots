@@ -20,6 +20,26 @@ services:
     root: PsySource
     # Prefer reproducible installs if you commit a package-lock.json
     # If you do NOT have a lockfile, Render will run `npm install` instead.
-    buildCommand: npm ci --production --no-audit --no-fund
+    buildCommand: npm ci --production --no-audit --no-fund || npm install --production --no-audit --no-fund
     startCommand: npm start
+    autoDeploy: true
+
+  # Pax and Ludus are lightweight worker bots; install dependencies from
+  # the repository `requirements.txt` if available and run their start scripts.
+  - type: worker
+    name: pax-bot
+    env: python
+    plan: free
+    root: Pax-Bot
+    buildCommand: pip install -r requirements.txt || pip install -r ../requirements.txt || true
+    startCommand: python start.py
+    autoDeploy: true
+
+  - type: worker
+    name: ludus-bot
+    env: python
+    plan: free
+    root: Ludus-Bot
+    buildCommand: pip install -r requirements.txt || pip install -r ../requirements.txt || true
+    startCommand: python start.py
     autoDeploy: true

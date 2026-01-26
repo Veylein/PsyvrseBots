@@ -1,0 +1,113 @@
+{
+    "items": [
+        {
+            "item_id": "R1",
+            "name": "1 Level",
+            "cost": 1,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R2",
+            "name": "Custom Role",
+            "cost": 2,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R3",
+            "name": "Server Booster Pack",
+            "cost": 2,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R4",
+            "name": "Mythic Weapon Skin",
+            "cost": 3,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R5",
+            "name": "4 Levels",
+            "cost": 2,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R6",
+            "name": "Permanent Garden Yield Boost (+10%)",
+            "cost": 5,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R7",
+            "name": "Discord Decoration Pack",
+            "cost": 5,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R8",
+            "name": "Exclusive Title + Rare Artifact",
+            "cost": 7,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R9",
+            "name": "7 Levels",
+            "cost": 5,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R10",
+            "name": "Legendary Pet Egg",
+            "cost": 10,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R11",
+            "name": "15 Free Levels",
+            "cost": 10,
+            "type": "default",
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R12",
+            "name": "+100 Permanent HP",
+            "cost": 3,
+            "type": "permanent_hp",
+            "hp_bonus": 100,
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R13",
+            "name": "+250 Permanent HP",
+            "cost": 6,
+            "type": "permanent_hp",
+            "hp_bonus": 250,
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R14",
+            "name": "+500 Permanent HP",
+            "cost": 12,
+            "type": "permanent_hp",
+            "hp_bonus": 500,
+            "realm": "Pandian Realm"
+        },
+        {
+            "item_id": "R15",
+            "name": "+1000 Permanent HP",
+            "cost": 25,
+            "type": "permanent_hp",
+            "hp_bonus": 1000,
+            "realm": "Pandian Realm"
+        }
+    ]
+}
