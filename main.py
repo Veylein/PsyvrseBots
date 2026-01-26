@@ -80,8 +80,9 @@ async def run_bot(folder: Path, entry: Path):
     else:
         cmd = [sys.executable, str(entry.resolve())]
 
-    # Conditor REQUIRES --run (python-only)
-    if entry.suffix != '.js' and folder.name.lower() == "conditor":
+    # Conditor REQUIRES --run (python-only).
+    # Accept folder name variants like 'Conditor-Bot' by checking substring.
+    if entry.suffix != '.js' and 'conditor' in folder.name.lower():
         cmd.append("--run")
 
     print(f"\n=== Starting {folder.name} ===")
@@ -122,6 +123,10 @@ async def main():
         # not found
         return None
 
+    # Keep track of which folders we've already attempted to start
+    started = set()
+
+    # First, start the curated BOT_ORDER so important services come up first
     for bot_name in BOT_ORDER:
         folder = find_folder_by_name(bot_name)
         if not folder:
@@ -135,7 +140,28 @@ async def main():
 
         proc = await run_bot(folder, entry)
         processes.append(proc)
+        started.add(folder.name.lower())
 
+        await asyncio.sleep(START_DELAY)
+
+    # Then, scan all other directories and start any that have a valid entry but weren't in BOT_ORDER
+    for folder in dir_folders:
+        name_l = folder.name.lower()
+        if name_l in started:
+            continue
+        # skip hidden or git/venv folders
+        if folder.name.startswith('.') or folder.name.lower() in ('.git', '.venv', 'venv'):
+            continue
+
+        entry = find_entry(folder)
+        if not entry:
+            # nothing to start here
+            continue
+
+        print(f"[info] Starting extra folder: {folder.name}")
+        proc = await run_bot(folder, entry)
+        processes.append(proc)
+        started.add(name_l)
         await asyncio.sleep(START_DELAY)
 
     if not processes:
