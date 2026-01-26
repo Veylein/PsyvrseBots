@@ -90,29 +90,44 @@ async def setup(bot: commands.Bot):
     cog = PerimeterExplicit(bot)
     await bot.add_cog(cog)
 
-    # Register only commands that do not already exist to avoid collisions
-    for cat in CATEGORIES:
-        if bot.tree.get_command(cat) is not None:
-            # skip if another extension already registered this slash command
-            continue
-
-        async def _wrapper(interaction: discord.Interaction, subcommand: str = "", _cog=cog):
-            await _cog._invoke(interaction, subcommand)
-
-        cmd = app_commands.Command(name=cat, callback=_wrapper, description=f"Run a {cat} category command")
+    # Defer registering slash-category bridge commands until after all cogs
+    # have been loaded to avoid CommandAlreadyRegistered during extension setup.
+    async def _deferred_register():
+        # wait until bot is ready and commands from other cogs have been injected
         try:
-            bot.tree.add_command(cmd)
+            await bot.wait_until_ready()
         except Exception:
-            # if adding fails, skip and continue
-            continue
+            return
 
-    # Add a /minigame command if not present
-    if bot.tree.get_command('minigame') is None:
-        async def _minigame_wrapper(interaction: discord.Interaction, game: str, target: Optional[str] = None, _cog=cog):
-            await _cog._invoke(interaction, f"{game} {target or ''}".strip())
+        for cat in CATEGORIES:
+            if bot.tree.get_command(cat) is not None:
+                continue
 
-        cmd = app_commands.Command(name='minigame', callback=_minigame_wrapper, description='Play a selected minigame')
+            async def _wrapper(interaction: discord.Interaction, subcommand: str = "", _cog=cog):
+                await _cog._invoke(interaction, subcommand)
+
+            cmd = app_commands.Command(name=cat, callback=_wrapper, description=f"Run a {cat} category command")
+            try:
+                bot.tree.add_command(cmd)
+            except Exception:
+                continue
+
+        # Register /minigame if missing
+        if bot.tree.get_command('minigame') is None:
+            async def _minigame_wrapper(interaction: discord.Interaction, game: str, target: Optional[str] = None, _cog=cog):
+                await _cog._invoke(interaction, f"{game} {target or ''}".strip())
+
+            cmd = app_commands.Command(name='minigame', callback=_minigame_wrapper, description='Play a selected minigame')
+            try:
+                bot.tree.add_command(cmd)
+            except Exception:
+                pass
+
+    try:
+        bot.loop.create_task(_deferred_register())
+    except Exception:
+        # If loop not available, schedule with add_listener fallback
         try:
-            bot.tree.add_command(cmd)
+            bot.add_listener(lambda: bot.loop.create_task(_deferred_register()), 'on_ready')
         except Exception:
             pass
