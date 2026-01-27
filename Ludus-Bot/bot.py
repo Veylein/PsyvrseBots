@@ -180,12 +180,16 @@ async def on_ready():
                     bot.tree.copy_global_to(guild=guild_obj)
                     synced = await bot.tree.sync(guild=guild_obj)
                     print(f"[BOT] ✅ Synced {len(synced)} commands to guild {dev_gid}")
+                    for cmd in synced:
+                        print(f"  - /{cmd.name}")
                 except Exception as e:
                     print(f"[BOT] ❌ Failed to sync to guild {dev_gid}: {e}")
             print(f"[BOT] Skipping global sync (dev mode enabled)")
         else:
             synced = await bot.tree.sync()
             print(f"[BOT] ✅ Synced {len(synced)} commands globally")
+            for cmd in synced:
+                print(f"  - /{cmd.name}")
     except Exception as e:
         print(f"[BOT] Error syncing commands: {e}")
         traceback.print_exc()
