@@ -44,6 +44,43 @@ bot = commands.Bot(
     description="🎮 The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with ❤️ by Psyvrse Development."
 )
 
+# Wrap CommandTree.add_command to ignore duplicate registrations gracefully.
+# This prevents CommandAlreadyRegistered exceptions during cog injection
+# when multiple cogs or bridge modules try to register the same slash name.
+try:
+    _original_add_command = bot.tree.add_command
+
+    def _safe_add_command(command, **kwargs):
+        # command may be app_commands.Command or app_commands.Group
+        try:
+            name = getattr(command, 'name', None) or getattr(command, '__name__', None)
+        except Exception:
+            name = None
+        # If command with same name already exists, skip silently
+        try:
+            if name and bot.tree.get_command(name) is not None:
+                print(f"[BOT] Skipping duplicate app command registration: {name}")
+                return bot.tree.get_command(name)
+        except Exception:
+            pass
+        try:
+            return _original_add_command(command, **kwargs)
+        except Exception as e:
+            # If it's a duplication error from discord internals, log and continue
+            try:
+                from discord.app_commands import CommandAlreadyRegistered
+                if isinstance(e, CommandAlreadyRegistered) or 'already registered' in str(e):
+                    print(f"[BOT] Duplicate app command detected and ignored: {name} -> {e}")
+                    return bot.tree.get_command(name)
+            except Exception:
+                pass
+            raise
+
+    bot.tree.add_command = _safe_add_command
+except Exception:
+    # If anything goes wrong, continue without monkeypatching
+    pass
+
 async def load_cogs():
     for filename in os.listdir("./cogs"):
         if filename.endswith(".py"):
