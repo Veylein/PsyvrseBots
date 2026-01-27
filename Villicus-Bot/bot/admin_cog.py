@@ -521,6 +521,172 @@ class AdminCog(commands.Cog):
         else:
             await interaction.followup.send('Emoji not locked.', ephemeral=True)
 
+    # --- Additional admin slash wrappers ---
+    async def softban_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = 'Softban by staff'):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.ban_members:
+            return await interaction.followup.send('You do not have permission to softban members.', ephemeral=True)
+        try:
+            await member.ban(reason=reason, delete_message_days=1)
+            await interaction.guild.unban(member, reason='Softban unban')
+            mod = self.bot.get_cog('ModerationCog')
+            if mod:
+                mod._record_infraction(member.id, interaction.user.id, 'softban', reason)
+            await interaction.followup.send(f'Softbanned {member}.')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to softban: {e}', ephemeral=True)
+
+    async def massban_slash(self, interaction: discord.Interaction, criteria: str):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+        try:
+            parts = criteria.split(':', 1)
+            members = []
+            if parts[0] == 'role' and len(parts) > 1:
+                role_name = parts[1].strip()
+                role = discord.utils.get(interaction.guild.roles, name=role_name)
+                if not role:
+                    return await interaction.followup.send('Role not found.', ephemeral=True)
+                members = [m for m in interaction.guild.members if role in m.roles and not m.bot]
+            elif parts[0].startswith('account_age'):
+                import re
+                m = re.search(r'account_age<(?P<days>\d+)', criteria)
+                if not m:
+                    return await interaction.followup.send('Invalid account_age filter, use account_age<days', ephemeral=True)
+                days = int(m.group('days'))
+                from datetime import datetime, timedelta
+                cutoff = datetime.utcnow() - timedelta(days=days)
+                members = [m for m in interaction.guild.members if m.joined_at and m.joined_at < cutoff and not m.bot]
+            else:
+                return await interaction.followup.send('Unsupported criteria. Use role:rolename or account_age<days', ephemeral=True)
+            count = 0
+            for m in members:
+                try:
+                    await interaction.guild.ban(m, reason=f'Massban: {criteria}')
+                    count += 1
+                except Exception:
+                    continue
+            await interaction.followup.send(f'Attempted massban for {len(members)} members; banned {count}.')
+        except Exception as e:
+            await interaction.followup.send(f'Massban failed: {e}', ephemeral=True)
+
+    async def slowmode_slash(self, interaction: discord.Interaction, seconds: int = 0):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.manage_channels:
+            return await interaction.followup.send('You do not have permission to manage channels.', ephemeral=True)
+        try:
+            await interaction.channel.edit(slowmode_delay=seconds)
+            await interaction.followup.send(f'Set slowmode to {seconds} seconds.', ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f'Failed to set slowmode: {e}', ephemeral=True)
+
+    async def clone_slash(self, interaction: discord.Interaction, channel: Optional[discord.abc.GuildChannel] = None):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+        ch = channel or interaction.channel
+        try:
+            new = await ch.clone(reason=f'Cloned by {interaction.user}')
+            await interaction.followup.send(f'Cloned {ch.mention} to {new.mention}')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to clone: {e}', ephemeral=True)
+
+    async def deafen_slash(self, interaction: discord.Interaction, member: discord.Member, duration_minutes: Optional[int] = None):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.moderate_members:
+            return await interaction.followup.send('You do not have permission to deafen members.', ephemeral=True)
+        try:
+            await member.edit(deafen=True, reason=f'Deafened by {interaction.user}')
+            await interaction.followup.send(f'{member.mention} deafened.')
+            if duration_minutes:
+                await asyncio.sleep(int(duration_minutes) * 60)
+                try:
+                    await member.edit(deafen=False, reason='Deafen expired')
+                except Exception:
+                    pass
+        except Exception as e:
+            await interaction.followup.send(f'Failed to deafen: {e}', ephemeral=True)
+
+    async def undeafen_slash(self, interaction: discord.Interaction, member: discord.Member):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.moderate_members:
+            return await interaction.followup.send('You do not have permission to undeafen members.', ephemeral=True)
+        try:
+            await member.edit(deafen=False, reason=f'Undeafen by {interaction.user}')
+            await interaction.followup.send(f'{member.mention} undeafened.')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to undeafen: {e}', ephemeral=True)
+
+    async def staff_setup_slash(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+        created = {}
+        for r in RANKS:
+            role = discord.utils.get(interaction.guild.roles, name=r)
+            if role is None:
+                try:
+                    role = await interaction.guild.create_role(name=r, reason='Staff setup by Villicus')
+                except Exception:
+                    role = discord.utils.get(interaction.guild.roles, name=r)
+            if role:
+                created[r] = role.id
+        settings = get_guild_settings(interaction.guild.id)
+        settings['staff_roles'] = created
+        save_guild_settings(interaction.guild.id, settings)
+        await interaction.followup.send(f'Staff roles ensured: {list(created.keys())}')
+
+    async def staff_promote_slash(self, interaction: discord.Interaction, member: discord.Member, rank: str):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+        settings = get_guild_settings(interaction.guild.id)
+        staff = settings.get('staff_roles', {})
+        if rank not in staff:
+            return await interaction.followup.send('Unknown rank. Run staff_setup first.', ephemeral=True)
+        role = interaction.guild.get_role(staff[rank])
+        if not role:
+            return await interaction.followup.send('Role not found on server.', ephemeral=True)
+        try:
+            await member.add_roles(role, reason=f'Promoted to {rank} by {interaction.user}')
+            await interaction.followup.send(f'{member.mention} promoted to {rank}.')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to promote: {e}', ephemeral=True)
+
+    async def staff_demote_slash(self, interaction: discord.Interaction, member: discord.Member, rank: str):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+        settings = get_guild_settings(interaction.guild.id)
+        staff = settings.get('staff_roles', {})
+        if rank not in staff:
+            return await interaction.followup.send('Unknown rank.', ephemeral=True)
+        role = interaction.guild.get_role(staff[rank])
+        if not role:
+            return await interaction.followup.send('Role not found on server.', ephemeral=True)
+        try:
+            await member.remove_roles(role, reason=f'Demoted from {rank} by {interaction.user}')
+            await interaction.followup.send(f'{member.mention} demoted from {rank}.')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to demote: {e}', ephemeral=True)
+
+    async def staff_perms_slash(self, interaction: discord.Interaction, rank: Optional[str] = None):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+        settings = get_guild_settings(interaction.guild.id)
+        staff = settings.get('staff_roles', {})
+        if rank:
+            if rank not in staff:
+                return await interaction.followup.send('Unknown rank.', ephemeral=True)
+            role = interaction.guild.get_role(staff[rank])
+            return await interaction.followup.send(f'Role {rank}: {role.mention if role else "(missing)"}', ephemeral=True)
+        if not staff:
+            return await interaction.followup.send('No staff roles configured. Run staff_setup', ephemeral=True)
+        lines = [f'{k}: <@&{v}>' for k, v in staff.items()]
+        await interaction.followup.send('Staff roles:\n' + '\n'.join(lines), ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     cog = AdminCog(bot)

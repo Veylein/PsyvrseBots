@@ -143,8 +143,19 @@ async def start_bot():
         print(f"Villicus is online as {bot.user}")
         # Sync slash commands
         try:
+            import os
+            dev_gid = os.environ.get('DEV_GUILD_ID')
+            # If a DEV_GUILD_ID is provided, sync to that guild first for rapid iteration
+            if dev_gid:
+                try:
+                    guild_obj = discord.Object(id=int(dev_gid))
+                    synced = await bot.tree.sync(guild=guild_obj)
+                    await log_message(bot, f"✅ Synced {len(synced)} commands to dev guild {dev_gid}.")
+                except Exception as e:
+                    await log_message(bot, f"⚠️ Dev guild sync failed for {dev_gid}: {e}")
+            # Then sync globally
             synced = await bot.tree.sync()
-            await log_message(bot, f"✅ Synced {len(synced)} slash commands.")
+            await log_message(bot, f"✅ Synced {len(synced)} global slash commands.")
         except Exception as e:
             await log_message(bot, f"❌ Slash command sync failed: {e}")
 
