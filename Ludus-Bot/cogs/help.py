@@ -138,15 +138,15 @@ class Help(commands.Cog):
                 "key": "events",
                 "desc": "Server vs Server competitions (Owner starts)",
                 "commands": [
-                    ("L!event war <hours>", "Server faction war"),
-                    ("L!joinfaction <name>", "Join faction"),
-                    ("L!warleaderboard", "War standings"),
-                    ("L!event worldboss", "Global boss raid"),
-                    ("L!attack", "Attack world boss"),
-                    ("L!bossstats", "Boss health/stats"),
-                    ("L!event hunt <mins>", "Global scavenger hunt"),
-                    ("L!event list", "Active events"),
-                    ("L!event end <type>", "End event"),
+                    ("event war <hours>", "Server faction war"),
+                    ("joinfaction <name>", "Join faction"),
+                    ("warleaderboard", "War standings"),
+                    ("event worldboss", "Global boss raid"),
+                    ("attack", "Attack world boss"),
+                    ("bossstats", "Boss health/stats"),
+                    ("event hunt <mins>", "Global scavenger hunt"),
+                    ("event list", "Active events"),
+                    ("event end <type>", "End event"),
                 ]
             },
             "👥 Social": {
@@ -162,13 +162,13 @@ class Help(commands.Cog):
                     ("highfive @user", "Celebrate (+5 coins)"),
                     ("reputation @user", "Check reputation"),
                     ("rep @user", "Give daily reputation point"),
-                    ("L!slap @user", "Slap someone with GIF"),
-                    ("L!punch @user", "Punch someone with GIF"),
-                    ("L!kick @user", "Kick someone with GIF"),
-                    ("L!kiss @user", "Kiss someone with GIF"),
-                    ("L!dance @user", "Dance with someone with GIF"),
-                    ("L!stab @user", "Stab someone with GIF"),
-                    ("L!shoot @user", "Shoot someone with GIF"),
+                    ("slap @user", "Slap someone with GIF"),
+                    ("punch @user", "Punch someone with GIF"),
+                    ("kick @user", "Kick someone with GIF"),
+                    ("kiss @user", "Kiss someone with GIF"),
+                    ("dance @user", "Dance with someone with GIF"),
+                    ("stab @user", "Stab someone with GIF"),
+                    ("shoot @user", "Shoot someone with GIF"),
                 ]
             },
             "🐾 Pets": {
@@ -259,7 +259,7 @@ class Help(commands.Cog):
                 "desc": "Helpful tools",
                 "commands": [
                     ("guide [category]", "This help menu"),
-                    ("L!about", "Full bot guide (DM)"),
+                    ("about", "Full bot guide (DM)"),
                     ("setup", "Bot setup guide"),
                     ("ping", "Check bot latency"),
                     ("invite", "Get bot invite link"),
@@ -301,6 +301,38 @@ class Help(commands.Cog):
                 ]
             }
         }
+
+    class CategorySelect(discord.ui.Select):
+        def __init__(self, cog: 'Help', is_owner: bool):
+            options = []
+            # add regular categories
+            for cat_name, cat_data in cog.categories.items():
+                label = cat_name
+                # value = key for matching
+                value = cat_data.get('key') or cat_name
+                options.append(discord.SelectOption(label=label, value=value, description=cat_data.get('desc', '')[:100]))
+
+            # add owner categories if owner
+            if is_owner:
+                for cat_name, cat_data in cog.owner_category.items():
+                    label = cat_name
+                    value = cat_data.get('key') or cat_name
+                    options.append(discord.SelectOption(label=label, value=value, description=cat_data.get('desc', '')[:100]))
+
+            super().__init__(placeholder='Choose a category...', min_values=1, max_values=1, options=options)
+            self.cog = cog
+
+        async def callback(self, interaction: discord.Interaction):
+            # selected value is category key
+            sel = self.values[0]
+            is_owner = interaction.user.id in getattr(self.cog.bot, 'owner_ids', [])
+            # delegate to cog's category helper
+            await self.cog._send_category_help(interaction, sel.lower(), is_owner, is_slash=True)
+
+    class CategoryView(discord.ui.View):
+        def __init__(self, cog: 'Help', is_owner: bool, timeout: int = 60):
+            super().__init__(timeout=timeout)
+            self.add_item(Help.CategorySelect(cog, is_owner))
     
     # Prefix-based help removed — slash-only help is provided below.
     
@@ -360,10 +392,11 @@ class Help(commands.Cog):
         
         embed.set_footer(text=f"Ludus v1.30.3 • {len(self.categories) + (1 if is_owner else 0)} Categories • Prefix: L! or /")
         
+        view = Help.CategoryView(self, is_owner)
         if is_slash:
-            await ctx.response.send_message(embed=embed)
+            await ctx.response.send_message(embed=embed, view=view)
         else:
-            await ctx.send(embed=embed)
+            await ctx.send(embed=embed, view=view)
     
     async def _send_category_help(self, ctx, category_key, is_owner, is_slash=False):
         """Send help for a specific category"""
@@ -371,7 +404,6 @@ class Help(commands.Cog):
             # remove non-alphanumeric characters (including emoji/punctuation), collapse whitespace
             text = re.sub(r"[^\w\s]", '', text or '')
             return ' '.join(text.split()).strip().lower()
-        print(f"[HELP debug] _send_category_help called with category_key='{category_key}'")
         # Find category
         category_data = None
         category_name = None
