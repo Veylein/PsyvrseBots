@@ -1,8 +1,17 @@
+import sys
 import discord
 from discord.ext import commands
 import json
 import os
 import asyncio
+import traceback
+import dotenv
+
+dotenv.load_dotenv()
+if not os.environ.get("LUDUS_TOKEN"):
+        print("LUDUS_TOKEN not set!")
+        sys.exit(1)
+        os.system(f"{sys.executable} bot.py")
 
 # Load Opus for voice support (optional) — don't crash if library missing
 try:
@@ -116,7 +125,6 @@ async def load_cogs():
                 print(f"Loaded cog: {cog_name}")
             except Exception as e:
                 print(f"Failed to load cog {cog_name}: {e}")
-                import traceback
                 traceback.print_exc()
 
 @bot.event
@@ -132,7 +140,6 @@ async def on_ready():
             print(f"  - /{cmd.name}")
     except Exception as e:
         print(f"[BOT] Error syncing commands: {e}")
-        import traceback
         traceback.print_exc()
 
 def load_blacklist():
@@ -202,7 +209,6 @@ async def on_command_error(ctx, error):
     else:
         # Log error but show clean message to users
         print(f"[BOT] Command error in {ctx.command}: {error}")
-        import traceback
         traceback.print_exception(type(error), error, error.__traceback__)
         await ctx.send("❌ An error occurred. Please try again or contact a server administrator.")
 
@@ -298,7 +304,7 @@ async def on_message(message):
 
 async def main():
     await load_cogs()
-    token = os.getenv("LUDUS_TOKEN", config.get("token", ""))
+    token = os.getenv("LUDUS_TOKEN")
     if not token:
         print("Error: No Discord token found! Please set LUDUS_TOKEN in Secrets or add 'token' to config.json.")
         return
