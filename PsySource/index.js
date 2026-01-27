@@ -15,6 +15,7 @@
 import express from 'express'
 import dotenv from 'dotenv'
 import crypto from 'crypto'
+import fs from 'fs'
 import { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } from 'discord.js'
 
 dotenv.config()
@@ -27,6 +28,8 @@ const {
   PORT = 3000,
   FAILURE_ROLE_ID,
   SILENCE_SUCCESS = 'false',
+  PSY_OWNER_IDS = '',
+  FEEDBACK_CHANNEL_ID,
 } = process.env
 
 const SILENCE_OK = String(SILENCE_SUCCESS).toLowerCase() === 'true'
@@ -76,6 +79,44 @@ client.once('ready', () => {
 const PREFIX = '$'
 const FEEDBACK_CHANNEL_ID = process.env.FEEDBACK_CHANNEL_ID || '1465194346784751827'
 
+const BLACKLIST_FILE = './feedback_blacklist.json'
+
+function loadFeedbackBlacklist() {
+  try {
+    if (!fs.existsSync(BLACKLIST_FILE)) return []
+    const raw = fs.readFileSync(BLACKLIST_FILE, 'utf8')
+    return JSON.parse(raw || '[]')
+  } catch (e) {
+    console.error('Failed to load feedback blacklist:', e)
+    return []
+  }
+}
+
+function saveFeedbackBlacklist(list) {
+  try {
+    fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(list, null, 2), 'utf8')
+    return true
+  } catch (e) {
+    console.error('Failed to save feedback blacklist:', e)
+    return false
+  }
+}
+
+// owners from env (comma-separated ids)
+const OWNER_IDS = new Set((PSY_OWNER_IDS || '').split(',').map(s => s.trim()).filter(Boolean))
+
+function isOwner(userId) {
+  if (OWNER_IDS.size > 0) return OWNER_IDS.has(String(userId))
+  // fallback: compare to application owner when available
+  try {
+    const appOwner = client.application?.owner?.id
+    if (appOwner) return String(userId) === String(appOwner)
+  } catch (e) {
+    // ignore
+  }
+  return false
+}
+
 client.on('messageCreate', async (message) => {
   try {
     if (!message.guild) return // ignore DMs
@@ -110,6 +151,8 @@ client.on('messageCreate', async (message) => {
 
     if (cmd === 'feedback') {
       if (!args) return message.reply('Usage: $feedback <your message>')
+      const blacklist = loadFeedbackBlacklist()
+      if (blacklist.includes(String(message.author.id))) return message.reply('You are not allowed to send feedback.')
       const targetChannel = await client.channels.fetch(FEEDBACK_CHANNEL_ID).catch(() => null)
       if (!targetChannel) {
         console.error('Feedback target channel not available')
@@ -128,6 +171,54 @@ client.on('messageCreate', async (message) => {
       await targetChannel.send({ embeds: [fb] })
       await message.reply('Thanks — your feedback has been sent to the team.')
       return
+    }
+
+    // Feedback blacklist management (owners only)
+    if (cmd === 'feedback_blacklist') {
+      const [sub, id] = rest
+      if (!isOwner(message.author.id)) return message.reply('Only bot owners can manage the feedback blacklist.')
+      const list = loadFeedbackBlacklist()
+      if (sub === 'add') {
+        if (!id) return message.reply('Usage: $feedback_blacklist add <user_id>')
+        if (!list.includes(id)) list.push(id)
+        saveFeedbackBlacklist(list)
+        return message.reply(`Added ${id} to feedback blacklist.`)
+      }
+      if (sub === 'remove') {
+        if (!id) return message.reply('Usage: $feedback_blacklist remove <user_id>')
+        const idx = list.indexOf(id)
+        if (idx !== -1) list.splice(idx, 1)
+        saveFeedbackBlacklist(list)
+        return message.reply(`Removed ${id} from feedback blacklist.`)
+      }
+      if (sub === 'list') {
+        return message.reply(`Feedback blacklist: ${list.length ? list.join(', ') : '(empty)'}`)
+      }
+      return message.reply('Usage: $feedback_blacklist <add|remove|list> [user_id]')
+    }
+
+    // Audit command - quick health checks
+    if (cmd === 'audit') {
+      // permission: require owner or ManageMessages
+      if (!isOwner(message.author.id) && !hasManage) return message.reply('You need Manage Messages or owner access to run audit.')
+      const checks = []
+      // env checks
+      const envs = ['PSYVERSE_TOKEN', 'LOG_CHANNEL', 'RENDER_WEBHOOK_SECRET', 'FEEDBACK_CHANNEL_ID']
+      for (const e of envs) {
+        const v = process.env[e]
+        checks.push(`${e}: ${v ? 'OK' : 'MISSING'}`)
+      }
+      // blacklist count
+      const bl = loadFeedbackBlacklist()
+      checks.push(`Feedback blacklist entries: ${bl.length}`)
+      // channel availability
+      try {
+        const logCh = await client.channels.fetch(LOG_CHANNEL).catch(() => null)
+        checks.push(`Log channel fetch: ${logCh ? 'OK' : 'FAILED'}`)
+      } catch (e) {
+        checks.push('Log channel fetch: ERROR')
+      }
+      return message.reply(`Audit results:\n${checks.join('\n')}`)
     }
   } catch (err) {
     console.error('Error handling message command:', err)
@@ -284,6 +375,12 @@ client.once('ready', async () => {
     new SlashCommandBuilder().setName('say').setDescription('Send a message as the bot').addStringOption(opt => opt.setName('message').setDescription('Message to send').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
     new SlashCommandBuilder().setName('embed').setDescription('Send an embed as the bot').addStringOption(opt => opt.setName('title').setDescription('Embed title').setRequired(true)).addStringOption(opt => opt.setName('description').setDescription('Embed description').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
     new SlashCommandBuilder().setName('feedback').setDescription('Send feedback to the team').addStringOption(opt => opt.setName('message').setDescription('Your feedback').setRequired(true)),
+    // feedback_blacklist: owners only management
+    new SlashCommandBuilder().setName('feedback_blacklist').setDescription('Manage feedback blacklist (owner only)')
+      .addSubcommand(sc => sc.setName('add').setDescription('Add user to feedback blacklist').addStringOption(o => o.setName('user_id').setDescription('User ID').setRequired(true)))
+      .addSubcommand(sc => sc.setName('remove').setDescription('Remove user from feedback blacklist').addStringOption(o => o.setName('user_id').setDescription('User ID').setRequired(true)))
+      .addSubcommand(sc => sc.setName('list').setDescription('List blacklisted user IDs')),
+    new SlashCommandBuilder().setName('audit').setDescription('Run a quick service audit (env, channels, blacklist)'),
     new SlashCommandBuilder().setName('ping').setDescription('Check bot latency'),
     new SlashCommandBuilder().setName('whoami').setDescription('Show info about you'),
     new SlashCommandBuilder().setName('uptime').setDescription('Show bot uptime'),
@@ -348,6 +445,8 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'feedback') {
       const msg = interaction.options.getString('message', true)
+      const blacklist = loadFeedbackBlacklist()
+      if (blacklist.includes(String(interaction.user.id))) return interaction.reply({ content: 'You are not allowed to send feedback.', ephemeral: true })
       const target = await client.channels.fetch(process.env.FEEDBACK_CHANNEL_ID || FEEDBACK_CHANNEL_ID).catch(() => null)
       if (!target) return interaction.reply({ content: 'Feedback channel not available.', ephemeral: true })
       const fb = new EmbedBuilder()
@@ -361,6 +460,50 @@ client.on('interactionCreate', async (interaction) => {
         .setColor(0x9b59b6)
       await target.send({ embeds: [fb] })
       return interaction.reply({ content: 'Thanks — your feedback has been sent.', ephemeral: true })
+    }
+
+    if (commandName === 'feedback_blacklist') {
+      // owner-only subcommands: add/remove/list
+      const sub = interaction.options.getSubcommand()
+      if (!isOwner(interaction.user.id)) return interaction.reply({ content: 'Only bot owners can manage the feedback blacklist.', ephemeral: true })
+      const list = loadFeedbackBlacklist()
+      if (sub === 'add') {
+        const id = interaction.options.getString('user_id', true)
+        if (!list.includes(id)) list.push(id)
+        saveFeedbackBlacklist(list)
+        return interaction.reply({ content: `Added ${id} to feedback blacklist.`, ephemeral: true })
+      }
+      if (sub === 'remove') {
+        const id = interaction.options.getString('user_id', true)
+        const idx = list.indexOf(id)
+        if (idx !== -1) list.splice(idx, 1)
+        saveFeedbackBlacklist(list)
+        return interaction.reply({ content: `Removed ${id} from feedback blacklist.`, ephemeral: true })
+      }
+      if (sub === 'list') {
+        return interaction.reply({ content: `Feedback blacklist: ${list.length ? list.join(', ') : '(empty)'}`, ephemeral: true })
+      }
+    }
+
+    if (commandName === 'audit') {
+      // permission: owner or ManageMessages
+      const memberOk = interaction.memberPermissions && interaction.memberPermissions.has(PermissionFlagsBits.ManageMessages)
+      if (!isOwner(interaction.user.id) && !memberOk) return interaction.reply({ content: 'You need Manage Messages or owner access to run audit.', ephemeral: true })
+      const checks = []
+      const envs = ['PSYVERSE_TOKEN', 'LOG_CHANNEL', 'RENDER_WEBHOOK_SECRET', 'FEEDBACK_CHANNEL_ID']
+      for (const e of envs) {
+        const v = process.env[e]
+        checks.push(`${e}: ${v ? 'OK' : 'MISSING'}`)
+      }
+      const bl = loadFeedbackBlacklist()
+      checks.push(`Feedback blacklist entries: ${bl.length}`)
+      try {
+        const logCh = await client.channels.fetch(LOG_CHANNEL).catch(() => null)
+        checks.push(`Log channel fetch: ${logCh ? 'OK' : 'FAILED'}`)
+      } catch (e) {
+        checks.push('Log channel fetch: ERROR')
+      }
+      return interaction.reply({ content: `Audit results:\n${checks.join('\n')}`, ephemeral: true })
     }
   } catch (err) {
     console.error('Interaction handler error:', err)
