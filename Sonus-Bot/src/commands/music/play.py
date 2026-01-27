@@ -296,53 +296,68 @@ def register(bot: commands.Bot):
         ctx = await commands.Context.from_interaction(interaction)
         await _play(ctx, query=query)
 
-    @bot.command(name='audiotest')
-    async def _audiotest(ctx: commands.Context, *, query: str):
-        """Prefix: S!audiotest <url|query> — test extraction and ffmpeg probe without playing."""
-        guild = ctx.guild
-        await ctx.send('Running audio test...')
-        info = await _yt_search(query)
-        if not info:
-            embed = discord.Embed(title="Extraction Failed", description="yt-dlp could not find or extract the media.", color=0xE63946)
-            await ctx.send(embed=embed)
-            return
+    # Register `audiotest` only if it doesn't already exist (some modules provide it)
+    if bot.get_command('audiotest') is None:
+        async def _audiotest(ctx: commands.Context, *, query: str):
+            """Prefix: S!audiotest <url|query> — test extraction and ffmpeg probe without playing."""
+            guild = ctx.guild
+            await ctx.send('Running audio test...')
+            info = await _yt_search(query)
+            if not info:
+                embed = discord.Embed(title="Extraction Failed", description="yt-dlp could not find or extract the media.", color=0xE63946)
+                await ctx.send(embed=embed)
+                return
 
-        candidate_urls = []
-        direct = _select_audio_url(info)
-        if direct:
-            candidate_urls.append(direct)
-        if info.get('webpage_url') and info.get('webpage_url') not in candidate_urls:
-            candidate_urls.append(info.get('webpage_url'))
-        # also include the original query as a last resort
-        if query and query not in candidate_urls:
-            candidate_urls.append(query)
+            candidate_urls = []
+            direct = _select_audio_url(info)
+            if direct:
+                candidate_urls.append(direct)
+            if info.get('webpage_url') and info.get('webpage_url') not in candidate_urls:
+                candidate_urls.append(info.get('webpage_url'))
+            # also include the original query as a last resort
+            if query and query not in candidate_urls:
+                candidate_urls.append(query)
 
-        ffmpeg_options = {
-            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-            'options': '-vn'
-        }
+            ffmpeg_options = {
+                'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+                'options': '-vn'
+            }
 
-        results = []
-        for src in candidate_urls:
-            try:
-                await ctx.send(f'Testing source: {src}')
-                player = await _create_player_with_probe(src, ffmpeg_options, timeout=6.0)
+            results = []
+            for src in candidate_urls:
                 try:
-                    player.cleanup()
-                except Exception:
-                    pass
-                results.append(f'SUCCESS: {src}')
-                break
-            except Exception as exc:
-                results.append(f'FAILED: {src} -> {type(exc).__name__}: {str(exc)[:200]}')
+                    await ctx.send(f'Testing source: {src}')
+                    player = await _create_player_with_probe(src, ffmpeg_options, timeout=6.0)
+                    try:
+                        player.cleanup()
+                    except Exception:
+                        pass
+                    results.append(f'SUCCESS: {src}')
+                    break
+                except Exception as exc:
+                    results.append(f'FAILED: {src} -> {type(exc).__name__}: {str(exc)[:200]}')
 
-        if not results:
-            embed = discord.Embed(title="Audio Test", description="No candidate URLs were evaluated.", color=0xE63946)
+            if not results:
+                embed = discord.Embed(title="Audio Test", description="No candidate URLs were evaluated.", color=0xE63946)
+                await ctx.send(embed=embed)
+                return
+
+            embed = discord.Embed(title="Audio Test Results", description='\n'.join(results), color=0x4CC9F0)
             await ctx.send(embed=embed)
-            return
 
-        embed = discord.Embed(title="Audio Test Results", description='\n'.join(results), color=0x4CC9F0)
-        await ctx.send(embed=embed)
+        try:
+            bot.add_command(commands.Command(_audiotest, name='audiotest'))
+        except Exception:
+            # if registration fails for any reason, continue without crashing the whole module
+            logger.info('Could not add audiotest command; it may already exist.')
+
+    # Register a slash variant only if the tree doesn't already have it
+    if bot.tree.get_command('audiotest') is None:
+        @bot.tree.command(name='audiotest')
+        async def _audiotest_slash(interaction: discord.Interaction, query: str):
+            await interaction.response.defer()
+            ctx = await commands.Context.from_interaction(interaction)
+            await _audiotest(ctx, query=query)
 
 
 async def _play_next(bot: commands.Bot, guild_id: int):

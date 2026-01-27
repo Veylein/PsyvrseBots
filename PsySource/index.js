@@ -29,7 +29,6 @@ const {
   FAILURE_ROLE_ID,
   SILENCE_SUCCESS = 'false',
   PSY_OWNER_IDS = '',
-  FEEDBACK_CHANNEL_ID,
 } = process.env
 
 const SILENCE_OK = String(SILENCE_SUCCESS).toLowerCase() === 'true'
