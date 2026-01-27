@@ -245,3 +245,22 @@ class ModerationCog(commands.Cog):
 async def setup(bot: commands.Bot):
     cog = ModerationCog(bot)
     await bot.add_cog(cog)
+    # Register app (slash) commands explicitly so they are present on the bot.tree
+    try:
+        # Bound methods on the cog can be used as callbacks for app commands
+        from discord import app_commands
+        try:
+            bot.tree.add_command(app_commands.Command(name='warn', callback=cog.warn_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='mute', callback=cog.mute_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='unmute', callback=cog.unmute_slash))
+        except Exception:
+            pass
+    except Exception:
+        # registration is best-effort; continue even if it fails
+        pass

@@ -76,7 +76,7 @@ A Discord bot that tracks user "chi" (positive energy) based on their language u
 6. Notifies admin when users reach milestones
 
 ### Quest System
-1. Admin uses `Q!Month` to load current month's themed quests
+1. Admin uses `P!Month` to load current month's themed quests
 2. Users complete quests and post proof in chat
 3. Admin reacts with ✅ to the user's message containing quest proof
 4. Bot automatically marks quest as complete and DMs the user
