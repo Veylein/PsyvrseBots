@@ -90,25 +90,20 @@ async def start_bot():
 
     try:
         print("[Villicus] Importing cogs dynamically...")
-        import importlib, inspect
+        import importlib, inspect, pkgutil, os
 
-        cog_names = [
-            'config_cog', 'moderation_cog', 'help_cog', 'mod_commands_cog', 'ticket_cog', 'leveling_cog',
-            'actionlog_cog', 'antinuke_cog', 'autoresponder_cog', 'autorole_cog', 'avatar_cog', 'calculator_cog',
-            'clean_cog', 'color_cog', 'deafen_cog', 'embed_cog', 'emoji_cog', 'forms_cog', 'giveaway_cog', 'info_cog',
-            'lock_cog', 'nick_cog', 'owner_cog', 'purge_cog', 'reminder_cog', 'roleinfo_cog', 'servertag_cog',
-            'slowmode_cog', 'translate_cog', 'userinfo_cog', 'warnings_cog', 'welcome_cog', 'automessage_cog',
-            'automod_cog', 'invite_tracker_cog', 'polls_cog', 'reactionroles_cog', 'perfectlog_cog', 'appeals_cog',
-            'welcomemedia_cog', 'serverbackup_cog', 'rule_cog', 'smartautomod_cog', 'rule_analytics_cog'
-        ]
-
+        # Auto-discover any python module under the `bot` package (excluding this file and __init__)
+        pkg_path = os.path.dirname(__file__)
         modules = []
-        for name in cog_names:
+        for finder, modname, ispkg in pkgutil.iter_modules([pkg_path]):
+            if modname in ('__init__', 'bot'):
+                continue
             try:
-                mod = importlib.import_module(f'bot.{name}')
+                mod = importlib.import_module(f'bot.{modname}')
                 modules.append(mod)
+                print(f"[Villicus] Discovered cog module: {modname}")
             except ModuleNotFoundError:
-                print(f"[Villicus] Cog module not found: {name} (skipping)")
+                print(f"[Villicus] Cog module not found: {modname} (skipping)")
 
         # Prefer module-level async setup(bot) if present; otherwise find the first Cog subclass
         for mod in modules:
