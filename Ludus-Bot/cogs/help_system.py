@@ -45,6 +45,24 @@ class HelpSystem(commands.Cog):
         if not category:
             await ctx.send(embed=self._category_list_embed())
             return
+
+        # Debug: show incoming category
+        print(f"[HELP_SYSTEM debug] Received prefix help request: '{category}' from {ctx.author}")
+
+        # If the richer Help cog exists, delegate to it for detailed category command lists
+        help_cog = self.bot.get_cog('Help')
+        if help_cog is not None:
+            try:
+                print(f"[HELP_SYSTEM debug] Delegating prefix help for '{category}' to Help cog")
+                is_owner = ctx.author.id in getattr(self.bot, 'owner_ids', [])
+                await help_cog._send_category_help(ctx, category.lower(), is_owner, is_slash=False)
+                return
+            except Exception as e:
+                import traceback
+                print(f"[HELP_SYSTEM debug] Delegation to Help cog failed: {e}")
+                traceback.print_exc()
+
+        # Fallback behaviour
         await ctx.send(embed=self._category_detail_embed(category.title()))
 
     @help_group.command(name="main", description="Show help categories or a specific category")
@@ -93,10 +111,5 @@ async def setup(bot: commands.Bot):
     if bot.get_cog('HelpSystem') is not None:
         return
     await bot.add_cog(HelpSystem(bot))
-    try:
-        if bot.get_command('help') is None:
-            cog = bot.get_cog('HelpSystem')
-            if cog:
-                bot.add_command(commands.Command(cog.help_prefix, name='help'))
-    except Exception:
-        pass
+    # Do not register a prefix 'help' command here to avoid conflicting
+    # with a dedicated Help cog that provides a richer implementation.

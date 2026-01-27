@@ -1,4 +1,5 @@
 import discord
+import re
 from discord.ext import commands
 from discord import app_commands
 from typing import Optional
@@ -313,6 +314,18 @@ class Help(commands.Cog):
             await self._send_category_help(interaction, category.lower(), is_owner, is_slash=True)
         else:
             await self._send_main_help(interaction, is_owner, is_slash=True)
+
+    @commands.command(name='help')
+    async def help_prefix_command(self, ctx: commands.Context, *, category: Optional[str] = None):
+        """Prefix command version of help registered on the Help cog.
+
+        Usage: `L!help` or `L!help <category>`
+        """
+        is_owner = ctx.author.id in getattr(self.bot, 'owner_ids', [])
+        if category:
+            await self._send_category_help(ctx, category.lower(), is_owner, is_slash=False)
+        else:
+            await self._send_main_help(ctx, is_owner, is_slash=False)
     
     async def _send_main_help(self, ctx, is_owner, is_slash=False):
         """Send main help menu with all categories"""
@@ -354,13 +367,30 @@ class Help(commands.Cog):
     
     async def _send_category_help(self, ctx, category_key, is_owner, is_slash=False):
         """Send help for a specific category"""
+        def _normalize(text: str) -> str:
+            # remove non-alphanumeric characters (including emoji/punctuation), collapse whitespace
+            text = re.sub(r"[^\w\s]", '', text or '')
+            return ' '.join(text.split()).strip().lower()
+        print(f"[HELP debug] _send_category_help called with category_key='{category_key}'")
         # Find category
         category_data = None
         category_name = None
         
+        # Normalize input for robust matching (handles emoji, punctuation, case)
+        raw_key = (category_key or '').strip()
+        norm_key = _normalize(raw_key)
+
         # Check regular categories
         for cat_name, cat_data in self.categories.items():
-            if cat_data['key'] == category_key or category_key in cat_name.lower():
+            cat_name_lower = cat_name.lower()
+            norm_cat = _normalize(cat_name_lower)
+            # direct key match, substring in visible name, or normalized match
+            if (
+                cat_data.get('key') == raw_key
+                or cat_data.get('key') == norm_key
+                or raw_key in cat_name_lower
+                or norm_key and norm_key in norm_cat
+            ):
                 category_data = cat_data
                 category_name = cat_name
                 break
@@ -368,7 +398,14 @@ class Help(commands.Cog):
         # Check owner category if owner
         if not category_data and is_owner:
             for cat_name, cat_data in self.owner_category.items():
-                if cat_data['key'] == category_key or category_key in cat_name.lower():
+                cat_name_lower = cat_name.lower()
+                norm_cat = _normalize(cat_name_lower)
+                if (
+                    cat_data.get('key') == raw_key
+                    or cat_data.get('key') == norm_key
+                    or raw_key in cat_name_lower
+                    or norm_key and norm_key in norm_cat
+                ):
                     category_data = cat_data
                     category_name = cat_name
                     break
