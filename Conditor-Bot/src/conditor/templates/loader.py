@@ -1,6 +1,9 @@
 import json
 from pathlib import Path
-from jsonschema import validate, ValidationError
+try:
+    from jsonschema import validate, ValidationError
+except Exception:  # pragma: no cover - runtime environment may be missing dependency
+    raise RuntimeError("Missing dependency 'jsonschema'. Add `jsonschema` to Conditor-Bot/requirements.txt and reinstall dependencies.")
 
 
 def _validate_against_schema(data: dict, schema_p: Path):
