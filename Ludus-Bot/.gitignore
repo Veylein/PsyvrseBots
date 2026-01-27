@@ -4,3 +4,6 @@ __pycache__/
 venv/
 
 *.json
+!data/uno_emoji_mapping.json
+!data/uno_translations.json
+!config.json

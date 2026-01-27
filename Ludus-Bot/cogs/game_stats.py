@@ -110,7 +110,7 @@ class GameStats(commands.Cog):
             }
         return self.stats[user_id]
     
-    def record_game(self, user_id, game_name, won=True, coins_earned=0, playtime_seconds=0, category=None):
+    def record_game(self, user_id, game_name, won=True, coins_earned=0, playtime_seconds=0, category=None, guild_id=None):
         """Record a game play"""
         stats = self._get_user_stats(user_id)
         
@@ -128,6 +128,24 @@ class GameStats(commands.Cog):
         if game_name not in stats["game_counts"]:
             stats["game_counts"][game_name] = 0
         stats["game_counts"][game_name] += 1
+        
+        # Track per-guild stats if guild_id provided
+        if guild_id:
+            if "guild_stats" not in stats:
+                stats["guild_stats"] = {}
+            guild_key = str(guild_id)
+            if guild_key not in stats["guild_stats"]:
+                stats["guild_stats"][guild_key] = {
+                    "total_games": 0,
+                    "games_won": 0,
+                    "game_counts": {}
+                }
+            stats["guild_stats"][guild_key]["total_games"] += 1
+            if won:
+                stats["guild_stats"][guild_key]["games_won"] += 1
+            if game_name not in stats["guild_stats"][guild_key]["game_counts"]:
+                stats["guild_stats"][guild_key]["game_counts"][game_name] = 0
+            stats["guild_stats"][guild_key]["game_counts"][game_name] += 1
         
         # Update favorite game
         if stats["game_counts"]:

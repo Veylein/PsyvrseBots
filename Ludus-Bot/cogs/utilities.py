@@ -307,10 +307,6 @@ class Utilities(commands.Cog):
             embed = discord.Embed(title="🃏 Card Game Commands", color=discord.Color.red())
             embed.description = "Multiplayer card games and gambling!"
             embed.add_field(name="/uno", value="Start UNO game (2-10 players, 300+ coins)", inline=False)
-            embed.add_field(name="/unostart", value="Begin the UNO game after players join", inline=False)
-            embed.add_field(name="/unoplay <card#> [color]", value="Play a card from your hand", inline=False)
-            embed.add_field(name="/unodraw", value="Draw a card", inline=False)
-            embed.add_field(name="/unohand", value="View your current hand (DM)", inline=False)
             embed.add_field(name="L!gofish / /gofish", value="Go-Fish (2-5 players, 200 coins)", inline=False)
             embed.add_field(name="L!blackjack <bet> / /blackjack", value="Blackjack vs dealer (10-10,000 bet)", inline=False)
             embed.add_field(name="L!war [@user] / /war", value="Quick War card game (instant results)", inline=False)

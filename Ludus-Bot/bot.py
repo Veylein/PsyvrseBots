@@ -6,6 +6,7 @@ import os
 import asyncio
 import traceback
 import dotenv
+import constants
 
 dotenv.load_dotenv()
 if not os.environ.get("LUDUS_TOKEN"):
@@ -53,11 +54,19 @@ bot = commands.Bot(
     description="🎮 The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with ❤️ by Psyvrse Development."
 )
 
+# Initialize game state storage for UNO and other games
+bot.active_games = {}
+bot.active_lobbies = {}
+
+
 # Wrap CommandTree.add_command to ignore duplicate registrations gracefully.
 # This prevents CommandAlreadyRegistered exceptions during cog injection
 # when multiple cogs or bridge modules try to register the same slash name.
 try:
     _original_add_command = bot.tree.add_command
+    # Expose original add_command so cogs can bypass the duplicate-skip when
+    # they intentionally want to register a guild-scoped copy of a command.
+    bot._original_tree_add_command = _original_add_command
 
     def _safe_add_command(command, **kwargs):
         # command may be app_commands.Command or app_commands.Group
@@ -90,42 +99,62 @@ except Exception:
     # If anything goes wrong, continue without monkeypatching
     pass
 
-async def load_cogs():
-    for filename in os.listdir("./cogs"):
-        if filename.endswith(".py"):
-            cog_name = filename[:-3]
-            
-            # Skip music_new (use music.py instead)
-            if cog_name == "music_new":
-                print("Skipping music_new (using music.py instead)")
-                continue
-            
-            # Skip uno_gofish (legacy - use cardgames.py instead, reduces command count)
-            if cog_name == "uno_gofish":
-                print("Skipping uno_gofish (legacy - using cardgames.py instead)")
-                continue
-            
-            # Skip leveling (causes glitches, takes command space, annoying)
-            if cog_name == "leveling":
-                print("Skipping leveling (disabled - causes issues)")
-                continue
-            
-            # Skip music cog if disabled in config (default: enabled)
-            if cog_name == "music" and not config.get("music_enabled", True):
-                print("Skipping music cog (disabled in config.json)")
-                continue
 
-            # Skip legacy tcg prefix cog if present to avoid duplicate registrations
-            if cog_name == "tcg":
-                print("Skipping legacy cog 'tcg' to avoid command conflicts")
-                continue
-            
-            try:
-                await bot.load_extension(f"cogs.{cog_name}")
-                print(f"Loaded cog: {cog_name}")
-            except Exception as e:
-                print(f"Failed to load cog {cog_name}: {e}")
-                traceback.print_exc()
+# Setup hook to load UNO emoji before cogs initialize
+@bot.event
+async def setup_hook():
+    try:
+        from cogs.uno import uno_logic
+        # Load emoji mapping and get back emoji
+        emoji_mapping = uno_logic.load_emoji_mapping('classic')
+        back_emoji_id = emoji_mapping.get('uno_back.png')
+        if back_emoji_id:
+            constants.UNO_BACK_EMOJI = f"<:uno_back:{back_emoji_id}>"
+    except Exception as e:
+        print(f"[BOT] Failed to load UNO emoji: {e}")
+        traceback.print_exc()
+    
+    # Now load all cogs
+    await load_cogs()
+
+
+async def load_cogs():
+    for entry in os.listdir("./cogs"):
+        path = os.path.join("./cogs", entry)
+
+        # If it's a Python file, load as before
+        if entry.endswith(".py"):
+            cog_name = entry[:-3]
+        # If it's a directory and a package (contains __init__.py), treat as an extension package
+        elif os.path.isdir(path) and os.path.exists(os.path.join(path, "__init__.py")):
+            cog_name = entry
+        else:
+            # skip non-py files and plain folders
+            continue
+
+        # Skip specific legacy or disabled cogs
+        if cog_name == "music_new":
+            print("Skipping music_new (using music.py instead)")
+            continue
+        if cog_name == "uno_gofish":
+            print("Skipping uno_gofish (legacy - using cardgames.py instead)")
+            continue
+        if cog_name == "leveling":
+            print("Skipping leveling (disabled - causes issues)")
+            continue
+        if cog_name == "music" and not config.get("music_enabled", True):
+            print("Skipping music cog (disabled in config.json)")
+            continue
+        if cog_name == "tcg":
+            print("Skipping legacy cog 'tcg' to avoid command conflicts")
+            continue
+
+        try:
+            await bot.load_extension(f"cogs.{cog_name}")
+            print(f"Loaded cog: {cog_name}")
+        except Exception as e:
+            print(f"Failed to load cog {cog_name}: {e}")
+            traceback.print_exc()
 
 @bot.event
 async def on_ready():
@@ -133,19 +162,30 @@ async def on_ready():
     print(f"[BOT] Bot owner_ids: {bot.owner_ids}")
     print(f"[BOT] Bot application info owner: {(await bot.application_info()).owner.id if bot.application else 'Unknown'}")
     
+    # ===== DEV GUILD COMMAND SYNC SYSTEM =====
+    # All slash commands defined in cogs are global by default.
+    # When DEV_GUILD_ID is set in .env:
+    #   - Commands sync ONLY to that guild (instant updates for testing)
+    #   - Guild commands override global commands in that guild
+    # To sync globally (production): remove DEV_GUILD_ID from .env
     try:
         import os
-        dev_gid = os.environ.get('DEV_GUILD_ID')
-        if dev_gid:
-            try:
-                synced = await bot.tree.sync(guild=discord.Object(id=int(dev_gid)))
-                print(f"[BOT] Synced {len(synced)} slash commands to dev guild {dev_gid}!")
-            except Exception as e:
-                print(f"[BOT] Dev guild sync failed ({dev_gid}): {e}")
-        synced = await bot.tree.sync()
-        print(f"[BOT] Synced {len(synced)} slash commands!")
-        for cmd in synced:
-            print(f"  - /{cmd.name}")
+        dev_guilds_raw = os.environ.get('DEV_GUILD_IDS') or os.environ.get('DEV_GUILD_ID')
+        if dev_guilds_raw:
+            print(f"[BOT] DEV_GUILD_ID detected - syncing commands to dev guilds only")
+            guild_ids = [g.strip() for g in dev_guilds_raw.split(',') if g.strip()]
+            for dev_gid in guild_ids:
+                try:
+                    guild_obj = discord.Object(id=int(dev_gid))
+                    bot.tree.copy_global_to(guild=guild_obj)
+                    synced = await bot.tree.sync(guild=guild_obj)
+                    print(f"[BOT] ✅ Synced {len(synced)} commands to guild {dev_gid}")
+                except Exception as e:
+                    print(f"[BOT] ❌ Failed to sync to guild {dev_gid}: {e}")
+            print(f"[BOT] Skipping global sync (dev mode enabled)")
+        else:
+            synced = await bot.tree.sync()
+            print(f"[BOT] ✅ Synced {len(synced)} commands globally")
     except Exception as e:
         print(f"[BOT] Error syncing commands: {e}")
         traceback.print_exc()
@@ -281,7 +321,7 @@ async def on_command(ctx):
                            f"• `L!tutorial` - Full interactive guide\n"
                            f"• `L!help` - All commands\n\n"
                            "💡 **Pro Tip:** Every action earns coins and XP!",
-                    color=0x00ff00
+                        color=0x00ff00
                 )
                 embed.set_footer(text="Use L!tutorial anytime for detailed guides")
                 
@@ -304,14 +344,50 @@ async def on_message(message):
             await message.channel.send("🚫 You or this server has been blacklisted from using this bot.")
             return
     
-    # Debug owner commands
-    if message.content.startswith(config["prefix"]):
-        print(f"[BOT] Message from {message.author.id}: {message.content}")
-    
     await bot.process_commands(message)
 
+@bot.event
+async def on_interaction(interaction: discord.Interaction):
+    """Handle button/select interactions for games"""
+    # Only handle component interactions (buttons/selects), not slash commands
+    if interaction.type != discord.InteractionType.component:
+        # Let discord.py handle slash commands automatically
+        return
+    
+    try:
+        custom_id = interaction.data.get('custom_id', '')
+        
+        # UNO interactions
+        if custom_id.startswith('uno_'):
+            uno_cog = bot.get_cog('UnoCog')
+            if uno_cog:
+                await uno_cog.handle_uno_interaction(interaction, custom_id)
+                return
+        
+        # Add other game handlers here as needed
+        
+    except Exception as e:
+        print(f"[BOT] Error handling interaction: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred processing your interaction.", ephemeral=True)
+        except:
+            pass
+
+# Blacklist checking
+def is_blacklisted(user_id=None, guild_id=None):
+    """Check if user or guild is blacklisted"""
+    blacklist = load_blacklist()
+    if user_id and str(user_id) in blacklist.get("users", []):
+        return True
+    if guild_id and str(guild_id) in blacklist.get("guilds", []):
+        return True
+    return False
+
 async def main():
-    await load_cogs()
+    # Cogs are now loaded in setup_hook (runs automatically before bot.start)
     token = os.getenv("LUDUS_TOKEN")
     if not token:
         print("Error: No Discord token found! Please set LUDUS_TOKEN in Secrets or add 'token' to config.json.")
