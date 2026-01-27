@@ -108,67 +108,7 @@ class ModerationCog(commands.Cog):
         perms = member.guild_permissions
         return perms.moderate_members or perms.kick_members or perms.ban_members or perms.manage_messages
 
-    # ---------------- PREFIX COMMANDS ----------------
-    @commands.command(name="warn")
-    async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
-        if not self._is_mod(ctx.author):
-            await ctx.send("You do not have permission to warn members.")
-            return
-        inf_id = self._record_infraction(member.id, ctx.author.id, "warn", reason)
-        await ctx.send(f"{member.mention} has been warned. (id: {inf_id})")
-
-    @commands.command(name="mute")
-    async def mute(self, ctx: commands.Context, member: discord.Member, duration_minutes: Optional[int] = None, *, reason: str = "No reason provided"):
-        if not self._is_mod(ctx.author):
-            await ctx.send("You do not have permission to mute members.")
-            return
-
-        role = await self._ensure_muted_role(ctx.guild)
-        if not role:
-            await ctx.send("Failed to find or create Muted role.")
-            return
-
-        await member.add_roles(role, reason=reason)
-        if duration_minutes:
-            duration = duration_minutes * 60
-            inf_id = self._record_infraction(member.id, ctx.author.id, "mute", reason, duration_seconds=duration)
-            task = asyncio.create_task(self._apply_timed_unmute(ctx.guild, member, role, inf_id, duration))
-            self._tasks[inf_id] = task
-            await ctx.send(f"{member.mention} muted for {duration_minutes} minute(s). (id: {inf_id})")
-        else:
-            inf_id = self._record_infraction(member.id, ctx.author.id, "mute", reason)
-            await ctx.send(f"{member.mention} muted indefinitely. (id: {inf_id})")
-
-    @commands.command(name="unmute")
-    async def unmute(self, ctx: commands.Context, member: discord.Member, *, reason: str = "Unmuted by staff"):
-        if not self._is_mod(ctx.author):
-            await ctx.send("You do not have permission to unmute members.")
-            return
-
-        role = discord.utils.get(ctx.guild.roles, name="Muted")
-        if not role:
-            await ctx.send("Muted role not found.")
-            return
-
-        await member.remove_roles(role, reason=reason)
-        for r in self._list_infractions_for(member.id):
-            if r[2] == "mute" and r[6] == 1:
-                self._set_infraction_inactive(r[0])
-        await ctx.send(f"{member.mention} has been unmuted.")
-
-    @commands.command(name="infractions")
-    async def infractions(self, ctx: commands.Context, member: Optional[discord.Member] = None):
-        target = member or ctx.author
-        rows = self._list_infractions_for(target.id)
-        if not rows:
-            await ctx.send(f"No infractions found for {target}.")
-            return
-        lines = []
-        for r in rows[:20]:
-            ts = datetime.fromtimestamp(r[4]).isoformat()
-            active = "active" if r[6] == 1 else "inactive"
-            lines.append(f"#{r[0]} {r[2]} by <@{r[1]}> at {ts} — {r[3] or ''} ({active})")
-        await ctx.send(f"Infractions for {target} (most recent {min(20, len(rows))}):\n" + "\n".join(lines))
+    # Prefix commands removed — slash equivalents are used instead.
 
     # ---------------- SLASH COMMANDS ----------------
     @app_commands.command(name="warn", description="Warn a member")
@@ -221,6 +161,21 @@ class ModerationCog(commands.Cog):
                 self._set_infraction_inactive(r[0])
         await interaction.response.send_message(f"{member.mention} has been unmuted.", ephemeral=True)
 
+    @app_commands.command(name="infractions", description="List infractions for a user")
+    @app_commands.describe(member="Member to view infractions for (defaults to you)")
+    async def infractions_slash(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+        await interaction.response.defer(ephemeral=True)
+        target = member or interaction.user
+        rows = self._list_infractions_for(target.id)
+        if not rows:
+            return await interaction.followup.send(f"No infractions found for {target}.", ephemeral=True)
+        lines = []
+        for r in rows[:20]:
+            ts = datetime.fromtimestamp(r[4]).isoformat()
+            active = "active" if r[6] == 1 else "inactive"
+            lines.append(f"#{r[0]} {r[2]} by <@{r[1]}> at {ts} — {r[3] or ''} ({active})")
+        await interaction.followup.send(f"Infractions for {target} (most recent {min(20, len(rows))}):\n" + "\n".join(lines), ephemeral=True)
+
 
 # ---------------- SETUP ----------------
 async def setup(bot: commands.Bot):
@@ -239,6 +194,10 @@ async def setup(bot: commands.Bot):
             pass
         try:
             bot.tree.add_command(app_commands.Command(name='unmute', description='Unmute a member', callback=cog.unmute_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='infractions', description='List infractions for a user', callback=cog.infractions_slash))
         except Exception:
             pass
     except Exception:

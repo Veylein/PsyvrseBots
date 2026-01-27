@@ -134,6 +134,14 @@ async def on_ready():
     print(f"[BOT] Bot application info owner: {(await bot.application_info()).owner.id if bot.application else 'Unknown'}")
     
     try:
+        import os
+        dev_gid = os.environ.get('DEV_GUILD_ID')
+        if dev_gid:
+            try:
+                synced = await bot.tree.sync(guild=discord.Object(id=int(dev_gid)))
+                print(f"[BOT] Synced {len(synced)} slash commands to dev guild {dev_gid}!")
+            except Exception as e:
+                print(f"[BOT] Dev guild sync failed ({dev_gid}): {e}")
         synced = await bot.tree.sync()
         print(f"[BOT] Synced {len(synced)} slash commands!")
         for cmd in synced:

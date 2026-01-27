@@ -583,6 +583,5 @@ async def setup(bot):
     try:
         if bot.tree.get_command('dnd') is None:
             bot.tree.add_command(DNDSystem.dnd_command)
-            await bot.tree.sync()
     except Exception:
         pass

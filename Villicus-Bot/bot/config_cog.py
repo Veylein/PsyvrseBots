@@ -27,6 +27,35 @@ class ConfigCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    # ------- SLASH COMMAND WRAPPERS -------
+    async def _send_ephemeral(self, interaction: discord.Interaction, content: str):
+        try:
+            await interaction.response.send_message(content, ephemeral=True)
+        except Exception:
+            try:
+                await interaction.followup.send(content, ephemeral=True)
+            except Exception:
+                pass
+
+    @staticmethod
+    def _parse_selection_text(text: str):
+        import re
+        text = (text or '').strip().lower()
+        selected = []
+        if text == 'all':
+            return list(PUNISHMENT_ROLES.keys())
+        if text == 'none' or text == '0':
+            return []
+        nums = re.findall(r'\d+', text)
+        for n in nums:
+            try:
+                idx = int(n) - 1
+                key = list(PUNISHMENT_ROLES.keys())[idx]
+                selected.append(key)
+            except Exception:
+                continue
+        return selected
+
     @commands.command(name='prefix')
     @commands.has_permissions(administrator=True)
     async def prefix(self, ctx: commands.Context, new_prefix: str):
@@ -57,6 +86,23 @@ class ConfigCog(commands.Cog):
             pass
         await ctx.send('\n'.join(lines))
 
+    async def status_slash(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        settings = get_guild_settings(interaction.guild.id)
+        enabled = settings.get('punishments', [])
+        lines = [f'Guild: {interaction.guild.name} ({interaction.guild.id})', f'Prefix: {settings.get("prefix", "V!")}', '', 'Enabled punishments:']
+        if not enabled:
+            lines.append(' (none)')
+        else:
+            for p in enabled:
+                lines.append(f' - {p}')
+        try:
+            p = round(self.bot.latency * 1000)
+            lines.append(f'Bot latency: {p}ms')
+        except Exception:
+            pass
+        await interaction.followup.send('\n'.join(lines), ephemeral=True)
+
     @commands.command(name='config')
     @commands.has_permissions(administrator=True)
     async def config(self, ctx: commands.Context, section: Optional[str] = None):
@@ -65,6 +111,65 @@ class ConfigCog(commands.Cog):
             await self._config_punishments(ctx)
             return
         await ctx.send('Config sections: `punishments` — try `V!config punishments`')
+
+    async def config_slash(self, interaction: discord.Interaction, section: Optional[str] = None, selection: Optional[str] = None):
+        """/config [section] [selection]
+        If no section provided, shows quick buttons. For `punishments` you may pass a `selection` like `1 3` or `all` or `none`.
+        """
+        await interaction.response.defer(ephemeral=True)
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+
+        if section is None:
+            # Show a simple button view to guide to using `/config punishments`
+            class _CfgView(discord.ui.View):
+                def __init__(self, bot, guild_id):
+                    super().__init__(timeout=120)
+                    self.bot = bot
+                    self.guild_id = guild_id
+
+                @discord.ui.button(label='Punishments', style=discord.ButtonStyle.primary)
+                async def punish(self, interaction2: discord.Interaction, button: discord.ui.Button):
+                    await interaction2.response.send_message('Use `/config punishments <selection>` — e.g. `/config punishments all` or `/config punishments 1 3`.', ephemeral=True)
+
+                @discord.ui.button(label='Cancel', style=discord.ButtonStyle.secondary)
+                async def cancel(self, interaction2: discord.Interaction, button: discord.ui.Button):
+                    await interaction2.response.send_message('Cancelled.', ephemeral=True)
+
+            return await interaction.followup.send('Config sections: `punishments`', view=_CfgView(self.bot, interaction.guild_id), ephemeral=True)
+
+        if section == 'punishments':
+            # selection may be provided as a string like '1 3' or 'all' or 'none'
+            sel = self._parse_selection_text(selection)
+            # create roles and persist
+            created = []
+            for key in sel:
+                role_name = PUNISHMENT_ROLES.get(key)
+                role = discord.utils.get(interaction.guild.roles, name=role_name)
+                try:
+                    if role is None:
+                        role = await interaction.guild.create_role(name=role_name, reason='Configured by Villicus punishments setup')
+                    created.append(role_name)
+                    if key == 'shadow_ban':
+                        # best-effort apply overwrites
+                        try:
+                            if interaction.guild.me and interaction.guild.me.guild_permissions.manage_channels:
+                                for ch in interaction.guild.channels:
+                                    try:
+                                        await ch.set_permissions(role, view_channel=False, read_message_history=False)
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            settings = get_guild_settings(interaction.guild.id)
+            settings['punishments'] = sel
+            save_guild_settings(interaction.guild.id, settings)
+            return await interaction.followup.send(f'Configured punishments: {created or "(none)"}', ephemeral=True)
+
+        await interaction.followup.send('Unknown config section.', ephemeral=True)
 
     async def _config_punishments(self, ctx: commands.Context):
         # Prompt the admin for which punishments to enable (simple text-based flow)
@@ -146,6 +251,25 @@ class ConfigCog(commands.Cog):
             except Exception:
                 pass
 
+    async def shadowban_slash(self, interaction: discord.Interaction, member: discord.Member, duration_minutes: Optional[int] = None):
+        await interaction.response.defer(ephemeral=True)
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+        role = discord.utils.get(interaction.guild.roles, name=PUNISHMENT_ROLES['shadow_ban'])
+        if role is None:
+            return await interaction.followup.send('Shadow Ban role not configured. Use `/config punishments` first.', ephemeral=True)
+        try:
+            await member.add_roles(role, reason=f'Shadow banned by {interaction.user}')
+        except Exception as e:
+            return await interaction.followup.send(f'Failed to add role: {e}', ephemeral=True)
+        await interaction.followup.send(f'{member.mention} shadow banned.', ephemeral=True)
+        if duration_minutes:
+            await asyncio.sleep(int(duration_minutes) * 60)
+            try:
+                await member.remove_roles(role, reason='Shadow ban expired')
+            except Exception:
+                pass
+
     @commands.command(name='shadowunban')
     @commands.has_permissions(administrator=True)
     async def shadowunban(self, ctx: commands.Context, member: discord.Member):
@@ -157,6 +281,19 @@ class ConfigCog(commands.Cog):
         except Exception as e:
             return await ctx.send(f'Failed to remove role: {e}')
         await ctx.send(f'{member.mention} shadow unbanned.')
+
+    async def shadowunban_slash(self, interaction: discord.Interaction, member: discord.Member):
+        await interaction.response.defer(ephemeral=True)
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+        role = discord.utils.get(interaction.guild.roles, name=PUNISHMENT_ROLES['shadow_ban'])
+        if role is None:
+            return await interaction.followup.send('Shadow Ban role not configured.', ephemeral=True)
+        try:
+            await member.remove_roles(role, reason=f'Shadow unbanned by {interaction.user}')
+        except Exception as e:
+            return await interaction.followup.send(f'Failed to remove role: {e}', ephemeral=True)
+        await interaction.followup.send(f'{member.mention} shadow unbanned.', ephemeral=True)
 
     @commands.command(name='shadowmute')
     @commands.has_permissions(manage_messages=True, moderate_members=True)
@@ -176,6 +313,25 @@ class ConfigCog(commands.Cog):
             except Exception:
                 pass
 
+    async def shadowmute_slash(self, interaction: discord.Interaction, member: discord.Member, duration_minutes: Optional[int] = None):
+        await interaction.response.defer(ephemeral=True)
+        if not (interaction.user.guild_permissions.manage_messages or interaction.user.guild_permissions.moderate_members):
+            return await interaction.followup.send('Insufficient permissions.', ephemeral=True)
+        role = discord.utils.get(interaction.guild.roles, name=PUNISHMENT_ROLES['shadow_mute'])
+        if role is None:
+            return await interaction.followup.send('Shadow Mute role not configured. Use `/config punishments` first.', ephemeral=True)
+        try:
+            await member.add_roles(role, reason=f'Shadow muted by {interaction.user}')
+        except Exception as e:
+            return await interaction.followup.send(f'Failed to add role: {e}', ephemeral=True)
+        await interaction.followup.send(f'{member.mention} shadow muted.', ephemeral=True)
+        if duration_minutes:
+            await asyncio.sleep(int(duration_minutes) * 60)
+            try:
+                await member.remove_roles(role, reason='Shadow mute expired')
+            except Exception:
+                pass
+
     @commands.command(name='shadowunmute')
     @commands.has_permissions(manage_messages=True, moderate_members=True)
     async def shadowunmute(self, ctx: commands.Context, member: discord.Member):
@@ -187,6 +343,19 @@ class ConfigCog(commands.Cog):
         except Exception as e:
             return await ctx.send(f'Failed to remove role: {e}')
         await ctx.send(f'{member.mention} shadow unmuted.')
+
+    async def shadowunmute_slash(self, interaction: discord.Interaction, member: discord.Member):
+        await interaction.response.defer(ephemeral=True)
+        if not (interaction.user.guild_permissions.manage_messages or interaction.user.guild_permissions.moderate_members):
+            return await interaction.followup.send('Insufficient permissions.', ephemeral=True)
+        role = discord.utils.get(interaction.guild.roles, name=PUNISHMENT_ROLES['shadow_mute'])
+        if role is None:
+            return await interaction.followup.send('Shadow Mute role not configured.', ephemeral=True)
+        try:
+            await member.remove_roles(role, reason=f'Shadow unmuted by {interaction.user}')
+        except Exception as e:
+            return await interaction.followup.send(f'Failed to remove role: {e}', ephemeral=True)
+        await interaction.followup.send(f'{member.mention} shadow unmuted.', ephemeral=True)
 
     # EVENT LISTENERS: enforce shadowmute/brick/demoji
     @commands.Cog.listener()
@@ -261,3 +430,31 @@ class ConfigCog(commands.Cog):
 async def setup(bot: commands.Bot):
     cog = ConfigCog(bot)
     await bot.add_cog(cog)
+    # Register slash commands (best-effort)
+    try:
+        try:
+            bot.tree.add_command(app_commands.Command(name='config', description='Configure server settings', callback=cog.config_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='shadowban', description='Apply Shadow Ban role', callback=cog.shadowban_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='shadowunban', description='Remove Shadow Ban role', callback=cog.shadowunban_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='shadowmute', description='Apply Shadow Mute role', callback=cog.shadowmute_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='shadowunmute', description='Remove Shadow Mute role', callback=cog.shadowunmute_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='status', description='Show basic bot health and enabled modules', callback=cog.status_slash))
+        except Exception:
+            pass
+    except Exception:
+        pass

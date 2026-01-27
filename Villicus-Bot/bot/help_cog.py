@@ -15,13 +15,13 @@ class HelpCog(commands.Cog):
     def _build_general_embed(self, prefix: str) -> discord.Embed:
         emb = discord.Embed(title="Villicus — Help", color=discord.Color.blurple())
         emb.description = (
-            f"Prefix commands use `{prefix}` (example: `{prefix}warn @user`).\n"
-            "Use the slash command preview for full argument help and required fields."
+            "Villicus uses Discord Slash Commands for all moderation and admin actions.\n"
+            "Use the command autocomplete and preview (type `/` and start typing) to see required fields and examples."
         )
-        emb.add_field(name="Moderation", value="warn, mute, unmute, kick, ban, softban, massban, infractions", inline=False)
-        emb.add_field(name="Admin", value="clear, slowmode, lock, unlock, clone, brick, demoji, emoji_lock", inline=False)
-        emb.add_field(name="Staff", value="staff_setup, staff_promote, staff_demote, staff_perms", inline=False)
-        emb.set_footer(text="Tip: try `/help <command>` for detailed info on a command.")
+        emb.add_field(name="Moderation", value="/warn, /mute, /unmute, /kick, /ban, /softban, /massban, /infractions", inline=False)
+        emb.add_field(name="Admin", value="/clear, /slowmode, /lock, /unlock, /clone, /brick, /demoji, /emoji_lock", inline=False)
+        emb.add_field(name="Staff", value="/staff_setup, /staff_promote, /staff_demote, /staff_perms", inline=False)
+        emb.set_footer(text="Tip: use command autocomplete or `/help <command>` for detailed info.")
         return emb
 
     @commands.command(name='help')
@@ -37,7 +37,7 @@ class HelpCog(commands.Cog):
         for cmd in self.bot.commands:
             if cmd.name == q:
                 emb = discord.Embed(title=f'Help — {cmd.name}', color=discord.Color.green())
-                emb.add_field(name='Usage', value=f"{prefix}{cmd.qualified_name} {cmd.signature}" or f"{prefix}{cmd.name}")
+                emb.add_field(name='Usage', value=f"/{cmd.qualified_name} {cmd.signature}" or f"/{cmd.name}")
                 emb.add_field(name='Help', value=cmd.help or '(no description)')
                 await ctx.send(embed=emb)
                 return
@@ -69,7 +69,7 @@ class HelpCog(commands.Cog):
         for cmd in self.bot.commands:
             if cmd.name == q:
                 emb = discord.Embed(title=f'Help — {cmd.name}', color=discord.Color.green())
-                emb.add_field(name='Usage', value=f"{prefix}{cmd.qualified_name} {cmd.signature}" or f"{prefix}{cmd.name}")
+                emb.add_field(name='Usage', value=f"/{cmd.qualified_name} {cmd.signature}" or f"/{cmd.name}")
                 emb.add_field(name='Help', value=cmd.help or '(no description)')
                 return await interaction.followup.send(embed=emb, ephemeral=True)
         for ac in self.bot.tree.walk_commands():

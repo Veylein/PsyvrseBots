@@ -1531,10 +1531,19 @@ async def start_bot():
     @bot.event
     async def on_ready():
         print(f"Villicus is online as {bot.user}")
-        # Sync slash commands
+        # Sync slash commands (guarded)
         try:
+            import os
+            dev_gid = os.environ.get('DEV_GUILD_ID')
+            if dev_gid:
+                try:
+                    guild_obj = discord.Object(id=int(dev_gid))
+                    synced = await bot.tree.sync(guild=guild_obj)
+                    await log_message(bot, f"✅ Synced {len(synced)} commands to dev guild {dev_gid}.")
+                except Exception as e:
+                    await log_message(bot, f"⚠️ Dev guild sync failed for {dev_gid}: {e}")
             synced = await bot.tree.sync()
-            await log_message(bot, f"✅ Synced {len(synced)} slash commands.")
+            await log_message(bot, f"✅ Synced {len(synced)} global slash commands.")
         except Exception as e:
             await log_message(bot, f"❌ Slash command sync failed: {e}")
 
@@ -5225,9 +5234,18 @@ class SlashMod(commands.Cog):
             self.mod = None
 
     async def cog_load(self):
-        # Sync tree for immediate availability in dev environments
+        # Sync tree for immediate availability in dev environments (guarded)
         try:
-            await self.bot.tree.sync()
+            import os
+            dev_gid = os.environ.get('DEV_GUILD_ID')
+            if dev_gid:
+                try:
+                    guild_obj = discord.Object(id=int(dev_gid))
+                    await self.bot.tree.sync(guild=guild_obj)
+                except Exception:
+                    pass
+            else:
+                await self.bot.tree.sync()
         except Exception:
             pass
 

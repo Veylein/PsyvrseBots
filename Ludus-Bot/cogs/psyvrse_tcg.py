@@ -589,6 +589,5 @@ async def setup(bot:commands.Bot):
     try:
         if bot.tree.get_command('tcg') is None:
             bot.tree.add_command(PsyvrseTCG.tcg_group)
-            await bot.tree.sync()
     except Exception:
         pass
