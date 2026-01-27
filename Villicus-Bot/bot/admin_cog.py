@@ -5,6 +5,7 @@ from typing import Optional
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 from core.config import get_guild_settings, save_guild_settings
 
@@ -389,7 +390,182 @@ class AdminCog(commands.Cog):
                     except Exception:
                         pass
 
+    # ---------------- SLASH COMMAND WRAPPERS ----------------
+    async def kick_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = 'No reason provided'):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.kick_members:
+            return await interaction.followup.send('You do not have permission to kick members.', ephemeral=True)
+        try:
+            await member.kick(reason=reason)
+            mod = self.bot.get_cog('ModerationCog')
+            if mod:
+                mod._record_infraction(member.id, interaction.user.id, 'kick', reason)
+            await interaction.followup.send(f'Kicked {member}.')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to kick: {e}', ephemeral=True)
+
+    async def ban_slash(self, interaction: discord.Interaction, member: discord.Member, days: int = 0, reason: str = 'No reason provided'):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.ban_members:
+            return await interaction.followup.send('You do not have permission to ban members.', ephemeral=True)
+        try:
+            await member.ban(reason=reason, delete_message_days=days)
+            mod = self.bot.get_cog('ModerationCog')
+            if mod:
+                mod._record_infraction(member.id, interaction.user.id, 'ban', reason)
+            await interaction.followup.send(f'Banned {member}.')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to ban: {e}', ephemeral=True)
+
+    async def unban_slash(self, interaction: discord.Interaction, user: discord.User, reason: str = 'Unbanned by staff'):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.ban_members:
+            return await interaction.followup.send('You do not have permission to unban members.', ephemeral=True)
+        try:
+            bans = await interaction.guild.bans()
+            target = None
+            for entry in bans:
+                if entry.user.id == user.id:
+                    target = entry.user
+                    break
+            if not target:
+                return await interaction.followup.send('User not found in ban list.', ephemeral=True)
+            await interaction.guild.unban(target, reason=reason)
+            mod = self.bot.get_cog('ModerationCog')
+            if mod:
+                mod._record_infraction(target.id, interaction.user.id, 'unban', reason)
+            await interaction.followup.send(f'Unbanned {target}.')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to unban: {e}', ephemeral=True)
+
+    async def clear_slash(self, interaction: discord.Interaction, amount: int = 50):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.manage_messages:
+            return await interaction.followup.send('You do not have permission to manage messages.', ephemeral=True)
+        try:
+            deleted = await interaction.channel.purge(limit=amount)
+            await interaction.followup.send(f'Deleted {len(deleted)} messages.', ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f'Failed to clear messages: {e}', ephemeral=True)
+
+    async def lock_slash(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
+        await interaction.response.defer()
+        ch = channel or interaction.channel
+        if not interaction.user.guild_permissions.manage_channels:
+            return await interaction.followup.send('You do not have permission to manage channels.', ephemeral=True)
+        try:
+            await ch.set_permissions(interaction.guild.default_role, send_messages=False)
+            await interaction.followup.send(f'Locked {ch.mention}')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to lock: {e}', ephemeral=True)
+
+    async def unlock_slash(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
+        await interaction.response.defer()
+        ch = channel or interaction.channel
+        if not interaction.user.guild_permissions.manage_channels:
+            return await interaction.followup.send('You do not have permission to manage channels.', ephemeral=True)
+        try:
+            await ch.set_permissions(interaction.guild.default_role, send_messages=True)
+            await interaction.followup.send(f'Unlocked {ch.mention}')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to unlock: {e}', ephemeral=True)
+
+    async def brick_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = ''):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.manage_roles:
+            return await interaction.followup.send('You do not have permission to manage roles.', ephemeral=True)
+        role = discord.utils.get(interaction.guild.roles, name='Brick')
+        if role is None:
+            return await interaction.followup.send('Brick role not configured. Run `V!config punishments` first.', ephemeral=True)
+        try:
+            await member.add_roles(role, reason=reason or f'Bricked by {interaction.user}')
+            await interaction.followup.send(f'{member.mention} bricked.')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to brick: {e}', ephemeral=True)
+
+    async def demoji_slash(self, interaction: discord.Interaction, member: discord.Member):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.manage_roles:
+            return await interaction.followup.send('You do not have permission to manage roles.', ephemeral=True)
+        role = discord.utils.get(interaction.guild.roles, name='Demoji')
+        if role is None:
+            return await interaction.followup.send('Demoji role not configured. Run `V!config punishments` first.', ephemeral=True)
+        try:
+            await member.add_roles(role, reason=f'Demoji by {interaction.user}')
+            await interaction.followup.send(f'{member.mention} demoji applied.')
+        except Exception as e:
+            await interaction.followup.send(f'Failed to apply demoji: {e}', ephemeral=True)
+
+    async def emoji_lock_slash(self, interaction: discord.Interaction, emoji: str, role: discord.Role):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.manage_guild:
+            return await interaction.followup.send('You do not have permission to manage the guild.', ephemeral=True)
+        settings = get_guild_settings(interaction.guild.id)
+        locks = settings.get('emoji_locks', {})
+        locks[emoji] = role.id
+        settings['emoji_locks'] = locks
+        save_guild_settings(interaction.guild.id, settings)
+        await interaction.followup.send(f'Locked emoji {emoji} to role {role.name}.')
+
+    async def emoji_unlock_slash(self, interaction: discord.Interaction, emoji: str):
+        await interaction.response.defer()
+        if not interaction.user.guild_permissions.manage_guild:
+            return await interaction.followup.send('You do not have permission to manage the guild.', ephemeral=True)
+        settings = get_guild_settings(interaction.guild.id)
+        locks = settings.get('emoji_locks', {})
+        if emoji in locks:
+            locks.pop(emoji, None)
+            settings['emoji_locks'] = locks
+            save_guild_settings(interaction.guild.id, settings)
+            await interaction.followup.send(f'Unlocked emoji {emoji}.')
+        else:
+            await interaction.followup.send('Emoji not locked.', ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     cog = AdminCog(bot)
     await bot.add_cog(cog)
+    # Best-effort: register important admin slash commands onto the tree — actual sync happens in on_ready()
+    try:
+        try:
+            bot.tree.add_command(app_commands.Command(name='kick', description='Kick a member', callback=cog.kick_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='ban', description='Ban a member', callback=cog.ban_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='unban', description='Unban a member', callback=cog.unban_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='clear', description='Purge messages', callback=cog.clear_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='lock', description='Lock a channel', callback=cog.lock_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='unlock', description='Unlock a channel', callback=cog.unlock_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='brick', description='Apply Brick role', callback=cog.brick_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='demoji', description='Apply Demoji role', callback=cog.demoji_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='emoji_lock', description='Lock an emoji to a role', callback=cog.emoji_lock_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='emoji_unlock', description='Unlock an emoji', callback=cog.emoji_unlock_slash))
+        except Exception:
+            pass
+    except Exception:
+        pass
