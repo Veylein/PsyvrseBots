@@ -40,58 +40,59 @@ class LoggingCog(commands.Cog):
         except Exception:
             pass
 
-    @app_commands.group(name='logconfig', description='Configure server logging')
-    async def logconfig_group(self, interaction: discord.Interaction):
-        if interaction.subcommand_passed is None:
-            await interaction.response.send_message('Use a subcommand: channel, enable, disable, status', ephemeral=True)
+    # Implement a proper app_commands.Group for logconfig so subcommands register correctly
+    class _LogConfigGroup(app_commands.Group):
+        def __init__(self):
+            super().__init__(name='logconfig', description='Configure server logging')
 
-    @logconfig_group.command(name='channel', description='Set the logging channel')
-    @app_commands.describe(channel='Channel to send logs to (text channel)')
-    async def logconfig_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        if not interaction.user.guild_permissions.manage_guild:
-            return await interaction.response.send_message('You need Manage Guild permission.', ephemeral=True)
-        settings = get_guild_settings(interaction.guild.id)
-        settings['log_channel'] = channel.id
-        save_guild_settings(interaction.guild.id, settings)
-        await interaction.response.send_message(f'Set log channel to {channel.mention}', ephemeral=True)
+        @app_commands.command(name='channel', description='Set the logging channel')
+        @app_commands.describe(channel='Channel to send logs to (text channel)')
+        async def channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+            if not interaction.user.guild_permissions.manage_guild:
+                return await interaction.response.send_message('You need Manage Guild permission.', ephemeral=True)
+            settings = get_guild_settings(interaction.guild.id)
+            settings['log_channel'] = channel.id
+            save_guild_settings(interaction.guild.id, settings)
+            await interaction.response.send_message(f'Set log channel to {channel.mention}', ephemeral=True)
 
-    @logconfig_group.command(name='enable', description='Enable logging for an event')
-    @app_commands.describe(event='Event to enable')
-    async def logconfig_enable(self, interaction: discord.Interaction, event: str):
-        if not interaction.user.guild_permissions.manage_guild:
-            return await interaction.response.send_message('You need Manage Guild permission.', ephemeral=True)
-        if event not in LOG_EVENTS:
-            return await interaction.response.send_message(f'Unknown event. Valid: {LOG_EVENTS}', ephemeral=True)
-        settings = get_guild_settings(interaction.guild.id)
-        evs = settings.get('log_events', {})
-        evs[event] = True
-        settings['log_events'] = evs
-        save_guild_settings(interaction.guild.id, settings)
-        await interaction.response.send_message(f'Enabled logging for {event}', ephemeral=True)
+        @app_commands.command(name='enable', description='Enable logging for an event')
+        @app_commands.describe(event='Event to enable')
+        async def enable(self, interaction: discord.Interaction, event: str):
+            if not interaction.user.guild_permissions.manage_guild:
+                return await interaction.response.send_message('You need Manage Guild permission.', ephemeral=True)
+            if event not in LOG_EVENTS:
+                return await interaction.response.send_message(f'Unknown event. Valid: {LOG_EVENTS}', ephemeral=True)
+            settings = get_guild_settings(interaction.guild.id)
+            evs = settings.get('log_events', {})
+            evs[event] = True
+            settings['log_events'] = evs
+            save_guild_settings(interaction.guild.id, settings)
+            await interaction.response.send_message(f'Enabled logging for {event}', ephemeral=True)
 
-    @logconfig_group.command(name='disable', description='Disable logging for an event')
-    @app_commands.describe(event='Event to disable')
-    async def logconfig_disable(self, interaction: discord.Interaction, event: str):
-        if not interaction.user.guild_permissions.manage_guild:
-            return await interaction.response.send_message('You need Manage Guild permission.', ephemeral=True)
-        if event not in LOG_EVENTS:
-            return await interaction.response.send_message(f'Unknown event. Valid: {LOG_EVENTS}', ephemeral=True)
-        settings = get_guild_settings(interaction.guild.id)
-        evs = settings.get('log_events', {})
-        evs[event] = False
-        settings['log_events'] = evs
-        save_guild_settings(interaction.guild.id, settings)
-        await interaction.response.send_message(f'Disabled logging for {event}', ephemeral=True)
+        @app_commands.command(name='disable', description='Disable logging for an event')
+        @app_commands.describe(event='Event to disable')
+        async def disable(self, interaction: discord.Interaction, event: str):
+            if not interaction.user.guild_permissions.manage_guild:
+                return await interaction.response.send_message('You need Manage Guild permission.', ephemeral=True)
+            if event not in LOG_EVENTS:
+                return await interaction.response.send_message(f'Unknown event. Valid: {LOG_EVENTS}', ephemeral=True)
+            settings = get_guild_settings(interaction.guild.id)
+            evs = settings.get('log_events', {})
+            evs[event] = False
+            settings['log_events'] = evs
+            save_guild_settings(interaction.guild.id, settings)
+            await interaction.response.send_message(f'Disabled logging for {event}', ephemeral=True)
 
-    @logconfig_group.command(name='status', description='Show logging settings')
-    async def logconfig_status(self, interaction: discord.Interaction):
-        settings = get_guild_settings(interaction.guild.id)
-        chan = settings.get('log_channel')
-        evs = settings.get('log_events', {})
-        lines = [f'Log channel: {self.bot.get_channel(chan).mention if chan and self.bot.get_channel(chan) else "(not set)"}']
-        for e in LOG_EVENTS:
-            lines.append(f'{e}: {"enabled" if evs.get(e) else "disabled"}')
-        await interaction.response.send_message('\n'.join(lines), ephemeral=True)
+        @app_commands.command(name='status', description='Show logging settings')
+        async def status(self, interaction: discord.Interaction):
+            settings = get_guild_settings(interaction.guild.id)
+            chan = settings.get('log_channel')
+            evs = settings.get('log_events', {})
+            bot = interaction.client
+            lines = [f'Log channel: {bot.get_channel(chan).mention if chan and bot.get_channel(chan) else "(not set)"}']
+            for e in LOG_EVENTS:
+                lines.append(f'{e}: {"enabled" if evs.get(e) else "disabled"}')
+            await interaction.response.send_message('\n'.join(lines), ephemeral=True)
 
     # --- listeners ---
     @commands.Cog.listener()
@@ -148,6 +149,6 @@ async def setup(bot: commands.Bot):
     await bot.add_cog(cog)
     # Register logconfig group as slash commands
     try:
-        bot.tree.add_command(app_commands.Group(name='logconfig', description='Configure server logging'))
+        bot.tree.add_command(_LogConfigGroup())
     except Exception:
         pass
