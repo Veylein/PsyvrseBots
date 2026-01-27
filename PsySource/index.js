@@ -17,6 +17,7 @@ import dotenv from 'dotenv'
 import crypto from 'crypto'
 import fs from 'fs'
 import { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } from 'discord.js'
+import { exec } from 'child_process'
 
 dotenv.config()
 
@@ -38,6 +39,40 @@ function isPlaceholder(value) {
   if (!value) return true
   const s = String(value).toLowerCase()
   return /your_|example|replace|xxx|changeme/.test(s)
+}
+
+// Runtime config persistence (allows updating LOG_CHANNEL without restarting)
+const RUNTIME_CONFIG_FILE = './runtime_config.json'
+function loadRuntimeConfig() {
+  try {
+    if (!fs.existsSync(RUNTIME_CONFIG_FILE)) return {}
+    const raw = fs.readFileSync(RUNTIME_CONFIG_FILE, 'utf8')
+    return JSON.parse(raw || '{}')
+  } catch (e) {
+    console.error('Failed to load runtime config:', e)
+    return {}
+  }
+}
+
+function saveRuntimeConfig(cfg) {
+  try {
+    fs.writeFileSync(RUNTIME_CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8')
+    return true
+  } catch (e) {
+    console.error('Failed to save runtime config:', e)
+    return false
+  }
+}
+
+function getLogChannelId() {
+  const runtime = loadRuntimeConfig()
+  return runtime.log_channel || LOG_CHANNEL
+}
+
+function setLogChannelId(id) {
+  const runtime = loadRuntimeConfig()
+  runtime.log_channel = String(id)
+  return saveRuntimeConfig(runtime)
 }
 
 const requiredEnv = {
@@ -212,7 +247,7 @@ client.on('messageCreate', async (message) => {
       checks.push(`Feedback blacklist entries: ${bl.length}`)
       // channel availability
       try {
-        const logCh = await client.channels.fetch(LOG_CHANNEL).catch(() => null)
+        const logCh = await client.channels.fetch(getLogChannelId()).catch(() => null)
         checks.push(`Log channel fetch: ${logCh ? 'OK' : 'FAILED'}`)
       } catch (e) {
         checks.push('Log channel fetch: ERROR')
@@ -323,13 +358,14 @@ app.post('/render-webhook', async (req, res) => {
 
     if (logsUrl) embed.setURL(logsUrl)
 
-    // Send to channel
-    if (!LOG_CHANNEL) {
+    // Send to channel (prefer runtime-configured channel)
+    const resolvedLogChannel = getLogChannelId()
+    if (!resolvedLogChannel) {
       console.error('LOG_CHANNEL not set; cannot post message')
       return res.status(500).send('Discord channel not configured')
     }
 
-    const channel = await client.channels.fetch(LOG_CHANNEL).catch(e => null)
+    const channel = await client.channels.fetch(resolvedLogChannel).catch(e => null)
     if (!channel) {
       console.error('Failed to fetch channel with id', LOG_CHANNEL)
       return res.status(500).send('Discord channel not available')
@@ -383,6 +419,8 @@ client.once('ready', async () => {
     new SlashCommandBuilder().setName('ping').setDescription('Check bot latency'),
     new SlashCommandBuilder().setName('whoami').setDescription('Show info about you'),
     new SlashCommandBuilder().setName('uptime').setDescription('Show bot uptime'),
+    new SlashCommandBuilder().setName('set-log-channel').setDescription('Set runtime log channel for deploy messages').addChannelOption(o => o.setName('channel').setDescription('Target channel').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+    new SlashCommandBuilder().setName('redeploy').setDescription('Run the configured redeploy command (owner only)'),
   ].map(c => c.toJSON())
 
   try {
@@ -397,6 +435,46 @@ client.once('ready', async () => {
   } catch (err) {
     console.error('Failed to register slash commands:', err)
   }
+  // Interaction handler for administrators/owners
+  client.on('interactionCreate', async (interaction) => {
+    try {
+      if (!interaction.isChatInputCommand()) return
+      const name = interaction.commandName
+      // Only owners may run restart
+      if (name === 'redeploy') {
+        if (!isOwner(interaction.user.id)) return interaction.reply({ content: 'Only owners can run redeploy.', ephemeral: true })
+        const runtime = loadRuntimeConfig()
+        const cmd = process.env.RESTART_CMD || runtime.restart_cmd
+        await interaction.reply({ content: 'Attempting redeploy...', ephemeral: true })
+        if (cmd) {
+          exec(cmd, { shell: true, cwd: process.cwd(), env: process.env }, async (err, stdout, stderr) => {
+            const out = String(stdout || '').slice(0, 1900)
+            const errout = String(stderr || '').slice(0, 1900)
+            const logId = getLogChannelId()
+            try {
+              const logCh = await client.channels.fetch(logId).catch(() => null)
+              if (logCh) await logCh.send({ content: `Redeploy executed by ${interaction.user.tag}\n\nStdout:\n${out || '(none)'}\n\nStderr:\n${errout || '(none)'} ` })
+            } catch (e) { /* ignore */ }
+          })
+        } else {
+          // No configured restart command; exit process and rely on external supervisor
+          setTimeout(() => process.exit(0), 1500)
+        }
+        return
+      }
+
+      if (name === 'set-log-channel') {
+        if (!isOwner(interaction.user.id) && !interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: 'Require Manage Guild or owner.', ephemeral: true })
+        const ch = interaction.options.getChannel('channel')
+        if (!ch) return interaction.reply({ content: 'Invalid channel', ephemeral: true })
+        setLogChannelId(ch.id)
+        await interaction.reply({ content: `Log channel set to ${ch.name} (${ch.id})`, ephemeral: true })
+        return
+      }
+    } catch (e) {
+      console.error('Interaction handler error:', e)
+    }
+  })
 })
 
 client.on('interactionCreate', async (interaction) => {
