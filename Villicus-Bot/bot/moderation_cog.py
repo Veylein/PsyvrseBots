@@ -224,5 +224,23 @@ class ModerationCog(commands.Cog):
 
 # ---------------- SETUP ----------------
 async def setup(bot: commands.Bot):
-    await bot.add_cog(ModerationCog(bot))
-    await bot.tree.sync()  # ensures slash commands appear
+    cog = ModerationCog(bot)
+    await bot.add_cog(cog)
+    # Register app (slash) commands onto the tree but do NOT call `bot.tree.sync()` here;
+    # the main bot (`start_bot`) performs a sync in `on_ready()` when the application_id is available.
+    try:
+        try:
+            bot.tree.add_command(app_commands.Command(name='warn', description='Warn a member', callback=cog.warn_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='mute', description='Mute a member', callback=cog.mute_slash))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='unmute', description='Unmute a member', callback=cog.unmute_slash))
+        except Exception:
+            pass
+    except Exception:
+        # best-effort registration; continue even if it fails
+        pass
