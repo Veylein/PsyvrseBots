@@ -350,7 +350,10 @@
       "through_stacking": "przez sumowanie",
       "stack_cleared": "Stack został wyczyszczony",
       "drew_lowercase": "dobrał",
-      "color_choice_expired": "Ten wybór koloru już wygasł lub nie jest dla ciebie"
+      "color_choice_expired": "Ten wybór koloru już wygasł lub nie jest dla ciebie",
+      "podium_title": "PODIUM",
+      "eliminated_players_title": "WYELIMINOWANI (≥25 kart)",
+      "congratulations_winners": "Gratulacje zwycięzcom!"
     },
     "rules": {
       "title": "Zasady tej gry UNO",
@@ -810,7 +813,10 @@
       "through_stacking": "through stacking",
       "stack_cleared": "Stack cleared",
       "drew_lowercase": "drew",
-      "color_choice_expired": "This color choice has expired or is not for you"
+      "color_choice_expired": "This color choice has expired or is not for you",
+      "podium_title": "LEADERBOARD",
+      "eliminated_players_title": "ELIMINATED (≥25 cards)",
+      "congratulations_winners": "Congratulations to the winners!"
     },
     "rules": {
       "title": "UNO Game Rules",

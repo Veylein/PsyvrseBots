@@ -438,14 +438,14 @@ class UnoCog(commands.Cog):
                 # Add eliminated players
                 eliminated = game.get('eliminated_players', [])
                 if eliminated:
-                    podium_text += "\n**--- WYELIMINOWANI (≥25 kart) ---**\n"
+                    podium_text += f"\n**--- {self.t('messages.eliminated_players_title', lang=lang)} ---**\n"
                     for elim_player in reversed(eliminated):
                         elim_display = self.get_bot_display_name(elim_player, game)
                         podium_text += f"💀 {elim_display}\n"
                 
                 embed = discord.Embed(
                     title=f"{uno_back} {self.t('messages.game_over', lang=lang)}",
-                    description=f"🏆 **PODIUM:**\n\n{podium_text}\n🎉 Gratulacje zwycięzcom!",
+                    description=f"🏆 **{self.t('messages.podium_title', lang=lang)}:**\n\n{podium_text}\n🎉 {self.t('messages.congratulations_winners', lang=lang)}",
                     color=discord.Color.gold()
                 )
                 

@@ -25,7 +25,7 @@ COLOR_EMOJIS = {
 }
 
 # Base path for card assets
-ASSETS_PATH = Path(__file__).parent.parent / 'assets' / 'uno_cards' / 'uno_classic'
+ASSETS_PATH = Path(__file__).parent.parent.parent / 'assets' / 'uno_cards' / 'uno_classic'
 
 # Cache dla emoji mapping
 _emoji_cache = None
