@@ -11,6 +11,8 @@ from core.config import get_guild_settings, save_guild_settings
 class TicketCog(commands.Cog):
     """Clean Ticketing cog — create private ticket channels, close them and post transcripts."""
 
+    ticket_group = app_commands.Group(name='ticket', description='Ticketing commands')
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -39,10 +41,8 @@ class TicketCog(commands.Cog):
         save_guild_settings(guild.id, settings)
         return channel
 
-    @app_commands.group(name='ticket', description='Ticketing commands')
-    async def ticket_group(self, interaction: discord.Interaction):
-        if interaction.subcommand_passed is None:
-            await interaction.response.send_message('Use /ticket create, /ticket close, or /ticket settings', ephemeral=True)
+    # Note: `ticket_group` is defined as a class-level `app_commands.Group` above.
+    # We don't define a bare group callback here; the group exists to namespace subcommands.
 
     @ticket_group.command(name='create', description='Create a private ticket channel')
     @app_commands.describe(reason='Optional reason for the ticket')
