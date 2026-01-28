@@ -76,45 +76,7 @@ async def _minigame_handler(bot: commands.Bot, interaction: discord.Interaction,
 async def setup(bot: commands.Bot):
     cog = Perimeter(bot)
     await bot.add_cog(cog)
-
-    # Add category bridge commands (skip if command exists)
-    for name in CATEGORY_NAMES:
-        if bot.tree.get_command(name) is None:
-            def make_cb(_bot):
-                async def cb(interaction: discord.Interaction, input: str = ""):
-                    await _invoke_prefix_from_interaction(_bot, interaction, input)
-
-                return cb
-
-            cb = make_cb(bot)
-            cmd = app_commands.Command(
-                name=name,
-                callback=cb,
-                description=f"Run a {name} category command (provide the subcommand and args as text)",
-            )
-            try:
-                bot.tree.add_command(cmd)
-            except Exception:
-                # ignore registration errors
-                pass
-
-    # Add an improved /minigame command with choices
-    if bot.tree.get_command('minigame') is None:
-        choices = [
-            app_commands.Choice(name='Wordle', value='wordle'),
-            app_commands.Choice(name='Trivia', value='trivia'),
-            app_commands.Choice(name='Rock-Paper-Scissors', value='rps'),
-            app_commands.Choice(name='Typerace', value='typerace'),
-            app_commands.Choice(name='GuessTheNumber', value='gtn'),
-            app_commands.Choice(name='Memory', value='memory'),
-        ]
-
-        async def minigame(interaction: discord.Interaction, game: str, target: Optional[str] = None):
-            await _minigame_handler(bot, interaction, game, target)
-
-        # annotate parameters via callback signature so app commands can register them
-        cmd = app_commands.Command(name='minigame', callback=minigame, description='Play a selected minigame')
-        try:
-            bot.tree.add_command(cmd)
-        except Exception:
-            pass
+    # Per-category bridge commands are provided by the more explicit
+    # `PerimeterExplicit` cog which defers registration until after all
+    # cogs are loaded. Avoid dynamically creating and registering duplicate
+    # category commands here.

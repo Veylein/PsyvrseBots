@@ -28,9 +28,9 @@ async def lifespan(app):
     
     set_bot_instance(bot)
     
-    discord_token = os.getenv("DISCORD_TOKEN")
+    discord_token = os.getenv("PAX_TOKEN")
     if not discord_token:
-        raise ValueError("DISCORD_TOKEN environment variable is required")
+        raise ValueError("PAX_TOKEN environment variable is required")
     
     bot_task = asyncio.create_task(bot.start(discord_token))
     

@@ -578,10 +578,6 @@ async def setup(bot):
         await bot.add_cog(DNDSystem(bot))
     except Exception:
         return
-
-    # Ensure the slash command is registered (idempotent)
-    try:
-        if bot.tree.get_command('dnd') is None:
-            bot.tree.add_command(DNDSystem.dnd_command)
-    except Exception:
-        pass
+    # App commands declared on the Cog are registered automatically when the
+    # cog is added. Avoid explicitly calling `bot.tree.add_command` here to
+    # prevent duplicate registrations during extension reloads.

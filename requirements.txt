@@ -21,3 +21,4 @@ redis
 sqlalchemy
 uvicorn
 yt-dlp>=2024.12.23
+jsonschema

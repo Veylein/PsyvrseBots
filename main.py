@@ -55,6 +55,14 @@ def load_env(env_path: Path, env: dict) -> dict:
 
 
 def find_entry(folder: Path) -> Path | None:
+    # Special-case: prefer lightweight `start.py` for Pax to allow quick health startup
+    try:
+        if 'pax' in folder.name.lower():
+            p_start = folder / 'start.py'
+            if p_start.exists():
+                return p_start
+    except Exception:
+        pass
     for name in ENTRY_CANDIDATES:
         p = folder / name
         if p.exists():

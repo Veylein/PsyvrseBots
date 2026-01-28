@@ -482,11 +482,6 @@ async def setup(bot):
     # Add cog and ensure the slash command is registered with the app command tree
     cog = Help(bot)
     await bot.add_cog(cog)
-    try:
-        # `help_slash` is an app command defined on the cog; add it to the tree explicitly
-        existing = bot.tree.get_command('help')
-        if existing is None:
-            bot.tree.add_command(cog.help_slash)
-    except Exception:
-        # If it fails, the cog may already have registered app commands — ignore
-        pass
+    # App commands defined on the Cog are registered automatically when the cog
+    # is added. Avoid manually calling `bot.tree.add_command` here to prevent
+    # duplicate registrations during extension reloads.

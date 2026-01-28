@@ -584,10 +584,6 @@ async def setup(bot:commands.Bot):
     except Exception:
         # If adding the cog fails, avoid crashing the loader.
         return
-
-    # Register the app-command group if not already present so /tcg subcommands work
-    try:
-        if bot.tree.get_command('tcg') is None:
-            bot.tree.add_command(PsyvrseTCG.tcg_group)
-    except Exception:
-        pass
+    # App commands on the Cog are registered automatically when the cog is
+    # added. Avoid calling `bot.tree.add_command` here to prevent duplicate
+    # registrations during extension reloads.

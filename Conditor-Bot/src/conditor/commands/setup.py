@@ -1,3 +1,4 @@
+import logging
 from discord import app_commands, Interaction
 from discord.ext import commands
 from ..modals import SetupModalStep1
@@ -15,7 +16,7 @@ class SetupCog(commands.Cog):
 async def setup_sync(bot: commands.Bot):
     # Add the cog instance; also register cog app-commands with the CommandTree
     cog = SetupCog(bot)
-    bot.add_cog(cog)
+    await bot.add_cog(cog)
     try:
         # Register any app commands defined on the cog immediately
         bot.tree.add_cog(cog)

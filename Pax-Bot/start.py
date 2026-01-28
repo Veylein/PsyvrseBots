@@ -21,24 +21,19 @@ if not TOKEN:
     logging.error('PAX_TOKEN not set. Create a Pax-Bot/.env from Pax-Bot/.env.example')
     sys.exit(2)
 
-intents = None
-try:
-    import discord
-    intents = discord.Intents.default()
-    intents.message_content = True
-except Exception:
-    intents = None
-
-bot = commands.Bot(command_prefix='!', intents=intents)
-
-
-@bot.event
-async def on_ready():
-    print(f"[Pax-Bot] Ready as {bot.user} (id: {bot.user.id})")
+import runpy
 
 
 def main():
     try:
+        # Execute main.py in a fresh namespace and get its globals
+        module_globals = runpy.run_path("main.py")
+        bot = module_globals.get("bot")
+        if bot is None:
+            logging.error('Pax main.py did not expose `bot`. Falling back to minimal runner.')
+            sys.exit(2)
+
+        # Run the bot using the token from the environment
         bot.run(TOKEN)
     except Exception as e:
         logging.exception('Bot failed to start: %s', e)
