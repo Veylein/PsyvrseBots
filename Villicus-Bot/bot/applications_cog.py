@@ -35,12 +35,17 @@ class ApplicationModal(ui.Modal, title="Server Application"):
         if not target_id:
             return await interaction.followup.send('Application channel is not configured. Ask an admin to set it with /set-application-channel.', ephemeral=True)
 
-        target = await interaction.client.fetch_channel(int(target_id)).catch(lambda e: None) if hasattr(interaction.client, 'fetch_channel') else None
-        # fallback fetch pattern
-        try:
-            target = await interaction.client.channels.fetch(int(target_id))
-        except Exception:
-            target = None
+        target = None
+        if hasattr(interaction.client, 'fetch_channel'):
+            try:
+                target = await interaction.client.fetch_channel(int(target_id))
+            except Exception:
+                target = None
+        else:
+            try:
+                target = await interaction.client.channels.fetch(int(target_id))
+            except Exception:
+                target = None
 
         if not target:
             return await interaction.followup.send('Configured application channel not available. Ask an admin to reconfigure.', ephemeral=True)
@@ -57,7 +62,7 @@ class ApplicationModal(ui.Modal, title="Server Application"):
             dm = await interaction.user.create_dm()
             await dm.send('Thanks — your application has been submitted. Here is a copy:')
             await dm.send({ 'embeds': [embed] })
-            await interaction.followup.send('Application submitted and a copy was DM'd to you.', ephemeral=True)
+            await interaction.followup.send("Application submitted and a copy was DM'd to you.", ephemeral=True)
         except discord.Forbidden:
             await interaction.followup.send('Application submitted, but I could not DM you — your DMs appear to be closed.', ephemeral=True)
         except Exception:
