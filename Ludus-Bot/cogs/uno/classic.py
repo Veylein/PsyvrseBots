@@ -374,6 +374,9 @@ class UnoCog(commands.Cog):
             except Exception:
                 pass
             
+            # Clear all hand messages to prevent callbacks
+            game['hand_messages'] = {}
+            
             # Notify player
             if interaction:
                 try:
@@ -452,6 +455,9 @@ class UnoCog(commands.Cog):
                         await msg.edit(embed=embed, view=None)
                 except Exception:
                     pass
+                
+                # Clear all hand messages to prevent callbacks
+                game['hand_messages'] = {}
                 
                 self.bot.active_games.pop(game_id, None)
                 return True

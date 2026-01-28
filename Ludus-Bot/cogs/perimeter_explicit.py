@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from typing import Optional, List
+from functools import partial
 
 
 def _make_choice(name: str):
@@ -99,14 +100,23 @@ async def setup(bot: commands.Bot):
         except Exception:
             return
 
+        # Factory function to create wrapper without problematic closure
+        def make_wrapper(cog_instance):
+            async def _wrapper(interaction: discord.Interaction, subcommand: str = ""):
+                await cog_instance._invoke(interaction, subcommand)
+            return _wrapper
+        
+        def make_minigame_wrapper(cog_instance):
+            async def _minigame_wrapper(interaction: discord.Interaction, game: str, target: Optional[str] = None):
+                await cog_instance._invoke(interaction, f"{game} {target or ''}".strip())
+            return _minigame_wrapper
+
         for cat in CATEGORIES:
             if bot.tree.get_command(cat) is not None:
                 continue
 
-            async def _wrapper(interaction: discord.Interaction, subcommand: str = "", _cog=cog):
-                await _cog._invoke(interaction, subcommand)
-
-            cmd = app_commands.Command(name=cat, callback=_wrapper, description=f"Run a {cat} category command")
+            wrapper = make_wrapper(cog)
+            cmd = app_commands.Command(name=cat, callback=wrapper, description=f"Run a {cat} category command")
             try:
                 bot.tree.add_command(cmd)
             except Exception:
@@ -114,10 +124,8 @@ async def setup(bot: commands.Bot):
 
         # Register /minigame if missing
         if bot.tree.get_command('minigame') is None:
-            async def _minigame_wrapper(interaction: discord.Interaction, game: str, target: Optional[str] = None, _cog=cog):
-                await _cog._invoke(interaction, f"{game} {target or ''}".strip())
-
-            cmd = app_commands.Command(name='minigame', callback=_minigame_wrapper, description='Play a selected minigame')
+            minigame_wrapper = make_minigame_wrapper(cog)
+            cmd = app_commands.Command(name='minigame', callback=minigame_wrapper, description='Play a selected minigame')
             try:
                 bot.tree.add_command(cmd)
             except Exception:
