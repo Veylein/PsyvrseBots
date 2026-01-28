@@ -3616,7 +3616,24 @@ async def compliment_command(ctx, target: discord.Member = None):
 @bot.command(name="help")
 async def help_command(ctx, category: str = None):
     """Display help for bot commands organized by category"""
-    
+    # Give new users a starting balance when they view the main help
+    try:
+        user_id_str = str(ctx.author.id)
+        user_data = chi_data.get(user_id_str)
+        if category is None:
+            if (not user_data) or (user_data.get("chi", 0) == 0 and not user_data.get("help_given", False)):
+                if not user_data:
+                    chi_data[user_id_str] = {"chi": 0, "rebirths": 0}
+                chi_data[user_id_str]["chi"] = chi_data[user_id_str].get("chi", 0) + 150
+                chi_data[user_id_str]["help_given"] = True
+                save_data()
+                try:
+                    await ctx.send(f"🎁 Welcome! You've been granted **150 chi** to get started, {ctx.author.mention}!")
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     if category is None:
         embed = discord.Embed(
             title="🐼 Panda Chi Bot - Command Categories",
