@@ -3,9 +3,9 @@ import discord
 import asyncio
 
 # Do NOT hardcode bot tokens. Use an environment variable instead.
-DISCORD_TOKEN = os.getenv('DISCORD_TOKEN') or os.getenv('PAX_TOKEN')
-if not DISCORD_TOKEN:
-    raise RuntimeError('DISCORD_TOKEN or PAX_TOKEN must be set in the environment')
+PAX_TOKEN = os.getenv('PAX_TOKEN')
+if not PAX_TOKEN:
+    raise RuntimeError('PAX_TOKEN must be set in the environment')
 
 
 class CleanupBot(discord.Client):
@@ -21,4 +21,4 @@ class CleanupBot(discord.Client):
 
 intents = discord.Intents.default()
 client = CleanupBot(intents=intents)
-client.run(DISCORD_TOKEN)
+client.run(PAX_TOKEN)

@@ -45,7 +45,7 @@ A Discord bot that tracks user "chi" (positive energy) based on their language u
 
 ## Setup
 
-1. **Discord Bot Token**: The bot requires a Discord bot token stored in Secrets as `DISCORD_TOKEN`
+1. **Pax Bot Token**: The bot requires a Discord bot token stored in Secrets as `PAX_TOKEN`
 
 2. **Bot Permissions**: Your bot needs these permissions:
    - Read Messages/View Channels
@@ -85,4 +85,4 @@ A Discord bot that tracks user "chi" (positive energy) based on their language u
 
 ## Running the Bot
 
-The bot will start automatically in this Repl. Make sure you've set your `DISCORD_TOKEN` in Secrets.
+The bot will start automatically in this Repl. Make sure you've set your `PAX_TOKEN` in Secrets.
