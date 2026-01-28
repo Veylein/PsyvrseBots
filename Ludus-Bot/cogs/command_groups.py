@@ -46,22 +46,10 @@ async def setup(bot: commands.Bot):
     if bot.get_cog('CommandGroups') is None:
         await bot.add_cog(CommandGroups(bot))
 
-    # For each category, create a slash group and register a generic action command
-    for cat in CAT_CATEGORIES:
-        try:
-            if bot.tree.get_command(cat) is None:
-                grp = app_commands.Group(name=cat, description=f"{cat.title()} category commands")
-
-                @grp.command(name="action", description="Perform an action in this category")
-                async def _action(interaction: discord.Interaction, action: str):
-                    # Dispatch to cog if available
-                    cog = bot.get_cog('CommandGroups')
-                    await cog.handle_action(interaction, None, cat, action)
-
-                bot.tree.add_command(grp)
-        except Exception:
-            # ignore registration errors to avoid blocking bot startup
-            pass
+    # Note: slash category commands are defined as app commands on the Cog
+    # class further below. Avoid dynamically creating and adding duplicate
+    # `app_commands.Group` objects here which can lead to duplicate
+    # registrations during module reloads.
 
     # Create lightweight prefix command wrappers if command prefix is in use
     # These commands are simple and meant to be replaced by richer implementations
