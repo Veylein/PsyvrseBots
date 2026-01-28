@@ -5,7 +5,7 @@ import re
 import os
 import random
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 from deep_translator import GoogleTranslator
 from db_service import db
@@ -1570,7 +1570,7 @@ async def log_event(event_type: str, description: str, guild, color: discord.Col
                 title=f"📋 {event_type}",
                 description=description,
                 color=color,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(timezone.utc)
             )
             embed.set_footer(text="Panda Bot Event Log")
             await log_channel.send(embed=embed)
@@ -2021,7 +2021,7 @@ try:
         raw_logs = data.get("logs", [])
         
         # Prune logs older than 7 days with defensive validation
-        cutoff_date = datetime.utcnow() - timedelta(days=ERROR_LOG_RETENTION_DAYS)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=ERROR_LOG_RETENTION_DAYS)
         error_logs = []
         for log in raw_logs:
             try:
@@ -2145,7 +2145,7 @@ async def save_log_config():
 def cleanup_old_logs():
     """Remove logs older than ERROR_LOG_RETENTION_DAYS"""
     global error_logs
-    cutoff_date = datetime.utcnow() - timedelta(days=ERROR_LOG_RETENTION_DAYS)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=ERROR_LOG_RETENTION_DAYS)
     error_logs = [
         log for log in error_logs 
         if datetime.fromisoformat(log["timestamp"]) > cutoff_date
@@ -2159,7 +2159,7 @@ def log_error(error_msg, command=None, user=None, message_link=None, error_code=
     
     error_entry = {
         "id": f"L{error_log_counter}",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "error": error_msg,
         "command": command,
         "user": str(user) if user else None,
@@ -2391,7 +2391,7 @@ for user_id in chi_data:
                     "xp": 0,
                     "battles_won": 0,
                     "battles_lost": 0,
-                    "purchased_at": pet.get("purchased_at", str(datetime.utcnow()))
+                    "purchased_at": pet.get("purchased_at", datetime.now(timezone.utc).isoformat())
                 }
                 migration_needed = True
                 
@@ -2849,7 +2849,7 @@ def is_garden_event_active():
         return False
     
     end_time = gardens_data["garden_event"]["end_time"]
-    if end_time and datetime.utcnow().timestamp() < end_time:
+    if end_time and datetime.now(timezone.utc).timestamp() < end_time:
         return True
     
     # Event expired, deactivate it
@@ -3259,7 +3259,7 @@ async def on_ready():
     if not database_sync_task.is_running():
         database_sync_task.start()
     
-    next_event_time = datetime.utcnow() + timedelta(seconds=random.randint(CHI_EVENT_MIN_INTERVAL, CHI_EVENT_MAX_INTERVAL))
+    next_event_time = datetime.now(timezone.utc) + timedelta(seconds=random.randint(CHI_EVENT_MIN_INTERVAL, CHI_EVENT_MAX_INTERVAL))
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -3289,7 +3289,7 @@ async def on_command_error(ctx, error):
                         title=f"⚠️ Error Log: {error_entry['id']}",
                         description=f"**Error:** {str(error)[:200]}",
                         color=discord.Color.red(),
-                        timestamp=datetime.utcnow()
+                        timestamp=datetime.now(timezone.utc)
                     )
                     embed.add_field(
                         name="Details",
@@ -4222,7 +4222,7 @@ async def chi_add(ctx, member: discord.Member, amount: int):
         dm_embed = discord.Embed(
             title="🔔 Chi Add Command Used",
             color=discord.Color.green(),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         dm_embed.add_field(name="👤 Used By", value=f"{ctx.author} ({ctx.author.id})", inline=False)
         dm_embed.add_field(name="🎯 Target User", value=f"{member} ({member.id})", inline=False)
@@ -4901,7 +4901,7 @@ async def psy_give(ctx, member: discord.Member = None, category: str = "", *, it
             "xp": 0,
             "battles_won": 0,
             "battles_lost": 0,
-            "purchased_at": str(datetime.utcnow())
+            "purchased_at": datetime.now(timezone.utc).isoformat()
         }
         chi_data[user_id]["pets"].append(pet_data)
         
@@ -5715,7 +5715,7 @@ async def find_artifact(ctx, *, args: str = ""):
     
     # Check if expired
     expires_at = datetime.fromisoformat(active_artifact["expires_at"])
-    if datetime.utcnow() > expires_at:
+    if datetime.now(timezone.utc) > expires_at:
         await ctx.send("❌ The artifact has already vanished...")
         artifact_state["active_artifact"] = None
         save_artifact_state()
@@ -5737,7 +5737,7 @@ async def find_artifact(ctx, *, args: str = ""):
         "tier": tier,
         "emoji": emoji,
         "name": artifact_name,
-        "claimed_at": datetime.utcnow().isoformat()
+        "claimed_at": datetime.now(timezone.utc).isoformat()
     })
     
     # Mark as claimed
@@ -5911,7 +5911,7 @@ async def event_command(ctx, event_type: str = ""):
         active_food_event = {
             "food_name": food_name,
             "quantity": food_quantity,
-            "spawned_at": datetime.utcnow().isoformat(),
+            "spawned_at": datetime.now(timezone.utc).isoformat(),
             "claimed_by": None
         }
         
@@ -5934,7 +5934,7 @@ async def event_command(ctx, event_type: str = ""):
         
         # Activate event
         gardens_data["garden_event"]["active"] = True
-        gardens_data["garden_event"]["end_time"] = (datetime.utcnow() + timedelta(minutes=10)).timestamp()
+        gardens_data["garden_event"]["end_time"] = (datetime.now(timezone.utc) + timedelta(minutes=10)).timestamp()
         save_gardens()
         
         # Count affected gardens
@@ -5973,7 +5973,7 @@ async def event_command(ctx, event_type: str = ""):
             return
         
         # Spawn artifact of specified tier
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         emoji_index = random.randint(0, len(ARTIFACT_CONFIG[event_type]["emojis"]) - 1)
         selected_emoji = ARTIFACT_CONFIG[event_type]["emojis"][emoji_index]
         selected_name = ARTIFACT_CONFIG[event_type]["names"][emoji_index]
@@ -6547,7 +6547,7 @@ async def log_command(ctx, mode: str = None, target: str = None):
         examples_text = ""
         for log in filtered_logs[-5:]:
             timestamp = datetime.fromisoformat(log["timestamp"])
-            time_ago = (datetime.utcnow() - timestamp).total_seconds()
+            time_ago = (datetime.now(timezone.utc) - timestamp).total_seconds()
             if time_ago < 3600:
                 time_str = f"{int(time_ago/60)}m ago"
             elif time_ago < 86400:
@@ -6642,7 +6642,7 @@ async def log_command(ctx, mode: str = None, target: str = None):
         error_text = ""
         for log in page_logs:
             timestamp = datetime.fromisoformat(log["timestamp"])
-            time_ago = (datetime.utcnow() - timestamp).total_seconds()
+            time_ago = (datetime.now(timezone.utc) - timestamp).total_seconds()
             
             if time_ago < 60:
                 time_str = f"{int(time_ago)}s ago"
@@ -6732,7 +6732,7 @@ async def artifact_give(ctx, target: discord.Member = None, artifact_type: str =
         chi_data[target_id]["artifacts"] = []
     
     # Generate random artifact of specified tier
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     emoji_index = random.randint(0, len(ARTIFACT_CONFIG[artifact_type]["emojis"]) - 1)
     selected_emoji = ARTIFACT_CONFIG[artifact_type]["emojis"][emoji_index]
     selected_name = ARTIFACT_CONFIG[artifact_type]["names"][emoji_index]
@@ -7082,7 +7082,7 @@ async def reset_all_chi(ctx):
 async def next(ctx):
     global next_event_time
     if next_event_time:
-        time_remaining = (next_event_time - datetime.utcnow()).total_seconds()
+        time_remaining = (next_event_time - datetime.now(timezone.utc)).total_seconds()
         if time_remaining > 0:
             minutes = int(time_remaining // 60)
             seconds = int(time_remaining % 60)
