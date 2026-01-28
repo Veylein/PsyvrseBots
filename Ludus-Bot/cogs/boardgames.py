@@ -4,19 +4,425 @@ from discord import app_commands
 import random
 import asyncio
 from typing import Optional, Dict, List
+import time
 
-from discord import app_commands
 from discord.ui import View, Button
 from cogs.minigames import PaginatedHelpView
+
+# Import TCG system for card rewards
 try:
-    from .tcg import manager as tcg_manager
-    from .psyvrse_tcg import CARD_DATABASE
-except Exception:
-    tcg_manager = None
-    CARD_DATABASE = {}
+    from cogs.psyvrse_tcg import inventory as tcg_inventory, generate_card_from_seed
+except ImportError:
+    tcg_inventory = None
+    generate_card_from_seed = None
+
+# ==================== HELPER FUNCTIONS ====================
+
+def generate_board_view(game_id, board, size, disabled=False, symbols=None):
+    """Generate interactive board view for Tic-Tac-Toe"""
+    if symbols is None:
+        symbols = {1: 'X', 2: 'O'}
+    
+    view = discord.ui.View(timeout=None)
+    for i in range(size * size):
+        row = i // size
+        state = board[i]
+        btn = discord.ui.Button(custom_id=f"ttt_move_{game_id}_{i}", row=row)
+        if state == 1:
+            btn.label = symbols[1]
+            btn.style = discord.ButtonStyle.primary
+            btn.disabled = True
+        elif state == 2:
+            btn.label = symbols[2]
+            btn.style = discord.ButtonStyle.danger
+            btn.disabled = True
+        else:
+            btn.label = "\u200b"
+            btn.style = discord.ButtonStyle.secondary
+            btn.disabled = disabled
+        view.add_item(btn)
+    return view
+
+def generate_lobby_embed(lobby, host_user):
+    """Generate embed for TTT lobby"""
+    embed = discord.Embed(title="🎮 Tic-Tac-Toe Lobby", color=discord.Color.blue())
+    try:
+        embed.set_thumbnail(url=host_user.display_avatar.url)
+    except Exception:
+        pass
+    players_list = ["🤖 BOT" if pid == 'BOT_AI' else f"<@{pid}>" for pid in lobby['players']]
+    starter_names = {'host_starts': 'Host Starts', 'guest_starts': 'Guest Starts', 'random': 'Random Order'}
+    mode_names = {'normal': 'Normal', 'sliding': 'Disappearing Symbols'}
+    embed.add_field(name="👑 Host", value=f"<@{lobby['hostId']}>")
+    embed.add_field(name="Players", value=f"{len(lobby['players'])}/{lobby['maxPlayers']}")
+    embed.add_field(name="Size", value=f"{lobby.get('boardSize','?')}x{lobby.get('boardSize','?')}")
+    embed.add_field(name="Starter", value=starter_names.get(lobby.get('starter','host_starts'), lobby.get('starter','')))
+    embed.add_field(name="Mode", value=mode_names.get(lobby.get('mode','normal'), lobby.get('mode','')))
+    embed.add_field(name="Joined", value="\n".join(players_list), inline=False)
+    return embed
+
+def generate_lobby_view(lobby_id, lobby_state):
+    """Generate lobby control buttons"""
+    view = discord.ui.View(timeout=None)
+    is_bot_game = 'BOT_AI' in lobby_state['players']
+    is_full = len(lobby_state['players']) >= lobby_state.get('maxPlayers', 2)
+    view.add_item(discord.ui.Button(label="Join", style=discord.ButtonStyle.success, custom_id=f"ttt_lobby_join_{lobby_id}", disabled=(is_full or is_bot_game)))
+    view.add_item(discord.ui.Button(label="🤖 Bot", style=discord.ButtonStyle.primary, custom_id=f"ttt_lobby_bot_{lobby_id}", disabled=(len(lobby_state['players']) > 1)))
+    view.add_item(discord.ui.Button(label="Leave", style=discord.ButtonStyle.secondary, custom_id=f"ttt_lobby_leave_{lobby_id}"))
+    view.add_item(discord.ui.Button(label="⚙️ Settings", style=discord.ButtonStyle.primary, custom_id=f"ttt_lobby_settings_{lobby_id}", row=1))
+    view.add_item(discord.ui.Button(label="Start", style=discord.ButtonStyle.success, custom_id=f"ttt_lobby_start_{lobby_id}", disabled=not (is_full or is_bot_game), row=1))
+    return view
+
+def generate_settings_selects(lobby_id, current_state):
+    """Generate settings selection menus"""
+    view = discord.ui.View(timeout=300)
+    size_options = [
+        discord.SelectOption(label="3x3 (classic)", value="3", default=current_state['boardSize'] == 3),
+        discord.SelectOption(label="5x5 (larger)", value="5", default=current_state['boardSize'] == 5)
+    ]
+    view.add_item(discord.ui.Select(
+        placeholder=f"Size: {current_state['boardSize']}x{current_state['boardSize']}",
+        options=size_options,
+        custom_id=f"ttt_set_size_{lobby_id}"
+    ))
+    starter_options = [
+        discord.SelectOption(label="Host Starts", value="host_starts", default=current_state['starter'] == 'host_starts'),
+        discord.SelectOption(label="Guest Starts", value="guest_starts", default=current_state['starter'] == 'guest_starts'),
+        discord.SelectOption(label="Random Order", value="random", default=current_state['starter'] == 'random')
+    ]
+    view.add_item(discord.ui.Select(
+        placeholder=f"Who Starts: {current_state['starter']}",
+        options=starter_options,
+        custom_id=f"ttt_set_starter_{lobby_id}"
+    ))
+    mode_options = [
+        discord.SelectOption(label="Normal (classic)", value="normal", default=current_state['mode'] == 'normal'),
+        discord.SelectOption(label="Disappearing Symbols", value="sliding", default=current_state['mode'] == 'sliding')
+    ]
+    view.add_item(discord.ui.Select(
+        placeholder=f"Mode: {current_state['mode']}",
+        options=mode_options,
+        custom_id=f"ttt_set_mode_{lobby_id}"
+    ))
+    return view
+
+def get_symbols(game_state):
+    """Get symbols for the game"""
+    return {1: 'X', 2: 'O'}
+
+def get_host_background(game_state, guild_id):
+    """Get background URL for the game (optional)"""
+    return None  # Can be implemented later if needed
+
+# ==================== GAME LOGIC ====================
+
+def check_winner(board, size):
+    """Check if there's a winner - 3x3 needs 3, 4x4 needs 4, 5x5 needs 4"""
+    # Determine win condition based on board size
+    if size == 3:
+        win_length = 3
+    elif size == 4:
+        win_length = 4
+    else:  # 5x5 or larger
+        win_length = 4
+    
+    # Check all possible lines
+    for row in range(size):
+        for col in range(size):
+            if board[row * size + col] == 0:
+                continue
+            
+            player = board[row * size + col]
+            
+            # Check horizontal (right)
+            if col + win_length <= size:
+                if all(board[row * size + col + i] == player for i in range(win_length)):
+                    return player
+            
+            # Check vertical (down)
+            if row + win_length <= size:
+                if all(board[(row + i) * size + col] == player for i in range(win_length)):
+                    return player
+            
+            # Check diagonal (down-right)
+            if row + win_length <= size and col + win_length <= size:
+                if all(board[(row + i) * size + col + i] == player for i in range(win_length)):
+                    return player
+            
+            # Check anti-diagonal (down-left)
+            if row + win_length <= size and col - win_length >= -1:
+                if all(board[(row + i) * size + col - i] == player for i in range(win_length)):
+                    return player
+    
+    return None
+
+def evaluate_position(board, size, player, opponent):
+    """Heuristic evaluation for larger boards"""
+    score = 0
+    
+    # Check all rows, columns, and diagonals
+    for row in range(size):
+        for col in range(size):
+            if board[row * size + col] != 0:
+                continue
+            # Evaluate potential of this position
+            threats = 0
+            opportunities = 0
+            
+            # Check row
+            row_player = sum(1 for c in range(size) if board[row * size + c] == player)
+            row_opponent = sum(1 for c in range(size) if board[row * size + c] == opponent)
+            if row_opponent == 0 and row_player > 0:
+                opportunities += row_player ** 2
+            if row_player == 0 and row_opponent > 0:
+                threats += row_opponent ** 2
+                
+            # Check column
+            col_player = sum(1 for r in range(size) if board[r * size + col] == player)
+            col_opponent = sum(1 for r in range(size) if board[r * size + col] == opponent)
+            if col_opponent == 0 and col_player > 0:
+                opportunities += col_player ** 2
+            if col_player == 0 and col_opponent > 0:
+                threats += col_opponent ** 2
+    
+    return opportunities - threats
+
+def minimax(board, size, depth, is_maximizing, alpha, beta, player, opponent, max_depth):
+    """Minimax algorithm with alpha-beta pruning and depth limit"""
+    winner = check_winner(board, size)
+    
+    # Terminal states
+    if winner == player:
+        return 100 - depth  # Prefer faster wins
+    elif winner == opponent:
+        return depth - 100  # Prefer slower losses
+    elif all(cell != 0 for cell in board):
+        return 0  # Draw
+    
+    # Depth limit - use heuristic evaluation
+    if depth >= max_depth:
+        return evaluate_position(board, size, player, opponent)
+    
+    if is_maximizing:
+        max_eval = -float('inf')
+        for i in range(len(board)):
+            if board[i] == 0:
+                board[i] = player
+                eval_score = minimax(board, size, depth + 1, False, alpha, beta, player, opponent, max_depth)
+                board[i] = 0
+                max_eval = max(max_eval, eval_score)
+                alpha = max(alpha, eval_score)
+                if beta <= alpha:
+                    break  # Beta cutoff
+        return max_eval
+    else:
+        min_eval = float('inf')
+        for i in range(len(board)):
+            if board[i] == 0:
+                board[i] = opponent
+                eval_score = minimax(board, size, depth + 1, True, alpha, beta, player, opponent, max_depth)
+                board[i] = 0
+                min_eval = min(min_eval, eval_score)
+                beta = min(beta, eval_score)
+                if beta <= alpha:
+                    break  # Alpha cutoff
+        return min_eval
+
+def choose_move(board, size, player):
+    """AI chooses optimal move - unbeatable on 3x3, very strong on larger boards"""
+    opponent = 3 - player
+    
+    # Set depth limit based on board size
+    if size == 3:
+        max_depth = 9  # Full search for 3x3
+    elif size == 4:
+        max_depth = 5  # Medium depth for 4x4
+    else:  # 5x5 or larger
+        max_depth = 3  # Shallow search with heuristic for 5x5
+    
+    # Priority moves for larger boards (optimization)
+    if size >= 4:
+        # 1. Check for immediate win
+        for i in range(len(board)):
+            if board[i] == 0:
+                board[i] = player
+                if check_winner(board, size):
+                    board[i] = 0
+                    return i
+                board[i] = 0
+        
+        # 2. Block immediate opponent win
+        for i in range(len(board)):
+            if board[i] == 0:
+                board[i] = opponent
+                if check_winner(board, size):
+                    board[i] = 0
+                    return i
+                board[i] = 0
+    
+    best_score = -float('inf')
+    best_moves = []
+    
+    # Evaluate all possible moves
+    for i in range(len(board)):
+        if board[i] == 0:
+            board[i] = player
+            score = minimax(board, size, 0, False, -float('inf'), float('inf'), player, opponent, max_depth)
+            board[i] = 0
+            
+            if score > best_score:
+                best_score = score
+                best_moves = [i]
+            elif score == best_score:
+                best_moves.append(i)
+    
+    # If multiple moves have same score, prefer center positions
+    if len(best_moves) > 1:
+        center = size // 2
+        center_positions = []
+        for move in best_moves:
+            row = move // size
+            col = move % size
+            dist = abs(row - center) + abs(col - center)
+            center_positions.append((dist, move))
+        center_positions.sort()
+        return center_positions[0][1]
+    
+    return best_moves[0] if best_moves else 0
+
+async def process_move(bot, interaction, game_id, game, idx):
+    player_num = game['turn']
+    size = game['size']
+    game['last_activity'] = time.time()
+
+    if game['board'][idx] != 0:
+        if hasattr(interaction.response, 'send_message'):
+            return await interaction.response.send_message("This field is already taken.", ephemeral=True)
+        else:
+            return
+
+    if game.get('mode') == 'sliding':
+        hist = game['history'][str(player_num)]
+        hist.append(idx)
+        # 3x3: max 3 symbols, 5x5: max 4 symbols
+        limit = 3 if size == 3 else 4
+        if len(hist) > limit:
+            old_idx = hist.pop(0)
+            if game['board'][old_idx] == player_num:
+                game['board'][old_idx] = 0
+
+    game['board'][idx] = player_num
+
+    winner = check_winner(game['board'], size)
+    is_draw = 0 not in game['board'] and not winner
+
+    symbols = get_symbols(game)
+
+    if winner or is_draw:
+        bot.pending_rematches[game_id] = {
+            'size': game['size'],
+            'mode': game['mode'],
+            'players': game['players'],
+            'messageId': game.get('messageId')
+        }
+        bot.active_games.pop(game_id, None)
+
+        if winner:
+            win_id = game['players'][str(winner)]
+            lose_id = game['players']['1' if winner==2 else '2']
+            is_multiplayer = win_id != 'BOT_AI' and lose_id != 'BOT_AI'
+            
+            # Record game statistics using GameStats cog
+            game_stats_cog = bot.get_cog("GameStats")
+            if game_stats_cog and win_id != 'BOT_AI':
+                duration = int(time.time() - game.get('start_time', time.time()))
+                guild_id = interaction.guild.id if interaction.guild else None
+                game_stats_cog.record_game(int(win_id), "ttt", won=True, coins_earned=50, playtime_seconds=duration, category="board_games", guild_id=guild_id)
+            
+            if win_id != 'BOT_AI':
+                # Award coins using Economy cog
+                economy_cog = bot.get_cog("Economy")
+                if economy_cog:
+                    economy_cog.add_coins(int(win_id), 50, reason="boardgame_win")
+                
+                # 40% chance to award a basic TCG card
+                if tcg_inventory and generate_card_from_seed and random.random() < 0.4:
+                    try:
+                        seed = random.randrange(1000000)
+                        tcg_inventory.add_card(int(win_id), str(seed))
+                        card = generate_card_from_seed(seed)
+                        try:
+                            await interaction.channel.send(f"🎴 **Bonus!** <@{win_id}> received a TCG card: **{card.name}** ({card.rarity})!", delete_after=10)
+                        except:
+                            pass
+                    except Exception:
+                        pass
+            
+            winner_mention = "🤖 BOT" if win_id == 'BOT_AI' else f"<@{win_id}>"
+            embed = discord.Embed(title="Game Over!", description=f"{winner_mention} won!", color=discord.Color.green())
+        else:
+            # Draw - no coins awarded
+            p1, p2 = game['players']['1'], game['players']['2']
+            embed = discord.Embed(title="Draw!", color=discord.Color.orange())
+
+        view = generate_board_view(game_id, game['board'], size, disabled=True, symbols=symbols)
+        await interaction.message.edit(embed=embed, view=view)
+        
+        # Send separate message with rematch button
+        rematch_view = discord.ui.View(timeout=60)
+        rematch_btn = discord.ui.Button(label="🔄 Rematch", style=discord.ButtonStyle.success, custom_id=f"ttt_rematch_{game_id}")
+        rematch_view.add_item(rematch_btn)
+        rematch_msg = await interaction.channel.send("Want to play again?", view=rematch_view)
+        
+        # Save rematch message ID
+        if game_id in bot.pending_rematches:
+            bot.pending_rematches[game_id]['rematch_message_id'] = rematch_msg.id
+        
+        return
+
+    game['turn'] = 2 if player_num == 1 else 1
+    next_pid = game['players'][str(game['turn'])]
+
+    p_name = "🤖 BOT" if next_pid == 'BOT_AI' else f"<@{next_pid}>"
+    embed = discord.Embed(title=f"Game {size}x{size}", description=f"Turn: {p_name} ({symbols[game['turn']]})")
+    view = generate_board_view(game_id, game['board'], size, symbols=symbols)
+
+    await interaction.message.edit(embed=embed, view=view)
+
+    if next_pid == 'BOT_AI':
+        await handle_bot_move(bot, interaction.message, game_id, game)
+
+async def handle_bot_move(bot, message, game_id, game):
+    await asyncio.sleep(1)
+    bot_player = game['turn']
+    move_idx = choose_move(game['board'], game['size'], bot_player)
+
+    class FakeInteraction:
+        def __init__(self, msg):
+            self.message = msg
+            self.channel = msg.channel
+            self.guild = msg.guild
+            self.response = self
+            self.user = type('obj', (object,), {'id': 'BOT_AI'})
+        def is_done(self): return True
+        async def edit_message(self, embed=None, view=None):
+            return await self.message.edit(embed=embed, view=view)
+        async def send_message(self, content, ephemeral=True):
+            return
+        async def edit(self, **kwargs):
+            return await self.message.edit(**kwargs)
+
+    await process_move(bot, FakeInteraction(message), game_id, game, move_idx)
+
+# ==================== BOARD GAMES COG ====================
 
 class BoardGames(commands.Cog):
     """Classic board games - Chess, Checkers, Connect4, Tic-Tac-Toe, and more"""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.active_games = {}
+        self.player_games = {}  # Track which game each player is in
 
     @app_commands.command(name="boardgames", description="View all board game commands and info (paginated)")
     async def boardgames_slash(self, interaction: discord.Interaction):
@@ -30,318 +436,403 @@ class BoardGames(commands.Cog):
         category_desc = "Play classic and new board games! Use the buttons below to see all commands."
         view = PaginatedHelpView(interaction, commands_list, category_name, category_desc)
         await view.send()
-    
-    def __init__(self, bot):
-        self.bot = bot
-        self.active_games = {}
-        self.player_games = {}  # Track which game each player is in
 
     # ==================== TIC-TAC-TOE ====================
     
-    # Slash command groups
-    ttt_group = app_commands.Group(name="ttt", description="Tic-Tac-Toe game")
-    
-    @commands.group(name="ttt", invoke_without_command=True)
-    async def ttt(self, ctx):
-        """Tic-Tac-Toe commands"""
-        await ctx.send("**Tic-Tac-Toe Commands:**\n`L!ttt start [@player]` - Start a game (vs player or AI)\n`L!ttt move <1-9>` - Make a move\n`L!ttt quit` - Quit current game")
-
-    @ttt.command(name="start")
-    async def ttt_start(self, ctx, opponent: Optional[discord.Member] = None, difficulty: str = "hard"):
-        """Start a Tic-Tac-Toe game"""
-        await self._start_ttt(ctx.author, opponent, difficulty, ctx, None)
-
-    @ttt_group.command(name="start", description="Start a Tic-Tac-Toe game")
-    @app_commands.describe(
-        opponent="Player to challenge (optional, defaults to AI)",
-        difficulty="AI difficulty: easy, medium, or hard (default: hard)"
-    )
-    @app_commands.choices(difficulty=[
-        app_commands.Choice(name="Easy", value="easy"),
-        app_commands.Choice(name="Medium", value="medium"),
-        app_commands.Choice(name="Hard (Unbeatable)", value="hard")
-    ])
-    async def ttt_slash(self, interaction: discord.Interaction, opponent: Optional[discord.Member] = None, difficulty: str = "hard"):
+    @app_commands.command(name="ttt", description="Create a Tic-Tac-Toe lobby")
+    @app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
+    @app_commands.allowed_installs(guilds=True, users=True)
+    async def tictactoe(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        await self._start_ttt(interaction.user, opponent, difficulty, None, interaction)
-
-    async def _start_ttt(self, player1, opponent, difficulty, ctx, interaction):
-        if player1.id in self.player_games:
-            msg = "❌ You're already in a game! Finish it first with `L!ttt quit`"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
-            return
-
-        # Initialize game
-        is_ai = opponent is None
-        player2 = "AI" if is_ai else opponent
         
-        if not is_ai and opponent.id in self.player_games:
-            msg = f"❌ {opponent.mention} is already in a game!"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
-            return
+        lobby_id = f"ttt_lobby_{interaction.channel_id}_{interaction.user.id}"
+        uid_str = str(interaction.user.id)
 
-        game_id = f"ttt_{player1.id}_{random.randint(1000, 9999)}"
-        board = [" " for _ in range(9)]
-        
-        game_state = {
-            "type": "ttt",
-            "board": board,
-            "players": [player1.id, player2 if is_ai else player2.id],
-            "current_turn": player1.id,
-            "symbols": {player1.id: "X", (player2 if is_ai else player2.id): "O"},
-            "is_ai": is_ai,
-            "difficulty": difficulty if is_ai else None,
-            "channel": ctx.channel.id if ctx else interaction.channel.id
+        # Prevent creating a TTT lobby if user is already in any game/lobby
+        for g in self.bot.active_games.values():
+            if uid_str in g.get('players', {}).values():
+                return await interaction.followup.send("You can't create a lobby while in another active game.", ephemeral=True)
+        for mg in self.bot.active_minigames.values():
+            if mg.get('type') == 'solo' and str(mg.get('user_id')) == uid_str:
+                return await interaction.followup.send("You can't create a lobby while in an active hangman game.", ephemeral=True)
+            if mg.get('type') == 'multi' and uid_str in mg.get('players', []):
+                return await interaction.followup.send("You can't create a lobby while in an active hangman game.", ephemeral=True)
+        for lid, l in self.bot.active_lobbies.items():
+            if uid_str in l.get('players', []) or l.get('hostId') == uid_str:
+                return await interaction.followup.send("You can't create a new lobby while already in a lobby.", ephemeral=True)
+
+        if lobby_id in self.bot.active_lobbies:
+            return await interaction.followup.send("You already have an active lobby!", ephemeral=True)
+
+        lobby_state = {
+            'hostId': str(interaction.user.id),
+            'players': [str(interaction.user.id)],
+            'maxPlayers': 2,
+            'boardSize': 3,
+            'starter': 'host_starts',
+            'mode': 'normal',
+            'messageId': None,
+            'last_activity': time.time(),
+            'start_time': time.time()
         }
-        
-        self.active_games[game_id] = game_state
-        self.player_games[player1.id] = game_id
-        if not is_ai:
-            self.player_games[opponent.id] = game_id
 
-        embed = self._create_ttt_embed(game_state, player1, player2)
-        if is_ai:
-            embed.add_field(name="AI Difficulty", value=f"**{difficulty.title()}**", inline=False)
+        embed = generate_lobby_embed(lobby_state, interaction.user)
+        view = generate_lobby_view(lobby_id, lobby_state)
+        msg = await interaction.followup.send(embed=embed, view=view, wait=True)
+        lobby_state['messageId'] = msg.id
+        self.bot.active_lobbies[lobby_id] = lobby_state
+
+    # TTT INTERACTION HANDLERS
+
+    async def handle_ttt_interaction(self, interaction: discord.Interaction, cid: str):
+        """Main router for all TTT-related interactions"""
+        if cid.startswith('ttt_set_'):
+            await self.handle_ttt_settings(interaction, cid)
+        elif cid.startswith('ttt_lobby_'):
+            await self.handle_ttt_lobby(interaction, cid)
+        elif cid.startswith('ttt_move_'):
+            await self.handle_ttt_move(interaction, cid)
+        elif cid.startswith('ttt_rematch_'):
+            await self.handle_ttt_rematch(interaction, cid)
+
+    async def handle_ttt_settings(self, interaction: discord.Interaction, cid: str):
+        """Handle TTT lobby settings changes (board size, starter, mode)"""
+        uid = str(interaction.user.id)
+        parts = cid.split('_')
+        setting = parts[2]
+        lobby_id = "_".join(parts[3:])
+        new_value = interaction.data['values'][0]
         
-        if interaction:
-            await interaction.followup.send(embed=embed)
+        lobby = self.bot.active_lobbies.get(lobby_id)
+        if not lobby:
+            return await interaction.response.edit_message(content="Lobby doesn't exist.", view=None)
+
+        if uid != lobby['hostId']:
+            return await interaction.response.send_message("Only the Host can change settings.", ephemeral=True)
+        
+        msg_info = ""
+        if setting == 'size':
+            lobby['boardSize'] = int(new_value)
+            msg_info = f"Board size changed to **{new_value}x{new_value}**."
+        elif setting == 'starter':
+            lobby['starter'] = new_value
+            starter_name = {
+                'host_starts': 'Host Starts', 
+                'guest_starts': 'Guest Starts', 
+                'random': 'Random Order'
+            }.get(new_value, new_value)
+            msg_info = f"Starter changed to **{starter_name}**."
+        elif setting == 'mode':
+            lobby['mode'] = new_value
+            mode_name = {
+                'normal': 'Normal', 
+                'sliding': 'Disappearing Symbols'
+            }.get(new_value, new_value)
+            msg_info = f"Game mode changed to **{mode_name}**."
         else:
-            await ctx.send(embed=embed)
+            return await interaction.response.edit_message(content="Unknown setting.", view=None)
 
-    def _create_ttt_embed(self, game_state, player1, player2):
-        board = game_state["board"]
-        # Show position numbers for empty spaces
-        display_board = [board[i] if board[i] != " " else str(i+1) for i in range(9)]
-        board_display = f"```\n {display_board[0]} │ {display_board[1]} │ {display_board[2]} \n───┼───┼───\n {display_board[3]} │ {display_board[4]} │ {display_board[5]} \n───┼───┼───\n {display_board[6]} │ {display_board[7]} │ {display_board[8]} \n```"
-        
-        current_player = self.bot.get_user(game_state["current_turn"]) if not game_state["is_ai"] or game_state["current_turn"] != "AI" else "AI"
-        
-        embed = discord.Embed(
-            title="⭕ Tic-Tac-Toe ❌",
-            description=board_display,
-            color=discord.Color.blue()
+        host = await self.bot.fetch_user(int(lobby['hostId']))
+        main_lobby_msg = interaction.channel.get_partial_message(lobby['messageId'])
+        await main_lobby_msg.edit(
+            embed=generate_lobby_embed(lobby, host), 
+            view=generate_lobby_view(lobby_id, lobby)
         )
+
+        await interaction.response.edit_message(
+            content=f"⚙️ **Lobby Settings**\n{msg_info}", 
+            view=generate_settings_selects(lobby_id, lobby)
+        )
+
+    async def handle_ttt_lobby(self, interaction: discord.Interaction, cid: str):
+        """Handle TTT lobby actions: join, bot, leave, settings, start"""
+        parts = cid.split('_')
+        action = parts[2]
+        prefix = f"ttt_lobby_{action}_"
+        lobby_id = cid[len(prefix):]
         
-        p1_name = player1.display_name if hasattr(player1, 'display_name') else str(player1)
-        p2_name = "AI" if game_state["is_ai"] else (player2.display_name if hasattr(player2, 'display_name') else str(player2))
-        
-        embed.add_field(name="Players", value=f"❌ {p1_name} vs ⭕ {p2_name}", inline=False)
-        embed.add_field(name="Current Turn", value=f"**{current_player.display_name if hasattr(current_player, 'display_name') else current_player}**", inline=False)
-        embed.add_field(name="How to Play", value="Use `L!ttt move <1-9>` or `/ttt-move <1-9>` to make a move", inline=False)
-        
-        return embed
+        lobby = self.bot.active_lobbies.get(lobby_id)
+        if not lobby:
+            return await interaction.response.send_message("Lobby doesn't exist.", ephemeral=True)
 
-    @ttt.command(name="move")
-    async def ttt_move(self, ctx, position: int):
-        """Make a move in Tic-Tac-Toe"""
-        await self._make_ttt_move(ctx.author, position, ctx, None)
+        uid = str(interaction.user.id)
+        host = await self.bot.fetch_user(int(lobby['hostId']))
 
-    @ttt_group.command(name="move", description="Make a Tic-Tac-Toe move")
-    @app_commands.describe(position="Position to place your symbol (1-9)")
-    async def ttt_move_slash(self, interaction: discord.Interaction, position: int):
-        await interaction.response.defer()
-        await self._make_ttt_move(interaction.user, position, None, interaction)
+        if action == 'join':
+            await self.handle_lobby_join(interaction, lobby, lobby_id, uid, host)
+        elif action == 'bot':
+            await self.handle_lobby_bot(interaction, lobby, lobby_id, uid, host)
+        elif action == 'leave':
+            await self.handle_lobby_leave(interaction, lobby, lobby_id, uid, host)
+        elif action == 'start':
+            await self.handle_lobby_start(interaction, lobby, lobby_id, uid)
+        elif action == 'settings':
+            await self.handle_lobby_settings(interaction, lobby, lobby_id, uid)
 
-    async def _make_ttt_move(self, player, position, ctx, interaction):
-        if player.id not in self.player_games:
-            msg = "❌ You're not in a game! Start one with `L!ttt start`"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
-            return
-
-        game_id = self.player_games[player.id]
-        game_state = self.active_games[game_id]
-        
-        if game_state["current_turn"] != player.id:
-            msg = "❌ It's not your turn!"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
-            return
-
-        if position < 1 or position > 9:
-            msg = "❌ Position must be between 1 and 9!"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
-            return
-
-        if game_state["board"][position - 1] != " ":
-            msg = "❌ That position is already taken!"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
-            return
-
-        # Make move
-        symbol = game_state["symbols"][player.id]
-        game_state["board"][position - 1] = symbol
-
-        # Check for win
-        winner = self._check_ttt_winner(game_state["board"])
-        
-        if winner:
-            embed = self._create_ttt_embed(game_state, player, game_state["players"][1])
-            embed.title = f"🎉 {player.display_name} wins!"
-            embed.color = discord.Color.green()
+    async def handle_lobby_join(self, interaction, lobby, lobby_id, uid, host):
+        """Handle player joining TTT lobby"""
+        if uid not in lobby['players']:
+            if 'BOT_AI' in lobby['players']:
+                lobby['players'].remove('BOT_AI')
             
-            # Award coins
-            economy_cog = self.bot.get_cog("Economy")
-            if economy_cog:
-                economy_cog.add_coins(player.id, 50, "ttt_win")
-                embed.add_field(name="Reward", value="+50 PsyCoins", inline=False)
-            # Chance to award a basic TCG card for simple minigame win
-            if tcg_manager:
+            lobby['players'].append(uid)
+            lobby['last_activity'] = time.time()
+            await interaction.message.edit(
+                embed=generate_lobby_embed(lobby, host), 
+                view=generate_lobby_view(lobby_id, lobby)
+            )
+            await interaction.response.defer()
+        else:
+            await interaction.response.send_message("You're already here.", ephemeral=True)
+
+    async def handle_lobby_bot(self, interaction, lobby, lobby_id, uid, host):
+        """Handle adding/removing bot from TTT lobby"""
+        if uid == lobby['hostId']:
+            if len(lobby['players']) > 1 and lobby['players'][1] != 'BOT_AI':
+                lobby['players'].pop(1)
+
+            if 'BOT_AI' not in lobby['players']:
+                lobby['players'].append('BOT_AI')
+            lobby['last_activity'] = time.time()
+            await interaction.response.defer()
+            await interaction.message.edit(
+                embed=generate_lobby_embed(lobby, host), 
+                view=generate_lobby_view(lobby_id, lobby)
+            )
+
+    async def handle_lobby_leave(self, interaction, lobby, lobby_id, uid, host):
+        """Handle player leaving TTT lobby"""
+        if uid in lobby['players']:
+            if len(lobby['players']) == 2 and 'BOT_AI' in lobby['players'] and uid == lobby['hostId']:
+                lobby['players'].remove('BOT_AI')
+                
+            lobby['players'].remove(uid)
+            lobby['last_activity'] = time.time()
+            if not lobby['players']:
+                await interaction.message.delete()
+                del self.bot.active_lobbies[lobby_id]
+                return await interaction.response.send_message("Lobby disbanded (was empty).", ephemeral=True)
+            
+            await interaction.response.defer()
+            await interaction.message.edit(
+                embed=generate_lobby_embed(lobby, host), 
+                view=generate_lobby_view(lobby_id, lobby)
+            )
+
+    async def handle_lobby_start(self, interaction, lobby, lobby_id, uid):
+        """Handle starting TTT game from lobby"""
+        if uid == lobby['hostId'] and (len(lobby['players']) == lobby['maxPlayers'] or 'BOT_AI' in lobby['players']):
+            del self.bot.active_lobbies[lobby_id]
+
+            p1_id_original = lobby['players'][0]
+            p2_id_original = lobby['players'][1]
+            p1 = p1_id_original
+            p2 = p2_id_original
+
+            if lobby.get('starter') == 'random':
+                if random.choice([True, False]):
+                    p1, p2 = p2, p1
+            elif lobby.get('starter') == 'guest_starts':
+                p1, p2 = p2, p1
+                
+            game_id = f"ttt_game_{interaction.channel_id}_{p1_id_original}_{int(time.time())}"
+            game_state = {
+                'board': [0] * (int(lobby['boardSize']) ** 2),
+                'size': int(lobby['boardSize']),
+                'players': {'1': p1, '2': p2},
+                'turn': 1,
+                'mode': lobby['mode'],
+                'history': {'1': [], '2': []},
+                'start_time': time.time(),
+                'last_activity': time.time(),
+                'messageId': lobby['messageId']
+            }
+            self.bot.active_games[game_id] = game_state
+            
+            symbols = get_symbols(game_state)
+            p1_name = "🤖 BOT" if p1 == 'BOT_AI' else f"<@{p1}>"
+            p2_name = "🤖 BOT" if p2 == 'BOT_AI' else f"<@{p2}>"
+            
+            embed = discord.Embed(
+                title=f"Tic-Tac-Toe {game_state['size']}x{game_state['size']}", 
+                description=f"Turn: {p1_name} ({symbols[1]})"
+            )
+            bg_url = get_host_background(game_state, interaction.guild.id if interaction.guild else None)
+            if bg_url:
+                embed.set_image(url=bg_url)
+            view = generate_board_view(game_id, game_state['board'], game_state['size'], symbols=symbols)
+            
+            await interaction.response.edit_message(content=f"{p1_name} vs {p2_name}", embed=embed, view=view)
+            
+            if p1 == 'BOT_AI':
+                await handle_bot_move(self.bot, interaction.message, game_id, game_state)
+        else:
+            await interaction.response.send_message("Start conditions not met (e.g. missing player).", ephemeral=True)
+
+    async def handle_lobby_settings(self, interaction, lobby, lobby_id, uid):
+        """Handle opening settings menu for TTT lobby"""
+        if uid == lobby['hostId']:
+            view = generate_settings_selects(lobby_id, lobby)
+            await interaction.response.send_message("⚙️ **Lobby Settings** (only Host can change)", view=view, ephemeral=True)
+        else:
+            await interaction.response.send_message("Only the Host can change settings.", ephemeral=True)
+
+    async def handle_ttt_move(self, interaction: discord.Interaction, cid: str):
+        """Handle TTT move button clicks"""
+        parts = cid.split('_')
+        idx = int(parts[-1])
+        game_id = "_".join(parts[2:-1])
+        
+        game = self.bot.active_games.get(game_id)
+        if not game:
+            if interaction.message.components:
+                await interaction.message.edit(content="Game inactive.", view=None)
+            return await interaction.response.send_message("Game inactive.", ephemeral=True)
+            
+        current_player_id = game['players'][str(game['turn'])]
+        if str(interaction.user.id) != current_player_id:
+            return await interaction.response.send_message("Not your turn!", ephemeral=True)
+        
+        # Defer response for AI processing
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+        
+        await process_move(self.bot, interaction, game_id, game, idx)
+
+    async def handle_ttt_rematch(self, interaction: discord.Interaction, cid: str):
+        """Handle TTT rematch requests and responses"""
+        if cid.startswith('ttt_rematch_accept_') or cid.startswith('ttt_rematch_deny_'):
+            await self.handle_rematch_response(interaction, cid)
+        else:
+            await self.handle_rematch_request(interaction, cid)
+
+    async def handle_rematch_request(self, interaction: discord.Interaction, cid: str):
+        """Handle initial rematch button click"""
+        game_id = cid[len('ttt_rematch_'):]
+        requester_id = str(interaction.user.id)
+
+        rematch_state = self.bot.pending_rematches.get(game_id)
+        if not rematch_state:
+            return await interaction.response.send_message("No data about previous game. Rematch impossible.", ephemeral=True)
+        
+        p1_original = rematch_state['players']['1']
+        p2_original = rematch_state['players']['2']
+        
+        if requester_id not in [p1_original, p2_original]:
+            return await interaction.response.send_message("You weren't a player in this game.", ephemeral=True)
+            
+        opponent_id = p2_original if requester_id == p1_original else p1_original
+        opponent_mention = "🤖 BOT" if opponent_id == 'BOT_AI' else f"<@{opponent_id}>"
+
+        if opponent_id == 'BOT_AI':
+            await self.start_rematch_game(interaction, game_id, rematch_state, p1_original, p2_original)
+        else:
+            if 'requested_by' not in self.bot.pending_rematches[game_id]:
+                self.bot.pending_rematches[game_id]['requested_by'] = requester_id
+                
                 try:
-                    awarded = tcg_manager.award_for_game_event(str(player.id), 'basic')
-                    if awarded:
-                        names = [CARD_DATABASE.get(c, {}).get('name', c) for c in awarded]
-                        embed.add_field(name='🎴 Bonus Card', value=', '.join(names), inline=False)
-                except Exception:
+                    await interaction.message.delete()
+                except:
                     pass
-            
-            # Clean up game
-            for p_id in game_state["players"]:
-                if p_id in self.player_games:
-                    del self.player_games[p_id]
-            del self.active_games[game_id]
-            
-            if interaction:
-                await interaction.followup.send(embed=embed)
-            else:
-                await ctx.send(embed=embed)
-            return
-
-        # Check for draw
-        if " " not in game_state["board"]:
-            embed = self._create_ttt_embed(game_state, player, game_state["players"][1])
-            embed.title = "🤝 It's a draw!"
-            embed.color = discord.Color.orange()
-            
-            # Clean up game
-            for p_id in game_state["players"]:
-                if p_id in self.player_games:
-                    del self.player_games[p_id]
-            del self.active_games[game_id]
-            
-            if interaction:
-                await interaction.followup.send(embed=embed)
-            else:
-                await ctx.send(embed=embed)
-            return
-
-        # Switch turn
-        if game_state["is_ai"]:
-            # AI turn
-            game_state["current_turn"] = "AI"
-            difficulty = game_state.get("difficulty", "hard")
-            ai_move = self._get_ai_ttt_move(game_state["board"], difficulty)
-            game_state["board"][ai_move] = "O"
-            
-            # Check AI win
-            winner = self._check_ttt_winner(game_state["board"])
-            if winner:
-                embed = self._create_ttt_embed(game_state, player, "AI")
-                embed.title = "🤖 AI wins!"
-                embed.color = discord.Color.red()
                 
-                # Clean up game
-                del self.player_games[player.id]
-                del self.active_games[game_id]
-                
-                if interaction:
-                    await interaction.followup.send(embed=embed)
-                else:
-                    await ctx.send(embed=embed)
-                return
-            
-            game_state["current_turn"] = player.id
-        else:
-            # Switch to other player
-            current_idx = game_state["players"].index(game_state["current_turn"])
-            game_state["current_turn"] = game_state["players"][1 - current_idx]
+                await interaction.channel.send(
+                    f"Rematch Request: {opponent_mention}, {interaction.user.mention} asks for a **rematch**!", 
+                    view=self.generate_rematch_accept_view(game_id, opponent_id),
+                    allowed_mentions=discord.AllowedMentions(users=True)
+                )
+            else:
+                await interaction.response.send_message("You already requested a rematch, wait for opponent's response.", ephemeral=True)
 
-        # Show updated board
-        p2 = "AI" if game_state["is_ai"] else self.bot.get_user(game_state["players"][1])
-        embed = self._create_ttt_embed(game_state, player, p2)
-        
-        if interaction:
-            await interaction.followup.send(embed=embed)
-        else:
-            await ctx.send(embed=embed)
+    async def handle_rematch_response(self, interaction: discord.Interaction, cid: str):
+        """Handle accept/deny rematch button clicks"""
+        parts = cid.rsplit('_', 1)
+        if len(parts) != 2:
+            return await interaction.response.send_message("Error parsing custom_id.", ephemeral=True)
 
-    def _check_ttt_winner(self, board):
-        """Check if there's a winner in Tic-Tac-Toe"""
-        wins = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
-            [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
-            [0, 4, 8], [2, 4, 6]              # Diagonals
-        ]
-        
-        for combo in wins:
-            if board[combo[0]] == board[combo[1]] == board[combo[2]] != " ":
-                return board[combo[0]]
-        return None
+        target_id = parts[1]
+        cid_prefix = parts[0]
 
-    def _get_ai_ttt_move(self, board, difficulty="hard"):
-        """Smart AI for Tic-Tac-Toe with difficulty levels"""
-        if difficulty == "easy":
-            # Random move
-            available = [i for i in range(9) if board[i] == " "]
-            return random.choice(available)
-        
-        elif difficulty == "medium":
-            # 50% chance of smart move, 50% random
-            if random.random() < 0.5:
-                return self._minimax_ttt(board, "O")[1]
-            available = [i for i in range(9) if board[i] == " "]
-            return random.choice(available)
-        
-        else:  # hard
-            # Minimax algorithm - perfect play
-            return self._minimax_ttt(board, "O")[1]
-    
-    def _minimax_ttt(self, board, player):
-        """Minimax algorithm for perfect Tic-Tac-Toe AI"""
-        winner = self._check_ttt_winner(board)
-        if winner == "O":
-            return (1, None)
-        elif winner == "X":
-            return (-1, None)
-        elif " " not in board:
-            return (0, None)
-        
-        if player == "O":
-            best = (-2, None)
-            for i in range(9):
-                if board[i] == " ":
-                    board[i] = "O"
-                    score = self._minimax_ttt(board, "X")[0]
-                    board[i] = " "
-                    if score > best[0]:
-                        best = (score, i)
-            return best
+        if cid_prefix.startswith('ttt_rematch_accept_'):
+            action = 'accept'
+            game_id = cid_prefix[len('ttt_rematch_accept_'):]
+        elif cid_prefix.startswith('ttt_rematch_deny_'):
+            action = 'deny'
+            game_id = cid_prefix[len('ttt_rematch_deny_'):]
         else:
-            best = (2, None)
-            for i in range(9):
-                if board[i] == " ":
-                    board[i] = "X"
-                    score = self._minimax_ttt(board, "O")[0]
-                    board[i] = " "
-                    if score < best[0]:
-                        best = (score, i)
-            return best
+            return await interaction.response.send_message("Error in rematch action.", ephemeral=True)
+
+        if str(interaction.user.id) != target_id:
+            return await interaction.response.send_message("You're not the player this request is addressed to.", ephemeral=True)
+
+        rematch_state = self.bot.pending_rematches.get(game_id)
+        if not rematch_state:
+            return await interaction.response.edit_message(content="Rematch request expired or already handled.", view=None)
+
+        if action == 'accept':
+            p1_original = rematch_state['players']['1']
+            p2_original = rematch_state['players']['2']
+            await self.start_rematch_game(interaction, game_id, rematch_state, p1_original, p2_original)
+        else:
+            self.bot.pending_rematches.pop(game_id, None)
+            try:
+                await interaction.message.delete()
+            except:
+                pass
+
+    async def start_rematch_game(self, interaction, old_game_id, rematch_state, p1_original, p2_original):
+        """Start a new rematch game (swap starting player)"""
+        new_p1 = rematch_state['players']['2']
+        new_p2 = rematch_state['players']['1']
+
+        new_game_id = f"ttt_game_{interaction.channel.id}_{p2_original}_{int(time.time())}"
+        new_game_state = {
+            'board': [0] * (rematch_state['size'] ** 2),
+            'size': rematch_state['size'],
+            'players': {'1': new_p1, '2': new_p2},
+            'turn': 1,
+            'mode': rematch_state['mode'],
+            'history': {'1': [], '2': []},
+            'start_time': time.time(),
+            'messageId': rematch_state.get('messageId')
+        }
+        self.bot.active_games[new_game_id] = new_game_state
+        self.bot.pending_rematches.pop(old_game_id, None)
+
+        symbols = get_symbols(new_game_state)
+        p1_name = "🤖 BOT" if new_p1 == 'BOT_AI' else f"<@{new_p1}>"
+        p2_name = "🤖 BOT" if new_p2 == 'BOT_AI' else f"<@{new_p2}>"
+
+        embed = discord.Embed(
+            title=f"Tic-Tac-Toe {new_game_state['size']}x{new_game_state['size']}",
+            description=f"REMATCH! Turn: {p1_name} ({symbols[1]})"
+        )
+        view = generate_board_view(new_game_id, new_game_state['board'], new_game_state['size'], symbols=symbols)
+
+        try:
+            await interaction.message.delete()
+        except:
+            pass
+        
+        msg = await interaction.channel.send(content=f"{p1_name} vs {p2_name}", embed=embed, view=view)
+        new_game_state['messageId'] = msg.id
+
+        if new_p1 == 'BOT_AI':
+            await handle_bot_move(self.bot, msg, new_game_id, new_game_state)
+
+    def generate_rematch_accept_view(self, game_id: str, target_id: str):
+        """Generate view with accept/deny buttons for rematch request"""
+        view = discord.ui.View(timeout=None)
+        view.add_item(discord.ui.Button(
+            label="✅ Accept",
+            style=discord.ButtonStyle.success,
+            custom_id=f"ttt_rematch_accept_{game_id}_{target_id}"
+        ))
+        view.add_item(discord.ui.Button(
+            label="❌ Deny",
+            style=discord.ButtonStyle.danger,
+            custom_id=f"ttt_rematch_deny_{game_id}_{target_id}"
+        ))
+        return view
 
     # ==================== CONNECT 4 ====================
     

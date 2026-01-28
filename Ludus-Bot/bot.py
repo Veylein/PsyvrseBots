@@ -57,6 +57,8 @@ bot = commands.Bot(
 # Initialize game state storage for UNO and other games
 bot.active_games = {}
 bot.active_lobbies = {}
+bot.active_minigames = {}
+bot.pending_rematches = {}
 
 
 # Wrap CommandTree.add_command to ignore duplicate registrations gracefully.
@@ -389,6 +391,13 @@ async def on_interaction(interaction: discord.Interaction):
             uno_cog = bot.get_cog('UnoCog')
             if uno_cog:
                 await uno_cog.handle_uno_interaction(interaction, custom_id)
+                return
+        
+        # TTT (Tic-Tac-Toe) interactions
+        if custom_id.startswith('ttt_'):
+            boardgames_cog = bot.get_cog('BoardGames')
+            if boardgames_cog:
+                await boardgames_cog.handle_ttt_interaction(interaction, custom_id)
                 return
         
         # Add other game handlers here as needed
