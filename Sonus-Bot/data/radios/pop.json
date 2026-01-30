@@ -1,0 +1,266 @@
+{
+  "id": "Pop",
+  "name": "Pop Hits",
+  "tracks": [
+    {
+      "title": "ABC",
+      "artist": "The Jackson 5",
+      "source": "https://www.youtube.com/watch?v=FtZL8lZ1b0Q"
+    },
+    {
+      "title": "Shape of You",
+      "artist": "Ed Sheeran",
+      "source": "https://www.youtube.com/watch?v=JGwWNGJdvx8"
+    },
+    {
+      "title": "Blinding Lights",
+      "artist": "The Weeknd",
+      "source": "https://www.youtube.com/watch?v=4NRXx6U8ABQ"
+    },
+    {
+      "title": "Levitating",
+      "artist": "Dua Lipa",
+      "source": "https://www.youtube.com/watch?v=TUVcZfQe-Kw"
+    },
+    {
+      "title": "Watermelon Sugar",
+      "artist": "Harry Styles",
+      "source": "https://www.youtube.com/watch?v=E07s5ZYygMg"
+    },
+    {
+      "title": "Uptown Funk",
+      "artist": "Mark Ronson ft. Bruno Mars",
+      "source": "https://www.youtube.com/watch?v=OPf0YbXqDm0"
+    },
+    {
+      "title": "Happy",
+      "artist": "Pharrell Williams",
+      "source": "https://www.youtube.com/watch?v=ZbZSe6N_BXs"
+    },
+    {
+      "title": "Rolling in the Deep",
+      "artist": "Adele",
+      "source": "https://www.youtube.com/watch?v=rYEDA3JcQqw"
+    },
+    {
+      "title": "Call Me Maybe",
+      "artist": "Carly Rae Jepsen",
+      "source": "https://www.youtube.com/watch?v=fWNaR-rxAic"
+    },
+    {
+      "title": "Firework",
+      "artist": "Katy Perry",
+      "source": "https://www.youtube.com/watch?v=QGJuMBdaqIw"
+    },
+    {
+      "title": "Shake It Off",
+      "artist": "Taylor Swift",
+      "source": "https://www.youtube.com/watch?v=nfWlot6h_JM"
+    },
+    {
+      "title": "Sorry",
+      "artist": "Justin Bieber",
+      "source": "https://www.youtube.com/watch?v=fRh_vgS2dFE"
+    },
+    {
+      "title": "Roar",
+      "artist": "Katy Perry",
+      "source": "https://www.youtube.com/watch?v=CevxZvSJLk8"
+    },
+    {
+      "title": "Cheap Thrills",
+      "artist": "Sia ft. Sean Paul",
+      "source": "https://www.youtube.com/watch?v=nYh-n7EOtMA"
+    },
+    {
+      "title": "Sugar",
+      "artist": "Maroon 5",
+      "source": "https://www.youtube.com/watch?v=09R8_2nJtjg"
+    },
+    {
+      "title": "What Makes You Beautiful",
+      "artist": "One Direction",
+      "source": "https://www.youtube.com/watch?v=QJO3ROT-A4E"
+    },
+    {
+      "title": "Dynamite",
+      "artist": "BTS",
+      "source": "https://www.youtube.com/watch?v=gdZLi9oWNZg"
+    },
+    {
+      "title": "Senorita",
+      "artist": "Shawn Mendes & Camila Cabello",
+      "source": "https://www.youtube.com/watch?v=Pkh8UtuejGw"
+    },
+    {
+      "title": "Bad Guy",
+      "artist": "Billie Eilish",
+      "source": "https://www.youtube.com/watch?v=DyDfgMOUjCI"
+    },
+    {
+      "title": "Havana",
+      "artist": "Camila Cabello ft. Young Thug",
+      "source": "https://www.youtube.com/watch?v=HCjNJDNzw8Y"
+    },
+    {
+      "title": "Memories",
+      "artist": "Maroon 5",
+      "source": "https://www.youtube.com/watch?v=SlPhMPnQ58k"
+    },
+    {
+      "title": "Don't Start Now",
+      "artist": "Dua Lipa",
+      "source": "https://www.youtube.com/watch?v=oygrmJFKYZY"
+    },
+    {
+      "title": "Stay",
+      "artist": "The Kid LAROI & Justin Bieber",
+      "source": "https://www.youtube.com/watch?v=kTJczUoc26U"
+    },
+    {
+      "title": "Peaches",
+      "artist": "Justin Bieber ft. Daniel Caesar & Giveon",
+      "source": "https://www.youtube.com/watch?v=tQ0yjYUFKAE"
+    },
+    {
+      "title": "Adore You",
+      "artist": "Harry Styles",
+      "source": "https://www.youtube.com/watch?v=yezDEWako8U"
+    },
+    {
+      "title": "Senorita",
+      "artist": "Shawn Mendes & Camila Cabello",
+      "source": "https://www.youtube.com/watch?v=Pkh8UtuejGw"
+    },
+    {
+      "title": "Bad Guy",
+      "artist": "Billie Eilish",
+      "source": "https://www.youtube.com/watch?v=DyDfgMOUjCI"
+    },
+    {
+      "title": "Havana",
+      "artist": "Camila Cabello ft. Young Thug",
+      "source": "https://www.youtube.com/watch?v=HCjNJDNzw8Y"
+    },
+    {
+      "title": "Memories",
+      "artist": "Maroon 5",
+      "source": "https://www.youtube.com/watch?v=SlPhMPnQ58k"
+    },
+    {
+      "title": "Don't Start Now",
+      "artist": "Dua Lipa",
+      "source": "https://www.youtube.com/watch?v=oygrmJFKYZY"
+    },
+    {
+      "title": "Stay",
+      "artist": "The Kid LAROI & Justin Bieber",
+      "source": "https://www.youtube.com/watch?v=kTJczUoc26U"
+    },
+    {
+      "title": "Peaches",
+      "artist": "Justin Bieber ft. Daniel Caesar & Giveon",
+      "source": "https://www.youtube.com/watch?v=tQ0yjYUFKAE"
+    },
+    {
+      "title": "Adore You",
+      "artist": "Harry Styles",
+      "source": "https://www.youtube.com/watch?v=yezDEWako8U"
+    },
+    {
+      "title": "Circles",
+      "artist": "Post Malone",
+      "source": "https://www.youtube.com/watch?v=wXhTHyIgQ_U"
+    },
+    {
+      "title": "Someone You Loved",
+      "artist": "Lewis Capaldi",
+      "source": "https://www.youtube.com/watch?v=bCuhuePlP8o"
+    },
+    {
+      "title": "Intentions",
+      "artist": "Justin Bieber ft. Quavo",
+      "source": "https://www.youtube.com/watch?v=9p2wMpVVtXg"
+    },
+    {
+      "title": "Before You Go",
+      "artist": "Lewis Capaldi",
+      "source": "https://www.youtube.com/watch?v=KdxgT35m3dI"
+    },
+    {
+      "title": "Lovely",
+      "artist": "Billie Eilish & Khalid",
+      "source": "https://www.youtube.com/watch?v=V1Pl8CzNzCw"
+    },
+    {
+      "title": "Break My Heart",
+      "artist": "Dua Lipa",
+      "source": "https://www.youtube.com/watch?v=Nj2U6rhnucI"
+    },
+    {
+      "title": "Stuck with U",
+      "artist": "Ariana Grande & Justin Bieber",
+      "source": "https://www.youtube.com/watch?v=pE49WK-oNjU"
+    },
+    {
+      "title": "Memories",
+      "artist": "Maroon 5",
+      "source": "https://www.youtube.com/watch?v=SlPhMPnQ58k"
+    },
+    {
+      "title": "Don't Start Now",
+      "artist": "Dua Lipa",
+      "source": "https://www.youtube.com/watch?v=oygrmJFKYZY"
+    },
+    {
+      "title": "Stay",
+      "artist": "The Kid LAROI & Justin Bieber",
+      "source": "https://www.youtube.com/watch?v=kTJczUoc26U"
+    },
+    {
+      "title": "Peaches",
+      "artist": "Justin Bieber ft. Daniel Caesar & Giveon",
+      "source": "https://www.youtube.com/watch?v=tQ0yjYUFKAE"
+    },
+    {
+      "title": "Adore You",
+      "artist": "Harry Styles",
+      "source": "https://www.youtube.com/watch?v=yezDEWako8U"
+    },  
+    {
+      "title": "Circles",
+      "artist": "Post Malone",
+      "source": "https://www.youtube.com/watch?v=wXhTHyIgQ_U"
+    },
+    {
+      "title": "Someone You Loved",
+      "artist": "Lewis Capaldi",
+      "source": "https://www.youtube.com/watch?v=bCuhuePlP8o"
+    },
+    {
+      "title": "Intentions",
+      "artist": "Justin Bieber ft. Quavo",
+      "source": "https://www.youtube.com/watch?v=9p2wMpVVtXg"
+    },
+    {
+      "title": "Before You Go",
+      "artist": "Lewis Capaldi",
+      "source": "https://www.youtube.com/watch?v=KdxgT35m3dI"
+    },
+    {
+      "title": "Lovely",
+      "artist": "Billie Eilish & Khalid",
+      "source": "https://www.youtube.com/watch?v=V1Pl8CzNzCw"
+    },
+    {
+      "title": "Break My Heart",
+      "artist": "Dua Lipa",
+      "source": "https://www.youtube.com/watch?v=Nj2U6rhnucI"
+    },
+    {
+      "title": "Stuck with U",
+      "artist": "Ariana Grande & Justin Bieber",
+      "source": "https://www.youtube.com/watch?v=pE49WK-oNjU"
+    }
+  ]
+}

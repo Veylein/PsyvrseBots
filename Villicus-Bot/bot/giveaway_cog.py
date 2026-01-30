@@ -18,8 +18,9 @@ class GiveawayCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._tasks = {}  # (guild_id, message_id) -> asyncio.Task
-        # Kick off a loader once the bot is ready
-        self.bot.loop.create_task(self._load_giveaways())
+        # Loader is scheduled from the async setup hook to avoid accessing
+        # `bot.loop` in synchronous contexts (see setup below).
+        pass
 
     async def _load_giveaways(self):
         await self.bot.wait_until_ready()
@@ -41,9 +42,9 @@ class GiveawayCog(commands.Cog):
                     delay = ends_at - int(time.time())
                     if delay <= 0:
                         # end immediately
-                        self.bot.loop.create_task(self._end_giveaway(guild.id, msg_id))
+                        asyncio.create_task(self._end_giveaway(guild.id, msg_id))
                     else:
-                        task = self.bot.loop.create_task(self._wait_and_end(guild.id, msg_id, delay))
+                        task = asyncio.create_task(self._wait_and_end(guild.id, msg_id, delay))
                         self._tasks[(guild.id, msg_id)] = task
             except Exception:
                 continue
@@ -100,7 +101,7 @@ class GiveawayCog(commands.Cog):
         self._persist(interaction.guild.id, giveaways)
 
         delay = ends_at - int(time.time())
-        task = self.bot.loop.create_task(self._wait_and_end(interaction.guild.id, msg.id, delay))
+        task = asyncio.create_task(self._wait_and_end(interaction.guild.id, msg.id, delay))
         self._tasks[(interaction.guild.id, msg.id)] = task
 
         await interaction.followup.send(f'Giveaway created: {msg.jump_url}', ephemeral=True)
@@ -217,6 +218,12 @@ class GiveawayCog(commands.Cog):
 async def setup(bot: commands.Bot):
     cog = GiveawayCog(bot)
     await bot.add_cog(cog)
+    # Schedule the giveaway loader from this async setup context so it uses
+    # the active event loop instead of accessing `bot.loop` from __init__.
+    try:
+        asyncio.create_task(cog._load_giveaways())
+    except Exception:
+        pass
     # Register slash commands (best-effort)
     try:
         bot.tree.add_command(app_commands.Command(name='giveaway', description='Create a giveaway', callback=cog.giveaway_create, default_member_permissions=discord.Permissions(manage_guild=True)))

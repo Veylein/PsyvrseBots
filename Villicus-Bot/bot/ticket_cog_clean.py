@@ -164,4 +164,6 @@ class TicketCog(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(TicketCog(bot))
+    # Avoid adding the cog if another module already loaded it
+    if bot.get_cog('TicketCog') is None:
+        await bot.add_cog(TicketCog(bot))

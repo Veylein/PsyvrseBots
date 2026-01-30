@@ -113,7 +113,7 @@ def register(bot: commands.Bot):
                     # schedule edit
                     import asyncio
 
-                    asyncio.get_event_loop().create_task(coro(embed=embed))
+                    asyncio.create_task(coro(embed=embed))
                 except Exception:
                     pass
             except Exception:
@@ -146,7 +146,9 @@ def register(bot: commands.Bot):
                 # kick off play loop if available and not playing
                 if _play_next is not None:
                     try:
-                        bot.loop.create_task(_play_next(bot, guild.id))
+                        import asyncio
+
+                        asyncio.create_task(_play_next(bot, guild.id))
                     except Exception:
                         pass
             except Exception:

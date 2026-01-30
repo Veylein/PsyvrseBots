@@ -10,6 +10,9 @@ import yt_dlp
 
 from src.logger import setup_logger
 from src.utils.audit import log_action
+from src.utils.ytdl_cache import extract_info_cached
+from src.utils.probe_cache import get as probe_get, set_success as probe_set_success, set_failure as probe_set_failure
+from src.utils.spotify import resolve_spotify
 
 logger = setup_logger(__name__)
 
@@ -49,35 +52,51 @@ def _select_audio_url(info: Dict[str, Any]) -> Optional[str]:
 
 
 async def _yt_search(query: str, attempts: int = 3, backoff: float = 0.5) -> Optional[dict]:
-    loop = asyncio.get_running_loop()
+    """Extract media info using a cached yt-dlp wrapper. Falls back to fresh extraction on failures.
 
-    def run(q: str):
-        with yt_dlp.YoutubeDL(YTDL_OPTS) as ytdl:
-            try:
-                return ytdl.extract_info(q, download=False)
-            except Exception:
-                logger.exception('yt-dlp extract failed for query/url: %s', q)
-                return None
-    for i in range(attempts):
-        info = await loop.run_in_executor(None, run, query)
-        if not info:
-            await asyncio.sleep(backoff * (2 ** i))
-            continue
+    Returns either a dict or None.
+    """
+    try:
+        info = await extract_info_cached(query, attempts=attempts, backoff=backoff)
+    except Exception:
+        logger.exception('Cached yt-dlp extract failed for query/url: %s', query)
+        info = None
 
-        # yt-dlp may return a container with `entries` (playlist/search results).
-        # Prefer the first valid entry that contains stream info.
-        if isinstance(info, dict) and info.get('entries'):
-            entries = info.get('entries') or []
-            # entries can be a generator or list-like
-            for e in entries:
-                if not e:
-                    continue
-                # some entries are urls/ids while others are full dicts
-                if isinstance(e, dict) and (e.get('url') or e.get('formats') or e.get('webpage_url') or e.get('title')):
-                    return e
-            # if no usable entry found, fall back to the parent info
-        return info
-    return None
+    # If cached extraction failed or returned a container, still try a direct fresh extraction
+    if not info:
+        loop = asyncio.get_running_loop()
+
+        def run(q: str):
+            with yt_dlp.YoutubeDL(YTDL_OPTS) as ytdl:
+                try:
+                    return ytdl.extract_info(q, download=False)
+                except Exception:
+                    logger.exception('yt-dlp extract failed for query/url: %s', q)
+                    return None
+
+        for i in range(attempts):
+            info = await loop.run_in_executor(None, run, query)
+            if not info:
+                await asyncio.sleep(backoff * (2 ** i))
+                continue
+            break
+
+    if not info:
+        return None
+
+    # yt-dlp may return a container with `entries` (playlist/search results).
+    # Prefer the first valid entry that contains stream info.
+    if isinstance(info, dict) and info.get('entries'):
+        entries = info.get('entries') or []
+        # entries can be a generator or list-like
+        for e in entries:
+            if not e:
+                continue
+            # some entries are urls/ids while others are full dicts
+            if isinstance(e, dict) and (e.get('url') or e.get('formats') or e.get('webpage_url') or e.get('title')):
+                return e
+        # if no usable entry found, fall back to the parent info
+    return info
 
 
 def _ensure_guild_queue(bot: commands.Bot, guild_id: int):
@@ -96,33 +115,65 @@ def _ensure_guild_queue(bot: commands.Bot, guild_id: int):
     return q[guild_id]
 
 
-def _queue_add(q, item: Any):
+from src.utils.queue_store import save_queue
+from src.utils.enqueue_store import save_enqueue_state, remove_enqueue_state, load_all_enqueue_states
+
+
+def _queue_add(q, item: Any, guild_id: Optional[int] = None):
     try:
         if hasattr(q, 'enqueue'):
             q.enqueue(item)
+            # persist when possible
+            try:
+                if guild_id:
+                    save_queue(guild_id, q.all() if hasattr(q, 'all') else list(q))
+            except Exception:
+                pass
             return
         if hasattr(q, 'append'):
             q.append(item)
+            try:
+                if guild_id:
+                    save_queue(guild_id, q.all() if hasattr(q, 'all') else list(q))
+            except Exception:
+                pass
             return
         # fallback
         q.enqueue(item)
     except Exception:
         try:
             q.append(item)
+            try:
+                if guild_id:
+                    save_queue(guild_id, q.all() if hasattr(q, 'all') else list(q))
+            except Exception:
+                pass
         except Exception:
             raise
 
 
-def _queue_pop(q):
+def _queue_pop(q, guild_id: Optional[int] = None):
     try:
         if hasattr(q, 'dequeue'):
-            return q.dequeue()
+            item = q.dequeue()
+            try:
+                if guild_id:
+                    save_queue(guild_id, q.all() if hasattr(q, 'all') else list(q))
+            except Exception:
+                pass
+            return item
         if hasattr(q, 'pop'):
             # assume list-like pop(0)
             try:
-                return q.pop(0)
+                item = q.pop(0)
             except TypeError:
-                return q.pop()
+                item = q.pop()
+            try:
+                if guild_id:
+                    save_queue(guild_id, q.all() if hasattr(q, 'all') else list(q))
+            except Exception:
+                pass
+            return item
         return None
     except Exception:
         return None
@@ -136,6 +187,28 @@ async def _create_player_with_probe(url: str, ffmpeg_options: Dict[str, str], ti
 
     def do_plain(u: str):
         return discord.FFmpegOpusAudio(u, **ffmpeg_options)
+    # If we have a cached probe success for this URL, try a single quick probe
+    cached = None
+    try:
+        cached = probe_get(url)
+    except Exception:
+        cached = None
+    if cached is True:
+        try:
+            player = await asyncio.wait_for(loop.run_in_executor(None, do_probe, url), timeout=min(6.0, timeout))
+            # mark success in cache and return
+            try:
+                probe_set_success(url)
+            except Exception:
+                pass
+            return player
+        except Exception:
+            # cached result seemed stale; fall through to normal probing
+            try:
+                probe_set_failure(url)
+            except Exception:
+                pass
+
     # try probe first with escalating timeouts and small backoffs, then fallback to plain construction.
     last_exc = None
     timeouts = [timeout, timeout * 2]
@@ -143,6 +216,10 @@ async def _create_player_with_probe(url: str, ffmpeg_options: Dict[str, str], ti
         try:
             player = await asyncio.wait_for(loop.run_in_executor(None, do_probe, url), timeout=t)
             logger.debug('Probe succeeded on attempt %d for %s (timeout=%s)', attempt, url, t)
+            try:
+                probe_set_success(url)
+            except Exception:
+                pass
             return player
         except Exception as exc:
             last_exc = exc
@@ -158,6 +235,10 @@ async def _create_player_with_probe(url: str, ffmpeg_options: Dict[str, str], ti
     except Exception as exc2:
         logger.exception('Plain FFmpeg construction failed for %s: %s', url, exc2)
         # raise the most relevant exception for upstream handling
+        try:
+            probe_set_failure(url)
+        except Exception:
+            pass
         raise last_exc or exc2
 
 
@@ -220,12 +301,393 @@ def register(bot: commands.Bot):
             await ctx.send('Playback is only available in a guild.')
             return
 
-        info = await _yt_search(query)
+        # If the query looks like a plain search (not a URL), offer interactive
+        # selection from top search results to improve reliability and UX.
+        info = None
+        is_plain_search = not (query.startswith('http') or query.startswith('<') and query.endswith('>'))
+        if is_plain_search:
+            # perform a yt-dlp search for top entries
+            try:
+                loop = asyncio.get_running_loop()
+
+                def run_search(q: str):
+                    with yt_dlp.YoutubeDL(YTDL_OPTS) as ytdl:
+                        try:
+                            return ytdl.extract_info(f"ytsearch20:{q}", download=False)
+                        except Exception:
+                            return None
+
+                search_info = await loop.run_in_executor(None, run_search, query)
+                entries = []
+                if isinstance(search_info, dict) and search_info.get('entries'):
+                    entries = [e for e in (search_info.get('entries') or []) if isinstance(e, dict)][:20]
+
+                # If multiple entries found, present a paginated selection UI
+                if entries:
+                    PAGE_SIZE = 5
+
+                    class SearchPaginator(discord.ui.View):
+                        def __init__(self, entries: List[dict], page_size: int = PAGE_SIZE, timeout: int = 30):
+                            super().__init__(timeout=timeout)
+                            self.entries = entries
+                            self.page_size = page_size
+                            self.page = 0
+                            self.value = None
+                            self.message = None
+                            self._build()
+
+                        def _build(self):
+                            # clear existing children
+                            try:
+                                self.clear_items()
+                            except Exception:
+                                pass
+                            start = self.page * self.page_size
+                            end = start + self.page_size
+                            page_entries = self.entries[start:end]
+                            for i, e in enumerate(page_entries, start=1):
+                                title = (e.get('title') or 'Untitled')[:80]
+                                btn = discord.ui.Button(label=f"{i}. {title}", style=discord.ButtonStyle.primary)
+                                async def _select(button: discord.ui.Button, interaction: discord.Interaction, idx=(start + i - 1)):
+                                    await interaction.response.defer(ephemeral=True)
+                                    try:
+                                        self.value = self.entries[idx]
+                                    except Exception:
+                                        self.value = None
+                                    # disable buttons
+                                    try:
+                                        for child in list(self.children):
+                                            child.disabled = True
+                                    except Exception:
+                                        pass
+                                    try:
+                                        if self.message:
+                                            await self.message.edit(view=self)
+                                    except Exception:
+                                        pass
+                                btn.callback = _select
+                                self.add_item(btn)
+
+                            # navigation buttons
+                            prev_disabled = self.page == 0
+                            next_disabled = (end >= len(self.entries))
+                            prev_btn = discord.ui.Button(label='◀ Prev', style=discord.ButtonStyle.secondary)
+                            next_btn = discord.ui.Button(label='Next ▶', style=discord.ButtonStyle.secondary)
+
+                            async def _prev(button: discord.ui.Button, interaction: discord.Interaction):
+                                await interaction.response.defer(ephemeral=True)
+                                if self.page > 0:
+                                    self.page -= 1
+                                    self._build()
+                                    try:
+                                        if self.message:
+                                            await self.message.edit(content=f'Select a result to play (page {self.page+1}/{(len(self.entries)-1)//self.page_size+1}):', view=self)
+                                    except Exception:
+                                        pass
+
+                            async def _next(button: discord.ui.Button, interaction: discord.Interaction):
+                                await interaction.response.defer(ephemeral=True)
+                                if (self.page + 1) * self.page_size < len(self.entries):
+                                    self.page += 1
+                                    self._build()
+                                    try:
+                                        if self.message:
+                                            await self.message.edit(content=f'Select a result to play (page {self.page+1}/{(len(self.entries)-1)//self.page_size+1}):', view=self)
+                                    except Exception:
+                                        pass
+
+                            prev_btn.callback = _prev
+                            next_btn.callback = _next
+                            prev_btn.disabled = prev_disabled
+                            next_btn.disabled = next_disabled
+                            self.add_item(prev_btn)
+                            self.add_item(next_btn)
+
+                        async def on_timeout(self):
+                            try:
+                                for child in list(self.children):
+                                    child.disabled = True
+                                if self.message:
+                                    await self.message.edit(view=self)
+                            except Exception:
+                                pass
+
+                    view = SearchPaginator(entries)
+                    try:
+                        msg = await ctx.send(f'Select a result to play (page 1/{(len(entries)-1)//PAGE_SIZE+1}):', view=view)
+                        view.message = msg
+                        await view.wait()
+                        chosen = getattr(view, 'value', None)
+                        if chosen:
+                            info = chosen
+                        else:
+                            info = await _yt_search(query)
+                    except Exception:
+                        info = await _yt_search(query)
+                else:
+                    info = await _yt_search(query)
+            except Exception:
+                info = await _yt_search(query)
+        else:
+            # handle spotify urls by resolving to search string(s) if possible
+            spotify_res = None
+            if 'spotify' in (query or '').lower():
+                try:
+                    spotify_res = resolve_spotify(query)
+                except Exception:
+                    spotify_res = None
+
+            if spotify_res:
+                # single track -> treat as a normal query
+                if spotify_res.get('type') == 'track' and spotify_res.get('query'):
+                    info = await _yt_search(spotify_res['query'])
+                # playlists/albums -> enqueue each resolved track
+                elif spotify_res.get('type') in ('album', 'playlist') and spotify_res.get('items'):
+                    items = spotify_res['items']
+                    limit = int(os.getenv('SONUS_PLAYLIST_LIMIT') or 100)
+                    to_enqueue = items[:limit]
+                    added = 0
+                    q = _ensure_guild_queue(bot, guild.id)
+                    CHUNK = int(os.getenv('SONUS_ENQUEUE_CHUNK') or 25)
+                    total = len(to_enqueue)
+                    try:
+                        # create a cancelable view so the requester can abort a large enqueue
+                        class _CancelEnqueueView(discord.ui.View):
+                            def __init__(self, bot: commands.Bot, guild_id: int):
+                                super().__init__(timeout=None)
+                                self._bot = bot
+                                self._guild_id = guild_id
+
+                                btn = discord.ui.Button(label='Cancel Enqueue', style=discord.ButtonStyle.danger)
+
+                                async def _cancel(interaction: discord.Interaction):
+                                    await interaction.response.defer(ephemeral=True)
+                                    tasks = getattr(self._bot, 'sonus_enqueue_tasks', {})
+                                    t = tasks.get(self._guild_id)
+                                    if t and not t.done():
+                                        t.cancel()
+                                        await interaction.followup.send('Enqueue cancelled.', ephemeral=True)
+                                    else:
+                                        await interaction.followup.send('No active enqueue to cancel.', ephemeral=True)
+
+                                btn.callback = _cancel
+                                self.add_item(btn)
+
+                        view = _CancelEnqueueView(bot, guild.id)
+                        progress_msg = await ctx.send(f'Enqueuing 0/{total} tracks from Spotify {spotify_res.get("type")}...', view=view)
+                    except Exception:
+                        progress_msg = None
+
+                    async def _enqueue_worker(items, q, ctx, progress_msg, guild_id):
+                        added_local = 0
+                        total_local = len(items)
+                        # persist initial state so we can resume after restarts
+                        try:
+                            save_enqueue_state(guild_id, {'items': items, 'added': 0, 'total': total_local, 'requester_id': getattr(ctx.author, 'id', None)})
+                        except Exception:
+                            pass
+                        try:
+                            for idx, item_query in enumerate(items, start=1):
+                                try:
+                                    e_info = await _yt_search(item_query)
+                                except asyncio.CancelledError:
+                                    raise
+                                except Exception:
+                                    e_info = None
+
+                                if not e_info:
+                                    if progress_msg and (idx % CHUNK == 0 or idx == total_local):
+                                        try:
+                                            await progress_msg.edit(content=f'Enqueued {added_local}/{total_local} tracks from Spotify {spotify_res.get("type")} (in progress)...')
+                                        except Exception:
+                                            pass
+                                    continue
+
+                                e = None
+                                try:
+                                    if isinstance(e_info, dict) and e_info.get('entries'):
+                                        entries = [ent for ent in (e_info.get('entries') or []) if isinstance(ent, dict)]
+                                        if entries:
+                                            e = entries[0]
+                                    if e is None:
+                                        e = e_info
+                                except Exception:
+                                    e = e_info
+
+                                try:
+                                    url = _select_audio_url(e) or e.get('url') or e.get('webpage_url')
+                                    title = e.get('title') or (e.get('webpage_url') or str(url))
+                                    track = {'title': title, 'url': url, 'webpage_url': e.get('webpage_url')}
+                                    try:
+                                        if ctx.author:
+                                            track['requested_by'] = getattr(ctx.author, 'display_name', None) or getattr(ctx.author, 'name', None) or str(ctx.author)
+                                            track['requester_id'] = getattr(ctx.author, 'id', None)
+                                            if ctx.author and getattr(ctx.author, 'voice', None) and getattr(ctx.author.voice, 'channel', None):
+                                                track['requester_channel_id'] = ctx.author.voice.channel.id
+                                    except Exception:
+                                        pass
+                                    _queue_add(q, track, guild_id)
+                                    added_local += 1
+                                    # persist progress and remaining items
+                                    try:
+                                        remaining = items[idx:]
+                                        save_enqueue_state(guild_id, {'items': remaining, 'added': added_local, 'total': total_local, 'requester_id': getattr(ctx.author, 'id', None)})
+                                    except Exception:
+                                        pass
+                                except Exception:
+                                    pass
+
+                                if progress_msg and (idx % CHUNK == 0 or idx == total_local):
+                                    try:
+                                        await progress_msg.edit(content=f'Enqueued {added_local}/{total_local} tracks from Spotify {spotify_res.get("type")} (in progress)...')
+                                    except Exception:
+                                        pass
+
+                            # final update
+                            if progress_msg:
+                                try:
+                                    await progress_msg.edit(content=f'Enqueued {added_local}/{total_local} tracks from Spotify {spotify_res.get("type")}.')
+                                except Exception:
+                                    pass
+
+                            # schedule playback if needed
+                            try:
+                                vc = ctx.guild.voice_client
+                                if not vc or not getattr(vc, 'is_connected', lambda: False)():
+                                    preferred = None
+                                    try:
+                                        if ctx.author and getattr(ctx.author, 'voice', None) and getattr(ctx.author.voice, 'channel', None):
+                                            preferred = ctx.author.voice.channel.id
+                                    except Exception:
+                                        preferred = None
+                                    await _ensure_vc_connected(bot, ctx.guild, preferred_channel_id=preferred)
+                                asyncio.create_task(_play_next(bot, guild_id))
+                            except Exception:
+                                pass
+
+                            try:
+                                await log_action(bot, ctx.author.id, 'play_playlist', {'title': getattr(spotify_res, 'get', lambda k, d=None: d)('name', 'spotify'), 'added': added_local})
+                            except Exception:
+                                pass
+                        except asyncio.CancelledError:
+                            # user cancelled the enqueue
+                            try:
+                                if progress_msg:
+                                    await progress_msg.edit(content=f'Enqueue cancelled by user. Enqueued {added_local}/{total_local} tracks.')
+                            except Exception:
+                                pass
+                        finally:
+                            # cleanup persistence on finish or cancel
+                            try:
+                                remove_enqueue_state(guild_id)
+                            except Exception:
+                                pass
+                            # cleanup task registry
+                            try:
+                                tasks = getattr(bot, 'sonus_enqueue_tasks', {})
+                                if tasks.get(guild_id):
+                                    del tasks[guild_id]
+                            except Exception:
+                                pass
+
+                    # register and start background enqueue task
+                    try:
+                        if not hasattr(bot, 'sonus_enqueue_tasks'):
+                            bot.sonus_enqueue_tasks = {}
+                        task = asyncio.create_task(_enqueue_worker(to_enqueue, q, ctx, progress_msg, guild.id))
+                        bot.sonus_enqueue_tasks[guild.id] = task
+                    except Exception:
+                        # fallback to inline processing if background task creation fails
+                        pass
+
+                    # start playback task if not already playing
+                    try:
+                        vc = guild.voice_client
+                        if not vc or not getattr(vc, 'is_connected', lambda: False)():
+                            preferred = None
+                            try:
+                                if ctx.author and getattr(ctx.author, 'voice', None) and getattr(ctx.author.voice, 'channel', None):
+                                    preferred = ctx.author.voice.channel.id
+                            except Exception:
+                                preferred = None
+                            vc = await _ensure_vc_connected(bot, guild, preferred_channel_id=preferred)
+                            if not vc:
+                                await log_action(bot, ctx.author.id, 'play_failed', {'reason': 'no_channel'})
+                                return
+                        asyncio.create_task(_play_next(bot, guild.id))
+                    except Exception:
+                        pass
+                    await log_action(bot, ctx.author.id, 'play_playlist', {'title': getattr(spotify_res, 'get', lambda k, d=None: d)('name', 'spotify'), 'added': added})
+                    return
+                else:
+                    info = await _yt_search(query)
+            else:
+                info = await _yt_search(query)
         if not info:
             await ctx.send('Could not find or extract the requested media.')
             return
 
-        # choose the best possible direct audio URL
+        # If the extracted info contains multiple entries (playlist/album/search results),
+        # enqueue each entry rather than attempting to play the container itself.
+        entries = []
+        if isinstance(info, dict) and info.get('entries'):
+            try:
+                entries = [e for e in (info.get('entries') or []) if isinstance(e, dict)]
+            except Exception:
+                entries = []
+
+        if entries:
+            # Enqueue up to a sensible limit to avoid flooding the queue (default 100)
+            limit = int(os.getenv('SONUS_PLAYLIST_LIMIT') or 100)
+            added = 0
+            q = _ensure_guild_queue(bot, guild.id)
+            for e in entries[:limit]:
+                try:
+                    url = _select_audio_url(e) or e.get('url') or e.get('webpage_url')
+                    title = e.get('title') or (e.get('webpage_url') or str(url))
+                    track = {'title': title, 'url': url, 'webpage_url': e.get('webpage_url')}
+                    # preserve requester metadata
+                    try:
+                        if ctx.author:
+                            track['requested_by'] = getattr(ctx.author, 'display_name', None) or getattr(ctx.author, 'name', None) or str(ctx.author)
+                            track['requester_id'] = getattr(ctx.author, 'id', None)
+                            if ctx.author and getattr(ctx.author, 'voice', None) and getattr(ctx.author.voice, 'channel', None):
+                                track['requester_channel_id'] = ctx.author.voice.channel.id
+                    except Exception:
+                        pass
+                    _queue_add(q, track)
+                    added += 1
+                except Exception:
+                    continue
+
+            if added == 0:
+                await ctx.send('Could not extract entries from the provided playlist/album.')
+                return
+
+            embed = discord.Embed(title="Enqueued Playlist", description=f"Enqueued {added} tracks from playlist/album/search results.", color=0x1DB954)
+            await ctx.send(embed=embed)
+            # start playback task if not already playing
+            try:
+                vc = guild.voice_client
+                if not vc or not getattr(vc, 'is_connected', lambda: False)():
+                    preferred = None
+                    try:
+                        if ctx.author and getattr(ctx.author, 'voice', None) and getattr(ctx.author.voice, 'channel', None):
+                            preferred = ctx.author.voice.channel.id
+                    except Exception:
+                        preferred = None
+                    vc = await _ensure_vc_connected(bot, guild, preferred_channel_id=preferred)
+                    if not vc:
+                        await log_action(bot, ctx.author.id, 'play_failed', {'reason': 'no_channel'})
+                        return
+                # schedule play loop
+                asyncio.create_task(_play_next(bot, guild.id))
+            except Exception:
+                pass
+            await log_action(bot, ctx.author.id, 'play_playlist', {'title': getattr(info, 'get', lambda k, d=None: d)('title', 'playlist'), 'added': added})
+            return
+
+        # choose the best possible direct audio URL for single-entry results
         url = _select_audio_url(info) or info.get('url') or (info.get('formats') and info['formats'][0].get('url'))
         title = info.get('title') or query
 
@@ -278,7 +740,7 @@ def register(bot: commands.Bot):
                     pass
                 await ctx.send(embed=embed)
                 # start playback task
-                bot.loop.create_task(_play_next(bot, guild.id))
+                asyncio.create_task(_play_next(bot, guild.id))
             else:
                 embed = discord.Embed(title="Enqueued", description=title, color=0xFFD166)
                 await ctx.send(embed=embed)
@@ -295,6 +757,58 @@ def register(bot: commands.Bot):
         await interaction.response.defer()
         ctx = await commands.Context.from_interaction(interaction)
         await _play(ctx, query=query)
+
+    @bot.command(name='enqueue_status')
+    async def _enqueue_status(ctx: commands.Context):
+        """Show status of any active background enqueue task for this guild."""
+        guild = ctx.guild
+        if not guild:
+            await ctx.send('This command must be used in a guild.')
+            return
+        tasks = getattr(bot, 'sonus_enqueue_tasks', {})
+        t = tasks.get(guild.id)
+        if not t:
+            await ctx.send('No active enqueue task for this guild.')
+            return
+        state = 'running'
+        try:
+            if t.cancelled():
+                state = 'cancelled'
+            elif t.done():
+                state = 'finished'
+        except Exception:
+            pass
+        await ctx.send(f'Enqueue task status: {state}')
+
+    @bot.tree.command(name='enqueue_status')
+    async def _enqueue_status_slash(interaction: discord.Interaction):
+        await interaction.response.defer()
+        ctx = await commands.Context.from_interaction(interaction)
+        await _enqueue_status(ctx)
+
+    @bot.command(name='enqueue_cancel')
+    async def _enqueue_cancel(ctx: commands.Context):
+        """Cancel an active background enqueue for this guild."""
+        guild = ctx.guild
+        if not guild:
+            await ctx.send('This command must be used in a guild.')
+            return
+        tasks = getattr(bot, 'sonus_enqueue_tasks', {})
+        t = tasks.get(guild.id)
+        if not t or t.done():
+            await ctx.send('No active enqueue to cancel.')
+            return
+        try:
+            t.cancel()
+            await ctx.send('Enqueue cancellation requested.')
+        except Exception:
+            await ctx.send('Failed to cancel enqueue task.')
+
+    @bot.tree.command(name='enqueue_cancel')
+    async def _enqueue_cancel_slash(interaction: discord.Interaction):
+        await interaction.response.defer()
+        ctx = await commands.Context.from_interaction(interaction)
+        await _enqueue_cancel(ctx)
 
     # Register `audiotest` only if it doesn't already exist (some modules provide it)
     if bot.get_command('audiotest') is None:
@@ -365,7 +879,7 @@ async def _play_next(bot: commands.Bot, guild_id: int):
     if not q:
         return
 
-    track = _queue_pop(q)
+    track = _queue_pop(q, guild_id=guild_id)
     guild = bot.get_guild(guild_id)
     if not guild:
         return
@@ -512,6 +1026,11 @@ async def _play_next(bot: commands.Bot, guild_id: int):
     await _play_next(bot, guild_id)
 
 
+# Enqueue resume helpers were removed to avoid import-time syntax issues.
+# Persistence helpers are available in src/utils/enqueue_store.py and
+# can be integrated later when ready.
+
+
 async def _after_play(bot: commands.Bot, guild_id: int, error):
     if error:
         logger.exception('Error in playback: %s', error)
@@ -520,3 +1039,6 @@ async def _after_play(bot: commands.Bot, guild_id: int, error):
     except Exception:
         pass
     await _play_next(bot, guild_id)
+
+
+# resume_persisted_enqueues removed; deferred until persistence logic is stabilized.

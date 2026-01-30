@@ -165,6 +165,50 @@ class NowPlayingView(discord.ui.View):
         except Exception as exc:
             await interaction.followup.send(f'Failed to change volume: {exc}', ephemeral=True)
 
+    @discord.ui.button(label='📜 Queue', style=discord.ButtonStyle.secondary, custom_id='np_queue')
+    async def show_queue(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            # fetch guild-specific queue if present
+            qmap = getattr(self.bot, 'sonus_queues', {}) or {}
+            q = qmap.get(self.guild_id)
+            # fallback to bot.player
+            if not q:
+                q = getattr(self.bot, 'player', None)
+
+            seq = []
+            try:
+                if hasattr(q, 'all') and callable(q.all):
+                    seq = q.all()
+                else:
+                    seq = list(q) if q else []
+            except Exception:
+                try:
+                    seq = list(q)
+                except Exception:
+                    seq = []
+
+            if not seq:
+                return await interaction.followup.send('Queue is empty.', ephemeral=True)
+
+            lines = []
+            for i, t in enumerate(seq[:20], start=1):
+                title = t.get('title') if isinstance(t, dict) else str(t)
+                requester = t.get('requested_by') if isinstance(t, dict) else None
+                if requester:
+                    lines.append(f"{i}. {title} — {requester}")
+                else:
+                    lines.append(f"{i}. {title}")
+
+            desc = '\n'.join(lines)
+            if len(seq) > 20:
+                desc += f"\n...and {len(seq)-20} more"
+
+            e = discord.Embed(title='Queue', description=desc, color=0x4CC9F0)
+            await interaction.followup.send(embed=e, ephemeral=True)
+        except Exception as exc:
+            await interaction.followup.send(f'Failed to show queue: {exc}', ephemeral=True)
+
 
 async def _updater_loop(bot: commands.Bot):
     await bot.wait_until_ready()
@@ -218,7 +262,8 @@ def register(bot: commands.Bot):
 
     # start background updater task
     if not hasattr(bot, '_sonus_now_updater'):
-        bot._sonus_now_updater = bot.loop.create_task(_updater_loop(bot))
+        import asyncio
+        bot._sonus_now_updater = asyncio.create_task(_updater_loop(bot))
 
     # Ensure persistent views are registered for existing now-playing messages
     try:

@@ -4,6 +4,7 @@ aiohttp
 python-dotenv
 pydantic
 asyncpg
+requests
 # Test dependencies
 pytest
 pytest-asyncio

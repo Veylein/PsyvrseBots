@@ -1,6 +1,6 @@
 {
-  "id": "pop",
-  "name": "Pop",
+  "id": "micheal jackson",
+  "name": "Micheal Jackson",
   "tracks": [
     {
       "title": "Billie Jean",
@@ -101,6 +101,31 @@
       "title": "Badder Than Bad",
       "artist": "Micheal Jackson",
       "source": "https://www.youtube.com/watch?v=3u7j1K1b0pQ"
+    },
+    {
+      "title": "ABC",
+      "artist": "Jackson 5 ",
+      "source": "https://www.youtube.com/watch?v=ho7796-au8U"
+    },
+    {
+      "title": "I Want You Back",
+      "artist": "Jackson 5 ",
+      "source": "https://www.youtube.com/watch?v=s3Q80mk7bxE"
+    },
+    {
+      "title": "I'll Be There",
+      "artist": "Jackson 5 ",
+      "source": "https://www.youtube.com/watch?v=7Y0YhJ7W8vI"
+    },
+    {
+      "title": "Dancing Machine",
+      "artist": "Jackson 5 ",
+      "source": "https://www.youtube.com/watch?v=1k8craCGpgs"
+    },
+    {
+      "title": "Rockin' Robin",
+      "artist": "Jackson 5 ",
+      "source": "https://www.youtube.com/watch?v=1k8craCGpgs"
     }
   ]
 }

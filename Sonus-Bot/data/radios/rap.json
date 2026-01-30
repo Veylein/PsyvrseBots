@@ -1,5 +1,141 @@
 {
   "id": "rap",
-  "name": "Rap",
-  "source": "https://www.youtube.com/watch?v=ye7k8DIAe9I&list=PLv0wvSMwAymaB93rWPvNaQH7hgynhrdzr&index=2"
+  "name": "Rap Classics",
+  "tracks":[
+    {
+      "title": "Lose Yourself",
+      "artist": "Eminem",
+      "source": "https://www.youtube.com/watch?v=_Yhyp-_hX2s"
+    },
+    {
+      "title": "Juicy",
+      "artist": "The Notorious B.I.G.",
+      "source": "https://www.youtube.com/watch?v=_JZom_gVfuw"
+    },
+    {
+      "title": "Nuthin' but a 'G' Thang",
+      "artist": "Dr. Dre ft. Snoop Dogg",
+      "source": "https://www.youtube.com/watch?v=0F0CAEoF4XM"
+    },
+    {
+      "title": "C.R.E.A.M.",
+      "artist": "Wu-Tang Clan",
+      "source": "https://www.youtube.com/watch?v=PBwAxmrE194"
+    },
+    {
+      "title": "HUMBLE.",
+      "artist": "Kendrick Lamar",
+      "source": "https://www.youtube.com/watch?v=tvTRZJ-4EyI"
+    },
+    {
+      "title": "Sicko Mode",
+      "artist": "Travis Scott",
+      "source": "https://www.youtube.com/watch?v=6ONRf7h3Mdk"
+    },
+    {
+      "title": "God's Plan",
+      "artist": "Drake",
+      "source": "https://www.youtube.com/watch?v=xpVfcZ0ZcFM"
+    },
+    {
+      "title": "Old Town Road",
+      "artist": "Lil Nas X ft. Billy Ray Cyrus",
+      "source": "https://www.youtube.com/watch?v=r7qovpFAGrQ"
+    },
+    {
+      "title": "Suge",
+      "artist": "DaBaby",
+      "source": "https://www.youtube.com/watch?v=3pPl1U6K8k8"
+    },
+    {
+      "title": "Rockstar",
+      "artist": "Post Malone ft. 21 Savage",
+      "source": "https://www.youtube.com/watch?v=UceaB4D0jpo"
+    },
+    {
+      "title": "In Da Club",
+      "artist": "50 Cent",
+      "source": "https://www.youtube.com/watch?v=5qm8PH4xAss"
+    },
+    {
+      "title": "Hotline Bling",
+      "artist": "Drake",
+      "source": "https://www.youtube.com/watch?v=uxpDa-c-4Mc"
+    },
+    {
+      "title": "Mask Off",
+      "artist": "Future",
+      "source": "https://www.youtube.com/watch?v=GxTjO1WJz_0"
+    },
+    {
+      "title": "Mo Money Mo Problems",
+      "artist": "The Notorious B.I.G. ft. Puff Daddy & Mase",
+      "source": "https://www.youtube.com/watch?v=gUhRKVIjJtw"
+    },
+    {
+      "title": "All of the Lights",
+      "artist": "Kanye West ft. Rihanna & Kid Cudi",
+      "source": "https://www.youtube.com/watch?v=HAfFfqiYLp0"
+    },
+    {
+      "title": "Stan",
+      "artist": "Eminem ft. Dido",
+      "source": "https://www.youtube.com/watch?v=gOMhN-hfMtY"
+    },
+    {
+      "title": "The Real Slim Shady",
+      "artist": "Eminem",
+      "source": "https://www.youtube.com/watch?v=eJO5HU_7_1w"
+    },
+    {
+      "title": "California Love",
+      "artist": "2Pac ft. Dr. Dre",
+      "source": "https://www.youtube.com/watch?v=5wBTdfAkqGU"
+    },
+    {
+      "title": "Big Poppa",
+      "artist": "The Notorious B.I.G.",
+      "source": "https://www.youtube.com/watch?v=2G3z6j0pU0k"
+    },
+    {
+      "title": "Work It",
+      "artist": "Missy Elliott",
+      "source": "https://www.youtube.com/watch?v=5T8a2V8PTPE"
+    },
+    {
+      "title": "Bodak Yellow",
+      "artist": "Cardi B",
+      "source": "https://www.youtube.com/watch?v=PEGccV-NOm8"
+    },
+    {
+      "title": "Fancy",
+      "artist": "Iggy Azalea ft. Charli XCX",
+      "source": "https://www.youtube.com/watch?v=AAxXv3f9g4c"
+    },
+    {
+      "title": "Thrift Shop",
+      "artist": "Macklemore & Ryan Lewis ft. Wanz",
+      "source": "https://www.youtube.com/watch?v=QK8mJJJvaes"
+    },
+    {
+      "title": "Empire State of Mind",
+      "artist": "Jay-Z ft. Alicia Keys",
+      "source": "https://www.youtube.com/watch?v=0UjsXo9l6I8"
+    },
+    {
+      "title": "Hot in Herre",
+      "artist": "Nelly",
+      "source": "https://www.youtube.com/watch?v=GeZZr_p6vB8"
+    },
+    {
+      "title": "Get Low",
+      "artist": "Lil Jon & The East Side Boyz ft. Ying Yang Twins",
+      "source": "https://www.youtube.com/watch?v=VwBSReu3nVE"
+    },
+    {
+      "title": "Crank That (Soulja Boy)",
+      "artist": "Soulja Boy Tell'em",
+      "source": "https://www.youtube.com/watch?v=8vJiSSAMNWw"
+    }
+  ]
 }

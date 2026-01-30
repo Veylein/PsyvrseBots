@@ -28,7 +28,9 @@ def register(bot):
         # start player loop if available
         try:
             if hasattr(bot, "player") and bot.player:
-                bot.loop.create_task(bot.player.play_loop(bot))
+                import asyncio
+
+                asyncio.create_task(bot.player.play_loop(bot))
                 logger.info("Started player play_loop task")
         except Exception:
             logger.exception("Failed to start player loop")

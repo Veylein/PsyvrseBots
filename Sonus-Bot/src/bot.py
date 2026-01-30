@@ -1,4 +1,5 @@
 import importlib
+import os
 import pkgutil
 from pathlib import Path
 
@@ -105,6 +106,64 @@ def create_bot():
     # We'll handle that in on_ready
     async def _on_ready_internal():
         logger.info(f"Bot ready as {bot.user}")
+        # Load persistent per-guild queues if available
+        try:
+            from src.utils.queue_store import load_queues
+
+            loaded = load_queues()
+            if loaded:
+                try:
+                    bot.sonus_queues = getattr(bot, 'sonus_queues', {}) or {}
+                    for gid, data in loaded.items():
+                        try:
+                            bot.sonus_queues[int(gid)] = data
+                        except Exception:
+                            continue
+                    logger.info(f"Loaded persistent queues for {len(loaded)} guild(s)")
+                except Exception:
+                    logger.exception('Failed to populate bot.sonus_queues from persisted data')
+        except Exception:
+            # ignore if persistence not available
+            pass
+        # If any loaded queues look active, attempt to resume playback for those guilds
+        try:
+            from src.commands.music.play import _play_next, _ensure_vc_connected
+            import asyncio
+
+            loaded_map = getattr(bot, 'sonus_queues', {}) or {}
+            for gid, q in list(loaded_map.items()):
+                try:
+                    if not q:
+                        continue
+                    guild_obj = bot.get_guild(int(gid))
+                    if not guild_obj:
+                        continue
+                    # if already playing or bot connected, skip starting duplicate
+                    vc = guild_obj.voice_client
+                    if vc and getattr(vc, 'is_playing', lambda: False)():
+                        continue
+                    # try to ensure voice client (do not force join if no members)
+                    try:
+                        await _ensure_vc_connected(bot, guild_obj)
+                    except Exception:
+                        pass
+                    # schedule play task
+                    asyncio.create_task(_play_next(bot, int(gid)))
+                except Exception:
+                    continue
+            # Optionally resume persisted enqueue jobs on startup if enabled.
+            try:
+                if os.getenv('SONUS_RESUME_ON_STARTUP', '').lower() in ('1', 'true', 'yes'):
+                    from src.utils.enqueue_resume import resume_persisted_enqueues
+
+                    try:
+                        await resume_persisted_enqueues(bot)
+                    except Exception:
+                        logger.exception('Failed to resume persisted enqueues')
+            except Exception:
+                pass
+        except Exception:
+            logger.exception('Failed to resume persistent queues')
         # Load commands and UI cogs
         await _register_command_modules(bot)
         # mark that command modules have been loaded

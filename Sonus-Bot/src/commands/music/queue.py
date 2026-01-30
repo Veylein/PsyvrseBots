@@ -11,7 +11,15 @@ def register(bot: commands.Bot):
     @bot.command(name="queue")
     async def _queue(ctx: commands.Context):
         try:
-            items = bot.player.all()
+            # Prefer guild-specific sonus queue if available
+            guild_id = ctx.guild.id if ctx.guild else None
+            if guild_id:
+                qmap = getattr(bot, 'sonus_queues', {}) or {}
+                items = qmap.get(guild_id) or None
+            else:
+                items = None
+            if not items:
+                items = bot.player.all()
         except Exception:
             items = getattr(bot, "track_queue", None) or getattr(bot, "sonus_queue", [])
 
@@ -21,7 +29,15 @@ def register(bot: commands.Bot):
 
         # Build a simple embed showing up to 10 upcoming tracks
         lines: List[str] = []
-        for i, t in enumerate(list(items)[:10], start=1):
+        seq = list(items)
+        # if items is a TrackQueue-like object, try to call .all()
+        try:
+            if hasattr(items, 'all') and callable(items.all):
+                seq = items.all()
+        except Exception:
+            pass
+
+        for i, t in enumerate(seq[:10], start=1):
             title = t.get("title") if isinstance(t, dict) else str(t)
             lines.append(f"{i}. {title}")
 
