@@ -25,7 +25,7 @@ COLOR_EMOJIS = {
 }
 
 # Base path for card assets
-ASSETS_PATH = Path(__file__).parent.parent / 'assets' / 'uno_cards' / 'uno_classic'
+ASSETS_PATH = Path(__file__).parent.parent.parent / 'assets' / 'uno_cards' / 'uno_classic'
 
 # Cache dla emoji mapping
 _emoji_cache = None
@@ -263,12 +263,12 @@ def get_card_asset_path(card, variant='classic'):
     else:
         folder_name = 'uno_classic'
     
-    assets_path = Path(__file__).parent.parent / 'assets' / 'uno_cards' / folder_name
+    assets_path = Path(__file__).parent.parent.parent / 'assets' / 'uno_cards' / folder_name
     card_path = assets_path / filename
     
     # Fallback: No Mercy+ uses No Mercy cards if not found
     if variant == 'no_mercy_plus' and not card_path.exists():
-        fallback_path = Path(__file__).parent.parent / 'assets' / 'uno_cards' / 'uno_no_mercy'
+        fallback_path = Path(__file__).parent.parent.parent / 'assets' / 'uno_cards' / 'uno_no_mercy'
         fallback_card_path = fallback_path / filename
         if fallback_card_path.exists():
             return fallback_card_path

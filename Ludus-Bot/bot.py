@@ -57,6 +57,8 @@ bot = commands.Bot(
 # Initialize game state storage for UNO and other games
 bot.active_games = {}
 bot.active_lobbies = {}
+bot.active_minigames = {}
+bot.pending_rematches = {}
 
 
 # Wrap CommandTree.add_command to ignore duplicate registrations gracefully.
@@ -163,28 +165,51 @@ async def on_ready():
     print(f"[BOT] Bot application info owner: {(await bot.application_info()).owner.id if bot.application else 'Unknown'}")
     
     # ===== DEV GUILD COMMAND SYNC SYSTEM =====
-    # All slash commands defined in cogs are global by default.
-    # When DEV_GUILD_ID is set in .env:
-    #   - Commands sync ONLY to that guild (instant updates for testing)
-    #   - Guild commands override global commands in that guild
-    # To sync globally (production): remove DEV_GUILD_ID from .env
+    # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
+    # All other commands sync globally
+    DEV_ONLY_COMMANDS = []  # Add command names here for dev guild testing
+    
     try:
         import os
         dev_guilds_raw = os.environ.get('DEV_GUILD_IDS') or os.environ.get('DEV_GUILD_ID')
         if dev_guilds_raw:
-            print(f"[BOT] DEV_GUILD_ID detected - syncing commands to dev guilds only")
+            print(f"[BOT] DEV_GUILD_ID detected - splitting commands")
             guild_ids = [g.strip() for g in dev_guilds_raw.split(',') if g.strip()]
+            
+            # Save references to dev-only commands before removing
+            dev_commands = {}
+            for cmd_name in DEV_ONLY_COMMANDS:
+                cmd = bot.tree.get_command(cmd_name)
+                if cmd:
+                    dev_commands[cmd_name] = cmd
+                    bot.tree.remove_command(cmd_name)
+                    print(f"[BOT] Saved {cmd_name} for dev guild only")
+            
+            # Sync global commands (without dev-only)
+            print(f"[BOT] Syncing global commands...")
+            synced_global = await bot.tree.sync()
+            print(f"[BOT] ✅ Synced {len(synced_global)} commands globally")
+            for cmd in synced_global:
+                print(f"  - /{cmd.name} (global)")
+            
+            # Sync dev-only commands to guild
             for dev_gid in guild_ids:
                 try:
                     guild_obj = discord.Object(id=int(dev_gid))
-                    bot.tree.copy_global_to(guild=guild_obj)
-                    synced = await bot.tree.sync(guild=guild_obj)
-                    print(f"[BOT] ✅ Synced {len(synced)} commands to guild {dev_gid}")
-                    for cmd in synced:
-                        print(f"  - /{cmd.name}")
+                    bot.tree.clear_commands(guild=guild_obj)
+                    
+                    # Add saved dev commands to guild tree
+                    for cmd_name, cmd in dev_commands.items():
+                        bot.tree.add_command(cmd, guild=guild_obj)
+                        print(f"[BOT] Added {cmd_name} to guild {dev_gid}")
+                    
+                    synced_guild = await bot.tree.sync(guild=guild_obj)
+                    print(f"[BOT] ✅ Synced {len(synced_guild)} dev commands to guild {dev_gid}")
+                    for cmd in synced_guild:
+                        print(f"  - /{cmd.name} (guild {dev_gid})")
                 except Exception as e:
                     print(f"[BOT] ❌ Failed to sync to guild {dev_gid}: {e}")
-            print(f"[BOT] Skipping global sync (dev mode enabled)")
+                    traceback.print_exc()
         else:
             synced = await bot.tree.sync()
             print(f"[BOT] ✅ Synced {len(synced)} commands globally")
@@ -366,6 +391,13 @@ async def on_interaction(interaction: discord.Interaction):
             uno_cog = bot.get_cog('UnoCog')
             if uno_cog:
                 await uno_cog.handle_uno_interaction(interaction, custom_id)
+                return
+        
+        # TTT (Tic-Tac-Toe) interactions
+        if custom_id.startswith('ttt_'):
+            boardgames_cog = bot.get_cog('BoardGames')
+            if boardgames_cog:
+                await boardgames_cog.handle_ttt_interaction(interaction, custom_id)
                 return
         
         # Add other game handlers here as needed
