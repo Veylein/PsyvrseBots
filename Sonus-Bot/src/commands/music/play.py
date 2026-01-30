@@ -757,6 +757,10 @@ def register(bot: commands.Bot):
         await interaction.response.defer()
         ctx = await commands.Context.from_interaction(interaction)
         await _play(ctx, query=query)
+    try:
+        _play.help = "Search or URL to play/enqueue. Supports search terms, YouTube/Spotify/SoundCloud URLs and stream URLs."
+    except Exception:
+        pass
 
     @bot.command(name='enqueue_status')
     async def _enqueue_status(ctx: commands.Context):
@@ -785,6 +789,10 @@ def register(bot: commands.Bot):
         await interaction.response.defer()
         ctx = await commands.Context.from_interaction(interaction)
         await _enqueue_status(ctx)
+    try:
+        _enqueue_status.help = "Show status of any active background enqueue task for your guild."
+    except Exception:
+        pass
 
     @bot.command(name='enqueue_cancel')
     async def _enqueue_cancel(ctx: commands.Context):
@@ -809,6 +817,96 @@ def register(bot: commands.Bot):
         await interaction.response.defer()
         ctx = await commands.Context.from_interaction(interaction)
         await _enqueue_cancel(ctx)
+    try:
+        _enqueue_cancel.help = "Cancel an active background enqueue for this guild."
+    except Exception:
+        pass
+
+    @bot.command(name='radio')
+    async def _radio(ctx: commands.Context, *, query: Optional[str] = None):
+        """List and play radio stations. Usage: S!radio [name|index|search]
+
+        Without arguments this lists available stations (by country/category).
+        Provide a name or partial match to play the first matching station.
+        """
+        guild = ctx.guild
+        try:
+            data_dir = Path(__file__).parents[2] / 'data' / 'radios'
+        except Exception:
+            data_dir = None
+
+        stations = []
+        if data_dir and data_dir.exists():
+            for f in data_dir.iterdir():
+                if f.suffix.lower() in ('.json',):
+                    try:
+                        import json
+
+                        j = json.loads(f.read_text())
+                        # assume structure: { 'stations': [...] } or list
+                        if isinstance(j, dict) and j.get('stations'):
+                            for s in j.get('stations'):
+                                s['_source_file'] = f.name
+                                stations.append(s)
+                        elif isinstance(j, list):
+                            for s in j:
+                                s['_source_file'] = f.name
+                                stations.append(s)
+                    except Exception:
+                        continue
+
+        if not stations:
+            await ctx.send('No radio station data available.')
+            return
+
+        if not query:
+            # show top 10 stations as examples
+            msg = 'Available radio stations (sample):\n'
+            for i, s in enumerate(stations[:10], start=1):
+                name = s.get('title') or s.get('name') or s.get('title_long') or 'Unnamed'
+                country = s.get('country') or s.get('_source_file')
+                msg += f'{i}. {name} ({country})\n'
+            msg += '\nUse `S!radio <name|index>` to play.'
+            await ctx.send(msg)
+            return
+
+        # try numeric index
+        q = query.strip()
+        chosen = None
+        if q.isdigit():
+            idx = int(q) - 1
+            if 0 <= idx < len(stations):
+                chosen = stations[idx]
+
+        if not chosen:
+            # search by partial match on name/title
+            lower = q.lower()
+            for s in stations:
+                name = (s.get('title') or s.get('name') or '')
+                if lower in name.lower():
+                    chosen = s
+                    break
+
+        if not chosen:
+            await ctx.send('No matching radio station found.')
+            return
+
+        # attempt to play station by its stream URL
+        url = chosen.get('url') or chosen.get('stream') or chosen.get('stream_url') or chosen.get('play_url')
+        if not url:
+            await ctx.send('Selected station has no playable URL.')
+            return
+
+        await ctx.send(f'Enqueuing radio: {chosen.get("title") or chosen.get("name")}')
+        # reuse existing play logic by calling _play with the stream URL
+        await _play(ctx, query=url)
+
+    @bot.tree.command(name='radio')
+    @app_commands.describe(query='Station name, index, or search term')
+    async def _radio_slash(interaction: discord.Interaction, query: Optional[str] = None):
+        await interaction.response.defer()
+        ctx = await commands.Context.from_interaction(interaction)
+        await _radio(ctx, query=query)
 
     # Register `audiotest` only if it doesn't already exist (some modules provide it)
     if bot.get_command('audiotest') is None:
@@ -864,6 +962,10 @@ def register(bot: commands.Bot):
         except Exception:
             # if registration fails for any reason, continue without crashing the whole module
             logger.info('Could not add audiotest command; it may already exist.')
+    try:
+        _audiotest.help = "Test extraction and ffmpeg probe for a given URL or search term (no playback)."
+    except Exception:
+        pass
 
     # Register a slash variant only if the tree doesn't already have it
     if bot.tree.get_command('audiotest') is None:

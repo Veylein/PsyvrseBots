@@ -49,6 +49,8 @@ Or run via your process manager/container with the environment variables set.
 - `YTDL_COOKIEFILE` / `YTDL_COOKIES`: path to a cookie file for yt-dlp when playing restricted YouTube content.
 - `SONUS_YTDL_CACHE_DB`: when set, enables a shelve-backed persistent cache for yt-dlp extraction results (reduces repeated network calls).
 - `SONUS_QUEUE_DB`: when set to a writable path, per-guild queue contents are persisted across restarts; the bot attempts to resume queued playback on startup.
+ - `SONUS_QUEUE_DB`: when set to a writable path, per-guild queue contents are persisted across restarts; the bot attempts to resume queued playback on startup.
+ - `SONUS_RESUME_ON_STARTUP`: when set to `1`, `true`, or `yes`, the bot will attempt to resume any persisted enqueue jobs (long-running playlist/album enqueues) on startup. This is optional and disabled by default to avoid unexpected background tasks during deploys.
 - `SONUS_PLAYLIST_LIMIT`: maximum number of tracks to enqueue when playing a playlist/album (default 100).
 - `SONUS_PROBE_CACHE_TTL` / `SONUS_YTDL_CACHE_TTL`: TTLs for probe and ytdl caches and related size env vars.
 
