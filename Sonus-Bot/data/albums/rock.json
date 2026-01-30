@@ -1,0 +1,216 @@
+{
+  "id": "rock",
+  "name": "Rock",
+  "tracks": [
+    {
+      "title": "Burning Love",
+      "artist": "Elvis Presley",
+      "source": "https://www.youtube.com/watch?v=Q"
+    },
+    {
+      "title": "Livin' on a Prayer",
+      "artist": "Bon Jovi",
+      "source": "https://www.youtube.com/watch?v=lDK9QqIzhwk"
+    },
+    {
+      "title": "Sweet Child O' Mine",
+      "artist": "Guns N' Roses",
+      "source": "https://www.youtube.com/watch?v=1w7OgIMMRc4"
+    },
+    {
+      "title": "Back In Black",
+      "artist": "AC/DC",
+      "source": "https://www.youtube.com/watch?v=pAgnJDJN4VA"
+    },
+    {
+      "title": "Hotel California",
+      "artist": "Eagles",
+      "source": "https://www.youtube.com/watch?v=EqPtz5qN7HM"
+    },
+    {
+      "title": "Bohemian Rhapsody",
+      "artist": "Queen",
+      "source": "https://www.youtube.com/watch?v=fJ9rUzIMcZQ"
+    },
+    {
+      "title": "Smells Like Teen Spirit",
+      "artist": "Nirvana",
+      "source": "https://www.youtube.com/watch?v=hTWKbfoikeg"
+    },
+    {
+      "title": "Wonderwall",
+      "artist": "Oasis",
+      "source": "https://www.youtube.com/watch?v=6hzrDeceEKc"
+    },
+    {
+      "title": "Stairway to Heaven",
+      "artist": "Led Zeppelin",
+      "source": "https://www.youtube.com/watch?v=QkF3oxziUI4"
+    },
+    {
+      "title": "Imagine",
+      "artist": "John Lennon",
+      "source": "https://www.youtube.com/watch?v=YkgkThdzX-8"
+    },
+    {
+      "title": "Free Fallin'",
+      "artist": "Tom Petty",
+      "source": "https://www.youtube.com/watch?v=1lWJXDG2i0A"
+    },
+    {
+      "title": "Born to Run",
+      "artist": "Bruce Springsteen",
+      "source": "https://www.youtube.com/watch?v=IxuThNgl3YA"
+    },
+    {
+      "title": "Purple Haze",
+      "artist": "Jimi Hendrix",
+      "source": "https://www.youtube.com/watch?v=fjwWjx7Cw8I"
+    },  
+    {
+      "title": "Light My Fire",
+      "artist": "The Doors",
+      "source": "https://www.youtube.com/watch?v=deB_u-to-IE"
+    },
+    {
+      "title": "Hey Jude",
+      "artist": "The Beatles",
+      "source": "https://www.youtube.com/watch?v=A_MjCqQoLLA"
+    },
+    {
+      "title": "Comfortably Numb",
+      "artist": "Pink Floyd",
+      "source": "https://www.youtube.com/watch?v=_FrOQC-zEog"
+    },
+    {
+      "title": "Highway to Hell",
+      "artist": "AC/DC",
+      "source": "https://www.youtube.com/watch?v=l482T0yNkeo"
+    },
+    {
+      "title": "Another Brick in the Wall, Pt. 2",
+      "artist": "Pink Floyd",
+      "source": "https://www.youtube.com/watch?v=Hrx5SmLiOZc"
+    },
+    {
+      "title": "Sweet Home Alabama",
+      "artist": "Lynyrd Skynyrd",
+      "source": "https://www.youtube.com/watch?v=ye5BuYf8q4o"
+    },
+    {
+      "title": "Jump",
+      "artist": "Van Halen",
+      "source": "https://www.youtube.com/watch?v=SwYN7mTi6HM"
+    },
+    {
+      "title": "Paint It Black",
+      "artist": "The Rolling Stones",
+      "source": "https://www.youtube.com/watch?v=O4irXQhgMqg"
+    },
+    {
+      "title": "Paranoid",
+      "artist": "Black Sabbath",
+      "source": "https://www.youtube.com/watch?v=0qanF-91aJo"
+    },
+    {
+      "title": "Born to Be Wild",
+      "artist": "Steppenwolf",
+      "source": "https://www.youtube.com/watch?v=egMWlD3fLJ8"
+    },
+    {
+      "title": "You Shook Me All Night Long",
+      "artist": "AC/DC",
+      "source": "https://www.youtube.com/watch?v=Lo2qQmj0_h4"
+    },
+    {
+      "title": "Creep",
+      "artist": "Radiohead",
+      "source": "https://www.youtube.com/watch?v=XFkzRNyygfk"
+    },
+    {
+      "title": "Livin' La Vida Loca",
+      "artist": "Ricky Martin",
+      "source": "https://www.youtube.com/watch?v=p47fEXGabaY"
+    },
+    {
+      "title": "Beat It",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=oRdxUFDoQe0"
+    },
+    {
+      "title": "Eye of the Tiger",
+      "artist": "Survivor",
+      "source": "https://www.youtube.com/watch?v=btPJPFnesV4"
+    },
+    {
+      "title": "Thunderstruck",
+      "artist": "AC/DC",
+      "source": "https://www.youtube.com/watch?v=v2AC41dglnM"
+    },
+    {
+      "title": "Crazy Train",
+      "artist": "Ozzy Osbourne",
+      "source": "https://www.youtube.com/watch?v=HgzGwKwLmgM"
+    },
+    {
+      "title": "Hotel California (Live)",
+      "artist": "Eagles",
+      "source": "https://www.youtube.com/watch?v=EqPtz5qN7HM"
+    },
+    {
+      "title": "Free Bird",
+      "artist": "Lynyrd Skynyrd",
+      "source": "https://www.youtube.com/watch?v=Rbm6GXllBiw"
+    },
+    {
+      "title": "Whole Lotta Love",
+      "artist": "Led Zeppelin",
+      "source": "https://www.youtube.com/watch?v=HQmmM_qwG4k"
+    },
+    {
+      "title": "Rock and Roll All Nite",
+      "artist": "KISS",
+      "source": "https://www.youtube.com/watch?v=FJ0l3vYzG6w"
+    },
+    {
+      "title": "The Final Countdown",
+      "artist": "Europe",
+      "source": "https://www.youtube.com/watch?v=9jK-NcRmVcw"
+    },
+    {
+      "title": "Welcome to the Jungle",
+      "artist": "Guns N' Roses",
+      "source": "https://www.youtube.com/watch?v=o1tj2zJ2Wvg"
+    },
+    {
+      "title": "Don't Stop Believin'",
+      "artist": "Journey",
+      "source": "https://www.youtube.com/watch?v=1k8craCGpgs"
+    },
+    {
+      "title": "Shook Me All Night Long",
+      "artist": "AC/DC",
+      "source": "https://www.youtube.com/watch?v=Lo2qQmj0_h4"
+    },
+    {
+      "title": "Bad to the Bone",
+      "artist": "George Thorogood & The Destroyers",
+      "source": "https://www.youtube.com/watch?v=Q9q4W9iWcCw"
+    },
+    {
+      "title": "Rock You Like a Hurricane",
+      "artist": "Scorpions",
+      "source": "https://www.youtube.com/watch?v=1nKXlr6LkTE"
+    },
+    {
+      "title": "I Love Rock 'n Roll",
+      "artist": "Joan Jett & The Blackhearts",
+      "source": "https://www.youtube.com/watch?v=J7p4bzqLvCw"
+    },
+    {
+      "title": "Sweet Emotion",
+      "artist": "Aerosmith",
+      "source": "https://www.youtube.com/watch?v=1y7pH8Y1k0g"
+    }
+  ]
+}

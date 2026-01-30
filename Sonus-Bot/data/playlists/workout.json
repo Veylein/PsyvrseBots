@@ -1,5 +1,126 @@
 {
   "id": "workout",
   "name": "Workout",
-  "tracks": []
+  "tracks": [
+    {
+      "title": "Eye of the Tiger",
+      "artist": "Survivor",
+      "source": "https://www.youtube.com/watch?v=btPJPFnesV4"
+    },
+    {
+      "title": "Stronger",
+      "artist": "Kanye West",
+      "source": "https://www.youtube.com/watch?v=PsO6ZnUZI0g"
+    },
+    {
+      "title": "Can't Hold Us",
+      "artist": "Macklemore & Ryan Lewis",
+      "source": "https://www.youtube.com/watch?v=2zNSgSzhBfM"
+    },
+    {
+     "title": "Eye of the Tiger",
+      "artist": "Survivor",
+      "source": "https://www.youtube.com/watch?v=btPJPFnesV4"
+    },
+    {
+      "title": "Stronger",
+      "artist": "Kanye West",
+      "source": "https://www.youtube.com/watch?v=PsO6ZnUZI0g"
+    },
+    {
+      "title": "Can't Hold Us",
+      "artist": "Macklemore & Ryan Lewis",
+      "source": "https://www.youtube.com/watch?v=2zNSgSzhBfM"
+    },
+    {
+      "title": "Human",
+      "artist": "Rag'n Bone Man",
+      "source": "https://www.youtube.com/watch?v=L3wKzyIN1yk"
+    },
+    {
+      "title": "Lose Yourself",
+      "artist": "Eminem",
+      "source": "https://www.youtube.com/watch?v=_Yhyp-_hX2s"
+    },
+    {
+      "title": "Remember the Name",
+      "artist": "Fort Minor",
+      "source": "https://www.youtube.com/watch?v=VDvr08sCPOc"
+    },
+    {
+      "title": "Till I Collapse",
+      "artist": "Eminem",
+      "source": "https://www.youtube.com/watch?v=ytQ5CYE1VZw"
+    },
+    {
+      "title": "Believer",
+      "artist": "Imagine Dragons",
+      "source": "https://www.youtube.com/watch?v=7wtfhZwyrcc"
+    },
+    {
+      "title": "Power",
+      "artist": "Kanye West",
+      "source": "https://www.youtube.com/watch?v=L53gjP-TtGE"
+    },
+    {
+      "title": "Stronger (What Doesn’t Kill You)",
+      "artist": "Kelly Clarkson",
+      "source": "https://www.youtube.com/watch?v=Xn676-fLq7I"
+    },
+    {
+      "title": "Thunderstruck",
+      "artist": "AC/DC",
+      "source": "https://www.youtube.com/watch?v=v2AC41dglnM"
+    },
+    {
+      "title": "Can’t Stop",
+      "artist": "Red Hot Chili Peppers",
+      "source": "https://www.youtube.com/watch?v=8DyziWtkfBw"
+    },
+    {
+      "title": "Warriors",
+      "artist": "Imagine Dragons",
+      "source": "https://www.youtube.com/watch?v=fmI_Ndrxy14"
+    },
+    {
+      "title": "Pump It",
+      "artist": "Black Eyed Peas",
+      "source": "https://www.youtube.com/watch?v=ZaI2IlHwmgQ"
+    },
+    {
+      "title": "X Gon’ Give It To Ya",
+      "artist": "DMX",
+      "source": "https://www.youtube.com/watch?v=EJnWXwJgI4I"
+    },
+    {
+      "title": "My Songs Know What You Did In the Dark",
+      "artist": "Fall Out Boy",
+      "source": "https://www.youtube.com/watch?v=LkIWmsP3c_s"
+    },
+    {
+      "title": "Stronger Than You",
+      "artist": "Steven Universe Soundtrack",
+      "source": "https://www.youtube.com/watch?v=5t0VYt-3pZo"
+    },
+    {
+      "title": "Heads Will Roll",
+      "artist": "Yeah Yeah Yeahs",
+      "source": "https://www.youtube.com/watch?v=2Abk1jAONjw"
+    },
+    {
+      "title": "Remember The Titans Theme",
+      "artist": "Trevor Rabin",
+      "source": "https://www.youtube.com/watch?v=3e8c0vHsT8I"
+    },
+    {
+      "title": "Centuries",
+      "artist": "Fall Out Boy",
+      "source": "https://www.youtube.com/watch?v=LBr7kECsjcQ"
+    },
+    {
+      "title": "Human",
+      "artist": "Rag'n Bone Man",
+      "source": "https://www.youtube.com/watch?v=L3wKzyIN1yk"
+    }
+  ]
 }

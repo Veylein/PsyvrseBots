@@ -1,0 +1,81 @@
+{
+  "id": "country",
+  "name": "Country",
+  "tracks": [
+    {
+      "title": "Jolene",
+      "artist": "Dolly Parton",
+      "source": "https://www.youtube.com/watch?v=Ixrje2rXLMA"
+    },
+    {
+      "title": "Take Me Home, Country Roads",
+      "artist": "John Denver",
+      "source": "https://www.youtube.com/watch?v=1vrEljMfXYo"
+    },
+    {
+      "title": "The Gambler",
+      "artist": "Kenny Rogers",
+      "source": "https://www.youtube.com/watch?v=7Y3l9W2J8mU"
+    },
+    {
+      "title": "Friends in Low Places",
+      "artist": "Garth Brooks",
+      "source": "https://www.youtube.com/watch?v=7g3Yl3v2Q1o"
+    },
+    {
+      "title": "Ring of Fire",
+      "artist": "Johnny Cash",
+      "source": "https://www.youtube.com/watch?v=It7107ELQvY"
+    },
+    {
+      "title": "Before He Cheats",
+      "artist": "Carrie Underwood",
+      "source": "https://www.youtube.com/watch?v=WaSy8yy-mr8"
+    },
+    {
+      "title": "Wagon Wheel",
+      "artist": "Darius Rucker",
+      "source": "https://www.youtube.com/watch?v=1x2pXkYc0lo"
+    },
+    {
+      "title": "Boot Scootin' Boogie",
+      "artist": "Brooks & Dunn",
+      "source": "https://www.youtube.com/watch?v=3l4nVByCL44"
+    },
+    {
+      "title": "Need You Now",
+      "artist": "Lady A",
+      "source": "https://www.youtube.com/watch?v=BYBKf1m1vXU"
+    },
+    {
+      "title": "Cruise",
+      "artist": "Florida Georgia Line",
+      "source": "https://www.youtube.com/watch?v=hvKyBcCD5cA"
+    },
+    {
+      "title": "Live Like You Were Dying",
+      "artist": "Tim McGraw",
+      "source": "https://www.youtube.com/watch?v=2s6z6zZ2F6k"
+    },
+    {
+      "title": "Fancy",
+      "artist": "Reba McEntire",
+      "source": "https://www.youtube.com/watch?v=0HVV1_3u6Go"
+    },
+    {
+      "title": "My Wish",
+      "artist": "Rascal Flatts",
+      "source": "https://www.youtube.com/watch?v=2c6etnG7XfE"
+    },
+    {
+      "title": "Humble and Kind",
+      "artist": "Tim McGraw",
+      "source": "https://www.youtube.com/watch?v=awzNHuGqoNE"
+    },
+    {
+      "title": "I Walk the Line",
+      "artist": "Johnny Cash",
+      "source": "https://www.youtube.com/watch?v=9wH9b4kYhXc"
+    }
+  ]
+}

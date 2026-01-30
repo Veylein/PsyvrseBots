@@ -1,0 +1,106 @@
+{
+  "id": "pop",
+  "name": "Pop",
+  "tracks": [
+    {
+      "title": "Billie Jean",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=Zi_XLOBDo_Y"
+    },
+    {
+      "title": "Thriller",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=sOnqjkJTMaA"
+    },
+    {
+      "title": "Beat It",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=oRdxUFDoQe0"
+    },
+    {
+      "title": "Smooth Criminal",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=h_D3VFfhvs4"
+    },
+    {
+      "title": "Bad",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=dsUXAEzaC3Q"
+    },
+    {
+      "title": "Man in the Mirror",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=PivWY9wn5ps"
+    },
+    {
+      "title": "Black or White",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=F2AitTPI5U0"
+    },
+    {
+      "title": "Don't Stop 'Til You Get Enough",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=yURRmWtbTbo"
+    },
+    {
+      "title": "Rock with You",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=5bOKu8xN2EE"
+    },
+    {
+      "title": "The Way You Make Me Feel",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=HzZ_urpj4As"
+    },
+    {
+      "title": "Human Nature",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=4Y1lZQsyuSQ"
+    },
+    {
+      "title": "Remember the Time",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=NUsoVlDFqZg"
+    },
+    {
+      "title": "You Are Not Alone",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=QZ2-Tu3-g6w"
+    },
+    {
+      "title": "Dirty Diana",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=ILWSp0m9G2U"
+    },
+    {
+      "title": "Heal the World",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=BWf-eARnf6U"
+    },
+    {
+      "title": "Wanna Be Startin' Somethin'",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=iM9ezhElX6w"
+    },
+    {
+      "title": "Off the Wall",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=Zs1GInX3jAs"
+    },
+    {
+      "title": "P.Y.T. (Pretty Young Thing)",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=H9tEvfIsDyo"
+    },
+    {
+      "title": "Give In to Me",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=20jGwlz6FiA"
+    },
+    {
+      "title": "Badder Than Bad",
+      "artist": "Micheal Jackson",
+      "source": "https://www.youtube.com/watch?v=3u7j1K1b0pQ"
+    }
+  ]
+}

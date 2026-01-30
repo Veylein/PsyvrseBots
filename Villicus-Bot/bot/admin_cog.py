@@ -52,21 +52,34 @@ class AdminCog(commands.Cog):
         locks = settings.get('emoji_locks', {})
         if not locks:
             return
-        # check content for custom emoji patterns
-        matches = re.findall(r'<a?:[A-Za-z0-9_]+:(\d+)>', message.content)
-        if not matches:
-            return
-        for eid in matches:
-            for emoji, role_id in locks.items():
-                if eid == emoji or emoji == f'<:{eid}>' or emoji == f'<a:{eid}>':
-                    role = guild.get_role(role_id)
-                    member = message.author
-                    if role and role not in member.roles:
-                        try:
-                            await message.delete()
-                        except Exception:
-                            pass
-                        return
+        # Check both custom emoji IDs and unicode emoji strings
+        custom_matches = re.findall(r'<a?:[A-Za-z0-9_]+:(\d+)>', message.content)
+        member = message.author
+        for emoji_key, role_id in locks.items():
+            try:
+                role = guild.get_role(role_id)
+                if not role:
+                    continue
+                # custom emoji by id
+                if emoji_key.isdigit():
+                    if emoji_key in custom_matches:
+                        if role not in member.roles:
+                            try:
+                                await message.delete()
+                            except Exception:
+                                pass
+                            return
+                else:
+                    # unicode emoji string check
+                    if emoji_key in message.content:
+                        if role not in member.roles:
+                            try:
+                                await message.delete()
+                            except Exception:
+                                pass
+                            return
+            except Exception:
+                continue
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
@@ -79,19 +92,35 @@ class AdminCog(commands.Cog):
             return
         # payload.emoji may have id
         eid = getattr(payload.emoji, 'id', None)
-        if not eid:
+        name = getattr(payload.emoji, 'name', None)
+        member = guild.get_member(payload.user_id)
+        if not member or member.bot:
             return
-        for emoji, role_id in locks.items():
-            if str(eid) == emoji or emoji == f'<:{eid}>' or emoji == f'<a:{eid}>':
-                member = guild.get_member(payload.user_id)
+        for emoji_key, role_id in locks.items():
+            try:
                 role = guild.get_role(role_id)
-                if member and role and role not in member.roles:
-                    try:
-                        channel = self.bot.get_channel(payload.channel_id)
-                        message = await channel.fetch_message(payload.message_id)
-                        await message.remove_reaction(payload.emoji, member)
-                    except Exception:
-                        pass
+                if not role:
+                    continue
+                if emoji_key.isdigit():
+                    if eid and str(eid) == emoji_key:
+                        if role not in member.roles:
+                            try:
+                                channel = self.bot.get_channel(payload.channel_id)
+                                message = await channel.fetch_message(payload.message_id)
+                                await message.remove_reaction(payload.emoji, member)
+                            except Exception:
+                                pass
+                else:
+                    if name and emoji_key == name:
+                        if role not in member.roles:
+                            try:
+                                channel = self.bot.get_channel(payload.channel_id)
+                                message = await channel.fetch_message(payload.message_id)
+                                await message.remove_reaction(payload.emoji, member)
+                            except Exception:
+                                pass
+            except Exception:
+                pass
 
     # ---------------- SLASH COMMAND WRAPPERS ----------------
     async def kick_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = 'No reason provided'):
@@ -102,7 +131,7 @@ class AdminCog(commands.Cog):
             await member.kick(reason=reason)
             mod = self.bot.get_cog('ModerationCog')
             if mod:
-                mod._record_infraction(member.id, interaction.user.id, 'kick', reason)
+                mod._record_infraction(member.id, interaction.user.id, 'kick', reason, guild_id=interaction.guild.id)
             await interaction.followup.send(f'Kicked {member}.')
         except Exception as e:
             await interaction.followup.send(f'Failed to kick: {e}', ephemeral=True)
@@ -115,7 +144,7 @@ class AdminCog(commands.Cog):
             await member.ban(reason=reason, delete_message_days=days)
             mod = self.bot.get_cog('ModerationCog')
             if mod:
-                mod._record_infraction(member.id, interaction.user.id, 'ban', reason)
+                mod._record_infraction(member.id, interaction.user.id, 'ban', reason, guild_id=interaction.guild.id)
             await interaction.followup.send(f'Banned {member}.')
         except Exception as e:
             await interaction.followup.send(f'Failed to ban: {e}', ephemeral=True)
@@ -136,7 +165,7 @@ class AdminCog(commands.Cog):
             await interaction.guild.unban(target, reason=reason)
             mod = self.bot.get_cog('ModerationCog')
             if mod:
-                mod._record_infraction(target.id, interaction.user.id, 'unban', reason)
+                mod._record_infraction(target.id, interaction.user.id, 'unban', reason, guild_id=interaction.guild.id)
             await interaction.followup.send(f'Unbanned {target}.')
         except Exception as e:
             await interaction.followup.send(f'Failed to unban: {e}', ephemeral=True)
@@ -182,6 +211,9 @@ class AdminCog(commands.Cog):
             return await interaction.followup.send('Brick role not configured. Run `V!config punishments` first.', ephemeral=True)
         try:
             await member.add_roles(role, reason=reason or f'Bricked by {interaction.user}')
+            mod = self.bot.get_cog('ModerationCog')
+            if mod:
+                mod._record_infraction(member.id, interaction.user.id, 'brick', reason or f'Bricked by {interaction.user}', guild_id=interaction.guild.id)
             await interaction.followup.send(f'{member.mention} bricked.')
         except Exception as e:
             await interaction.followup.send(f'Failed to brick: {e}', ephemeral=True)
@@ -195,6 +227,9 @@ class AdminCog(commands.Cog):
             return await interaction.followup.send('Demoji role not configured. Run `V!config punishments` first.', ephemeral=True)
         try:
             await member.add_roles(role, reason=f'Demoji by {interaction.user}')
+            mod = self.bot.get_cog('ModerationCog')
+            if mod:
+                mod._record_infraction(member.id, interaction.user.id, 'demoji', f'Demoji by {interaction.user}', guild_id=interaction.guild.id)
             await interaction.followup.send(f'{member.mention} demoji applied.')
         except Exception as e:
             await interaction.followup.send(f'Failed to apply demoji: {e}', ephemeral=True)
@@ -203,26 +238,73 @@ class AdminCog(commands.Cog):
         await interaction.response.defer()
         if not interaction.user.guild_permissions.manage_guild:
             return await interaction.followup.send('You do not have permission to manage the guild.', ephemeral=True)
+        # Normalize emoji input: accept <:name:id>, <a:name:id>, raw id, or unicode emoji
+        key = emoji
+        m = re.match(r'<a?:[A-Za-z0-9_]+:(\d+)>', emoji)
+        if m:
+            key = m.group(1)
+        else:
+            # if purely digits, treat as id
+            if emoji.isdigit():
+                key = emoji
+            else:
+                # keep unicode emoji as-is
+                key = emoji
         settings = get_guild_settings(interaction.guild.id)
         locks = settings.get('emoji_locks', {})
-        locks[emoji] = role.id
+        locks[str(key)] = role.id
         settings['emoji_locks'] = locks
         save_guild_settings(interaction.guild.id, settings)
-        await interaction.followup.send(f'Locked emoji {emoji} to role {role.name}.')
+        await interaction.followup.send(f'Locked emoji {emoji} to role {role.name}.', ephemeral=True)
 
     async def emoji_unlock_slash(self, interaction: discord.Interaction, emoji: str):
         await interaction.response.defer()
         if not interaction.user.guild_permissions.manage_guild:
             return await interaction.followup.send('You do not have permission to manage the guild.', ephemeral=True)
+        # Normalize input like emoji_lock
+        m = re.match(r'<a?:[A-Za-z0-9_]+:(\d+)>', emoji)
+        key = None
+        if m:
+            key = m.group(1)
+        elif emoji.isdigit():
+            key = emoji
+        else:
+            key = emoji
         settings = get_guild_settings(interaction.guild.id)
         locks = settings.get('emoji_locks', {})
-        if emoji in locks:
-            locks.pop(emoji, None)
+        if str(key) in locks:
+            locks.pop(str(key), None)
             settings['emoji_locks'] = locks
             save_guild_settings(interaction.guild.id, settings)
-            await interaction.followup.send(f'Unlocked emoji {emoji}.')
-        else:
-            await interaction.followup.send('Emoji not locked.', ephemeral=True)
+            await interaction.followup.send(f'Unlocked emoji {emoji}.', ephemeral=True)
+            return
+        # Try to find by matching unicode strings
+        found = None
+        for k in list(locks.keys()):
+            if k == emoji:
+                found = k
+                break
+        if found:
+            locks.pop(found, None)
+            settings['emoji_locks'] = locks
+            save_guild_settings(interaction.guild.id, settings)
+            await interaction.followup.send(f'Unlocked emoji {emoji}.', ephemeral=True)
+            return
+        await interaction.followup.send('Emoji not locked.', ephemeral=True)
+
+    async def emoji_list_slash(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        if not interaction.user.guild_permissions.manage_guild:
+            return await interaction.followup.send('Manage Guild required.', ephemeral=True)
+        settings = get_guild_settings(interaction.guild.id)
+        locks = settings.get('emoji_locks', {})
+        if not locks:
+            return await interaction.followup.send('No emoji locks configured.', ephemeral=True)
+        lines = []
+        for k, rid in locks.items():
+            role = interaction.guild.get_role(rid)
+            lines.append(f'{k} -> {role.name if role else rid}')
+        await interaction.followup.send('Emoji locks:\n' + '\n'.join(lines), ephemeral=True)
 
     # --- Additional admin slash wrappers ---
     async def softban_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = 'Softban by staff'):
@@ -234,7 +316,7 @@ class AdminCog(commands.Cog):
             await interaction.guild.unban(member, reason='Softban unban')
             mod = self.bot.get_cog('ModerationCog')
             if mod:
-                mod._record_infraction(member.id, interaction.user.id, 'softban', reason)
+                mod._record_infraction(member.id, interaction.user.id, 'softban', reason, guild_id=interaction.guild.id)
             await interaction.followup.send(f'Softbanned {member}.')
         except Exception as e:
             await interaction.followup.send(f'Failed to softban: {e}', ephemeral=True)
@@ -397,84 +479,88 @@ async def setup(bot: commands.Bot):
     # Best-effort: register important admin slash commands onto the tree — actual sync happens in on_ready()
     try:
         try:
-            bot.tree.add_command(app_commands.Command(name='kick', description='Kick a member', callback=cog.kick_slash))
+            bot.tree.add_command(app_commands.Command(name='kick', description='Kick a member', callback=cog.kick_slash, default_member_permissions=discord.Permissions(kick_members=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='ban', description='Ban a member', callback=cog.ban_slash))
+            bot.tree.add_command(app_commands.Command(name='ban', description='Ban a member', callback=cog.ban_slash, default_member_permissions=discord.Permissions(ban_members=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='unban', description='Unban a member', callback=cog.unban_slash))
+            bot.tree.add_command(app_commands.Command(name='unban', description='Unban a member', callback=cog.unban_slash, default_member_permissions=discord.Permissions(ban_members=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='clear', description='Purge messages', callback=cog.clear_slash))
+            bot.tree.add_command(app_commands.Command(name='clear', description='Purge messages', callback=cog.clear_slash, default_member_permissions=discord.Permissions(manage_messages=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='lock', description='Lock a channel', callback=cog.lock_slash))
+            bot.tree.add_command(app_commands.Command(name='lock', description='Lock a channel', callback=cog.lock_slash, default_member_permissions=discord.Permissions(manage_channels=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='unlock', description='Unlock a channel', callback=cog.unlock_slash))
+            bot.tree.add_command(app_commands.Command(name='unlock', description='Unlock a channel', callback=cog.unlock_slash, default_member_permissions=discord.Permissions(manage_channels=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='brick', description='Apply Brick role', callback=cog.brick_slash))
+            bot.tree.add_command(app_commands.Command(name='brick', description='Apply Brick role', callback=cog.brick_slash, default_member_permissions=discord.Permissions(manage_roles=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='demoji', description='Apply Demoji role', callback=cog.demoji_slash))
+            bot.tree.add_command(app_commands.Command(name='demoji', description='Apply Demoji role', callback=cog.demoji_slash, default_member_permissions=discord.Permissions(manage_roles=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='emoji_lock', description='Lock an emoji to a role', callback=cog.emoji_lock_slash))
+            bot.tree.add_command(app_commands.Command(name='emoji_lock', description='Lock an emoji to a role', callback=cog.emoji_lock_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='emoji_unlock', description='Unlock an emoji', callback=cog.emoji_unlock_slash))
+            bot.tree.add_command(app_commands.Command(name='emoji_unlock', description='Unlock an emoji', callback=cog.emoji_unlock_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='emoji_list', description='List locked emojis and roles', callback=cog.emoji_list_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
         except Exception:
             pass
         # Additional admin slash commands
         try:
-            bot.tree.add_command(app_commands.Command(name='softban', description='Softban a member', callback=cog.softban_slash))
+            bot.tree.add_command(app_commands.Command(name='softban', description='Softban a member', callback=cog.softban_slash, default_member_permissions=discord.Permissions(ban_members=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='massban', description='Massban members by criteria', callback=cog.massban_slash))
+            bot.tree.add_command(app_commands.Command(name='massban', description='Massban members by criteria', callback=cog.massban_slash, default_member_permissions=discord.Permissions(administrator=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='slowmode', description='Set channel slowmode', callback=cog.slowmode_slash))
+            bot.tree.add_command(app_commands.Command(name='slowmode', description='Set channel slowmode', callback=cog.slowmode_slash, default_member_permissions=discord.Permissions(manage_channels=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='clone', description='Clone a channel', callback=cog.clone_slash))
+            bot.tree.add_command(app_commands.Command(name='clone', description='Clone a channel', callback=cog.clone_slash, default_member_permissions=discord.Permissions(manage_channels=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='deafen', description='Deafen a member', callback=cog.deafen_slash))
+            bot.tree.add_command(app_commands.Command(name='deafen', description='Deafen a member', callback=cog.deafen_slash, default_member_permissions=discord.Permissions(moderate_members=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='undeafen', description='Undeafen a member', callback=cog.undeafen_slash))
+            bot.tree.add_command(app_commands.Command(name='undeafen', description='Undeafen a member', callback=cog.undeafen_slash, default_member_permissions=discord.Permissions(moderate_members=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='staff_setup', description='Ensure staff roles', callback=cog.staff_setup_slash))
+            bot.tree.add_command(app_commands.Command(name='staff_setup', description='Ensure staff roles', callback=cog.staff_setup_slash, default_member_permissions=discord.Permissions(administrator=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='staff_promote', description='Promote a member to staff rank', callback=cog.staff_promote_slash))
+            bot.tree.add_command(app_commands.Command(name='staff_promote', description='Promote a member to staff rank', callback=cog.staff_promote_slash, default_member_permissions=discord.Permissions(administrator=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='staff_demote', description='Demote a member from staff rank', callback=cog.staff_demote_slash))
+            bot.tree.add_command(app_commands.Command(name='staff_demote', description='Demote a member from staff rank', callback=cog.staff_demote_slash, default_member_permissions=discord.Permissions(administrator=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='staff_perms', description='Show staff role mappings', callback=cog.staff_perms_slash))
+            bot.tree.add_command(app_commands.Command(name='staff_perms', description='Show staff role mappings', callback=cog.staff_perms_slash, default_member_permissions=discord.Permissions(administrator=True)))
         except Exception:
             pass
     except Exception:

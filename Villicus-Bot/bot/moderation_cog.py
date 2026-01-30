@@ -8,6 +8,8 @@ from typing import Optional
 import discord
 from discord.ext import commands
 from discord import app_commands
+import csv
+import io
 
 DB_DIR = os.path.join(os.path.dirname(__file__), '..', 'data')
 DB_PATH = os.path.join(DB_DIR, 'moderation.db')
@@ -44,7 +46,7 @@ class ModerationCog(commands.Cog):
     def _record_infraction(
         self, user_id: int, moderator_id: int, action: str,
         reason: Optional[str] = None, duration_seconds: Optional[int] = None,
-        active: bool = True
+        active: bool = True, guild_id: Optional[int] = None
     ) -> int:
         ts = int(time.time())
         conn = sqlite3.connect(DB_PATH)
@@ -57,6 +59,27 @@ class ModerationCog(commands.Cog):
         inf_id = cur.lastrowid
         conn.commit()
         conn.close()
+        # Send a moderation log embed to configured log channel (best-effort)
+        try:
+            if guild_id:
+                log = self.bot.get_cog('LoggingCog')
+                if log:
+                    emb = discord.Embed(title='Infraction recorded', color=discord.Color.dark_red())
+                    emb.add_field(name='Action', value=action, inline=False)
+                    emb.add_field(name='User ID', value=str(user_id), inline=True)
+                    emb.add_field(name='Moderator ID', value=str(moderator_id), inline=True)
+                    if reason:
+                        emb.add_field(name='Reason', value=reason, inline=False)
+                    if duration_seconds:
+                        emb.add_field(name='Duration (s)', value=str(duration_seconds), inline=True)
+                    emb.set_footer(text=f'Infraction ID: {inf_id} | Timestamp: {ts}')
+                    try:
+                        # schedule async send
+                        self.bot.loop.create_task(log._send_log(guild_id, emb))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
         return inf_id
 
     def _set_infraction_inactive(self, inf_id: int):
@@ -73,6 +96,16 @@ class ModerationCog(commands.Cog):
         ).fetchall()
         conn.close()
         return rows
+
+    def _export_infractions_csv(self, user_id: int) -> bytes:
+        """Return CSV bytes for infractions of a user."""
+        rows = self._list_infractions_for(user_id)
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['id', 'moderator_id', 'action', 'reason', 'timestamp', 'duration_seconds', 'active'])
+        for r in rows:
+            writer.writerow(list(r))
+        return output.getvalue().encode('utf-8')
 
     # ---------------- Role & Mute Handling ----------------
     async def _ensure_muted_role(self, guild: discord.Guild) -> Optional[discord.Role]:
@@ -117,7 +150,7 @@ class ModerationCog(commands.Cog):
         if not self._is_mod(interaction.user):
             await interaction.response.send_message("You do not have permission to warn members.", ephemeral=True)
             return
-        inf_id = self._record_infraction(member.id, interaction.user.id, "warn", reason)
+        inf_id = self._record_infraction(member.id, interaction.user.id, "warn", reason, guild_id=interaction.guild.id)
         await interaction.response.send_message(f"{member.mention} warned (id: {inf_id}).", ephemeral=True)
 
     @app_commands.command(name="mute", description="Mute a member")
@@ -136,12 +169,30 @@ class ModerationCog(commands.Cog):
 
         if minutes:
             duration = minutes * 60
-            inf_id = self._record_infraction(member.id, interaction.user.id, "mute", reason, duration_seconds=duration)
+            inf_id = self._record_infraction(member.id, interaction.user.id, "mute", reason, duration_seconds=duration, guild_id=interaction.guild.id)
             asyncio.create_task(self._apply_timed_unmute(interaction.guild, member, role, inf_id, duration))
             await interaction.response.send_message(f"{member.mention} muted for {minutes} minute(s). (id: {inf_id})", ephemeral=True)
         else:
-            inf_id = self._record_infraction(member.id, interaction.user.id, "mute", reason)
+            inf_id = self._record_infraction(member.id, interaction.user.id, "mute", reason, guild_id=interaction.guild.id)
             await interaction.response.send_message(f"{member.mention} muted indefinitely. (id: {inf_id})", ephemeral=True)
+
+    @app_commands.command(name="timeout", description="Apply communication timeout to a member")
+    @app_commands.describe(member="Member to timeout", minutes="Duration in minutes", reason="Reason for timeout")
+    async def timeout_slash(self, interaction: discord.Interaction, member: discord.Member, minutes: Optional[int] = None, reason: str = "Timed out by staff"):
+        if not self._is_mod(interaction.user):
+            await interaction.response.send_message("You do not have permission to timeout members.", ephemeral=True)
+            return
+        if minutes is None or minutes <= 0:
+            await interaction.response.send_message("Please specify a timeout duration in minutes.", ephemeral=True)
+            return
+        try:
+            from datetime import datetime, timedelta
+            until = datetime.utcnow() + timedelta(minutes=int(minutes))
+            await member.edit(communication_disabled_until=until, reason=reason)
+            inf_id = self._record_infraction(member.id, interaction.user.id, 'timeout', reason, duration_seconds=int(minutes) * 60, guild_id=interaction.guild.id)
+            await interaction.response.send_message(f"{member.mention} timed out for {minutes} minute(s). (id: {inf_id})", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"Failed to apply timeout: {e}", ephemeral=True)
 
     @app_commands.command(name="unmute", description="Unmute a member")
     @app_commands.describe(member="Member to unmute", reason="Reason for unmute")
@@ -176,6 +227,21 @@ class ModerationCog(commands.Cog):
             lines.append(f"#{r[0]} {r[2]} by <@{r[1]}> at {ts} — {r[3] or ''} ({active})")
         await interaction.followup.send(f"Infractions for {target} (most recent {min(20, len(rows))}):\n" + "\n".join(lines), ephemeral=True)
 
+    @app_commands.command(name='export_infractions', description='Export infractions for a user as CSV')
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(member='Member to export infractions for (defaults to you)')
+    async def export_infractions_slash(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+        if not self._is_mod(interaction.user):
+            await interaction.response.send_message('You do not have permission to export infractions.', ephemeral=True)
+            return
+        target = member or interaction.user
+        csv_bytes = self._export_infractions_csv(target.id)
+        if not csv_bytes:
+            return await interaction.response.send_message('No infractions found.', ephemeral=True)
+        bio = io.BytesIO(csv_bytes)
+        bio.seek(0)
+        await interaction.response.send_message(file=discord.File(fp=bio, filename=f'infractions-{target.id}.csv'), ephemeral=True)
+
 
 # ---------------- SETUP ----------------
 async def setup(bot: commands.Bot):
@@ -185,15 +251,19 @@ async def setup(bot: commands.Bot):
     # the main bot (`start_bot`) performs a sync in `on_ready()` when the application_id is available.
     try:
         try:
-            bot.tree.add_command(app_commands.Command(name='warn', description='Warn a member', callback=cog.warn_slash))
+            bot.tree.add_command(app_commands.Command(name='warn', description='Warn a member', callback=cog.warn_slash, default_member_permissions=discord.Permissions(moderate_members=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='mute', description='Mute a member', callback=cog.mute_slash))
+            bot.tree.add_command(app_commands.Command(name='mute', description='Mute a member', callback=cog.mute_slash, default_member_permissions=discord.Permissions(manage_messages=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='unmute', description='Unmute a member', callback=cog.unmute_slash))
+            bot.tree.add_command(app_commands.Command(name='unmute', description='Unmute a member', callback=cog.unmute_slash, default_member_permissions=discord.Permissions(manage_messages=True)))
+        except Exception:
+            pass
+        try:
+            bot.tree.add_command(app_commands.Command(name='timeout', description='Timeout a member', callback=cog.timeout_slash, default_member_permissions=discord.Permissions(moderate_members=True)))
         except Exception:
             pass
         try:

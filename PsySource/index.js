@@ -64,6 +64,35 @@ function saveRuntimeConfig(cfg) {
   }
 }
 
+// Small HTML/escaping helpers used to update the repo GitHub page
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function buildUpdateHtml(messageText, authorTag, when) {
+  const body = escapeHtml(messageText).replace(/\n/g, '<br>')
+  const ts = (when instanceof Date) ? when.toISOString() : String(when)
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Latest Update</title>
+    <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;max-width:900px;margin:40px auto;padding:0 16px;color:#111} .meta{color:#666;margin-bottom:8px} .card{border-radius:8px;padding:18px;background:#f6f8fa;border:1px solid #e1e4e8}</style>
+  </head>
+  <body>
+    <h1>Latest Update</h1>
+    <div class="meta">Posted by ${escapeHtml(authorTag)} on ${escapeHtml(ts)}</div>
+    <div class="card">${body}</div>
+  </body>
+</html>`
+}
+
 function getLogChannelId() {
   const runtime = loadRuntimeConfig()
   return runtime.log_channel || LOG_CHANNEL
@@ -180,6 +209,20 @@ client.on('messageCreate', async (message) => {
       const description = parts.join('|').trim() || '\u200b'
       const eb = new EmbedBuilder().setTitle(title).setDescription(description).setTimestamp().setColor(0x3498db).setFooter({ text: `Posted by ${message.author.tag}` })
       await message.channel.send({ embeds: [eb] })
+      return
+    }
+
+    if (cmd === 'update') {
+      if (!hasManage) return message.reply('You need Manage Messages permission to use this command.')
+      if (!args) return message.reply('Usage: $update <message>')
+      const eb = new EmbedBuilder().setDescription(args).setTimestamp().setColor(0x3498db).setFooter({ text: `Posted by ${message.author.tag}` })
+      await message.channel.send({ embeds: [eb] })
+      try {
+        const html = buildUpdateHtml(args, message.author.tag, new Date())
+        fs.writeFileSync('./update.html', html, 'utf8')
+      } catch (e) {
+        console.error('Failed to write update.html', e)
+      }
       return
     }
 
@@ -409,6 +452,7 @@ client.once('ready', async () => {
   const commands = [
     new SlashCommandBuilder().setName('say').setDescription('Send a message as the bot').addStringOption(opt => opt.setName('message').setDescription('Message to send').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
     new SlashCommandBuilder().setName('embed').setDescription('Send an embed as the bot').addStringOption(opt => opt.setName('title').setDescription('Embed title').setRequired(true)).addStringOption(opt => opt.setName('description').setDescription('Embed description').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+    new SlashCommandBuilder().setName('update').setDescription('Post an update as the bot and publish to update.html').addStringOption(opt => opt.setName('message').setDescription('Update text').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
     new SlashCommandBuilder().setName('feedback').setDescription('Send feedback to the team').addStringOption(opt => opt.setName('message').setDescription('Your feedback').setRequired(true)),
     // feedback_blacklist: owners only management
     new SlashCommandBuilder().setName('feedback_blacklist').setDescription('Manage feedback blacklist (owner only)')
@@ -518,6 +562,22 @@ client.on('interactionCreate', async (interaction) => {
       const eb = new EmbedBuilder().setTitle(title).setDescription(description).setTimestamp().setColor(0x3498db).setFooter({ text: `Posted by ${interaction.user.tag}` })
       await interaction.channel.send({ embeds: [eb] })
       return interaction.reply({ content: 'Embed posted.', ephemeral: true })
+    }
+
+    if (commandName === 'update') {
+      const msg = interaction.options.getString('message', true)
+      if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageMessages)) {
+        return interaction.reply({ content: 'You need Manage Messages permission to use this.', ephemeral: true })
+      }
+      const eb = new EmbedBuilder().setDescription(msg).setTimestamp().setColor(0x3498db).setFooter({ text: `Posted by ${interaction.user.tag}` })
+      await interaction.channel.send({ embeds: [eb] })
+      try {
+        const html = buildUpdateHtml(msg, interaction.user.tag, new Date())
+        fs.writeFileSync('./update.html', html, 'utf8')
+      } catch (e) {
+        console.error('Failed to write update.html', e)
+      }
+      return interaction.reply({ content: 'Update posted and update.html saved.', ephemeral: true })
     }
 
     if (commandName === 'feedback') {

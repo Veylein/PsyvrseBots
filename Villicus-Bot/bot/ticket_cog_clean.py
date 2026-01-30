@@ -103,6 +103,7 @@ class TicketCog(commands.Cog):
             pass
         await interaction.followup.send('Ticket closed.', ephemeral=True)
 
+    @app_commands.default_permissions(manage_guild=True)
     @ticket_group.command(name='settings', description='Configure ticketing for this server')
     @app_commands.describe(category='Category for created tickets', staff_role='Role to give ticket access')
     async def ticket_settings(self, interaction: discord.Interaction, category: Optional[discord.CategoryChannel] = None, staff_role: Optional[discord.Role] = None):
@@ -115,6 +116,51 @@ class TicketCog(commands.Cog):
             settings['ticket_staff_role'] = staff_role.id
         save_guild_settings(interaction.guild.id, settings)
         await interaction.response.send_message('Ticket settings updated.', ephemeral=True)
+
+    @app_commands.default_permissions(manage_guild=True)
+    @ticket_group.command(name='panel', description='Post a ticket creation panel (click to open ticket)')
+    @app_commands.describe(channel='Channel to post the panel in (defaults to current)')
+    async def ticket_panel(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
+        if not interaction.user.guild_permissions.manage_guild:
+            return await interaction.response.send_message('Manage Guild required to post a ticket panel.', ephemeral=True)
+        ch = channel or interaction.channel
+
+        class _PanelView(discord.ui.View):
+            def __init__(self, outer: 'TicketCog'):
+                super().__init__(timeout=None)
+                self.outer = outer
+
+            @discord.ui.button(label='Create Ticket', style=discord.ButtonStyle.primary, emoji='🎫')
+            async def create_button(self, button: discord.ui.Button, button_interaction: discord.Interaction):
+                await button_interaction.response.defer(ephemeral=True)
+                # prevent duplicate open tickets per user
+                settings = get_guild_settings(button_interaction.guild.id)
+                tickets = settings.get('open_tickets', {})
+                for tid, meta in tickets.items():
+                    try:
+                        if meta.get('owner') == button_interaction.user.id:
+                            # user already has ticket
+                            chobj = button_interaction.guild.get_channel(int(tid))
+                            if chobj:
+                                return await button_interaction.followup.send(f'You already have a ticket: {chobj.mention}', ephemeral=True)
+                    except Exception:
+                        continue
+                try:
+                    new = await self.outer._create_ticket_channel(button_interaction.guild, button_interaction.user)
+                    try:
+                        await new.send(f'{button_interaction.user.mention} created this ticket via panel.')
+                    except Exception:
+                        pass
+                    await button_interaction.followup.send(f'Ticket created: {new.mention}', ephemeral=True)
+                except Exception as e:
+                    await button_interaction.followup.send(f'Failed to create ticket: {e}', ephemeral=True)
+
+        embed = discord.Embed(title='Open a Support Ticket', description='Click the button below to create a private ticket channel.', color=discord.Color.green())
+        try:
+            await ch.send(embed=embed, view=_PanelView(self))
+            await interaction.response.send_message(f'Ticket panel posted in {ch.mention}', ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f'Failed to post panel: {e}', ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

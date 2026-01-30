@@ -117,8 +117,10 @@ class ConfigCog(commands.Cog):
         If no section provided, shows quick buttons. For `punishments` you may pass a `selection` like `1 3` or `all` or `none`.
         """
         await interaction.response.defer(ephemeral=True)
-        if not interaction.user.guild_permissions.administrator:
-            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+        perms = interaction.user.guild_permissions
+        # Allow administrators or server managers (manage_guild/manage_roles) to configure
+        if not (perms.administrator or perms.manage_guild or perms.manage_roles):
+            return await interaction.followup.send('Administrator or Manage Guild/Manage Roles required.', ephemeral=True)
 
         if section is None:
             # Show a simple button view to guide to using `/config punishments`
@@ -136,7 +138,7 @@ class ConfigCog(commands.Cog):
                 async def cancel(self, interaction2: discord.Interaction, button: discord.ui.Button):
                     await interaction2.response.send_message('Cancelled.', ephemeral=True)
 
-            return await interaction.followup.send('Config sections: `punishments`', view=_CfgView(self.bot, interaction.guild_id), ephemeral=True)
+            return await interaction.followup.send('Config sections: `punishments`, `tickets`, `emoji`, `staff`, `giveaways`', view=_CfgView(self.bot, interaction.guild_id), ephemeral=True)
 
         if section == 'punishments':
             # selection may be provided as a string like '1 3' or 'all' or 'none'
@@ -168,6 +170,30 @@ class ConfigCog(commands.Cog):
             settings['punishments'] = sel
             save_guild_settings(interaction.guild.id, settings)
             return await interaction.followup.send(f'Configured punishments: {created or "(none)"}', ephemeral=True)
+
+        if section == 'tickets':
+            # Provide quick guidance for ticket setup
+            return await interaction.followup.send('Ticket configuration is available via `/ticket settings` — open the command and choose a category and staff role.', ephemeral=True)
+
+        if section == 'emoji':
+            return await interaction.followup.send('Lock or unlock emojis using `/emoji_lock <emoji> <role>` and `/emoji_unlock <emoji>`.', ephemeral=True)
+
+        if section == 'staff':
+            return await interaction.followup.send('Staff roles can be created with `/staff_setup`. Promote/demote with `/staff_promote` and `/staff_demote`.', ephemeral=True)
+
+        if section == 'giveaways':
+            # allow setting a default giveaway channel via selection like a channel mention or 'channel:<id>'
+            sel = (selection or '').strip()
+            settings = get_guild_settings(interaction.guild.id)
+            if sel.startswith('channel:'):
+                try:
+                    cid = int(sel.split(':', 1)[1])
+                    settings['giveaway_channel'] = cid
+                    save_guild_settings(interaction.guild.id, settings)
+                    return await interaction.followup.send(f'Default giveaway channel set to <#{cid}>', ephemeral=True)
+                except Exception:
+                    pass
+            return await interaction.followup.send('Set default giveaway channel with `/config giveaways channel:<id>` or use `/giveaway` to create one now.', ephemeral=True)
 
         await interaction.followup.send('Unknown config section.', ephemeral=True)
 
@@ -433,27 +459,27 @@ async def setup(bot: commands.Bot):
     # Register slash commands (best-effort)
     try:
         try:
-            bot.tree.add_command(app_commands.Command(name='config', description='Configure server settings', callback=cog.config_slash))
+            bot.tree.add_command(app_commands.Command(name='config', description='Configure server settings', callback=cog.config_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='shadowban', description='Apply Shadow Ban role', callback=cog.shadowban_slash))
+            bot.tree.add_command(app_commands.Command(name='shadowban', description='Apply Shadow Ban role', callback=cog.shadowban_slash, default_member_permissions=discord.Permissions(administrator=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='shadowunban', description='Remove Shadow Ban role', callback=cog.shadowunban_slash))
+            bot.tree.add_command(app_commands.Command(name='shadowunban', description='Remove Shadow Ban role', callback=cog.shadowunban_slash, default_member_permissions=discord.Permissions(administrator=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='shadowmute', description='Apply Shadow Mute role', callback=cog.shadowmute_slash))
+            bot.tree.add_command(app_commands.Command(name='shadowmute', description='Apply Shadow Mute role', callback=cog.shadowmute_slash, default_member_permissions=discord.Permissions(manage_messages=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='shadowunmute', description='Remove Shadow Mute role', callback=cog.shadowunmute_slash))
+            bot.tree.add_command(app_commands.Command(name='shadowunmute', description='Remove Shadow Mute role', callback=cog.shadowunmute_slash, default_member_permissions=discord.Permissions(manage_messages=True)))
         except Exception:
             pass
         try:
-            bot.tree.add_command(app_commands.Command(name='status', description='Show basic bot health and enabled modules', callback=cog.status_slash))
+            bot.tree.add_command(app_commands.Command(name='status', description='Show basic bot health and enabled modules', callback=cog.status_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
         except Exception:
             pass
     except Exception:
