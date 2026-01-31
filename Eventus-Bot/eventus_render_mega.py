@@ -4,6 +4,7 @@ import logging
 from discord.ext import commands
 from discord import app_commands
 import sqlite3
+import asyncio
 
 # ============
 # CONFIG
@@ -63,100 +64,242 @@ logger.info('Logging initialized at %s', LOG_LEVEL)
 # DATABASE SETUP
 # ============
 DB_PATH = "eventus.db"
+DATABASE_URL = os.getenv('DATABASE_URL')
+try:
+    import asyncpg
+except Exception:
+    asyncpg = None
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
-    conn = get_db()
-    c = conn.cursor()
-    # Users table: advanced activity tracking
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY,
-        username TEXT,
-        activity_score INTEGER DEFAULT 0,
-        momentum INTEGER DEFAULT 0,
-        streak INTEGER DEFAULT 0,
-        last_active TEXT,
-        topic_influence REAL DEFAULT 0,
-        multi_channel_presence TEXT DEFAULT ''
-    )
-    """)
-    # Ensure legacy databases receive the `username` column
-    # (SQLite supports simple ADD COLUMN operations)
-    c.execute("PRAGMA table_info('users')")
-    cols = [r[1] for r in c.fetchall()]
-    if 'username' not in cols:
-        try:
-            c.execute("ALTER TABLE users ADD COLUMN username TEXT")
-            logging.info('Added missing column `username` to users table')
-        except Exception as e:
-            logging.exception('Failed to add username column to users table: %s', e)
-    # Events table: recurrence, RSVP details, analytics
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS events (
-        event_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT,
-        description TEXT,
-        creator_id INTEGER,
-        start_time TEXT,
-        end_time TEXT,
-        rsvp_list TEXT,
-        recurring TEXT,
-        archived INTEGER DEFAULT 0
-    )
-    """)
-    # Messages table: per-message records for activity analytics
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS messages (
-        message_id INTEGER PRIMARY KEY,
-        guild_id INTEGER,
-        channel_id INTEGER,
-        author_id INTEGER,
-        created_at TEXT,
-        content TEXT
-    )
-    """)
-    # Pings table: scheduled dynamic pings to top members
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS pings (
-        ping_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        guild_id INTEGER,
-        channel_id INTEGER,
-        interval_minutes INTEGER DEFAULT 60,
-        top_n INTEGER DEFAULT 3,
-        last_sent TEXT
-    )
-    """)
-    # Rewards / roles table
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS rewards (
-        reward_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        guild_id INTEGER,
-        role_id INTEGER,
-        criteria TEXT,
-        tier INTEGER DEFAULT 0
-    )
-    """)
-    # Analytics snapshots
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS analytics (
-        snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        created_at TEXT,
-        data TEXT
-    )
-    """)
-    # Guilds table: prefix and settings
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS guilds (
-        guild_id INTEGER PRIMARY KEY,
-        prefix TEXT DEFAULT 'E!'
-    )
-    """)
-    conn.commit()
-    conn.close()
+async def init_db():
+    """Initialize DB schema. Supports SQLite (default) and Postgres when DATABASE_URL is set.
+
+    This function is async; callers in async contexts must `await init_db()`.
+    """
+    # Postgres path
+    if DATABASE_URL and asyncpg:
+        pool = await asyncpg.create_pool(DATABASE_URL)
+        async with pool.acquire() as conn:
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                user_id BIGINT PRIMARY KEY,
+                username TEXT,
+                activity_score BIGINT DEFAULT 0,
+                momentum INTEGER DEFAULT 0,
+                streak INTEGER DEFAULT 0,
+                last_active TEXT,
+                topic_influence DOUBLE PRECISION DEFAULT 0,
+                multi_channel_presence TEXT DEFAULT ''
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                event_id SERIAL PRIMARY KEY,
+                title TEXT,
+                description TEXT,
+                creator_id BIGINT,
+                start_time TEXT,
+                end_time TEXT,
+                rsvp_list TEXT,
+                recurring TEXT,
+                archived INTEGER DEFAULT 0
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                message_id BIGINT PRIMARY KEY,
+                guild_id BIGINT,
+                channel_id BIGINT,
+                author_id BIGINT,
+                created_at TEXT,
+                content TEXT
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS pings (
+                ping_id SERIAL PRIMARY KEY,
+                guild_id BIGINT,
+                channel_id BIGINT,
+                interval_minutes INTEGER DEFAULT 60,
+                top_n INTEGER DEFAULT 3,
+                last_sent TEXT
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS rewards (
+                reward_id SERIAL PRIMARY KEY,
+                guild_id BIGINT,
+                role_id BIGINT,
+                criteria TEXT,
+                tier INTEGER DEFAULT 0
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS analytics (
+                snapshot_id SERIAL PRIMARY KEY,
+                created_at TEXT,
+                data TEXT
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS guilds (
+                guild_id BIGINT PRIMARY KEY,
+                prefix TEXT DEFAULT 'E!'
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS topic_settings (
+                guild_id BIGINT PRIMARY KEY,
+                channel_id BIGINT,
+                interval_minutes INTEGER DEFAULT 60,
+                enabled INTEGER DEFAULT 1,
+                last_sent TEXT,
+                last_topic TEXT,
+                custom_topics TEXT
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS topic_opt_out (
+                guild_id BIGINT,
+                user_id BIGINT,
+                PRIMARY KEY (guild_id, user_id)
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS ignored_channels (
+                guild_id BIGINT,
+                channel_id BIGINT,
+                PRIMARY KEY (guild_id, channel_id)
+            )
+            """)
+            await conn.execute("""
+            CREATE TABLE IF NOT EXISTS ignored_roles (
+                guild_id BIGINT,
+                role_id BIGINT,
+                PRIMARY KEY (guild_id, role_id)
+            )
+            """)
+        await pool.close()
+        return
+
+    # SQLite path (run in thread to avoid blocking)
+    def _init_sqlite():
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            activity_score INTEGER DEFAULT 0,
+            momentum INTEGER DEFAULT 0,
+            streak INTEGER DEFAULT 0,
+            last_active TEXT,
+            topic_influence REAL DEFAULT 0,
+            multi_channel_presence TEXT DEFAULT ''
+        )
+        """)
+        c.execute("PRAGMA table_info('users')")
+        cols = [r[1] for r in c.fetchall()]
+        if 'username' not in cols:
+            try:
+                c.execute("ALTER TABLE users ADD COLUMN username TEXT")
+                logging.info('Added missing column `username` to users table')
+            except Exception as e:
+                logging.exception('Failed to add username column to users table: %s', e)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            description TEXT,
+            creator_id INTEGER,
+            start_time TEXT,
+            end_time TEXT,
+            rsvp_list TEXT,
+            recurring TEXT,
+            archived INTEGER DEFAULT 0
+        )
+        """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            message_id INTEGER PRIMARY KEY,
+            guild_id INTEGER,
+            channel_id INTEGER,
+            author_id INTEGER,
+            created_at TEXT,
+            content TEXT
+        )
+        """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS pings (
+            ping_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER,
+            channel_id INTEGER,
+            interval_minutes INTEGER DEFAULT 60,
+            top_n INTEGER DEFAULT 3,
+            last_sent TEXT
+        )
+        """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS rewards (
+            reward_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER,
+            role_id INTEGER,
+            criteria TEXT,
+            tier INTEGER DEFAULT 0
+        )
+        """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS analytics (
+            snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT,
+            data TEXT
+        )
+        """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS guilds (
+            guild_id INTEGER PRIMARY KEY,
+            prefix TEXT DEFAULT 'E!'
+        )
+        """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS topic_settings (
+            guild_id INTEGER PRIMARY KEY,
+            channel_id INTEGER,
+            interval_minutes INTEGER DEFAULT 60,
+            enabled INTEGER DEFAULT 1,
+            last_sent TEXT,
+            last_topic TEXT,
+            custom_topics TEXT
+        )
+        """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS topic_opt_out (
+            guild_id INTEGER,
+            user_id INTEGER,
+            PRIMARY KEY (guild_id, user_id)
+        )
+        """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS ignored_channels (
+            guild_id INTEGER,
+            channel_id INTEGER,
+            PRIMARY KEY (guild_id, channel_id)
+        )
+        """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS ignored_roles (
+            guild_id INTEGER,
+            role_id INTEGER,
+            PRIMARY KEY (guild_id, role_id)
+        )
+        """)
+        conn.commit()
+        conn.close()
+
+    await asyncio.to_thread(_init_sqlite)
 
 # ============
 # MODULAR COG LOADING
@@ -170,6 +313,8 @@ COGS = [
     'momentum',
     'rules',
     'owner',
+    'importer',
+    'admin',
     # topicai listed once; help command is in topicai.py
 ]
 
@@ -178,7 +323,10 @@ COGS = [
 @bot.event
 async def on_ready():
     print("[Eventus] on_ready triggered. Initializing DB and loading cogs...")
-    init_db()
+    try:
+        await init_db()
+    except Exception as e:
+        print(f"[Eventus] init_db error: {e}")
     loaded = set()
     for cog in COGS:
         if cog in loaded:

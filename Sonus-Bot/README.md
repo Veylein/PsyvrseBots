@@ -59,6 +59,15 @@ Or run via your process manager/container with the environment variables set.
 - `ytdl_cache_stats` / `/ytdl-cache-stats`: show yt-dlp cache stats.
 - `ytdl_cache_clear` / `/ytdl-cache-clear`: clear persistent yt-dlp cache.
 
+## Playback shortcuts and simple usage
+
+- `S!play <query>` or `/play <query>` — search or play a URL. You can also use special prefixes:
+	- `playlist:<id>` — enqueue a playlist from `data/playlists` (use `S!playlist list` to see IDs).
+	- `album:<id>` — enqueue an album from `data/albums` (use `S!album list`).
+	- `radio:<id>` — tune into a radio from `data/radios` (use `S!radio list`).
+
+These shortcuts make it easy to play curated local content without pasting URLs.
+
 ## Notes and troubleshooting
 
 - `ffmpeg` must be installed and available on PATH for playback to work. The bot logs an FFmpeg diagnostic at startup.

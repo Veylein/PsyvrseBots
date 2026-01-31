@@ -117,6 +117,9 @@ def register(bot: commands.Bot):
         'settings-prefix': 'S!settings prefix !',
         'settings-color': 'S!settings color #1DB954',
         'playlist_add': 'S!playlist_add mylist https://youtu.be/...',
+        'album': 'S!album play eminem',
+        'album-play': 'S!album play eminem',
+        'radio': 'S!radio play jazz',
         'feedback': 'S!feedback I love Sonus!'
     }
 

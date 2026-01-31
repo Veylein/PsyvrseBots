@@ -753,13 +753,48 @@ def register(bot: commands.Bot):
             await log_action(bot, ctx.author.id, 'play_failed', {'title': title, 'error': str(exc)})
 
     @bot.tree.command(name='play')
-    @app_commands.describe(query='Search term or URL')
-    async def _play_slash(interaction: discord.Interaction, query: str):
+    @app_commands.describe(query='Search term or URL or id', source='Source type to play from')
+    @app_commands.choices(source=[
+        app_commands.Choice(name='YouTube / search', value='youtube'),
+        app_commands.Choice(name='Playlist (local)', value='playlist'),
+        app_commands.Choice(name='Album (local)', value='album'),
+        app_commands.Choice(name='Radio (local)', value='radio'),
+    ])
+    async def _play_slash(interaction: discord.Interaction, query: str, source: str = 'youtube'):
+        """Compact play slash command — choose a source type for clearer UX."""
         await interaction.response.defer()
         ctx = await commands.Context.from_interaction(interaction)
+
+        # Route to local sources when requested
+        src = (source or 'youtube').lower()
+        try:
+            if src == 'playlist':
+                cmd = bot.get_command('playlist_play')
+                if cmd:
+                    await ctx.invoke(cmd, playlist_id=query)
+                    return
+            if src == 'album':
+                cmd = bot.get_command('album')
+                if cmd:
+                    # album command expects action and name
+                    await ctx.invoke(cmd, 'play', query)
+                    return
+            if src == 'radio':
+                cmd = bot.get_command('radio')
+                if cmd:
+                    await ctx.invoke(cmd, 'play', query)
+                    return
+        except Exception:
+            # fallback to default play behavior on any error
+            pass
+
+        # Default: treat as a normal play query or URL
         await _play(ctx, query=query)
     try:
-        _play.help = "Search or URL to play/enqueue. Supports search terms, YouTube/Spotify/SoundCloud URLs and stream URLs."
+        _play.help = (
+            "Search term or URL to play/enqueue. Supports search terms, YouTube/Spotify/SoundCloud URLs and stream URLs. "
+            "Use `playlist:<id>` to play playlists from data/playlists, `album:<id>` to play from data/albums, and `radio:<id>` to play a local radio station."
+        )
     except Exception:
         pass
 
@@ -1017,7 +1052,7 @@ def register(bot: commands.Bot):
             await interaction.followup.send(f'```\n{text}\n```')
 
         bot.tree.add_command(music_group)
-        bot.tree.add_command(enqueue_group)
+        bot.tree.add_command(enqueue_group)  
         bot.tree.add_command(playlist_group)
         bot.tree.add_command(settings_group)
     except Exception:

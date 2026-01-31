@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import discord
-from discord import Embed
+from discord import Embed, app_commands
+from discord.ext import commands
 
 from src.utils.loaders import ROOT, load_json
 from src.commands.music.play import _ensure_vc_connected, _create_player_with_probe
@@ -129,3 +130,16 @@ def register(bot):
             await ctx.send(embed=Embed(title="Tuned in", description=track["title"], color=0x1DB954))
         except Exception as exc:
             await ctx.send(embed=Embed(title="Radio Error", description=str(exc), color=0xE63946))
+
+    # Slash command variant
+    try:
+        @bot.tree.command(name='radio')
+        @app_commands.describe(action='list or play', name='Radio id or name from data/radios')
+        async def _radio_slash(interaction: discord.Interaction, action: str = 'list', name: str = ''):
+            await interaction.response.defer(ephemeral=True)
+            # reuse the prefix command implementation via context
+            ctx = await commands.Context.from_interaction(interaction)
+            await _radio(ctx, action=action, name=name)
+    except Exception:
+        # ignore if slash already registered
+        pass

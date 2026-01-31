@@ -1,0 +1,82 @@
+{
+    "id": "jazz",
+    "name": "Jazz Classics",
+    "tracks": [
+        {
+            "title": "So What",
+            "artist": "Miles Davis",
+            "source": "https://www.youtube.com/watch?v=zqNTltOGh5c"
+        },
+        {
+            "title": "Take Five",
+            "artist": "The Dave Brubeck Quartet",
+            "source": "https://www.youtube.com/watch?v=tT9Eh8wNMkw"
+        },
+        {
+            "title": "My Favorite Things",
+            "artist": "John Coltrane",
+            "source": "https://www.youtube.com/watch?v=qWG2dsXV5HI"
+        },
+        {
+            "title": "What a Wonderful World",
+            "artist": "Louis Armstrong",
+            "source": "https://www.youtube.com/watch?v=CWzrABouyeE"
+        },
+        {
+            "title": "A Night in Tunisia",
+            "artist": "Dizzy Gillespie",
+            "source": "https://www.youtube.com/watch?v=UMGxZ4vYk3E"
+        },
+        {
+            "title": "Blue in Green",
+            "artist": "Bill Evans",
+            "source": "https://www.youtube.com/watch?v=PoPL7BExSQU"
+        },
+        {
+            "title": "All Blues",
+            "artist": "Miles Davis",
+            "source": "https://www.youtube.com/watch?v=3aB8hYlGzXk"
+        },
+        {
+            "title": "Misty",
+            "artist": "Erroll Garner",
+            "source": "https://www.youtube.com/watch?v=P_tAU3GM9XI"
+        },
+        {
+            "title": "Cantaloupe Island",
+            "artist": "Herbie Hancock",
+            "source": "https://www.youtube.com/watch?v=8B1oIXGX0Io"
+        },
+        {
+            "title": "Autumn Leaves",
+            "artist": "Cannonball Adderley",
+            "source": "https://www.youtube.com/watch?v=9k2YFfQ6K3g"
+        },
+        {
+            "title": "Giant Steps",
+            "artist": "John Coltrane",
+            "source": "https://www.youtube.com/watch?v=30FTr6G53VU"
+        },
+        {
+            "title": "Round Midnight",
+            "artist": "Thelonious Monk",
+            "source": "https://www.youtube.com/watch?v=OMmeNsmQaFw"
+        },
+        {
+            "title": "Freddie Freeloader",
+            "artist": "Miles Davis",
+            "source": "https://www.youtube.com/watch?v=RPfFhfSuUZ4"
+        },
+        {
+            "title": "In a Sentimental Mood",
+            "artist": "Duke Ellington & John Coltrane",
+            "source": "https://www.youtube.com/watch?v=4vN4hl5oW7I"
+        },
+        {
+            "title": "Birdland",
+            "artist": "Weather Report",
+            "source": "https://www.youtube.com/watch?v=J3j0gW8Xk6g"
+        }
+    ]
+    
+}
