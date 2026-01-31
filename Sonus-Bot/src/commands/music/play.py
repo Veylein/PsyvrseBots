@@ -18,7 +18,15 @@ from src.utils.spotify import resolve_spotify
 logger = setup_logger(__name__)
 
 
-_YTDL_COOKIEFILE = os.getenv('YTDL_COOKIEFILE') or os.getenv('YTDL_COOKIES')
+_YTDL_COOKIEFILE = None
+
+_env_cookie = os.getenv('YTDL_COOKIEFILE') or os.getenv('YTDL_COOKIES')
+if _env_cookie and os.path.exists(_env_cookie):
+    _YTDL_COOKIEFILE = _env_cookie
+else:
+    _secret_path = '/etc/secrets/cookies.txt'
+    if os.path.exists(_secret_path):
+        _YTDL_COOKIEFILE = _secret_path
 
 YTDL_OPTS = {
     'format': 'bestaudio/best',

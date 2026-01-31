@@ -1,5 +1,6 @@
 import asyncio
 import time
+import os
 from collections import OrderedDict
 from typing import Any, Optional
 
@@ -14,7 +15,16 @@ YTDL_OPTS = {
     'source_address': '0.0.0.0',
     'ignoreerrors': True,
 }
-_YTDL_COOKIEFILE = __import__('os').getenv('YTDL_COOKIEFILE') or __import__('os').getenv('YTDL_COOKIES')
+# Determine cookiefile: prefer env vars, fall back to a mounted secret at /etc/secrets/cookies.txt
+_YTDL_COOKIEFILE = None
+_env_cookie = os.getenv('YTDL_COOKIEFILE') or os.getenv('YTDL_COOKIES')
+if _env_cookie and os.path.exists(_env_cookie):
+    _YTDL_COOKIEFILE = _env_cookie
+else:
+    _secret_path = '/etc/secrets/cookies.txt'
+    if os.path.exists(_secret_path):
+        _YTDL_COOKIEFILE = _secret_path
+
 if _YTDL_COOKIEFILE:
     YTDL_OPTS['cookiefile'] = _YTDL_COOKIEFILE
 
