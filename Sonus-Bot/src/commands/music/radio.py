@@ -49,6 +49,14 @@ def _find_radio(name: str) -> Optional[Dict]:
 
 
 def register(bot):
+    # Avoid registering duplicate `radio` command if another module already added it
+    try:
+        if bot.get_command('radio') is not None:
+            logger.info('Radio command already exists; skipping registration in src.commands.music.radio')
+            return
+    except Exception:
+        pass
+
     @bot.command(name="radio")
     async def _radio(ctx, action: str = "list", *, name: str = ""):
         """Prefix: S!radio list|play <name> — quick ambient/lofi radios."""
