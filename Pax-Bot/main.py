@@ -12210,7 +12210,11 @@ async def chi_event_scheduler():
     if event_active:
         return
     
-    now = datetime.utcnow()
+    # Use timezone-aware UTC now to compare against possibly-aware next_event_time
+    try:
+        now = datetime.now(timezone.utc)
+    except Exception:
+        now = datetime.utcnow()
     if next_event_time is None or now < next_event_time:
         return
     
