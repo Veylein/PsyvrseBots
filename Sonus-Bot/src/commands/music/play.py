@@ -6,6 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
+from pathlib import Path
 import yt_dlp
 
 from src.logger import setup_logger
@@ -820,6 +821,207 @@ def register(bot: commands.Bot):
     try:
         _enqueue_cancel.help = "Cancel an active background enqueue for this guild."
     except Exception:
+        pass
+
+    # ----- Music help and grouped slash commands -----
+    @bot.command(name='music_help')
+    async def _music_help(ctx: commands.Context):
+        """Show help for music commands (prefix and slash)."""
+        embed = discord.Embed(title="Sonus Music Commands", color=0x4CC9F0)
+        try:
+            cmds = [
+                ('play', getattr(_play, 'help', 'Play a track or enqueue a query/url')),
+                ('radio', getattr(_radio, 'help', 'List and play radio stations')),
+                ('enqueue status/cancel', getattr(_enqueue_status, 'help', 'Enqueue status/cancel')),
+                ('audiotest', getattr(_audiotest, 'help', 'Test extraction and probe without playing')),
+            ]
+            for name, desc in cmds:
+                embed.add_field(name=f'S!{name}', value=desc or 'No description', inline=False)
+        except Exception:
+            embed.description = 'Music commands: play, radio, enqueue_status, enqueue_cancel, audiotest'
+        await ctx.send(embed=embed)
+
+    @bot.tree.command(name='music_help')
+    async def _music_help_slash(interaction: discord.Interaction):
+        await interaction.response.defer()
+        ctx = await commands.Context.from_interaction(interaction)
+        await _music_help(ctx)
+
+    # Create organized slash command groups for better UX
+    try:
+        music_group = app_commands.Group(name='music', description='Top-level music commands')
+
+        enqueue_group = app_commands.Group(name='enqueue', description='Manage background enqueues', parent=music_group)
+
+        @enqueue_group.command(name='status', description='Show status of background enqueue for this guild')
+        async def _enqueue_status_group(interaction: discord.Interaction):
+            await interaction.response.defer()
+            ctx = await commands.Context.from_interaction(interaction)
+            await _enqueue_status(ctx)
+
+        @enqueue_group.command(name='cancel', description='Cancel background enqueue for this guild')
+        async def _enqueue_cancel_group(interaction: discord.Interaction):
+            await interaction.response.defer()
+            ctx = await commands.Context.from_interaction(interaction)
+            await _enqueue_cancel(ctx)
+
+        playlist_group = app_commands.Group(name='playlist', description='Playlist and album helpers', parent=music_group)
+
+        @playlist_group.command(name='enqueue', description='Enqueue a playlist/album URL or search')
+        async def _playlist_enqueue(interaction: discord.Interaction, query: str):
+            await interaction.response.defer()
+            ctx = await commands.Context.from_interaction(interaction)
+            await _play(ctx, query=query)
+
+        @playlist_group.command(name='limit', description='Show current playlist enqueue limit')
+        async def _playlist_limit(interaction: discord.Interaction):
+            await interaction.response.defer()
+            lim = int(os.getenv('SONUS_PLAYLIST_LIMIT') or 100)
+            await interaction.followup.send(f'Playlist enqueue limit: {lim}')
+
+        settings_group = app_commands.Group(name='settings', description='Sonus settings and diagnostics', parent=music_group)
+
+        @music_group.command(name='help', description='Show paginated help for Sonus music commands')
+        async def _music_help_pages(interaction: discord.Interaction):
+            await interaction.response.defer()
+
+            # collect commands and descriptions
+            items = []
+            try:
+                for c in bot.commands:
+                    name = c.name
+                    desc = c.help or 'No description available.'
+                    items.append((f'S!{name}', desc))
+            except Exception:
+                pass
+            try:
+                for c in bot.tree.walk_commands():
+                    try:
+                        # skip groups themselves
+                        if isinstance(c, app_commands.Group):
+                            continue
+                        name = f'/{c.qualified_name}'
+                        desc = c.description or 'No description available.'
+                        items.append((name, desc))
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+            if not items:
+                await interaction.followup.send('No command help available.')
+                return
+
+            # build pages
+            PAGE_SIZE = 6
+            pages = []
+            for i in range(0, len(items), PAGE_SIZE):
+                block = items[i:i+PAGE_SIZE]
+                embed = discord.Embed(title='Sonus Music Help', color=0x4CC9F0)
+                for name, desc in block:
+                    embed.add_field(name=name, value=desc, inline=False)
+                embed.set_footer(text=f'Page {i//PAGE_SIZE+1}/{(len(items)-1)//PAGE_SIZE+1}')
+                pages.append(embed)
+
+            class _HelpView(discord.ui.View):
+                def __init__(self, pages):
+                    super().__init__(timeout=180)
+                    self.pages = pages
+                    self.index = 0
+
+                    # Page selector (limit to 25 options due to Discord limits)
+                    options = []
+                    total = len(self.pages)
+                    for i in range(min(total, 25)):
+                        options.append(discord.SelectOption(label=f'Page {i+1}', value=str(i)))
+
+                    if options:
+                        class PageSelect(discord.ui.Select):
+                            def __init__(self, options, parent_view):
+                                super().__init__(placeholder='Jump to page...', min_values=1, max_values=1, options=options)
+                                self._parent = parent_view
+
+                            async def callback(self, interaction: discord.Interaction):
+                                try:
+                                    val = int(self.values[0])
+                                    self._parent.index = val
+                                    await self._parent._update(interaction)
+                                except Exception:
+                                    await interaction.response.send_message('Invalid page selection.', ephemeral=True)
+
+                        self.add_item(PageSelect(options, self))
+
+                async def _update(self, interaction: discord.Interaction, *, edit=True):
+                    # update footer to reflect current page
+                    try:
+                        embed = self.pages[self.index]
+                        embed.set_footer(text=f'Page {self.index+1}/{len(self.pages)}')
+                    except Exception:
+                        pass
+                    try:
+                        if edit:
+                            await interaction.response.edit_message(embed=embed, view=self)
+                        else:
+                            await interaction.followup.send(embed=embed)
+                    except Exception:
+                        try:
+                            await interaction.followup.send(embed=embed)
+                        except Exception:
+                            pass
+
+                @discord.ui.button(label='◀ Prev', style=discord.ButtonStyle.secondary)
+                async def prev(self, button: discord.ui.Button, interaction: discord.Interaction):
+                    if self.index > 0:
+                        self.index -= 1
+                        await self._update(interaction)
+
+                @discord.ui.button(label='Next ▶', style=discord.ButtonStyle.secondary)
+                async def next(self, button: discord.ui.Button, interaction: discord.Interaction):
+                    if self.index < len(self.pages)-1:
+                        self.index += 1
+                        await self._update(interaction)
+
+                @discord.ui.button(label='Close', style=discord.ButtonStyle.danger)
+                async def close(self, button: discord.ui.Button, interaction: discord.Interaction):
+                    try:
+                        for child in list(self.children):
+                            child.disabled = True
+                        await interaction.response.edit_message(view=self)
+                    except Exception:
+                        pass
+                    try:
+                        # send a small ephemeral confirmation so user knows it closed
+                        await interaction.followup.send('Help closed.', ephemeral=True)
+                    except Exception:
+                        try:
+                            await interaction.response.send_message('Closed.', ephemeral=True)
+                        except Exception:
+                            pass
+
+            view = _HelpView(pages)
+            try:
+                # ensure initial footer is accurate
+                pages[0].set_footer(text=f'Page 1/{len(pages)}')
+                await interaction.followup.send(embed=pages[0], view=view)
+            except Exception:
+                await interaction.followup.send(embed=pages[0])
+
+        @settings_group.command(name='show', description='Show bot music-related settings for this process')
+        async def _settings_show(interaction: discord.Interaction):
+            await interaction.response.defer()
+            vals = {
+                'SONUS_RESUME_ON_STARTUP': os.getenv('SONUS_RESUME_ON_STARTUP') or 'unset',
+                'SONUS_PLAYLIST_LIMIT': os.getenv('SONUS_PLAYLIST_LIMIT') or '100',
+            }
+            text = '\n'.join(f'{k}: {v}' for k, v in vals.items())
+            await interaction.followup.send(f'```\n{text}\n```')
+
+        bot.tree.add_command(music_group)
+        bot.tree.add_command(enqueue_group)
+        bot.tree.add_command(playlist_group)
+        bot.tree.add_command(settings_group)
+    except Exception:
+        # if building groups fails, ignore (older discord.py compatibility)
         pass
 
     @bot.command(name='radio')
