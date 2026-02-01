@@ -7,6 +7,409 @@ from typing import Optional
 import json
 import os
 
+
+# ==================== VIEW CLASSES ====================
+# These need to be defined before the Gambling cog
+
+class CrashView(discord.ui.View):
+    """View for crash game"""
+    
+    def __init__(self, cog, user, bet, crash_multiplier):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.user = user
+        self.bet = bet
+        self.crash_multiplier = crash_multiplier
+        self.current_multiplier = 1.00
+        self.cashed_out = False
+        self.crashed = False
+    
+    @discord.ui.button(label="💰 Cash Out (1.00x)", style=discord.ButtonStyle.green, custom_id="cashout")
+    async def cashout_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        if self.crashed:
+            await interaction.response.send_message("❌ Too late! Already crashed!", ephemeral=True)
+            return
+        
+        if self.cashed_out:
+            await interaction.response.send_message("❌ Already cashed out!", ephemeral=True)
+            return
+        
+        self.cashed_out = True
+        self.stop()
+        
+        # Calculate payout
+        payout = int(self.bet * self.current_multiplier)
+        
+        economy_cog = self.cog.bot.get_cog("Economy")
+        economy_cog.add_coins(self.user.id, payout, "crash_win")
+        
+        # Record stats
+        self.cog.record_game(self.user.id, "crash", self.bet, True, payout)
+        # Update most played games
+        profile_cog = self.cog.bot.get_cog("Profile")
+        if profile_cog and hasattr(profile_cog, "profile_manager"):
+            profile_cog.profile_manager.record_game_played(self.user.id, "crash")
+        
+        # Create result embed
+        embed = discord.Embed(
+            title="💰 Cashed Out!",
+            description=f"**Multiplier:** {self.current_multiplier:.2f}x\n"
+                       f"**Payout:** +{payout:,} coins\n\n"
+                       f"*(Game would have crashed at {self.crash_multiplier:.2f}x)*",
+            color=discord.Color.green()
+        )
+        
+        await interaction.response.edit_message(embed=embed, view=None)
+    
+    async def start_crash(self, interaction):
+        """Start the crash animation"""
+        await asyncio.sleep(2)
+        
+        # Increment multiplier until crash
+        increment = 0.10
+        
+        while self.current_multiplier < self.crash_multiplier and not self.cashed_out:
+            self.current_multiplier += increment
+            
+            # Update button label
+            for item in self.children:
+                if isinstance(item, discord.ui.Button) and item.custom_id == "cashout":
+                    item.label = f"💰 Cash Out ({self.current_multiplier:.2f}x)"
+            
+            # Update embed
+            embed = discord.Embed(
+                title="📈 Crash Game Running...",
+                description=f"**Your Bet:** {self.bet:,} coins\n\n"
+                           f"**Current Multiplier:** {self.current_multiplier:.2f}x\n"
+                           f"**Potential Win:** {int(self.bet * self.current_multiplier):,} coins",
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="Click 'Cash Out' to claim your winnings!")
+            
+            try:
+                await interaction.edit_original_response(embed=embed, view=self)
+            except:
+                break
+            
+            # Wait before next increment (speed increases over time)
+            wait_time = max(0.3, 1.0 - (self.current_multiplier * 0.05))
+            await asyncio.sleep(wait_time)
+        
+        if not self.cashed_out:
+            # CRASHED!
+            self.crashed = True
+            self.stop()
+            
+            # Record loss
+            self.cog.record_game(self.user.id, "crash", self.bet, False, 0)
+            # Update most played games
+            profile_cog = self.cog.bot.get_cog("Profile")
+            if profile_cog and hasattr(profile_cog, "profile_manager"):
+                profile_cog.profile_manager.record_game_played(self.user.id, "crash")
+            
+            embed = discord.Embed(
+                title="💥 CRASHED!",
+                description=f"**Crash Point:** {self.crash_multiplier:.2f}x\n"
+                           f"**You Lost:** -{self.bet:,} coins\n\n"
+                           f"You needed to cash out before {self.crash_multiplier:.2f}x!",
+                color=discord.Color.red()
+            )
+            
+            try:
+                await interaction.edit_original_response(embed=embed, view=None)
+            except:
+                pass
+
+
+class MinesView(discord.ui.View):
+    """View for mines game"""
+    
+    def __init__(self, cog, user, bet, mine_count):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.user = user
+        self.bet = bet
+        self.mine_count = mine_count
+        self.revealed = []
+        self.game_over = False
+        
+        # Limit: Discord allows max 25 components, so we use 4x5 grid (20 tiles) + 1 cash out button
+        self.grid_size = 20
+        
+        # Place mines randomly on 20 tiles
+        positions = list(range(self.grid_size))
+        random.shuffle(positions)
+        # Adjust mine count if it's too high for 20 tiles
+        max_mines = min(mine_count, 18)  # Leave at least 2 safe tiles
+        self.mines = set(positions[:max_mines])
+        self.mine_count = max_mines
+        self.safe_tiles = self.grid_size - max_mines
+        self.revealed_safe = 0
+        
+        # Create 4x5 grid of buttons (20 tiles total)
+        for i in range(self.grid_size):
+            button = discord.ui.Button(
+                label="❓",
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"tile_{i}",
+                row=i // 5
+            )
+            button.callback = self.create_tile_callback(i)
+            self.add_item(button)
+        
+        # Add cash out button in the last row
+        cashout_btn = discord.ui.Button(
+            label="💰 Cash Out",
+            style=discord.ButtonStyle.green,
+            custom_id="mines_cashout",
+            row=4
+        )
+        cashout_btn.callback = self.cashout_callback
+        self.add_item(cashout_btn)
+    
+    def create_tile_callback(self, position):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user != self.user:
+                await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+                return
+            
+            if self.game_over:
+                await interaction.response.send_message("❌ Game is over!", ephemeral=True)
+                return
+            
+            if position in self.revealed:
+                await interaction.response.send_message("❌ Already revealed!", ephemeral=True)
+                return
+            
+            self.revealed.append(position)
+            
+            # Check if mine
+            if position in self.mines:
+                # HIT A MINE!
+                self.game_over = True
+                await self.reveal_all_mines(interaction)
+                
+                # Record loss
+                self.cog.record_game(self.user.id, "mines", self.bet, False, 0)
+                # Update most played games
+                profile_cog = self.cog.bot.get_cog("Profile")
+                if profile_cog and hasattr(profile_cog, "profile_manager"):
+                    profile_cog.profile_manager.record_game_played(self.user.id, "mines")
+                
+                embed = discord.Embed(
+                    title="💥 BOOM! You hit a mine!",
+                    description=f"**You Lost:** -{self.bet:,} coins\n\n"
+                               f"Better luck next time!",
+                    color=discord.Color.red()
+                )
+                
+                await interaction.response.edit_message(embed=embed, view=self)
+                self.stop()
+            else:
+                # SAFE!
+                self.revealed_safe += 1
+                
+                # Calculate current multiplier
+                multiplier = self.calculate_multiplier()
+                potential_win = int(self.bet * multiplier)
+                
+                # Update button
+                for item in self.children:
+                    if isinstance(item, discord.ui.Button) and item.custom_id == f"tile_{position}":
+                        item.label = "💎"
+                        item.style = discord.ButtonStyle.success
+                        item.disabled = True
+                
+                # Check if won (all safe tiles revealed)
+                if self.revealed_safe >= self.safe_tiles:
+                    self.game_over = True
+                    await self.auto_cashout(interaction, multiplier, potential_win)
+                else:
+                    # Update embed
+                    embed = discord.Embed(
+                        title="💎 Safe Tile!",
+                        description=f"**Your Bet:** {self.bet:,} coins\n"
+                                   f"**Mines:** {self.mine_count}/25\n"
+                                   f"**Revealed:** {self.revealed_safe}/{self.safe_tiles}\n\n"
+                                   f"**Current Multiplier:** {multiplier:.2f}x\n"
+                                   f"**Potential Win:** {potential_win:,} coins\n\n"
+                                   f"Keep going or cash out!",
+                        color=discord.Color.green()
+                    )
+                    
+                    await interaction.response.edit_message(embed=embed, view=self)
+        
+        return callback
+    
+    def calculate_multiplier(self):
+        """Calculate multiplier based on revealed tiles and mine count"""
+        # Formula: Base multiplier increases with each reveal
+        # More mines = higher multiplier per reveal
+        if self.revealed_safe == 0:
+            return 1.00
+        
+        # Multiplier formula (exponential growth)
+        mine_factor = 1 + (self.mine_count * 0.1)
+        reveal_factor = 1 + (self.revealed_safe * 0.15 * mine_factor)
+        
+        return round(reveal_factor, 2)
+    
+    async def cashout_callback(self, interaction: discord.Interaction):
+        """Handle cash out"""
+        if interaction.user != self.user:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        if self.game_over:
+            await interaction.response.send_message("❌ Game is over!", ephemeral=True)
+            return
+        
+        if self.revealed_safe == 0:
+            await interaction.response.send_message("❌ Reveal at least one tile first!", ephemeral=True)
+            return
+        
+        self.game_over = True
+        multiplier = self.calculate_multiplier()
+        payout = int(self.bet * multiplier)
+        
+        await self.auto_cashout(interaction, multiplier, payout)
+    
+    async def auto_cashout(self, interaction, multiplier, payout):
+        """Auto cash out when all safe tiles revealed or manual cashout"""
+        economy_cog = self.cog.bot.get_cog("Economy")
+        economy_cog.add_coins(self.user.id, payout, "mines_win")
+        
+        # Record win
+        self.cog.record_game(self.user.id, "mines", self.bet, True, payout)
+        # Update most played games
+        profile_cog = self.cog.bot.get_cog("Profile")
+        if profile_cog and hasattr(profile_cog, "profile_manager"):
+            profile_cog.profile_manager.record_game_played(self.user.id, "mines")
+        
+        # Reveal all mines
+        for item in self.children:
+            if isinstance(item, discord.ui.Button) and item.custom_id.startswith("tile_"):
+                pos = int(item.custom_id.split("_")[1])
+                if pos in self.mines:
+                    item.label = "💣"
+                    item.style = discord.ButtonStyle.danger
+                item.disabled = True
+        
+        embed = discord.Embed(
+            title="💰 Cashed Out!",
+            description=f"**Tiles Revealed:** {self.revealed_safe}/{self.safe_tiles}\n"
+                       f"**Final Multiplier:** {multiplier:.2f}x\n"
+                       f"**Payout:** +{payout:,} coins\n\n"
+                       f"Great job avoiding the mines!",
+            color=discord.Color.gold()
+        )
+        
+        try:
+            await interaction.response.edit_message(embed=embed, view=self)
+        except:
+            await interaction.edit_original_response(embed=embed, view=self)
+        
+        self.stop()
+    
+    async def reveal_all_mines(self, interaction):
+        """Reveal all mines when player hits one"""
+        for item in self.children:
+            if isinstance(item, discord.ui.Button) and item.custom_id.startswith("tile_"):
+                pos = int(item.custom_id.split("_")[1])
+                if pos in self.mines:
+                    item.label = "💣"
+                    item.style = discord.ButtonStyle.danger
+                elif pos in self.revealed:
+                    item.label = "💎"
+                    item.style = discord.ButtonStyle.success
+                item.disabled = True
+
+
+class HigherLowerView(discord.ui.View):
+    """View for higher/lower game"""
+    
+    def __init__(self, cog, user, bet, first_card, deck):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.user = user
+        self.bet = bet
+        self.first_card = first_card
+        self.deck = deck
+    
+    @discord.ui.button(label="⬆️ Higher", style=discord.ButtonStyle.green)
+    async def higher_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        await self.resolve_game(interaction, "higher")
+    
+    @discord.ui.button(label="⬇️ Lower", style=discord.ButtonStyle.red)
+    async def lower_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        await self.resolve_game(interaction, "lower")
+    
+    async def resolve_game(self, interaction, choice):
+        """Resolve the higher/lower game"""
+        self.stop()
+        
+        # Draw second card
+        second_card = self.deck.pop()
+        
+        # Convert ranks to values
+        rank_values = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
+        first_value = rank_values[self.first_card[0]]
+        second_value = rank_values[second_card[0]]
+        
+        # Determine result
+        if second_value > first_value:
+            actual = "higher"
+        elif second_value < first_value:
+            actual = "lower"
+        else:
+            actual = "tie"
+        
+        # Check if won
+        economy_cog = self.cog.bot.get_cog("Economy")
+        
+        if choice == actual:
+            payout = int(self.bet * 1.6)  # Reduced from 2x to 1.6x
+            economy_cog.add_coins(self.user.id, payout, "higherlower_win")
+            result_text = f"🎉 **CORRECT!**\n+{payout:,} coins"
+            color = discord.Color.green()
+            won = True
+        else:
+            payout = 0
+            result_text = f"💀 **WRONG!**\n-{self.bet:,} coins"
+            color = discord.Color.red()
+            won = False
+        
+        # Record stats
+        self.cog.record_game(self.user.id, "higherlower", self.bet, won, payout)
+        # Update most played games
+        profile_cog = self.cog.bot.get_cog("Profile")
+        if profile_cog and hasattr(profile_cog, "profile_manager"):
+            profile_cog.profile_manager.record_game_played(self.user.id, "higherlower")
+        
+        # Create result embed
+        embed = discord.Embed(title="🎴 Higher or Lower - Result", color=color)
+        embed.add_field(name="First Card", value=f"{self.first_card[0]}{self.first_card[1]}", inline=True)
+        embed.add_field(name="Second Card", value=f"{second_card[0]}{second_card[1]}", inline=True)
+        embed.add_field(name="Your Guess", value=choice.title(), inline=True)
+        embed.add_field(name="Result", value=result_text, inline=False)
+        
+        await interaction.response.edit_message(embed=embed, view=None)
+
+
+# ==================== GAMBLING COG ====================
+
 class Gambling(commands.Cog):
     """Casino-style gambling games: Poker, Slots, Roulette, Higher/Lower"""
     
@@ -787,84 +1190,6 @@ class Gambling(commands.Cog):
         
         await self._send_message(ctx_or_interaction, embed=embed, is_slash=is_slash)
 
-class HigherLowerView(discord.ui.View):
-    """View for higher/lower game"""
-    
-    def __init__(self, cog, user, bet, first_card, deck):
-        super().__init__(timeout=60)
-        self.cog = cog
-        self.user = user
-        self.bet = bet
-        self.first_card = first_card
-        self.deck = deck
-    
-    @discord.ui.button(label="⬆️ Higher", style=discord.ButtonStyle.green)
-    async def higher_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user != self.user:
-            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
-            return
-        
-        await self.resolve_game(interaction, "higher")
-    
-    @discord.ui.button(label="⬇️ Lower", style=discord.ButtonStyle.red)
-    async def lower_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user != self.user:
-            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
-            return
-        
-        await self.resolve_game(interaction, "lower")
-    
-    async def resolve_game(self, interaction, choice):
-        """Resolve the higher/lower game"""
-        self.stop()
-        
-        # Draw second card
-        second_card = self.deck.pop()
-        
-        # Convert ranks to values
-        rank_values = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
-        first_value = rank_values[self.first_card[0]]
-        second_value = rank_values[second_card[0]]
-        
-        # Determine result
-        if second_value > first_value:
-            actual = "higher"
-        elif second_value < first_value:
-            actual = "lower"
-        else:
-            actual = "tie"
-        
-        # Check if won
-        economy_cog = self.cog.bot.get_cog("Economy")
-        
-        if choice == actual:
-            payout = int(self.bet * 1.6)  # Reduced from 2x to 1.6x
-            economy_cog.add_coins(self.user.id, payout, "higherlower_win")
-            result_text = f"🎉 **CORRECT!**\n+{payout:,} coins"
-            color = discord.Color.green()
-            won = True
-        else:
-            payout = 0
-            result_text = f"💀 **WRONG!**\n-{self.bet:,} coins"
-            color = discord.Color.red()
-            won = False
-        
-        # Record stats
-        self.cog.record_game(self.user.id, "higherlower", self.bet, won, payout)
-        # Update most played games
-        profile_cog = self.cog.bot.get_cog("Profile")
-        if profile_cog and hasattr(profile_cog, "profile_manager"):
-            profile_cog.profile_manager.record_game_played(self.user.id, "higherlower")
-        
-        # Create result embed
-        embed = discord.Embed(title="🎴 Higher or Lower - Result", color=color)
-        embed.add_field(name="First Card", value=f"{self.first_card[0]}{self.first_card[1]}", inline=True)
-        embed.add_field(name="Second Card", value=f"{second_card[0]}{second_card[1]}", inline=True)
-        embed.add_field(name="Your Guess", value=choice.title(), inline=True)
-        embed.add_field(name="Result", value=result_text, inline=False)
-        
-        await interaction.response.edit_message(embed=embed, view=None)
-
     # ==================== DICE ROLL GAMBLING ====================
     
     @commands.command(name="dicegamble", aliases=["dicebet"])
@@ -1060,12 +1385,12 @@ class HigherLowerView(discord.ui.View):
     # ==================== MINES ====================
     
     @commands.command(name="mines")
-    async def mines_prefix(self, ctx, bet: int, mine_count: int = 3):
+    async def mines_prefix(self, ctx, bet: int, mine_count: int = 8):
         """Minesweeper gambling - reveal tiles without hitting mines! (L!mines <bet> [mines])"""
         await ctx.send("❌ Mines game requires interactive buttons! Please use `/mines <bet> [mine_count]` instead.")
     
     @app_commands.command(name="mines", description="Minesweeper gambling - reveal tiles without hitting mines! (10-5,000)")
-    async def mines_slash(self, interaction: discord.Interaction, bet: int, mine_count: int = 3):
+    async def mines_slash(self, interaction: discord.Interaction, bet: int, mine_count: int = 8):
         """Play mines game"""
         economy_cog = self.bot.get_cog("Economy")
         if not economy_cog:
@@ -1077,9 +1402,9 @@ class HigherLowerView(discord.ui.View):
             await interaction.response.send_message("❌ Bet must be between 10 and 5,000 coins!")
             return
         
-        # Validate mine count
-        if mine_count < 1 or mine_count > 24:
-            await interaction.response.send_message("❌ Mine count must be between 1 and 24!")
+        # Validate mine count (max 18 for 4x5 grid = 20 tiles)
+        if mine_count < 1 or mine_count > 18:
+            await interaction.response.send_message("❌ Mine count must be between 1 and 18!")
             return
         
         balance = economy_cog.get_balance(interaction.user.id)
@@ -1095,10 +1420,10 @@ class HigherLowerView(discord.ui.View):
         view = MinesView(self, interaction.user, bet, mine_count)
         
         embed = discord.Embed(
-            title="💣 Mines Game",
+            title="💣 Mines Game (4x5 Grid)",
             description=f"**Your Bet:** {bet:,} coins\n"
-                       f"**Mines:** {mine_count}/25\n"
-                       f"**Safe Tiles:** {25 - mine_count}\n\n"
+                       f"**Mines:** {view.mine_count}/20\n"
+                       f"**Safe Tiles:** {view.safe_tiles}\n\n"
                        f"**Current Multiplier:** 1.00x\n"
                        f"**Potential Win:** {bet:,} coins\n\n"
                        f"Click tiles to reveal! Avoid the mines!",
@@ -1107,321 +1432,6 @@ class HigherLowerView(discord.ui.View):
         embed.set_footer(text="Cash out anytime or keep going for higher multipliers!")
         
         await interaction.response.send_message(embed=embed, view=view)
-
-async def setup(bot):
-    await bot.add_cog(Gambling(bot))
-
-
-class CrashView(discord.ui.View):
-    """View for crash game"""
-    
-    def __init__(self, cog, user, bet, crash_multiplier):
-        super().__init__(timeout=60)
-        self.cog = cog
-        self.user = user
-        self.bet = bet
-        self.crash_multiplier = crash_multiplier
-        self.current_multiplier = 1.00
-        self.cashed_out = False
-        self.crashed = False
-    
-    @discord.ui.button(label="💰 Cash Out (1.00x)", style=discord.ButtonStyle.green, custom_id="cashout")
-    async def cashout_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user != self.user:
-            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
-            return
-        
-        if self.crashed:
-            await interaction.response.send_message("❌ Too late! Already crashed!", ephemeral=True)
-            return
-        
-        if self.cashed_out:
-            await interaction.response.send_message("❌ Already cashed out!", ephemeral=True)
-            return
-        
-        self.cashed_out = True
-        self.stop()
-        
-        # Calculate payout
-        payout = int(self.bet * self.current_multiplier)
-        
-        economy_cog = self.cog.bot.get_cog("Economy")
-        economy_cog.add_coins(self.user.id, payout, "crash_win")
-        
-        # Record stats
-        self.cog.record_game(self.user.id, "crash", self.bet, True, payout)
-        # Update most played games
-        profile_cog = self.cog.bot.get_cog("Profile")
-        if profile_cog and hasattr(profile_cog, "profile_manager"):
-            profile_cog.profile_manager.record_game_played(self.user.id, "crash")
-        
-        # Create result embed
-        embed = discord.Embed(
-            title="💰 Cashed Out!",
-            description=f"**Multiplier:** {self.current_multiplier:.2f}x\n"
-                       f"**Payout:** +{payout:,} coins\n\n"
-                       f"*(Game would have crashed at {self.crash_multiplier:.2f}x)*",
-            color=discord.Color.green()
-        )
-        
-        await interaction.response.edit_message(embed=embed, view=None)
-    
-    async def start_crash(self, interaction):
-        """Start the crash animation"""
-        await asyncio.sleep(2)
-        
-        # Increment multiplier until crash
-        increment = 0.10
-        
-        while self.current_multiplier < self.crash_multiplier and not self.cashed_out:
-            self.current_multiplier += increment
-            
-            # Update button label
-            for item in self.children:
-                if isinstance(item, discord.ui.Button) and item.custom_id == "cashout":
-                    item.label = f"💰 Cash Out ({self.current_multiplier:.2f}x)"
-            
-            # Update embed
-            embed = discord.Embed(
-                title="📈 Crash Game Running...",
-                description=f"**Your Bet:** {self.bet:,} coins\n\n"
-                           f"**Current Multiplier:** {self.current_multiplier:.2f}x\n"
-                           f"**Potential Win:** {int(self.bet * self.current_multiplier):,} coins",
-                color=discord.Color.blue()
-            )
-            embed.set_footer(text="Click 'Cash Out' to claim your winnings!")
-            
-            try:
-                await interaction.edit_original_response(embed=embed, view=self)
-            except:
-                break
-            
-            # Wait before next increment (speed increases over time)
-            wait_time = max(0.3, 1.0 - (self.current_multiplier * 0.05))
-            await asyncio.sleep(wait_time)
-        
-        if not self.cashed_out:
-            # CRASHED!
-            self.crashed = True
-            self.stop()
-            
-            # Record loss
-            self.cog.record_game(self.user.id, "crash", self.bet, False, 0)
-            # Update most played games
-            profile_cog = self.cog.bot.get_cog("Profile")
-            if profile_cog and hasattr(profile_cog, "profile_manager"):
-                profile_cog.profile_manager.record_game_played(self.user.id, "crash")
-            
-            embed = discord.Embed(
-                title="💥 CRASHED!",
-                description=f"**Crash Point:** {self.crash_multiplier:.2f}x\n"
-                           f"**You Lost:** -{self.bet:,} coins\n\n"
-                           f"You needed to cash out before {self.crash_multiplier:.2f}x!",
-                color=discord.Color.red()
-            )
-            
-            try:
-                await interaction.edit_original_response(embed=embed, view=None)
-            except:
-                pass
-
-
-class MinesView(discord.ui.View):
-    """View for mines game"""
-    
-    def __init__(self, cog, user, bet, mine_count):
-        super().__init__(timeout=120)
-        self.cog = cog
-        self.user = user
-        self.bet = bet
-        self.mine_count = mine_count
-        self.revealed = []
-        self.game_over = False
-        
-        # Place mines randomly
-        positions = list(range(25))
-        random.shuffle(positions)
-        self.mines = set(positions[:mine_count])
-        self.safe_tiles = 25 - mine_count
-        self.revealed_safe = 0
-        
-        # Create 5x5 grid of buttons
-        for i in range(25):
-            button = discord.ui.Button(
-                label="❓",
-                style=discord.ButtonStyle.secondary,
-                custom_id=f"tile_{i}",
-                row=i // 5
-            )
-            button.callback = self.create_tile_callback(i)
-            self.add_item(button)
-        
-        # Add cash out button
-        cashout_btn = discord.ui.Button(
-            label="💰 Cash Out",
-            style=discord.ButtonStyle.green,
-            custom_id="mines_cashout",
-            row=4
-        )
-        cashout_btn.callback = self.cashout_callback
-        self.add_item(cashout_btn)
-    
-    def create_tile_callback(self, position):
-        async def callback(interaction: discord.Interaction):
-            if interaction.user != self.user:
-                await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
-                return
-            
-            if self.game_over:
-                await interaction.response.send_message("❌ Game is over!", ephemeral=True)
-                return
-            
-            if position in self.revealed:
-                await interaction.response.send_message("❌ Already revealed!", ephemeral=True)
-                return
-            
-            self.revealed.append(position)
-            
-            # Check if mine
-            if position in self.mines:
-                # HIT A MINE!
-                self.game_over = True
-                await self.reveal_all_mines(interaction)
-                
-                # Record loss
-                self.cog.record_game(self.user.id, "mines", self.bet, False, 0)
-                # Update most played games
-                profile_cog = self.cog.bot.get_cog("Profile")
-                if profile_cog and hasattr(profile_cog, "profile_manager"):
-                    profile_cog.profile_manager.record_game_played(self.user.id, "mines")
-                
-                embed = discord.Embed(
-                    title="💥 BOOM! You hit a mine!",
-                    description=f"**You Lost:** -{self.bet:,} coins\n\n"
-                               f"Better luck next time!",
-                    color=discord.Color.red()
-                )
-                
-                await interaction.response.edit_message(embed=embed, view=self)
-                self.stop()
-            else:
-                # SAFE!
-                self.revealed_safe += 1
-                
-                # Calculate current multiplier
-                multiplier = self.calculate_multiplier()
-                potential_win = int(self.bet * multiplier)
-                
-                # Update button
-                for item in self.children:
-                    if isinstance(item, discord.ui.Button) and item.custom_id == f"tile_{position}":
-                        item.label = "💎"
-                        item.style = discord.ButtonStyle.success
-                        item.disabled = True
-                
-                # Check if won (all safe tiles revealed)
-                if self.revealed_safe >= self.safe_tiles:
-                    self.game_over = True
-                    await self.auto_cashout(interaction, multiplier, potential_win)
-                else:
-                    # Update embed
-                    embed = discord.Embed(
-                        title="💎 Safe Tile!",
-                        description=f"**Your Bet:** {self.bet:,} coins\n"
-                                   f"**Mines:** {self.mine_count}/25\n"
-                                   f"**Revealed:** {self.revealed_safe}/{self.safe_tiles}\n\n"
-                                   f"**Current Multiplier:** {multiplier:.2f}x\n"
-                                   f"**Potential Win:** {potential_win:,} coins\n\n"
-                                   f"Keep going or cash out!",
-                        color=discord.Color.green()
-                    )
-                    
-                    await interaction.response.edit_message(embed=embed, view=self)
-        
-        return callback
-    
-    def calculate_multiplier(self):
-        """Calculate multiplier based on revealed tiles and mine count"""
-        # Formula: Base multiplier increases with each reveal
-        # More mines = higher multiplier per reveal
-        if self.revealed_safe == 0:
-            return 1.00
-        
-        # Multiplier formula (exponential growth)
-        mine_factor = 1 + (self.mine_count * 0.1)
-        reveal_factor = 1 + (self.revealed_safe * 0.15 * mine_factor)
-        
-        return round(reveal_factor, 2)
-    
-    async def cashout_callback(self, interaction: discord.Interaction):
-        """Handle cash out"""
-        if interaction.user != self.user:
-            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
-            return
-        
-        if self.game_over:
-            await interaction.response.send_message("❌ Game is over!", ephemeral=True)
-            return
-        
-        if self.revealed_safe == 0:
-            await interaction.response.send_message("❌ Reveal at least one tile first!", ephemeral=True)
-            return
-        
-        self.game_over = True
-        multiplier = self.calculate_multiplier()
-        payout = int(self.bet * multiplier)
-        
-        await self.auto_cashout(interaction, multiplier, payout)
-    
-    async def auto_cashout(self, interaction, multiplier, payout):
-        """Auto cash out when all safe tiles revealed or manual cashout"""
-        economy_cog = self.cog.bot.get_cog("Economy")
-        economy_cog.add_coins(self.user.id, payout, "mines_win")
-        
-        # Record win
-        self.cog.record_game(self.user.id, "mines", self.bet, True, payout)
-        # Update most played games
-        profile_cog = self.cog.bot.get_cog("Profile")
-        if profile_cog and hasattr(profile_cog, "profile_manager"):
-            profile_cog.profile_manager.record_game_played(self.user.id, "mines")
-        
-        # Reveal all mines
-        for item in self.children:
-            if isinstance(item, discord.ui.Button) and item.custom_id.startswith("tile_"):
-                pos = int(item.custom_id.split("_")[1])
-                if pos in self.mines:
-                    item.label = "💣"
-                    item.style = discord.ButtonStyle.danger
-                item.disabled = True
-        
-        embed = discord.Embed(
-            title="💰 Cashed Out!",
-            description=f"**Tiles Revealed:** {self.revealed_safe}/{self.safe_tiles}\n"
-                       f"**Final Multiplier:** {multiplier:.2f}x\n"
-                       f"**Payout:** +{payout:,} coins\n\n"
-                       f"Great job avoiding the mines!",
-            color=discord.Color.gold()
-        )
-        
-        try:
-            await interaction.response.edit_message(embed=embed, view=self)
-        except:
-            await interaction.edit_original_response(embed=embed, view=self)
-        
-        self.stop()
-    
-    async def reveal_all_mines(self, interaction):
-        """Reveal all mines when player hits one"""
-        for item in self.children:
-            if isinstance(item, discord.ui.Button) and item.custom_id.startswith("tile_"):
-                pos = int(item.custom_id.split("_")[1])
-                if pos in self.mines:
-                    item.label = "💣"
-                    item.style = discord.ButtonStyle.danger
-                elif pos in self.revealed:
-                    item.label = "💎"
-                    item.style = discord.ButtonStyle.success
-                item.disabled = True
 
     # ==================== COINFLIP ====================
     

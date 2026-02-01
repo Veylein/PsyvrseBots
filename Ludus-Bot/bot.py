@@ -169,6 +169,12 @@ async def on_ready():
     # All other commands sync globally
     DEV_ONLY_COMMANDS = []  # Add command names here for dev guild testing
     
+    # Log all commands available before sync
+    print(f"[BOT] Total app commands in tree: {len(bot.tree.get_commands())}")
+    all_cmds = bot.tree.get_commands()
+    gambling_cmds = [cmd.name for cmd in all_cmds if 'gambl' in cmd.name.lower() or cmd.name in ['poker', 'slots', 'roulette', 'higherlower', 'mines', 'crash', 'dicegamble', 'coinflip']]
+    print(f"[BOT] Gambling-related commands found: {gambling_cmds}")
+    
     try:
         import os
         dev_guilds_raw = os.environ.get('DEV_GUILD_IDS') or os.environ.get('DEV_GUILD_ID')
