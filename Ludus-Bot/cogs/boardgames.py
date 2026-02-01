@@ -439,7 +439,7 @@ class BoardGames(commands.Cog):
 
     # ==================== TIC-TAC-TOE ====================
     
-    @app_commands.command(name="ttt", description="Create a Tic-Tac-Toe lobby")
+    @app_commands.command(name="tictactoe", description="Create a Tic-Tac-Toe lobby")
     @app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
     @app_commands.allowed_installs(guilds=True, users=True)
     async def tictactoe(self, interaction: discord.Interaction):
