@@ -427,9 +427,10 @@ class BoardGames(commands.Cog):
     @app_commands.command(name="boardgames", description="View all board game commands and info (paginated)")
     async def boardgames_slash(self, interaction: discord.Interaction):
         commands_list = []
+        prefix = self.bot.command_prefix
         for cmd in self.get_commands():
             if not cmd.hidden:
-                name = f"/{cmd.name}" if hasattr(cmd, 'app_command') else f"L!{cmd.name}"
+                name = f"/{cmd.name}" if hasattr(cmd, 'app_command') else f"{prefix}{cmd.name}"
                 desc = cmd.help or cmd.short_doc or "No description."
                 commands_list.append((name, desc))
         category_name = "Board Games"
@@ -439,9 +440,47 @@ class BoardGames(commands.Cog):
 
     # ==================== TIC-TAC-TOE ====================
     
+    @commands.command(name="tictactoe", aliases=["ttt"])
+    async def tictactoe_prefix(self, ctx):
+        """Create a Tic-Tac-Toe lobby"""
+        lobby_id = f"ttt_lobby_{ctx.channel.id}_{ctx.author.id}"
+        uid_str = str(ctx.author.id)
+
+        # Prevent creating a TTT lobby if user is already in any game/lobby
+        for g in self.bot.active_games.values():
+            if uid_str in g.get('players', {}).values():
+                return await ctx.send("You can't create a lobby while in another active game.")
+        for mg in self.bot.active_minigames.values():
+            if mg.get('type') == 'solo' and str(mg.get('user_id')) == uid_str:
+                return await ctx.send("You can't create a lobby while in an active hangman game.")
+            if mg.get('type') == 'multi' and uid_str in mg.get('players', []):
+                return await ctx.send("You can't create a lobby while in an active hangman game.")
+        for lid, l in self.bot.active_lobbies.items():
+            if uid_str in l.get('players', []) or l.get('hostId') == uid_str:
+                return await ctx.send("You can't create a new lobby while already in a lobby.")
+
+        if lobby_id in self.bot.active_lobbies:
+            return await ctx.send("You already have an active lobby!")
+
+        lobby_state = {
+            'hostId': str(ctx.author.id),
+            'players': [str(ctx.author.id)],
+            'maxPlayers': 2,
+            'boardSize': 3,
+            'starter': 'host_starts',
+            'mode': 'normal',
+            'messageId': None,
+            'last_activity': time.time(),
+            'start_time': time.time()
+        }
+
+        embed = generate_lobby_embed(lobby_state, ctx.author)
+        view = generate_lobby_view(lobby_id, lobby_state)
+        msg = await ctx.send(embed=embed, view=view)
+        lobby_state['messageId'] = msg.id
+        self.bot.active_lobbies[lobby_id] = lobby_state
+    
     @app_commands.command(name="tictactoe", description="Create a Tic-Tac-Toe lobby")
-    @app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
-    @app_commands.allowed_installs(guilds=True, users=True)
     async def tictactoe(self, interaction: discord.Interaction):
         await interaction.response.defer()
         
