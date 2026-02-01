@@ -171,9 +171,6 @@ async def on_ready():
     
     # Log all commands available before sync
     print(f"[BOT] Total app commands in tree: {len(bot.tree.get_commands())}")
-    all_cmds = bot.tree.get_commands()
-    gambling_cmds = [cmd.name for cmd in all_cmds if 'gambl' in cmd.name.lower() or cmd.name in ['poker', 'slots', 'roulette', 'higherlower', 'mines', 'crash', 'dicegamble', 'coinflip']]
-    print(f"[BOT] Gambling-related commands found: {gambling_cmds}")
     
     try:
         import os
