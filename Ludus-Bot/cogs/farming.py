@@ -21,6 +21,8 @@ class FarmingManager:
     def __init__(self, data_dir):
         self.data_dir = data_dir
         self.farms_file = os.path.join(data_dir, "farms.json")
+        self.seeds_file = os.path.join(data_dir, "seeds.json")
+        self.seeds = self.load_seeds()
         self.farms = self.load_farms()
         
         # Crop definitions with growth times and values
@@ -136,6 +138,45 @@ class FarmingManager:
             except Exception:
                 return {}
         return {}
+
+    def load_seeds(self):
+        """Load seeds inventory per user"""
+        if os.path.exists(self.seeds_file):
+            try:
+                with open(self.seeds_file, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def save_seeds(self):
+        try:
+            with open(self.seeds_file, 'w') as f:
+                json.dump(self.seeds, f, indent=4)
+        except Exception as e:
+            print(f"Error saving seeds: {e}")
+
+    def get_seed_count(self, user_id, crop_id):
+        user_key = str(user_id)
+        user_seeds = self.seeds.get(user_key, {})
+        return user_seeds.get(crop_id, 0)
+
+    def add_seeds(self, user_id, crop_id, quantity=1):
+        user_key = str(user_id)
+        if user_key not in self.seeds:
+            self.seeds[user_key] = {}
+        self.seeds[user_key][crop_id] = self.seeds[user_key].get(crop_id, 0) + quantity
+        self.save_seeds()
+
+    def remove_seeds(self, user_id, crop_id, quantity=1):
+        user_key = str(user_id)
+        if user_key not in self.seeds or self.seeds[user_key].get(crop_id, 0) < quantity:
+            return False
+        self.seeds[user_key][crop_id] -= quantity
+        if self.seeds[user_key][crop_id] <= 0:
+            del self.seeds[user_key][crop_id]
+        self.save_seeds()
+        return True
     
     def save_farms(self):
         """Save farms to JSON"""
@@ -205,6 +246,11 @@ class FarmingManager:
         crop = self.crops.get(crop_id)
         if not crop:
             return False, "Invalid crop!"
+
+        # Check seed availability
+        seed_count = self.get_seed_count(user_id, crop_id)
+        if seed_count <= 0:
+            return False, f"You don't have any seeds for {crop['name']}. Buy seeds from the farm shop first!"
         
         season = self.get_current_season()
         if not self.can_plant_crop(crop_id, season, farm["upgrades"]["greenhouse"]):
@@ -216,6 +262,9 @@ class FarmingManager:
             "planted_at": datetime.utcnow().isoformat(),
             "ready_at": (datetime.utcnow() + timedelta(minutes=crop["grow_time"])).isoformat()
         }
+
+        # Consume one seed
+        self.remove_seeds(user_id, crop_id, 1)
         
         self.save_farms()
         return True, f"Planted {crop['emoji']} {crop['name']}!"
@@ -394,31 +443,25 @@ class FarmView(View):
         )
         
         await interaction.followup.send(embed=embed)
+        # Award PsyCoins for the harvested value via Economy cog
+        economy_cog = self.manager and getattr(self.manager, 'data_dir', None) and self.manager
+        # Use bot economy cog instead
+        try:
+            econ = self.ctx.bot.get_cog("Economy")
+            if econ:
+                econ.add_coins(self.ctx.author.id, total_value, "farming")
+        except Exception:
+            pass
 
 class Farming(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         data_dir = os.getenv("RENDER_DISK_PATH", ".")
         self.manager = FarmingManager(data_dir)
-        self.economy_file = os.path.join(data_dir, "economy.json")
         self.inventory_file = os.path.join(data_dir, "inventory.json")
         self.profile_file = os.path.join(data_dir, "profiles.json")
     
-    def load_economy(self):
-        if os.path.exists(self.economy_file):
-            try:
-                with open(self.economy_file, 'r') as f:
-                    return json.load(f)
-            except Exception:
-                return {}
-        return {}
-    
-    def save_economy(self, data):
-        try:
-            with open(self.economy_file, 'w') as f:
-                json.dump(data, f, indent=4)
-        except Exception as e:
-            print(f"Error saving economy: {e}")
+    # Economy is handled via the central Economy cog; file fallbacks are performed inline where needed.
     
     def load_profile(self):
         if os.path.exists(self.profile_file):
@@ -493,27 +536,27 @@ class Farming(commands.Cog):
         """View available seeds"""
         season = self.manager.get_current_season()
         farm = self.manager.get_farm(ctx.author.id)
-        
         embed = EmbedBuilder.create(
             title=f"{Emojis.TREASURE} Available Seeds",
             description=f"**Current Season:** {season.capitalize()} {self._get_season_emoji(season)}\n"
-                       f"Purchase seeds at: `L!shop market`\n\n",
+                       "Purchase seeds with `/farmshop action:buyseed`\n\n",
             color=Colors.PRIMARY
         )
-        
+
+        # Show user's seed inventory counts alongside seed info
         for crop_id, crop in self.manager.crops.items():
             can_plant = self.manager.can_plant_crop(crop_id, season, farm["upgrades"]["greenhouse"])
             status = "✅" if can_plant else "❌"
-            
+            seed_count = self.manager.get_seed_count(ctx.author.id, crop_id)
+
             embed.add_field(
                 name=f"{status} {crop['emoji']} {crop['name']}",
-                value=f"**Grow Time:** {crop['grow_time']}m\n"
-                      f"**Seed Cost:** {crop['seed_cost']} coins\n"
-                      f"**Sell Price:** {crop['sell_price']} coins\n"
+                value=f"**Seeds Owned:** {seed_count} | **Grow Time:** {crop['grow_time']}m\n"
+                      f"**Seed Cost:** {crop['seed_cost']} coins | **Sell Price:** {crop['sell_price']} coins\n"
                       f"**Season:** {crop['season'].capitalize()}",
                 inline=True
             )
-        
+
         await ctx.send(embed=embed)
     
     @commands.command(name="plant")
@@ -567,18 +610,19 @@ class Farming(commands.Cog):
             await ctx.send(f"❌ {result}")
             return
         
-        # Give coins
-        economy = self.load_economy()
-        user_id = str(ctx.author.id)
-        if user_id not in economy:
-            economy[user_id] = {"balance": 0}
-        economy[user_id]["balance"] += value
-        self.save_economy(economy)
-        
+        # Award PsyCoins via Economy cog
+        economy_cog = self.bot.get_cog("Economy")
+        if economy_cog:
+            try:
+                economy_cog.add_coins(ctx.author.id, value, "farming")
+            except Exception:
+                pass
+
         # Update profile
         profiles = self.load_profile()
+        user_id = str(ctx.author.id)
         if user_id in profiles:
-            profiles[user_id]["crops_harvested"] += result["quantity"]
+            profiles[user_id]["crops_harvested"] = profiles[user_id].get("crops_harvested", 0) + result["quantity"]
             self.save_profile(profiles)
         
         embed = EmbedBuilder.create(
@@ -676,18 +720,37 @@ class Farming(commands.Cog):
             await ctx.send(f"❌ {message}")
             return
         
-        # Deduct coins
-        economy = self.load_economy()
-        user_id = str(ctx.author.id)
-        if user_id not in economy:
-            economy[user_id] = {"balance": 0}
-        
-        if economy[user_id]["balance"] < cost:
-            await ctx.send(f"❌ Not enough coins! Need {cost}, have {economy[user_id]['balance']}.")
-            return
-        
-        economy[user_id]["balance"] -= cost
-        self.save_economy(economy)
+        # Deduct coins via Economy cog
+        economy_cog = self.bot.get_cog("Economy")
+        if economy_cog:
+            balance = economy_cog.get_balance(ctx.author.id)
+            if balance < cost:
+                await ctx.send(f"❌ Not enough coins! Need {cost}, have {balance}.")
+                return
+            economy_cog.remove_coins(ctx.author.id, cost)
+        else:
+            # Fallback to local economy file
+            economy_file = os.path.join(self.manager.data_dir, "economy.json")
+            economy = {}
+            if os.path.exists(economy_file):
+                try:
+                    with open(economy_file, 'r') as f:
+                        economy = json.load(f)
+                except Exception:
+                    economy = {}
+
+            user_id = str(ctx.author.id)
+            if user_id not in economy:
+                economy[user_id] = {"balance": 0}
+            if economy[user_id]["balance"] < cost:
+                await ctx.send(f"❌ Not enough coins! Need {cost}, have {economy[user_id]['balance']}.")
+                return
+            economy[user_id]["balance"] -= cost
+            try:
+                with open(economy_file, 'w') as f:
+                    json.dump(economy, f, indent=4)
+            except Exception:
+                pass
         
         embed = EmbedBuilder.create(
             title=f"{Emojis.SUCCESS} Upgrade Purchased!",

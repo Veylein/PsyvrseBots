@@ -11,6 +11,7 @@ from typing import Optional, Dict, List
 from discord import app_commands
 from discord.ui import View, Button
 from cogs.minigames import PaginatedHelpView
+from utils.embed_styles import EmbedBuilder, Colors, Emojis
 try:
     from .tcg import manager as tcg_manager
     from .psyvrse_tcg import CARD_DATABASE
@@ -393,11 +394,13 @@ class Fishing(commands.Cog):
         app_commands.Choice(name="🎣 Cast Line", value="cast"),
         app_commands.Choice(name="🎒 Inventory", value="inventory"),
         app_commands.Choice(name="🏪 Shop", value="shop"),
+        app_commands.Choice(name="🛒 Buy Item", value="buy"),
         app_commands.Choice(name="🗺️ Areas", value="areas"),
         app_commands.Choice(name="📖 Encyclopedia", value="encyclopedia"),
         app_commands.Choice(name="📊 Stats", value="stats"),
     ])
-    async def fish_main(self, interaction: discord.Interaction, action: Optional[str] = "menu", bait: Optional[str] = None, rarity: Optional[str] = None):
+    @app_commands.describe(item="Item id to buy (for buy action)")
+    async def fish_main(self, interaction: discord.Interaction, action: Optional[str] = "menu", bait: Optional[str] = None, rarity: Optional[str] = None, item: Optional[str] = None):
         """Main fishing command with optional actions"""
         if action == "cast":
             await self.cast_action(interaction, bait)
@@ -405,6 +408,8 @@ class Fishing(commands.Cog):
             await self.fish_inventory_action(interaction)
         elif action == "shop":
             await self.fish_shop_action(interaction)
+        elif action == "buy":
+            await self.fish_buy_action(interaction, item)
         elif action == "areas":
             await self.fish_areas_action(interaction)
         elif action == "encyclopedia":
@@ -413,28 +418,93 @@ class Fishing(commands.Cog):
             await self.fish_stats_action(interaction)
         else:  # menu
             await self.fish_menu_action(interaction)
+
+    async def fish_buy_action(self, interaction: discord.Interaction, item: Optional[str] = None):
+        """Handle purchasing rods, boats, and bait from the fishing shop"""
+        user_data = self.get_user_data(interaction.user.id)
+        economy_cog = self.bot.get_cog("Economy")
+
+        if not item:
+            await interaction.response.send_message("Please specify an `item` to buy. Example: `/fish action:buy item:worm`", ephemeral=True)
+            return
+
+        item_key = item.lower()
+
+        # Buying a rod
+        if item_key in self.rods:
+            rod = self.rods[item_key]
+            cost = rod.get("cost", 0)
+            if user_data.get("rod") == item_key:
+                await interaction.response.send_message(f"You already own {rod['name']}.", ephemeral=True)
+                return
+            if not economy_cog:
+                await interaction.response.send_message("Economy cog not available.", ephemeral=True)
+                return
+            if economy_cog.remove_coins(interaction.user.id, cost):
+                user_data["rod"] = item_key
+                self.save_fishing_data()
+                await interaction.response.send_message(f"Purchased {rod['name']} for {cost} PsyCoins.")
+            else:
+                await interaction.response.send_message(f"You don't have enough PsyCoins to buy {rod['name']} (cost: {cost}).", ephemeral=True)
+            return
+
+        # Buying a boat
+        if item_key in self.boats:
+            boat = self.boats[item_key]
+            cost = boat.get("cost", 0)
+            if user_data.get("boat") == item_key:
+                await interaction.response.send_message(f"You already own {boat['name']}.", ephemeral=True)
+                return
+            if not economy_cog:
+                await interaction.response.send_message("Economy cog not available.", ephemeral=True)
+                return
+            if economy_cog.remove_coins(interaction.user.id, cost):
+                user_data["boat"] = item_key
+                self.save_fishing_data()
+                await interaction.response.send_message(f"Purchased {boat['name']} for {cost} PsyCoins.")
+            else:
+                await interaction.response.send_message(f"You don't have enough PsyCoins to buy {boat['name']} (cost: {cost}).", ephemeral=True)
+            return
+
+        # Buying bait (adds to bait_inventory)
+        if item_key in self.baits:
+            bait = self.baits[item_key]
+            cost = bait.get("cost", 0)
+            if not economy_cog:
+                await interaction.response.send_message("Economy cog not available.", ephemeral=True)
+                return
+            if economy_cog.remove_coins(interaction.user.id, cost):
+                inv = user_data.setdefault("bait_inventory", {})
+                inv[item_key] = inv.get(item_key, 0) + 1
+                self.save_fishing_data()
+                await interaction.response.send_message(f"Purchased 1 x {bait['name']} for {cost} PsyCoins.")
+            else:
+                await interaction.response.send_message(f"You don't have enough PsyCoins to buy {bait['name']} (cost: {cost}).", ephemeral=True)
+            return
+
+        await interaction.response.send_message(f"Item `{item}` not found in the fishing shop.", ephemeral=True)
     
     async def fish_menu_action(self, interaction: discord.Interaction):
         """Show fishing main menu"""
         user_data = self.get_user_data(interaction.user.id)
         
-        embed = discord.Embed(
-            title="🎣 Ultimate Fishing Simulator",
+        embed = EmbedBuilder.create(
+            title=f"{Emojis.FIRE} Ultimate Fishing Simulator",
             description="**Welcome to the most advanced fishing experience!**\n\n"
-                       "**Your Stats:**\n"
-                       f"🎣 Rod: {self.rods[user_data['rod']]['name']}\n"
-                       f"🛶 Boat: {self.boats[user_data['boat']]['name']}\n"
-                       f"📍 Area: {self.areas[user_data['current_area']]['name']}\n"
-                       f"🐟 Total Catches: {user_data['total_catches']}\n\n"
-                       "**Available Actions:**\n"
-                       "Use `/fish <action>` to access different features:\n"
-                       "• `cast` - Cast your line and fish!\n"
-                       "• `inventory` - View your catches\n"
-                       "• `shop` - Buy equipment & bait\n"
-                       "• `areas` - Explore fishing locations\n"
-                       "• `encyclopedia` - View fish encyclopedia\n"
-                       "• `stats` - View your statistics",
-            color=discord.Color.blue()
+                        "**Your Stats:**\n"
+                        f"🎣 Rod: {self.rods[user_data['rod']]['name']}\n"
+                        f"🛶 Boat: {self.boats[user_data['boat']]['name']}\n"
+                        f"📍 Area: {self.areas[user_data['current_area']]['name']}\n"
+                        f"🐟 Total Catches: {user_data['total_catches']}\n\n"
+                        "**Available Actions:**\n"
+                        "Use `/fish <action>` to access different features:\n"
+                        "• `cast` - Cast your line and fish!\n"
+                        "• `inventory` - View your catches\n"
+                        "• `shop` - Buy equipment & bait\n"
+                        "• `areas` - Explore fishing locations\n"
+                        "• `encyclopedia` - View fish encyclopedia\n"
+                        "• `stats` - View your statistics",
+            color=Colors.FISHING
         )
         
         await interaction.response.send_message(embed=embed)
@@ -463,14 +533,14 @@ class Fishing(commands.Cog):
                     del user_data["bait_inventory"][bait]
         
         # Fishing animation
-        embed = discord.Embed(
-            title="🎣 Casting Line...",
-            description=f"{weather_data['emoji']} **Weather:** {weather.title()} - {weather_data['description']}\n"
-                       f"{time_data['emoji']} **Time:** {time_period.title()}\n"
-                       f"🎣 **Rod:** {self.rods[user_data['rod']]['name']}\n"
-                       f"🪱 **Bait:** {bait_name}\n\n"
-                       "🌊 *Waiting for a bite...*",
-            color=discord.Color.blue()
+        embed = EmbedBuilder.info(
+            "Casting Line...",
+            f"{weather_data['emoji']} **Weather:** {weather.title()} - {weather_data['description']}\n"
+            f"{time_data['emoji']} **Time:** {time_period.title()}\n"
+            f"🎣 **Rod:** {self.rods[user_data['rod']]['name']}\n"
+            f"🪱 **Bait:** {bait_name}\n\n"
+            "🌊 *Waiting for a bite...*",
+            footer_text="Tight lines!"
         )
         
         await interaction.response.send_message(embed=embed)
@@ -540,23 +610,23 @@ class Fishing(commands.Cog):
                 pass
         
         # Result embed
-        rarity_colors = {
-            "Common": discord.Color.light_grey(),
-            "Uncommon": discord.Color.green(),
-            "Rare": discord.Color.blue(),
-            "Epic": discord.Color.purple(),
-            "Legendary": discord.Color.gold(),
-            "Mythic": discord.Color.red()
+        rarity_map = {
+            "Common": Colors.COMMON,
+            "Uncommon": Colors.UNCOMMON,
+            "Rare": Colors.RARE,
+            "Epic": Colors.EPIC,
+            "Legendary": Colors.LEGENDARY,
+            "Mythic": Colors.MYTHIC
         }
-        
-        embed = discord.Embed(
-            title="🎉 Fish Caught!",
+
+        embed = EmbedBuilder.create(
+            title=f"{Emojis.PARTY} Fish Caught!",
             description=f"**{caught_fish['name']}**\n"
-                       f"**Rarity:** {caught_fish['rarity']}\n"
-                       f"**Weight:** {weight} kg\n"
-                       f"**Value:** {value} PsyCoins\n\n"
-                       f"*Added to your collection!*",
-            color=rarity_colors.get(caught_fish["rarity"], discord.Color.blue())
+                        f"**Rarity:** {caught_fish['rarity']}\n"
+                        f"**Weight:** {weight} kg\n"
+                        f"**Value:** {value} PsyCoins\n\n"
+                        f"*Added to your collection!*",
+            color=rarity_map.get(caught_fish["rarity"], Colors.FISHING)
         )
         
         self.save_fishing_data()
@@ -581,12 +651,12 @@ class Fishing(commands.Cog):
             reverse=True
         )
         
-        embed = discord.Embed(
+        embed = EmbedBuilder.create(
             title=f"🐟 {interaction.user.display_name}'s Fish Collection",
             description=f"**Total Catches:** {user_data['total_catches']}\n"
-                       f"**Total Value:** {user_data['total_value']} PsyCoins\n"
-                       f"**Species Caught:** {len(user_data['fish_caught'])}/{len(self.fish_types)}\n",
-            color=discord.Color.blue()
+                        f"**Total Value:** {user_data['total_value']} PsyCoins\n"
+                        f"**Species Caught:** {len(user_data['fish_caught'])}/{len(self.fish_types)}\n",
+            color=Colors.FISHING
         )
         
         # Show top 10 fish
@@ -604,11 +674,11 @@ class Fishing(commands.Cog):
         """Fishing shop"""
         user_data = self.get_user_data(interaction.user.id)
         
-        embed = discord.Embed(
-            title="🏪 Fishing Shop",
-            description="**Purchase upgrades and supplies!**\n\n"
-                       "Use the commands below to buy items:",
-            color=discord.Color.gold()
+        embed = EmbedBuilder.economy(
+            "Fishing Shop",
+            "**Purchase upgrades and supplies!**\n\n"
+            "Use the commands below to buy items:",
+            footer_text="Use /fish action:buy to purchase items"
         )
         
         # Show rods
@@ -639,11 +709,11 @@ class Fishing(commands.Cog):
         """View fishing areas"""
         user_data = self.get_user_data(interaction.user.id)
         
-        embed = discord.Embed(
+        embed = EmbedBuilder.create(
             title="🗺️ Fishing Areas",
             description=f"**Current Location:** {self.areas[user_data['current_area']]['name']}\n\n"
-                       "**Available Areas:**",
-            color=discord.Color.blue()
+                        "**Available Areas:**",
+            color=Colors.FISHING
         )
         
         for area_id, area in self.areas.items():
@@ -663,10 +733,10 @@ class Fishing(commands.Cog):
         await interaction.response.send_message(embed=embed)
     
     async def fish_encyclopedia_action(self, interaction: discord.Interaction, rarity: Optional[str] = None):
-        embed = discord.Embed(
+        embed = EmbedBuilder.create(
             title="📖 Fish Encyclopedia",
             description="**Discover all the fish species!**",
-            color=discord.Color.green()
+            color=Colors.INFO
         )
         
         # Filter by rarity if provided
@@ -712,9 +782,9 @@ class Fishing(commands.Cog):
                 highest_rarity = rarity_order.get(fish_rarity, 0)
                 rarest_catch = self.fish_types[fish_id]["name"]
         
-        embed = discord.Embed(
+        embed = EmbedBuilder.create(
             title=f"📊 {interaction.user.display_name}'s Fishing Stats",
-            color=discord.Color.blue()
+            color=Colors.FISHING
         )
         
         embed.add_field(name="🎣 Total Catches", value=str(user_data["total_catches"]), inline=True)

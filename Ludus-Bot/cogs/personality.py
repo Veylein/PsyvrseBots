@@ -135,6 +135,62 @@ class LudusPersonality(commands.Cog):
                 return False
         self.last_reaction_time[user_id] = now
         return True
+
+    @app_commands.command(name="personality", description="Enable/disable personality reactions and set channels")
+    @app_commands.choices(action=[
+        app_commands.Choice(name="enable", value="enable"),
+        app_commands.Choice(name="disable", value="disable"),
+    ])
+    @app_commands.describe(channels="Optional channels to restrict personality messages to")
+    async def personality_slash(self, interaction: discord.Interaction, action: app_commands.Choice[str], channels: Optional[str] = None):
+        # Only allow server admins to change settings
+        if not interaction.guild:
+            await interaction.response.send_message("This command must be used in a server.", ephemeral=True)
+            return
+        member = interaction.guild.get_member(interaction.user.id)
+        if not member.guild_permissions.administrator:
+            await interaction.response.send_message("You must be a server administrator to change personality settings.", ephemeral=True)
+            return
+
+        server_config = self._load_server_config(interaction.guild.id)
+        if action.value == "disable":
+            server_config["personality_reactions"] = False
+            server_config["personality_channels"] = []
+            self._save_server_config(interaction.guild.id, server_config)
+            await interaction.response.send_message("Ludus personality reactions disabled for this server.")
+            return
+
+        # enable
+        server_config["personality_reactions"] = True
+        # Parse channels string like: #general #games or channel ids separated by spaces
+        if channels:
+            # attempt to resolve channel mentions/ids
+            parts = channels.split()
+            ids = []
+            for p in parts:
+                p = p.strip()
+                if p.startswith('<#') and p.endswith('>'):
+                    try:
+                        cid = int(p[2:-1])
+                        ids.append(str(cid))
+                    except Exception:
+                        continue
+                else:
+                    try:
+                        cid = int(p)
+                        ids.append(str(cid))
+                    except Exception:
+                        continue
+            server_config["personality_channels"] = ids
+        else:
+            server_config["personality_channels"] = []
+
+        self._save_server_config(interaction.guild.id, server_config)
+        if server_config["personality_channels"]:
+            ch_mentions = ", ".join(f"<#{c}>" for c in server_config["personality_channels"]) 
+            await interaction.response.send_message(f"Ludus personality messages enabled in: {ch_mentions}")
+        else:
+            await interaction.response.send_message("Ludus personality reactions enabled in all channels.")
     
     @commands.Cog.listener()
     async def on_message(self, message):

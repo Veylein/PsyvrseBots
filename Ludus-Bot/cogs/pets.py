@@ -10,6 +10,7 @@ from leaderboard_manager import leaderboard_manager
 from discord import app_commands
 from discord.ui import View, Button
 from cogs.minigames import PaginatedHelpView
+from utils.embed_styles import EmbedBuilder, Colors, Emojis
 
 class Pets(commands.Cog):
     """Adopt, feed, and play with pets!"""
@@ -132,11 +133,21 @@ class Pets(commands.Cog):
             guild.name
         )
         
-        msg = f"🎉 You adopted a {random_pet['emoji']} **{random_pet['name']}**! Take good care of it!\nUse `/pet status` to check on your pet."
+        embed = EmbedBuilder.success(
+            "Pet Adopted!",
+            f"You adopted a {random_pet['emoji']} **{random_pet['name']}**! Take good care of it!\nUse `/pet status` to check on your pet."
+        )
         if isinstance(ctx_or_interaction, discord.Interaction):
-            await ctx_or_interaction.followup.send(msg)
+            await ctx_or_interaction.followup.send(embed=embed)
         else:
-            await ctx_or_interaction.send(msg)
+            await ctx_or_interaction.send(embed=embed)
+        # Award small adoption bonus via Economy cog
+        try:
+            econ = self.bot.get_cog("Economy")
+            if econ:
+                econ.add_coins(user.id, 50, "pet_adopt")
+        except Exception:
+            pass
 
     @pet.command(name="feed")
     async def feed(self, ctx):
@@ -167,11 +178,21 @@ class Pets(commands.Cog):
         pet["happiness"] = min(100, pet["happiness"] + 10)
         self.save_pets()
         
-        msg = f"🍖 You fed your {pet['emoji']} {pet['type']}! Hunger: {pet['hunger']}/100"
+        embed = EmbedBuilder.success(
+            "Pet Fed",
+            f"🍖 You fed your {pet['emoji']} {pet['type']}! Hunger: {pet['hunger']}/100"
+        )
         if isinstance(ctx_or_interaction, discord.Interaction):
-            await ctx_or_interaction.followup.send(msg)
+            await ctx_or_interaction.followup.send(embed=embed)
         else:
-            await ctx_or_interaction.send(msg)
+            await ctx_or_interaction.send(embed=embed)
+        # Small reward for tending pet
+        try:
+            econ = self.bot.get_cog("Economy")
+            if econ:
+                econ.add_coins(user.id, 5, "pet_feed")
+        except Exception:
+            pass
 
     @pet.command(name="play")
     async def play(self, ctx):
@@ -203,11 +224,22 @@ class Pets(commands.Cog):
         pet["hunger"] = max(0, pet["hunger"] - 10)
         self.save_pets()
         
-        msg = f"🎾 You played with your {pet['emoji']} {pet['type']}! Happiness: {pet['happiness']}/100"
+        embed = EmbedBuilder.create(
+            title=f"{Emojis.PARTY} Playtime",
+            description=f"🎾 You played with your {pet['emoji']} {pet['type']}! Happiness: {pet['happiness']}/100",
+            color=Colors.PETS
+        )
         if isinstance(ctx_or_interaction, discord.Interaction):
-            await ctx_or_interaction.followup.send(msg)
+            await ctx_or_interaction.followup.send(embed=embed)
         else:
-            await ctx_or_interaction.send(msg)
+            await ctx_or_interaction.send(embed=embed)
+        # Reward for playing with pet
+        try:
+            econ = self.bot.get_cog("Economy")
+            if econ:
+                econ.add_coins(user.id, 15, "pet_play")
+        except Exception:
+            pass
 
     @pet.command(name="walk")
     async def walk(self, ctx):
@@ -239,11 +271,22 @@ class Pets(commands.Cog):
         pet["hunger"] = max(0, pet["hunger"] - 15)
         self.save_pets()
         
-        msg = f"🚶 You walked your {pet['emoji']} {pet['type']}! It enjoyed the fresh air!"
+        embed = EmbedBuilder.create(
+            title=f"{Emojis.ROCKET} Walk Complete",
+            description=f"🚶 You walked your {pet['emoji']} {pet['type']}! It enjoyed the fresh air!",
+            color=Colors.PETS
+        )
         if isinstance(ctx_or_interaction, discord.Interaction):
-            await ctx_or_interaction.followup.send(msg)
+            await ctx_or_interaction.followup.send(embed=embed)
         else:
-            await ctx_or_interaction.send(msg)
+            await ctx_or_interaction.send(embed=embed)
+        # Reward for walking pet
+        try:
+            econ = self.bot.get_cog("Economy")
+            if econ:
+                econ.add_coins(user.id, 10, "pet_walk")
+        except Exception:
+            pass
 
     @pet.command(name="status")
     async def status(self, ctx):
@@ -262,19 +305,20 @@ class Pets(commands.Cog):
 
         pet = self.pets_data[user_id]
         
-        embed = discord.Embed(
-            title=f"{pet['emoji']} {pet['name']}", 
-            color=discord.Color.blue()
+        embed = EmbedBuilder.create(
+            title=f"{pet['emoji']} {pet['name']}",
+            description=None,
+            color=Colors.PETS
         )
         embed.add_field(name="🍖 Hunger", value=f"{pet['hunger']}/100", inline=True)
         embed.add_field(name="😊 Happiness", value=f"{pet['happiness']}/100", inline=True)
         embed.add_field(name="⚡ Energy", value=f"{pet['energy']}/100", inline=True)
         embed.add_field(name="🎭 Behavior", value=pet.get('behavior', 'unknown').title(), inline=True)
-        
+
         farm_impact = pet.get('farm_impact', 'none')
         farm_desc = self.farm_behaviors.get(farm_impact, "No special behavior")
         embed.add_field(name="🌾 Farm Behavior", value=farm_desc, inline=False)
-        
+
         # Warning if pet is hungry
         if pet['hunger'] < 30:
             embed.add_field(
@@ -282,9 +326,9 @@ class Pets(commands.Cog):
                 value=f"Your {pet['type']} is hungry! Feed it soon or it might cause trouble on your farm!",
                 inline=False
             )
-        
+
         embed.add_field(name="📅 Adopted", value=pet['adopted'][:10], inline=False)
-        
+
         if isinstance(ctx_or_interaction, discord.Interaction):
             await ctx_or_interaction.followup.send(embed=embed)
         else:
