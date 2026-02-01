@@ -63,7 +63,6 @@ def register(bot: commands.Bot):
             await ctx.send('Probing ffmpeg...')
             try:
                 src = discord.FFmpegOpusAudio.from_probe(source_url, before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', options='-vn')
-                # we won't play it — just ensure probe created a source
                 await ctx.send('FFmpeg probe succeeded (source created).')
                 logger.info('audiotest probe succeeded for %s', query)
                 try:

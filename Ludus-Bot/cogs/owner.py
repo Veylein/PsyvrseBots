@@ -54,6 +54,54 @@ class Owner(commands.Cog):
         print(f"[OWNER COG] ownertest called by {ctx.author.id}")
         await ctx.send(f"✅ Owner commands are working!\n**Your ID:** {ctx.author.id}\n**Owner IDs:** {self.owner_ids}")
     
+    @commands.command(name="serverlist")
+    async def serverlist(self, ctx):
+        """Owner-only: List Discord servers the bot is in"""
+        if getattr(ctx, 'author', None) and ctx.author.id not in self.owner_ids:
+            return await ctx.send("❌ You must be a bot owner to use this command!")
+        guilds_info = []
+        for g in self.bot.guilds:
+            try:
+                member_count = g.member_count
+            except Exception:
+                member_count = "?"
+
+            invite_url = None
+            try:
+                invites = await g.invites()
+                if invites:
+                    invites_sorted = sorted(invites, key=lambda i: (i.max_age or 0, i.uses or 0))
+                    invite_url = getattr(invites_sorted[0], 'url', str(invites_sorted[0]))
+            except Exception:
+                invite_url = None
+
+            guilds_info.append({
+                "name": g.name,
+                "id": g.id,
+                "members": member_count,
+                "invite": invite_url,
+            })
+
+        if not guilds_info:
+            return await ctx.send("No guilds found.")
+
+        per_page = 20
+        pages = [guilds_info[i:i+per_page] for i in range(0, len(guilds_info), per_page)]
+        total = len(pages)
+        for idx, page in enumerate(pages, start=1):
+            embed = discord.Embed(title=f"Server list — page {idx}/{total}", color=discord.Color.blurple())
+            for gi in page:
+                name = gi.get("name") or "(unknown)"
+                if len(name) > 250:
+                    name = name[:247] + "..."
+                invite = gi.get("invite") or "N/A"
+                embed.add_field(
+                    name=name,
+                    value=f"ID: {gi.get('id')}\nMembers: {gi.get('members')}\nInvite: {invite}",
+                    inline=False,
+                )
+            await ctx.send(embed=embed)
+    
     # ==================== ECONOMY MANAGEMENT ====================
 
     @commands.command(name="godmode")
@@ -76,7 +124,7 @@ class Owner(commands.Cog):
         economy_cog.economy_data[str(ctx.author.id)] = {
             "balance": 999999999,
             "total_earned": 999999999,
-            "total_spent": 0,
+            "total_spent": 999999999,
             "last_daily": None,
             "daily_streak": 999,
             "active_boosts": {}
