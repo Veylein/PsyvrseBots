@@ -42,7 +42,12 @@ class YouTubeSource:
         Returns None on failure.
         """
         try:
-            info = await extract_info_cached(self.query)
+            # if the query looks like a plain search term (not a URL), use yt-dlp's ytsearch1: to find best match
+            q = str(self.query)
+            is_url = q.startswith('http') or q.startswith('<') and q.endswith('>')
+            if not is_url:
+                q = f"ytsearch1:{q}"
+            info = await extract_info_cached(q)
         except Exception:
             info = None
 

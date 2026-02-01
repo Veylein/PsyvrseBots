@@ -10,6 +10,47 @@ from typing import Optional
 
 import requests
 import yt_dlp
+import time
+
+# Network retry defaults
+_HTTP_ATTEMPTS = int(__import__('os').getenv('SONUS_HTTP_ATTEMPTS') or 3)
+_HTTP_BACKOFF = float(__import__('os').getenv('SONUS_HTTP_BACKOFF') or 0.5)
+_HTTP_TIMEOUT = float(__import__('os').getenv('SONUS_HTTP_TIMEOUT') or 5.0)
+
+
+def _requests_post_with_retries(url: str, data=None, auth=None, headers=None, attempts: int = None, backoff: float = None, timeout: float = None):
+    attempts = attempts or _HTTP_ATTEMPTS
+    backoff = backoff or _HTTP_BACKOFF
+    timeout = timeout or _HTTP_TIMEOUT
+    last_exc = None
+    for i in range(attempts):
+        try:
+            return requests.post(url, data=data, auth=auth, headers=headers, timeout=timeout)
+        except Exception as exc:
+            last_exc = exc
+            time.sleep(backoff * (2 ** i))
+    # final attempt without catching to preserve original behavior
+    try:
+        return requests.post(url, data=data, auth=auth, headers=headers, timeout=timeout)
+    except Exception:
+        raise last_exc
+
+
+def _requests_get_with_retries(url: str, headers=None, attempts: int = None, backoff: float = None, timeout: float = None):
+    attempts = attempts or _HTTP_ATTEMPTS
+    backoff = backoff or _HTTP_BACKOFF
+    timeout = timeout or _HTTP_TIMEOUT
+    last_exc = None
+    for i in range(attempts):
+        try:
+            return requests.get(url, headers=headers, timeout=timeout)
+        except Exception as exc:
+            last_exc = exc
+            time.sleep(backoff * (2 ** i))
+    try:
+        return requests.get(url, headers=headers, timeout=timeout)
+    except Exception:
+        raise last_exc
 from typing import List, Dict
 
 YTDL_OPTS = {
@@ -35,7 +76,9 @@ def _get_token() -> Optional[str]:
     if _TOKEN and _TOKEN_EXPIRES - 30 > time.time():
         return _TOKEN
     try:
-        resp = requests.post('https://accounts.spotify.com/api/token', data={'grant_type': 'client_credentials'}, auth=(_CLIENT_ID, _CLIENT_SECRET), timeout=5.0)
+        resp = _requests_post_with_retries('https://accounts.spotify.com/api/token', data={'grant_type': 'client_credentials'}, auth=(_CLIENT_ID, _CLIENT_SECRET))
+        if resp is None:
+            return None
         if resp.status_code == 200:
             j = resp.json()
             _TOKEN = j.get('access_token')
@@ -179,7 +222,9 @@ def resolve_spotify(url: str) -> Optional[dict]:
             id_ = parts[-1].split('?')[0]
 
         if typ == 'track':
-            r = requests.get(f'https://api.spotify.com/v1/tracks/{id_}', headers=headers, timeout=5.0)
+            r = _requests_get_with_retries(f'https://api.spotify.com/v1/tracks/{id_}', headers=headers)
+            if r is None:
+                return None
             if r.status_code == 200:
                 j = r.json()
                 artists = ', '.join(a.get('name') for a in j.get('artists', []) if a.get('name'))
@@ -192,8 +237,8 @@ def resolve_spotify(url: str) -> Optional[dict]:
             offset = 0
             limit = 50
             while True:
-                r = requests.get(f'https://api.spotify.com/v1/albums/{id_}/tracks?offset={offset}&limit={limit}', headers=headers, timeout=5.0)
-                if r.status_code != 200:
+                r = _requests_get_with_retries(f'https://api.spotify.com/v1/albums/{id_}/tracks?offset={offset}&limit={limit}', headers=headers)
+                if r is None or r.status_code != 200:
                     break
                 j = r.json()
                 for t in j.get('items', []) or []:
@@ -211,8 +256,8 @@ def resolve_spotify(url: str) -> Optional[dict]:
             offset = 0
             limit = 100
             while True:
-                r = requests.get(f'https://api.spotify.com/v1/playlists/{id_}/tracks?offset={offset}&limit={limit}', headers=headers, timeout=8.0)
-                if r.status_code != 200:
+                r = _requests_get_with_retries(f'https://api.spotify.com/v1/playlists/{id_}/tracks?offset={offset}&limit={limit}', headers=headers)
+                if r is None or r.status_code != 200:
                     break
                 j = r.json()
                 for entry in j.get('items', []) or []:
