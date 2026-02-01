@@ -8,6 +8,60 @@ import json
 import os
 
 
+# ==================== GAMBLING AWARENESS ====================
+
+GAMBLING_DISCLAIMER = """
+**⚠️ Our Stance on Gambling**
+
+It is important to remember that **gambling is not a way to make money**, real or fake. It is a form of entertainment and should be treated as such.
+
+**If you or someone you know is struggling with gambling addiction, please seek help.**
+
+Additionally, please remember that **the odds are always in favor of the house. The house always wins.**
+
+**⚠️ IMPORTANT:** You should **NEVER** spend real money to gamble in games. If someone is offering to sell you in-game currency for real money, they are breaking our listed rules and should be reported.
+
+🆘 **Need Help?** 
+• National Council on Problem Gambling: 1-800-522-4700
+• Visit: ncpgambling.org
+"""
+
+async def show_gambling_disclaimer(interaction: discord.Interaction):
+    """Show gambling disclaimer to user"""
+    embed = discord.Embed(
+        title="⚠️ Responsible Gaming Information",
+        description=GAMBLING_DISCLAIMER,
+        color=discord.Color.orange()
+    )
+    embed.set_footer(text="Please gamble responsibly. This is for entertainment only.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+def add_disclaimer_button(view):
+    """Add gambling disclaimer button to any view"""
+    button = discord.ui.Button(
+        label="⚠️",
+        style=discord.ButtonStyle.secondary,
+        custom_id="gambling_disclaimer",
+        row=4  # Place in last row
+    )
+    
+    async def disclaimer_callback(interaction: discord.Interaction):
+        await show_gambling_disclaimer(interaction)
+    
+    button.callback = disclaimer_callback
+    view.add_item(button)
+    return view
+
+
+class GamblingDisclaimerView(discord.ui.View):
+    """Simple view with only a disclaimer button for games without other buttons"""
+    
+    def __init__(self):
+        super().__init__(timeout=None)
+        add_disclaimer_button(self)
+
+
 # ==================== VIEW CLASSES ====================
 # These need to be defined before the Gambling cog
 
@@ -23,6 +77,9 @@ class CrashView(discord.ui.View):
         self.current_multiplier = 1.00
         self.cashed_out = False
         self.crashed = False
+        
+        # Add disclaimer button
+        add_disclaimer_button(self)
     
     @discord.ui.button(label="💰 Cash Out (1.00x)", style=discord.ButtonStyle.green, custom_id="cashout")
     async def cashout_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -170,6 +227,9 @@ class MinesView(discord.ui.View):
         )
         cashout_btn.callback = self.cashout_callback
         self.add_item(cashout_btn)
+        
+        # Add disclaimer button
+        add_disclaimer_button(self)
     
     def create_tile_callback(self, position):
         async def callback(interaction: discord.Interaction):
@@ -339,6 +399,9 @@ class HigherLowerView(discord.ui.View):
         self.bet = bet
         self.first_card = first_card
         self.deck = deck
+        
+        # Add disclaimer button
+        add_disclaimer_button(self)
     
     @discord.ui.button(label="⬆️ Higher", style=discord.ButtonStyle.green)
     async def higher_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -624,7 +687,9 @@ class Gambling(commands.Cog):
         if won:
             embed.add_field(name="Payout", value=f"+{payout:,} coins", inline=False)
         
-        await interaction.response.send_message(embed=embed)
+        # Add disclaimer button
+        view = GamblingDisclaimerView()
+        await interaction.response.send_message(embed=embed, view=view)
     
     def create_deck(self):
         """Create a standard 52-card deck"""
@@ -805,10 +870,12 @@ class Gambling(commands.Cog):
         else:
             embed.add_field(name="Lost", value=f"-{bet:,} coins", inline=False)
         
+        # Add disclaimer button
+        view = GamblingDisclaimerView()
         if is_slash:
-            await ctx_or_interaction.response.send_message(embed=embed)
+            await ctx_or_interaction.response.send_message(embed=embed, view=view)
         else:
-            await ctx_or_interaction.send(embed=embed)
+            await ctx_or_interaction.send(embed=embed, view=view)
     
     # ==================== ROULETTE ====================
     
@@ -908,7 +975,9 @@ class Gambling(commands.Cog):
         embed.add_field(name="Result", value=f"**{result}** {color_result}", inline=False)
         embed.add_field(name="Outcome", value=result_text, inline=False)
         
-        await interaction.response.send_message(embed=embed)
+        # Add disclaimer button
+        view = GamblingDisclaimerView()
+        await interaction.response.send_message(embed=embed, view=view)
     
     # ==================== HIGHER/LOWER ====================
     
@@ -1254,7 +1323,9 @@ class Gambling(commands.Cog):
         embed.add_field(name="Outcome", value=result_text, inline=False)
         embed.set_footer(text="Exact number = 6x payout!")
         
-        await ctx.send(embed=embed)
+        # Add disclaimer button
+        view = GamblingDisclaimerView()
+        await ctx.send(embed=embed, view=view)
     
     @app_commands.command(name="dicegamble", description="Bet on dice roll outcome (10-10,000 coins)")
     async def dice_gamble_slash(self, interaction: discord.Interaction, bet: int, target: int):
@@ -1316,7 +1387,9 @@ class Gambling(commands.Cog):
         embed.add_field(name="Outcome", value=result_text, inline=False)
         embed.set_footer(text="Exact number = 4x payout!")
         
-        await interaction.response.send_message(embed=embed)
+        # Add disclaimer button
+        view = GamblingDisclaimerView()
+        await interaction.response.send_message(embed=embed, view=view)
 
     # ==================== CRASH GAME ====================
     
@@ -1587,10 +1660,12 @@ class Gambling(commands.Cog):
         new_balance = economy_cog.get_balance(user_id)
         embed.set_footer(text=f"Balance: {new_balance:,} PsyCoins")
         
+        # Add disclaimer button
+        view = GamblingDisclaimerView()
         if interaction:
-            await interaction.edit_original_response(embed=embed)
+            await interaction.edit_original_response(embed=embed, view=view)
         else:
-            await msg.edit(embed=embed)
+            await msg.edit(embed=embed, view=view)
 
 async def setup(bot):
     await bot.add_cog(Gambling(bot))
