@@ -447,16 +447,16 @@ class Economy(commands.Cog):
         user_data["last_daily"] = now.isoformat()
         self.add_coins(user.id, total_reward, "daily_reward")
         
-        embed = discord.Embed(
-            title="🎁 Daily Reward Claimed!",
-            description=f"{msg_shield if 'msg_shield' in locals() else ''}You received **{total_reward:,} PsyCoins**!",
-            color=discord.Color.green()
+        desc = f"{msg_shield if 'msg_shield' in locals() else ''}You received **{total_reward:,} PsyCoins**!"
+        embed = EmbedBuilder.success(
+            "Daily Reward Claimed!",
+            desc
         )
         embed.add_field(name="Base Reward", value=f"{base_reward} PsyCoins", inline=True)
         embed.add_field(name="Streak Bonus", value=f"+{streak_bonus} PsyCoins", inline=True)
         embed.add_field(name="Current Streak", value=f"🔥 {user_data['daily_streak']} days", inline=True)
         embed.add_field(name="New Balance", value=f"💰 {self.get_balance(user.id):,} PsyCoins", inline=False)
-        
+
         if interaction:
             await interaction.followup.send(embed=embed)
         else:
@@ -473,10 +473,9 @@ class Economy(commands.Cog):
         await self._show_shop(None, interaction)
 
     async def _show_shop(self, ctx, interaction):
-        embed = discord.Embed(
-            title="🏪 PsyCoin Shop",
-            description="Purchase items with your PsyCoins!\nUse `L!buy <item>` or `/buy <item>` to purchase",
-            color=discord.Color.blue()
+        embed = EmbedBuilder.economy(
+            "PsyCoin Shop",
+            "Purchase items with your PsyCoins!\nUse `L!buy <item>` or `/buy <item>` to purchase"
         )
         
         for item_id, item in self.shop_items.items():
@@ -527,10 +526,9 @@ class Economy(commands.Cog):
         if self.remove_coins(user.id, total_cost):
             self.add_item(user.id, item_id, quantity)
             
-            embed = discord.Embed(
-                title="✅ Purchase Successful!",
-                description=f"You bought **{quantity}x {item['name']}** for **{total_cost:,} PsyCoins**",
-                color=discord.Color.green()
+            embed = EmbedBuilder.success(
+                "Purchase Successful!",
+                f"You bought **{quantity}x {item['name']}** for **{total_cost:,} PsyCoins**"
             )
             embed.add_field(name="Remaining Balance", value=f"{self.get_balance(user.id):,} PsyCoins")
             
@@ -567,9 +565,9 @@ class Economy(commands.Cog):
                 await ctx.send(msg)
             return
         
-        embed = discord.Embed(
+        embed = EmbedBuilder.create(
             title=f"🎒 {member.display_name}'s Inventory",
-            color=discord.Color.purple()
+            color=Colors.PRIMARY
         )
         
         for item_id, quantity in inventory.items():
@@ -838,16 +836,15 @@ class Economy(commands.Cog):
         
         await self.save_economy()
         
-        embed = discord.Embed(
-            title="✅ Currency Converted!",
-            description=f"Successfully converted PsyCoins to {conversion['name']}",
-            color=discord.Color.green()
+        embed = EmbedBuilder.success(
+            "Currency Converted!",
+            f"Successfully converted PsyCoins to {conversion['name']}"
         )
         embed.add_field(name="💸 Cost", value=f"{cost:,} PsyCoins", inline=True)
         embed.add_field(name=f"{conversion['emoji']} Received", value=f"{amount:,} {conversion['name']}", inline=True)
         embed.add_field(name="💰 Remaining", value=f"{self.economy_data[user_id]['balance']:,} PsyCoins", inline=True)
         embed.set_footer(text=f"Conversion Rate: {conversion['rate']} PsyCoins = 1 {conversion['name']}")
-        
+
         await interaction.response.send_message(embed=embed)
     
     @app_commands.command(name="currencies", description="View your currency balances")
@@ -860,9 +857,9 @@ class Economy(commands.Cog):
         
         data = self.economy_data[user_id]
         
-        embed = discord.Embed(
+        embed = EmbedBuilder.create(
             title=f"💰 {interaction.user.display_name}'s Currencies",
-            color=discord.Color.gold()
+            color=Colors.ECONOMY
         )
         
         # PsyCoins
