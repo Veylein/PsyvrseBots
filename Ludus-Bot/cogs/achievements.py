@@ -387,25 +387,7 @@ class Achievements(commands.Cog):
         self.bot = bot
         data_dir = os.getenv("RENDER_DISK_PATH", ".")
         self.manager = AchievementManager(data_dir)
-        self.economy_file = os.path.join(data_dir, "economy.json")
-    
-    def load_economy(self):
-        """Load economy data"""
-        if os.path.exists(self.economy_file):
-            try:
-                with open(self.economy_file, 'r') as f:
-                    return json.load(f)
-            except Exception:
-                return {}
-        return {}
-    
-    def save_economy(self, data):
-        """Save economy data"""
-        try:
-            with open(self.economy_file, 'w') as f:
-                json.dump(data, f, indent=4)
-        except Exception as e:
-            print(f"Error saving economy: {e}")
+        
     
     async def _send_achievement_notification(self, ctx, achievement):
         """Send achievement unlock notification"""

@@ -132,23 +132,9 @@ class Guilds(commands.Cog):
         self.bot = bot
         data_dir = os.getenv("RENDER_DISK_PATH", ".")
         self.manager = GuildManager(data_dir)
-        self.economy_file = os.path.join(data_dir, "economy.json")
+        # Economy handled by central Economy cog; fallback file reads/writes done inline when needed
     
-    def load_economy(self):
-        if os.path.exists(self.economy_file):
-            try:
-                with open(self.economy_file, 'r') as f:
-                    return json.load(f)
-            except Exception:
-                return {}
-        return {}
-    
-    def save_economy(self, data):
-        try:
-            with open(self.economy_file, 'w') as f:
-                json.dump(data, f, indent=4)
-        except Exception as e:
-            print(f"Error saving economy: {e}")
+    # Removed direct persistent economy helpers; prefer `Economy` cog.
     
     @commands.group(name="guild", aliases=["g"])
     async def guild(self, ctx):
@@ -171,15 +157,29 @@ class Guilds(commands.Cog):
     @guild.command(name="create")
     async def guild_create(self, ctx, *, name: str):
         """Create a new guild"""
-        economy = self.load_economy()
+        economy_cog = self.bot.get_cog("Economy")
         user_id = str(ctx.author.id)
-        
-        if user_id not in economy:
-            economy[user_id] = {"balance": 0}
-        
-        if economy[user_id]["balance"] < 1000:
-            await ctx.send("❌ Need 1,000 PsyCoins to create a guild!")
-            return
+
+        if economy_cog:
+            balance = economy_cog.get_balance(ctx.author.id)
+            if balance < 1000:
+                await ctx.send("❌ Need 1,000 PsyCoins to create a guild!")
+                return
+        else:
+            economy_file = os.path.join(self.manager.data_dir, "economy.json")
+            economy = {}
+            if os.path.exists(economy_file):
+                try:
+                    with open(economy_file, 'r') as f:
+                        economy = json.load(f)
+                except Exception:
+                    economy = {}
+
+            if user_id not in economy:
+                economy[user_id] = {"balance": 0}
+            if economy[user_id]["balance"] < 1000:
+                await ctx.send("❌ Need 1,000 PsyCoins to create a guild!")
+                return
         
         # Check if already in guild
         _, current_guild = self.manager.get_user_guild(ctx.author.id)
@@ -192,8 +192,19 @@ class Guilds(commands.Cog):
         success, message = self.manager.create_guild(guild_id, name, ctx.author.id)
         
         if success:
-            economy[user_id]["balance"] -= 1000
-            self.save_economy(economy)
+            # Deduct coins via Economy cog if available
+            if economy_cog:
+                try:
+                    economy_cog.remove_coins(ctx.author.id, 1000)
+                except Exception:
+                    pass
+            else:
+                economy[user_id]["balance"] -= 1000
+                try:
+                    with open(economy_file, 'w') as f:
+                        json.dump(economy, f, indent=4)
+                except Exception:
+                    pass
             
             embed = EmbedBuilder.create(
                 title=f"{Emojis.SUCCESS} Guild Created!",
@@ -242,23 +253,47 @@ class Guilds(commands.Cog):
         if amount <= 0:
             await ctx.send("❌ Amount must be positive!")
             return
-        
-        economy = self.load_economy()
+        economy_cog = self.bot.get_cog("Economy")
         user_id = str(ctx.author.id)
-        
-        if user_id not in economy:
-            economy[user_id] = {"balance": 0}
-        
-        if economy[user_id]["balance"] < amount:
-            await ctx.send(f"❌ Not enough coins! You have {economy[user_id]['balance']}.")
-            return
-        
+
+        # Verify balance and deduct through Economy cog if available
+        if economy_cog:
+            balance = economy_cog.get_balance(ctx.author.id)
+            if balance < amount:
+                await ctx.send(f"❌ Not enough coins! You have {balance}.")
+                return
+        else:
+            economy_file = os.path.join(self.manager.data_dir, "economy.json")
+            economy = {}
+            if os.path.exists(economy_file):
+                try:
+                    with open(economy_file, 'r') as f:
+                        economy = json.load(f)
+                except Exception:
+                    economy = {}
+
+            if user_id not in economy:
+                economy[user_id] = {"balance": 0}
+            if economy[user_id]["balance"] < amount:
+                await ctx.send(f"❌ Not enough coins! You have {economy[user_id]['balance']}.")
+                return
+
         success, message = self.manager.deposit_to_guild(ctx.author.id, amount)
-        
+
         if success:
-            economy[user_id]["balance"] -= amount
-            self.save_economy(economy)
-            
+            if economy_cog:
+                try:
+                    economy_cog.remove_coins(ctx.author.id, amount)
+                except Exception:
+                    pass
+            else:
+                economy[user_id]["balance"] -= amount
+                try:
+                    with open(economy_file, 'w') as f:
+                        json.dump(economy, f, indent=4)
+                except Exception:
+                    pass
+
             embed = EmbedBuilder.create(
                 title=f"{Emojis.SUCCESS} Donation Complete!",
                 description=f"Deposited **{amount} PsyCoins** to guild bank!\n"
