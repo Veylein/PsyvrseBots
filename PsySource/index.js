@@ -441,7 +441,8 @@ app.listen(Number(PORT), () => {
 })
 
 // Register slash commands and interaction handlers
-import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js'
+import { SlashCommandBuilder, PermissionFlagsBits, ContextMenuCommandBuilder, ApplicationCommandType } from 'discord.js'
+import translate from '@vitalets/google-translate-api'
 
 const DEV_GUILD_ID = process.env.DEV_GUILD_ID || null
 
@@ -465,6 +466,8 @@ client.once('ready', async () => {
     new SlashCommandBuilder().setName('uptime').setDescription('Show bot uptime'),
     new SlashCommandBuilder().setName('set-log-channel').setDescription('Set runtime log channel for deploy messages').addChannelOption(o => o.setName('channel').setDescription('Target channel').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
     new SlashCommandBuilder().setName('redeploy').setDescription('Run the configured redeploy command (owner only)'),
+    // Message context menu: Translate
+    new ContextMenuCommandBuilder().setName('Translate').setType(ApplicationCommandType.Message),
   ].map(c => c.toJSON())
 
   try {
@@ -482,6 +485,37 @@ client.once('ready', async () => {
   // Interaction handler for administrators/owners
   client.on('interactionCreate', async (interaction) => {
     try {
+      // Handle chat input commands and message context menu
+      if (interaction.isMessageContextMenuCommand && interaction.commandName === 'Translate') {
+        // Translate the selected message and show a polished embed
+        await interaction.deferReply({ ephemeral: true })
+        const target = interaction.targetMessage
+        if (!target) return interaction.editReply({ content: 'Could not access target message.' })
+        const text = String(target.content || '').trim()
+        if (!text) return interaction.editReply({ content: 'Message contains no text to translate.' })
+        try {
+          const res = await translate(text, { to: 'en' })
+          const detected = res.from?.language?.iso || 'unknown'
+          const original = text.length > 1900 ? text.slice(0, 1900) + '...(truncated)' : text
+          const translated = String(res.text).slice(0, 1900)
+          const eb = new EmbedBuilder()
+            .setTitle('Translate')
+            .setDescription(translated)
+            .addFields(
+              { name: 'Detected', value: detected, inline: true },
+              { name: 'From', value: `${target.author ? `${target.author.tag}` : 'Unknown'} (${target.id})`, inline: true },
+              { name: 'Original', value: original }
+            )
+            .setTimestamp()
+            .setColor(0x1abc9c)
+            .setFooter({ text: `Requested by ${interaction.user.tag}` })
+          return interaction.editReply({ embeds: [eb] })
+        } catch (e) {
+          console.error('Translate error:', e)
+          return interaction.editReply({ content: 'Translation failed.' })
+        }
+      }
+
       if (!interaction.isChatInputCommand()) return
       const name = interaction.commandName
       // Only owners may run restart
