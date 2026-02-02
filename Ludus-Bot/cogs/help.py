@@ -100,14 +100,13 @@ class Help(commands.Cog):
                 "key": "fishing",
                 "desc": "Enhanced fishing empire",
                 "commands": [
-                    ("/fish", "Cast your line (30s cooldown)"),
-                    ("/fishingzones", "View all fishing zones"),
-                    ("/fishzone <zone>", "Fish in specific zone"),
-                    ("/aquarium [@user]", "View fish collection"),
-                    ("/sellfish", "Sell all catches"),
-                    ("/fishingrod", "View/upgrade equipment"),
-                    ("/buyrod <name>", "Purchase rod upgrade"),
-                    ("/fishingtournament <mins>", "Start server tournament"),
+                    (f"fish", "Cast your line and go fishing!"),
+                    (f"/fish cast", "Cast your line with advanced options"),
+                    (f"/fish inventory", "View your catches and equipment"),
+                    (f"/fish shop", "Buy rods, bait, and boats"),
+                    (f"/fish areas", "Explore fishing locations"),
+                    (f"/fish encyclopedia", "View all available fish"),
+                    (f"/fish stats", "Check your fishing statistics"),
                 ]
             },
             "🚜 Farm & Sims": {
@@ -275,7 +274,7 @@ class Help(commands.Cog):
                     ("setleveling <channel>", "Enable leveling"),
                     ("/counting [channel]", "Setup counting game"),
                     ("/starboard <emoji> <channel> <amt>", "Setup starboard"),
-                    ("ludusconfig", "Configuration menu"),
+                    ("serverconfig", "Configuration menu"),
                     ("purge <amount>", "Delete messages"),
                 ]
             },

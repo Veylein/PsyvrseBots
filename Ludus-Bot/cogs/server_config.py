@@ -51,6 +51,13 @@ class ServerConfig(commands.Cog):
         """Configure Ludus bot settings for this server (Admin only)"""
         config = self.get_server_config(ctx.guild.id)
         
+        # Get fishing tournament channel if fishing cog is loaded
+        fishing_cog = self.bot.get_cog("Fishing")
+        tournament_channel = None
+        if fishing_cog:
+            guild_config = fishing_cog.get_guild_config(ctx.guild.id)
+            tournament_channel = guild_config.get("tournament_channel")
+        
         embed = EmbedBuilder.create(
             title=f"{Emojis.TOOLS} Server Configuration",
             description=f"**{ctx.guild.name}** - Bot Settings\n\n"
@@ -66,7 +73,8 @@ class ServerConfig(commands.Cog):
                 f"**Rate Limiting:** {'✅ Enabled' if config['rate_limit_enabled'] else '❌ Disabled'}\n"
                 f"**NSFW Filter:** {'✅ Enabled' if config['nsfw_filter'] else '❌ Disabled'}\n"
                 f"**Disabled Commands:** {len(config['disabled_commands'])} commands\n"
-                f"**Log Channel:** {'<#'+str(config['log_channel'])+'>' if config['log_channel'] else 'None'}"
+                f"**Log Channel:** {'<#'+str(config['log_channel'])+'>' if config['log_channel'] else 'None'}\n"
+                f"**🎣 Tournament Channel:** {'<#'+str(tournament_channel)+'>' if tournament_channel else 'Random'}"
             ),
             inline=False
         )
@@ -79,6 +87,7 @@ class ServerConfig(commands.Cog):
                   "`L!disablecmd <command>` - Disable a command\n"
                   "`L!enablecmd <command>` - Enable a command\n"
                   "`L!setlogchannel <channel>` - Set log channel\n"
+                  "`L!fishtournament_channel <channel>` - Set fishing tournament channel\n"
                   "`L!listdisabled` - View disabled commands",
             inline=False
         )
@@ -95,6 +104,46 @@ class ServerConfig(commands.Cog):
         
         embed.set_footer(text="All settings are server-specific")
         await ctx.send(embed=embed)
+    
+    @commands.command(name="fishtournament_channel")
+    @commands.has_permissions(administrator=True)
+    async def set_fishing_tournament_channel(self, ctx, channel: discord.TextChannel = None):
+        """Set the channel for automatic fishing tournament announcements (Admin only)
+        
+        Usage:
+        L!fishtournament_channel #channel - Set tournament channel
+        L!fishtournament_channel - Clear tournament channel (use random channels)
+        """
+        fishing_cog = self.bot.get_cog("Fishing")
+        if not fishing_cog:
+            await ctx.send("❌ Fishing system is not available!")
+            return
+        
+        guild_config = fishing_cog.get_guild_config(ctx.guild.id)
+        
+        if channel is None:
+            guild_config["tournament_channel"] = None
+            fishing_cog.save_fishing_data()
+            await ctx.send("✅ Tournament channel cleared! Random tournaments will now appear in suitable channels (fishing, games, bot, or general).")
+        else:
+            guild_config["tournament_channel"] = channel.id
+            fishing_cog.save_fishing_data()
+            
+            embed = EmbedBuilder.create(
+                title=f"{Emojis.SUCCESS} Tournament Channel Set!",
+                description=f"**Channel:** {channel.mention}\n\n"
+                           f"🎣 Automatic fishing tournaments will now appear here!\n\n"
+                           f"**Tournament Details:**\n"
+                           f"• Spawns randomly every 2-4 hours\n"
+                           f"• 30% chance per check\n"
+                           f"• Lasts 5-15 minutes\n"
+                           f"• Modes: Biggest, Most, or Rarest fish\n"
+                           f"• Prizes: 1000/500/250 coins for top 3\n\n"
+                           f"Use `L!fishtournament_channel` (no channel) to reset.",
+                color=Colors.SUCCESS
+            )
+            embed.set_footer(text="Tournaments are rare - don't miss them!")
+            await ctx.send(embed=embed)
     
     @commands.command(name="toggle")
     @commands.has_permissions(administrator=True)

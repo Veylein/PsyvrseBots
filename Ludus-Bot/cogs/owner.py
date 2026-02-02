@@ -54,6 +54,53 @@ class Owner(commands.Cog):
         print(f"[OWNER COG] ownertest called by {ctx.author.id}")
         await ctx.send(f"✅ Owner commands are working!\n**Your ID:** {ctx.author.id}\n**Owner IDs:** {self.owner_ids}")
     
+    @commands.command(name="fishing_tournament")
+    async def fishing_tournament_owner(self, ctx, mode: str = "biggest", duration: int = 5):
+        """Owner-only: Start a fishing tournament
+        
+        Usage: L!fishing_tournament <mode> <duration>
+        Modes: biggest, most, rarest
+        Duration: 1-30 minutes
+        """
+        fishing_cog = self.bot.get_cog("Fishing")
+        if not fishing_cog:
+            return await ctx.send("❌ Fishing cog not loaded!")
+        
+        mode = mode.lower()
+        if mode not in ["biggest", "most", "rarest"]:
+            return await ctx.send("❌ Invalid mode! Use: biggest, most, or rarest")
+        
+        if duration < 1 or duration > 30:
+            return await ctx.send("❌ Duration must be between 1-30 minutes!")
+        
+        # Check if tournament already running
+        guild_id = str(ctx.guild.id)
+        if guild_id in getattr(fishing_cog, 'active_tournaments', {}):
+            return await ctx.send("❌ A tournament is already running in this server!")
+        
+        # Get configured tournament channel
+        guild_config = fishing_cog.get_guild_config(ctx.guild.id)
+        tournament_channel_id = guild_config.get("tournament_channel")
+        
+        if not tournament_channel_id:
+            return await ctx.send("❌ No tournament channel configured! Admin must set it first using `L!fishtournament_channel #channel`")
+        
+        tournament_channel = self.bot.get_channel(tournament_channel_id)
+        if not tournament_channel:
+            return await ctx.send("❌ Tournament channel not found! Ask admin to reconfigure it.")
+        
+        # Start tournament via fishing cog
+        await fishing_cog.start_random_tournament(ctx.guild.id, tournament_channel_id, mode=mode, duration=duration)
+        
+        mode_names = {
+            "biggest": "🏆 Biggest Fish",
+            "most": "📊 Most Fish",
+            "rarest": "✨ Rarest Fish"
+        }
+        await ctx.send(f"✅ Tournament started in {tournament_channel.mention}!\n"
+                      f"**Mode:** {mode_names.get(mode, mode)}\n"
+                      f"**Duration:** {duration} minutes")
+    
     @commands.command(name="serverlist")
     async def serverlist(self, ctx):
         """Owner-only: List Discord servers the bot is in"""
@@ -1007,6 +1054,17 @@ class Owner(commands.Cog):
                   "L!hack @user - Fake hack (fun)\n"
                   "L!roastme - Ultimate roast\n"
                   "L!vibe [@user] - Vibe check\n"
+                  "```",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🎣 Fishing Management",
+            value="```\n"
+                  "L!fishing_tournament <mode> <mins> - Start tournament\n"
+                  "  Modes: biggest, most, rarest\n"
+                  "  Duration: 1-30 minutes\n"
+                  "Note: Random tournaments spawn automatically every 2-4h\n"
                   "```",
             inline=False
         )
