@@ -100,6 +100,185 @@ class Owner(commands.Cog):
         await ctx.send(f"✅ Tournament started in {tournament_channel.mention}!\n"
                       f"**Mode:** {mode_names.get(mode, mode)}\n"
                       f"**Duration:** {duration} minutes")
+
+    @commands.command(name="give_fish")
+    async def give_fish(self, ctx, member: discord.Member, fish_id: str, quantity: int = 1):
+        """Owner-only: Give a fish to someone
+        
+        Usage: L!give_fish @user <fish_id> [quantity]
+        Example: L!give_fish @user salmon 5
+        """
+        if ctx.author.id not in self.owner_ids:
+            await ctx.send("❌ You must be a bot owner to use this command!")
+            print(f"[OWNER COG] UNAUTHORIZED give_fish attempt by {ctx.author.id}")
+            return
+        
+        fishing_cog = self.bot.get_cog("Fishing")
+        if not fishing_cog:
+            return await ctx.send("❌ Fishing cog not loaded!")
+        
+        # Check if fish exists
+        if fish_id not in fishing_cog.fish_types:
+            available_fish = list(fishing_cog.fish_types.keys())[:20]  # Show first 20
+            return await ctx.send(f"❌ Invalid fish ID! Examples: {', '.join(available_fish[:10])}...\nUse `/fish encyclopedia` to see all fish!")
+        
+        # Get user data
+        user_data = fishing_cog.get_user_data(member.id)
+        
+        # Add fish to user's catches
+        if fish_id not in user_data["fish_caught"]:
+            user_data["fish_caught"][fish_id] = 0
+        user_data["fish_caught"][fish_id] += quantity
+        user_data["total_catches"] += quantity
+        
+        # Update total value
+        fish_info = fishing_cog.fish_types[fish_id]
+        user_data["total_value"] += fish_info["value"] * quantity
+        
+        fishing_cog.save_fishing_data()
+        
+        fish_name = fish_info["name"]
+        await ctx.send(f"🎣 Gave **{quantity}x {fish_name}** to {member.mention}!")
+
+    @commands.command(name="give_bait")
+    async def give_bait(self, ctx, member: discord.Member, bait_id: str, quantity: int = 1):
+        """Owner-only: Give fishing bait to someone
+        
+        Usage: L!give_bait @user <bait_id> [quantity]
+        Bait types: worm, cricket, minnow, shrimp, squid, special
+        Example: L!give_bait @user special 10
+        """
+        if ctx.author.id not in self.owner_ids:
+            await ctx.send("❌ You must be a bot owner to use this command!")
+            print(f"[OWNER COG] UNAUTHORIZED give_bait attempt by {ctx.author.id}")
+            return
+        
+        fishing_cog = self.bot.get_cog("Fishing")
+        if not fishing_cog:
+            return await ctx.send("❌ Fishing cog not loaded!")
+        
+        # Check if bait exists
+        if bait_id not in fishing_cog.baits:
+            available_baits = ', '.join(fishing_cog.baits.keys())
+            return await ctx.send(f"❌ Invalid bait ID! Available: {available_baits}")
+        
+        # Get user data
+        user_data = fishing_cog.get_user_data(member.id)
+        
+        # Add bait to inventory
+        if bait_id not in user_data["bait_inventory"]:
+            user_data["bait_inventory"][bait_id] = 0
+        user_data["bait_inventory"][bait_id] += quantity
+        
+        fishing_cog.save_fishing_data()
+        
+        bait_name = fishing_cog.baits[bait_id]["name"]
+        await ctx.send(f"🪱 Gave **{quantity}x {bait_name}** to {member.mention}!")
+
+    @commands.command(name="give_rod")
+    async def give_rod(self, ctx, member: discord.Member, rod_id: str):
+        """Owner-only: Give a fishing rod to someone
+        
+        Usage: L!give_rod @user <rod_id>
+        Rod types: basic_rod, carbon_rod, pro_rod, master_rod, legendary_rod
+        Example: L!give_rod @user legendary_rod
+        """
+        if ctx.author.id not in self.owner_ids:
+            await ctx.send("❌ You must be a bot owner to use this command!")
+            print(f"[OWNER COG] UNAUTHORIZED give_rod attempt by {ctx.author.id}")
+            return
+        
+        fishing_cog = self.bot.get_cog("Fishing")
+        if not fishing_cog:
+            return await ctx.send("❌ Fishing cog not loaded!")
+        
+        # Check if rod exists
+        if rod_id not in fishing_cog.rods:
+            available_rods = ', '.join(fishing_cog.rods.keys())
+            return await ctx.send(f"❌ Invalid rod ID! Available: {available_rods}")
+        
+        # Get user data
+        user_data = fishing_cog.get_user_data(member.id)
+        
+        # Set user's rod
+        user_data["rod"] = rod_id
+        
+        fishing_cog.save_fishing_data()
+        
+        rod_name = fishing_cog.rods[rod_id]["name"]
+        await ctx.send(f"🎣 Gave {rod_name} to {member.mention}!")
+
+    @commands.command(name="give_boat")
+    async def give_boat(self, ctx, member: discord.Member, boat_id: str):
+        """Owner-only: Give a fishing boat to someone
+        
+        Usage: L!give_boat @user <boat_id>
+        Boat types: none, kayak, motorboat, yacht, submarine
+        Example: L!give_boat @user submarine
+        """
+        if ctx.author.id not in self.owner_ids:
+            await ctx.send("❌ You must be a bot owner to use this command!")
+            print(f"[OWNER COG] UNAUTHORIZED give_boat attempt by {ctx.author.id}")
+            return
+        
+        fishing_cog = self.bot.get_cog("Fishing")
+        if not fishing_cog:
+            return await ctx.send("❌ Fishing cog not loaded!")
+        
+        # Check if boat exists
+        if boat_id not in fishing_cog.boats:
+            available_boats = ', '.join(fishing_cog.boats.keys())
+            return await ctx.send(f"❌ Invalid boat ID! Available: {available_boats}")
+        
+        # Get user data
+        user_data = fishing_cog.get_user_data(member.id)
+        
+        # Set user's boat
+        user_data["boat"] = boat_id
+        
+        fishing_cog.save_fishing_data()
+        
+        if boat_id == "none":
+            await ctx.send(f"🚫 Removed boat from {member.mention}")
+        else:
+            boat_name = fishing_cog.boats[boat_id]["name"]
+            await ctx.send(f"⛵ Gave {boat_name} to {member.mention}!")
+
+    @commands.command(name="unlock_area")
+    async def unlock_fishing_area(self, ctx, member: discord.Member, area_id: str):
+        """Owner-only: Unlock a fishing area for someone
+        
+        Usage: L!unlock_area @user <area_id>
+        Areas: pond, river, lake, ocean, reef, abyss, trench
+        Example: L!unlock_area @user trench
+        """
+        if ctx.author.id not in self.owner_ids:
+            await ctx.send("❌ You must be a bot owner to use this command!")
+            print(f"[OWNER COG] UNAUTHORIZED unlock_area attempt by {ctx.author.id}")
+            return
+        
+        fishing_cog = self.bot.get_cog("Fishing")
+        if not fishing_cog:
+            return await ctx.send("❌ Fishing cog not loaded!")
+        
+        # Check if area exists
+        if area_id not in fishing_cog.areas:
+            available_areas = ', '.join(fishing_cog.areas.keys())
+            return await ctx.send(f"❌ Invalid area ID! Available: {available_areas}")
+        
+        # Get user data
+        user_data = fishing_cog.get_user_data(member.id)
+        
+        # Unlock area
+        if area_id not in user_data["unlocked_areas"]:
+            user_data["unlocked_areas"].append(area_id)
+            fishing_cog.save_fishing_data()
+            
+            area_name = fishing_cog.areas[area_id]["name"]
+            await ctx.send(f"🗺️ Unlocked {area_name} for {member.mention}!")
+        else:
+            area_name = fishing_cog.areas[area_id]["name"]
+            await ctx.send(f"ℹ️ {member.mention} already has {area_name} unlocked!")
     
     @commands.command(name="serverlist")
     async def serverlist(self, ctx):
@@ -1064,6 +1243,11 @@ class Owner(commands.Cog):
                   "L!fishing_tournament <mode> <mins> - Start tournament\n"
                   "  Modes: biggest, most, rarest\n"
                   "  Duration: 1-30 minutes\n"
+                  "L!give_fish @user <fish_id> [qty] - Give fish\n"
+                  "L!give_bait @user <bait_id> [qty] - Give bait\n"
+                  "L!give_rod @user <rod_id> - Give fishing rod\n"
+                  "L!give_boat @user <boat_id> - Give boat\n"
+                  "L!unlock_area @user <area_id> - Unlock area\n"
                   "Note: Random tournaments spawn automatically every 2-4h\n"
                   "```",
             inline=False
