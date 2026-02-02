@@ -6,6 +6,7 @@ import os
 import random
 from datetime import datetime, timedelta
 from typing import Optional
+from utils.embed_styles import EmbedBuilder, Colors, Emojis
 
 class PassiveBusinesses(commands.Cog):
     """Buy and manage businesses for passive income"""
@@ -110,10 +111,10 @@ class PassiveBusinesses(commands.Cog):
     @commands.group(name="mybusiness", aliases=['mybiz', 'passivebiz'], invoke_without_command=True)
     async def business(self, ctx):
         """View available passive income businesses"""
-        embed = discord.Embed(
+        embed = EmbedBuilder.create(
             title="🏢 Business Empire (Passive Income)",
             description="Buy businesses to generate passive income!",
-            color=discord.Color.blue()
+            color=Colors.PRIMARY
         )
         
         for biz_id, biz in self.business_types.items():
@@ -192,13 +193,14 @@ class PassiveBusinesses(commands.Cog):
             description=f"You bought **{biz['name']}**!",
             color=discord.Color.green()
         )
-        
+        embed = EmbedBuilder.success(
+            "Business Purchased!",
+            f"You bought **{biz['name']}**!"
+        )
         embed.add_field(name="Cost", value=f"{cost:,} coins", inline=True)
         embed.add_field(name="Income", value=f"{income} coins/hour", inline=True)
         embed.add_field(name="Business ID", value=business_id, inline=True)
-        
         embed.set_footer(text="Collect income with: L!business collect")
-        
         await ctx.send(embed=embed)
     
     @business.command(name="list", aliases=['my', 'owned'])
@@ -211,9 +213,9 @@ class PassiveBusinesses(commands.Cog):
             await ctx.send(f"🏢 {target.mention} doesn't own any businesses yet!")
             return
         
-        embed = discord.Embed(
+        embed = EmbedBuilder.create(
             title=f"🏢 {target.display_name}'s Businesses",
-            color=discord.Color.blue()
+            color=Colors.PRIMARY
         )
         
         total_hourly_income = 0
@@ -306,17 +308,14 @@ class PassiveBusinesses(commands.Cog):
             await ctx.send("💼 No income to collect yet! Check back later.")
             return
         
-        embed = discord.Embed(
-            title="💰 Income Collected!",
-            description=f"**Total: {total_collected:,} PsyCoins**",
-            color=discord.Color.gold()
+        embed = EmbedBuilder.economy(
+            "Income Collected!",
+            f"**Total: {total_collected:,} PsyCoins**"
         )
-        
         for biz_id, amount in businesses_updated:
             biz_type = user_businesses["businesses"][biz_id]["type"]
             biz_name = self.business_types[biz_type]["name"]
             embed.add_field(name=biz_name, value=f"{amount:,} coins", inline=True)
-        
         await ctx.send(embed=embed)
     
     @business.command(name="upgrade")
@@ -356,22 +355,18 @@ class PassiveBusinesses(commands.Cog):
         new_income = self.calculate_income(biz_type, new_level)
         old_income = self.calculate_income(biz_type, current_level)
         
-        embed = discord.Embed(
-            title="⬆️ Business Upgraded!",
-            description=f"**{biz_info['name']}** upgraded to Level {new_level}!",
-            color=discord.Color.green()
+        embed = EmbedBuilder.success(
+            "Business Upgraded!",
+            f"**{biz_info['name']}** upgraded to Level {new_level}!"
         )
-        
         embed.add_field(name="Cost", value=f"{upgrade_cost:,} coins", inline=True)
         embed.add_field(name="Old Income", value=f"{old_income}/hour", inline=True)
         embed.add_field(name="New Income", value=f"{new_income}/hour", inline=True)
-        
         if new_level < biz_info["max_level"]:
             next_cost = self.calculate_upgrade_cost(biz_type, new_level)
             embed.set_footer(text=f"Next upgrade: {next_cost:,} coins")
         else:
             embed.set_footer(text="MAX LEVEL!")
-        
         await ctx.send(embed=embed)
     
     @business.command(name="protect")
