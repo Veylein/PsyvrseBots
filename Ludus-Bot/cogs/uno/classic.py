@@ -2151,12 +2151,36 @@ class UnoCog(commands.Cog):
             uid_str = str(interaction.user.id)
 
             # Prevent creating while in other game/lobby
-            for g in self.bot.active_games.values():
+            for gid, g in self.bot.active_games.items():
                 if uid_str in g.get('players', []):
-                    return await interaction.response.send_message("You cannot create a lobby while in another active game.", ephemeral=True)
+                    # Create view with Leave Game button
+                    leave_view = discord.ui.View(timeout=60)
+                    leave_button = discord.ui.Button(
+                        label="🚪 Leave Game",
+                        style=discord.ButtonStyle.danger,
+                        custom_id=f"uno_leave_{gid}"
+                    )
+                    leave_view.add_item(leave_button)
+                    return await interaction.response.send_message(
+                        "You cannot create a lobby while in another active game.\n\n⚠️ Click the button below to leave your current game.",
+                        view=leave_view,
+                        ephemeral=True
+                    )
             for lid, l in self.bot.active_lobbies.items():
                 if uid_str in l.get('players', []) or l.get('hostId') == uid_str:
-                    return await interaction.response.send_message("You cannot create a new lobby while already in a lobby.", ephemeral=True)
+                    # Create view with Leave Lobby button
+                    leave_view = discord.ui.View(timeout=60)
+                    leave_button = discord.ui.Button(
+                        label="🚪 Leave Lobby",
+                        style=discord.ButtonStyle.danger,
+                        custom_id=f"uno_lobby_leave_{lid}"
+                    )
+                    leave_view.add_item(leave_button)
+                    return await interaction.response.send_message(
+                        "You cannot create a new lobby while already in a lobby.\n\n⚠️ Click the button below to leave your current lobby.",
+                        view=leave_view,
+                        ephemeral=True
+                    )
 
             if lobby_id in self.bot.active_lobbies:
                 return await interaction.response.send_message("You already have an active UNO lobby in this channel.", ephemeral=True)
@@ -4284,7 +4308,6 @@ class UnoCog(commands.Cog):
                 return await send_response(self.t('messages.game_inactive', lang='en'), ephemeral=True)
             
             lang = game.get('language', 'en')
-            current_player = game['players'][game['current_turn']]
             
             if cid.startswith('uno_leave_'):
                 if uid not in game['players']:
@@ -4351,6 +4374,9 @@ class UnoCog(commands.Cog):
                 else:
                     await self.auto_refresh_player_hand(game_id, game, current_player, interaction.channel)
                 return
+            
+            # For all other actions (uno_call_, uno_draw_, uno_play_), get current player
+            current_player = game['players'][game['current_turn']]
             
             if cid.startswith('uno_call_'):
                 # UNO call - mark player as called UNO

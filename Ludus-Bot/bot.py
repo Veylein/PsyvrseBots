@@ -370,6 +370,24 @@ async def on_message(message):
     if message.author.bot:
         return
     
+    # Check for active chess games and process moves
+    chess_cog = bot.get_cog('ChessCog')
+    if chess_cog:
+        # Check if there's an active chess game in this channel
+        for game_id, game in list(bot.active_games.items()):
+            if game_id.startswith('chess_') and game.get('messageId'):
+                # Check if message is in the same channel as the game
+                try:
+                    game_message = await message.channel.fetch_message(game['messageId'])
+                    if game_message.channel.id == message.channel.id:
+                        # Check if the message author is a player in this game
+                        if str(message.author.id) in game['players']:
+                            # Try to process as a chess move
+                            await chess_cog.process_chess_move(message, game_id, game)
+                            return  # Don't process as command if it's a valid move attempt
+                except:
+                    pass
+    
     # Check blacklist before processing commands
     if message.content.startswith(config["prefix"]):
         if is_blacklisted(user_id=message.author.id, guild_id=message.guild.id if message.guild else None):
@@ -401,6 +419,20 @@ async def on_interaction(interaction: discord.Interaction):
             boardgames_cog = bot.get_cog('BoardGames')
             if boardgames_cog:
                 await boardgames_cog.handle_ttt_interaction(interaction, custom_id)
+                return
+        
+        # Chess interactions
+        if custom_id.startswith('chess_'):
+            chess_cog = bot.get_cog('ChessCog')
+            if chess_cog:
+                await chess_cog.handle_chess_interaction(interaction, custom_id)
+                return
+        
+        # Checkers interactions
+        if custom_id.startswith('checkers_'):
+            chess_cog = bot.get_cog('ChessCog')
+            if chess_cog:
+                await chess_cog.handle_checkers_interaction(interaction, custom_id)
                 return
         
         # Add other game handlers here as needed
