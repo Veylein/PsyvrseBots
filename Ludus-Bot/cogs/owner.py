@@ -125,10 +125,15 @@ class Owner(commands.Cog):
         # Get user data
         user_data = fishing_cog.get_user_data(member.id)
         
-        # Add fish to user's catches
+        # Add fish to user's catches (new dict format)
         if fish_id not in user_data["fish_caught"]:
-            user_data["fish_caught"][fish_id] = 0
-        user_data["fish_caught"][fish_id] += quantity
+            user_data["fish_caught"][fish_id] = {"count": 0, "biggest": 0}
+        
+        # Ensure dict format (fix old data)
+        if not isinstance(user_data["fish_caught"][fish_id], dict):
+            user_data["fish_caught"][fish_id] = {"count": int(user_data["fish_caught"][fish_id]), "biggest": 0}
+        
+        user_data["fish_caught"][fish_id]["count"] += quantity
         user_data["total_catches"] += quantity
         
         # Update total value
@@ -145,8 +150,8 @@ class Owner(commands.Cog):
         """Owner-only: Give fishing bait to someone
         
         Usage: L!give_bait @user <bait_id> [quantity]
-        Bait types: worm, cricket, minnow, shrimp, squid, special
-        Example: L!give_bait @user special 10
+        Bait types: worm, cricket, minnow, shrimp, squid, special, kraken_bait
+        Example: L!give_bait @user kraken_bait 1
         """
         if ctx.author.id not in self.owner_ids:
             await ctx.send("❌ You must be a bot owner to use this command!")
@@ -173,7 +178,13 @@ class Owner(commands.Cog):
         fishing_cog.save_fishing_data()
         
         bait_name = fishing_cog.baits[bait_id]["name"]
-        await ctx.send(f"🪱 Gave **{quantity}x {bait_name}** to {member.mention}!")
+        
+        # Special message for kraken bait
+        if bait_id == "kraken_bait":
+            await ctx.send(f"🦑 Gave **{quantity}x {bait_name}** to {member.mention}!\n"
+                          f"⚠️ **Warning:** This summons the Kraken in Mariana Trench!")
+        else:
+            await ctx.send(f"🪱 Gave **{quantity}x {bait_name}** to {member.mention}!")
 
     @commands.command(name="give_rod")
     async def give_rod(self, ctx, member: discord.Member, rod_id: str):
@@ -1245,10 +1256,12 @@ class Owner(commands.Cog):
                   "  Duration: 1-30 minutes\n"
                   "L!give_fish @user <fish_id> [qty] - Give fish\n"
                   "L!give_bait @user <bait_id> [qty] - Give bait\n"
+                  "  Special: kraken_bait (summons Kraken boss!)\n"
                   "L!give_rod @user <rod_id> - Give fishing rod\n"
                   "L!give_boat @user <boat_id> - Give boat\n"
                   "L!unlock_area @user <area_id> - Unlock area\n"
                   "Note: Random tournaments spawn automatically every 2-4h\n"
+                  "Use /fish craft to craft kraken_bait from 8 tentacles\n"
                   "```",
             inline=False
         )
