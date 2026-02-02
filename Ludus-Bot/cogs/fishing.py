@@ -1207,17 +1207,36 @@ class AreaSelectView(discord.ui.View):
             unlocked = area_id in user_data["unlocked_areas"]
             current = area_id == user_data["current_area"]
             
+            # Sprawdź wymagania łódki
+            required_boat = area.get("required_boat", "none")
+            current_boat = user_data.get("boat", "none")
+            current_boat_data = fishing_cog.boats.get(current_boat, {})
+            allowed_areas = current_boat_data.get("areas", [])
+            has_boat = area_id in allowed_areas
+            
+            # Label with icons
             if current:
                 label = f"📍 {area['name']} (Current)"
-            elif unlocked:
+            elif unlocked and has_boat:
                 label = f"✅ {area['name']}"
+            elif not has_boat:
+                req_boat = fishing_cog.boats.get(required_boat, {})
+                label = f"🔒 {area['name']} - 🛶 {req_boat.get('name', 'Boat')}"
             else:
-                label = f"🔒 {area['name']} - {area['unlock_cost']} coins"
+                label = f"🔒 {area['name']} - {area['unlock_cost']:,}💰"
+            
+            # Description with requirements
+            desc_parts = [area['description'][:60]]
+            if not has_boat:
+                req_boat = fishing_cog.boats.get(required_boat, {})
+                desc_parts.append(f"Requires: {req_boat.get('name', 'Boat')}")
+            elif not unlocked:
+                desc_parts.append(f"Cost: {area['unlock_cost']:,} PsyCoins")
             
             options.append(discord.SelectOption(
                 label=label[:100],
                 value=area_id,
-                description=area['description'][:100]
+                description=" | ".join(desc_parts)[:100]
             ))
         
         self.area_select_menu = discord.ui.Select(
@@ -1239,7 +1258,40 @@ class AreaSelectView(discord.ui.View):
                 await interaction.followup.send("📍 You are already at this location!", ephemeral=True)
                 return
             
-            # Check if unlocked
+            # FIRST check boat requirements
+            required_boat = area.get("required_boat", "none")
+            current_boat = self.user_data.get("boat", "none")
+            required_boat_data = self.fishing_cog.boats.get(required_boat, {})
+            current_boat_data = self.fishing_cog.boats.get(current_boat, {})
+            
+            # Check if current_boat can reach this area
+            allowed_areas = current_boat_data.get("areas", [])
+            if area_id not in allowed_areas:
+                # Missing required boat!
+                embed = discord.Embed(
+                    title=f"🔒 {area['name']} - Access Denied",
+                    description=f"This area requires a better boat!",
+                    color=discord.Color.red()
+                )
+                embed.add_field(
+                    name="🛶 Your Boat",
+                    value=f"**{current_boat_data.get('name', 'None')}**",
+                    inline=True
+                )
+                embed.add_field(
+                    name="🛶 Required Boat",
+                    value=f"**{required_boat_data.get('name', 'Unknown')}**\n💰 {required_boat_data.get('cost', 0):,} PsyCoins",
+                    inline=True
+                )
+                embed.add_field(
+                    name="💡 What to do?",
+                    value=f"Buy **{required_boat_data.get('name', 'Unknown')}** at:\n`/fish shop` → **Boats** tab",
+                    inline=False
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                return
+            
+            # POTEM sprawdź czy obszar jest odblokowany
             success_message = None
             if area_id not in self.user_data["unlocked_areas"]:
                 # Try to unlock
@@ -1248,16 +1300,43 @@ class AreaSelectView(discord.ui.View):
                     return
                 
                 cost = area["unlock_cost"]
-                if economy_cog.remove_coins(interaction.user.id, cost):
+                balance = economy_cog.get_balance(interaction.user.id)
+                
+                if balance >= cost:
+                    economy_cog.remove_coins(interaction.user.id, cost)
                     self.user_data["unlocked_areas"].append(area_id)
                     self.user_data["current_area"] = area_id
                     self.fishing_cog.save_fishing_data()
-                    success_message = f"🎉 Unlocked and traveled to **{area['name']}** for {cost} PsyCoins!"
+                    success_message = f"🎉 Unlocked and traveled to **{area['name']}** for {cost:,} PsyCoins!"
                 else:
-                    await interaction.followup.send(
-                        f"❌ You need {cost} PsyCoins to unlock **{area['name']}**.",
-                        ephemeral=True
+                    # Not enough money!
+                    needed = cost - balance
+                    embed = discord.Embed(
+                        title=f"💰 Not Enough PsyCoins!",
+                        description=f"You can't afford to unlock **{area['name']}**",
+                        color=discord.Color.orange()
                     )
+                    embed.add_field(
+                        name="💳 Your Balance",
+                        value=f"**{balance:,}** PsyCoins",
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="💰 Area Cost",
+                        value=f"**{cost:,}** PsyCoins",
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="📉 Need",
+                        value=f"**{needed:,}** PsyCoins",
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="💡 How to earn?",
+                        value="🎣 Catch and sell fish!\n💰 Use `/fish cast` to fish",
+                        inline=False
+                    )
+                    await interaction.followup.send(embed=embed, ephemeral=True)
                     return
             else:
                 # Just travel
@@ -1293,18 +1372,41 @@ class AreaSelectView(discord.ui.View):
                 # Add all areas as fields
                 for area_id_iter, area_iter in self.fishing_cog.areas.items():
                     unlocked = area_id_iter in self.user_data["unlocked_areas"]
-                    current = area_id_iter == self.user_data["current_area"]
+                    current_loc = area_id_iter == self.user_data["current_area"]
                     
-                    if current:
-                        status = "📍 Current Location"
-                    elif unlocked:
-                        status = "✅ Unlocked"
+                    # Check boat requirements
+                    required_boat = area_iter.get("required_boat", "none")
+                    current_boat = self.user_data.get("boat", "none")
+                    current_boat_data = self.fishing_cog.boats.get(current_boat, {})
+                    allowed_areas = current_boat_data.get("areas", [])
+                    has_boat = area_id_iter in allowed_areas
+                    
+                    # Status icons
+                    if current_loc:
+                        status_icon = "📍"
+                        status_text = "**[CURRENT]**"
+                    elif unlocked and has_boat:
+                        status_icon = "✅"
+                        status_text = "Available"
                     else:
-                        status = f"🔒 Locked - {area_iter['unlock_cost']} PsyCoins"
+                        status_icon = "🔒"
+                        status_text = "Locked"
+                    
+                    # Requirements
+                    requirements = []
+                    
+                    if not has_boat:
+                        req_boat_data = self.fishing_cog.boats.get(required_boat, {})
+                        requirements.append(f"🛶 Requires: **{req_boat_data.get('name', 'Unknown')}** ({req_boat_data.get('cost', 0):,} 💰)")
+                    
+                    if not unlocked and area_iter.get("unlock_cost", 0) > 0:
+                        requirements.append(f"💰 Unlock cost: **{area_iter['unlock_cost']:,} PsyCoins**")
+                    
+                    req_text = "\n".join(requirements) if requirements else "✅ Ready to explore!"
                     
                     new_embed.add_field(
-                        name=f"{area_iter['name']}",
-                        value=f"{area_iter['description']}\n**Status:** {status}",
+                        name=f"{status_icon} {area_iter['name']}",
+                        value=f"{area_iter['description']}\n{req_text}\n_{status_text}_",
                         inline=False
                     )
                 
@@ -2790,33 +2892,58 @@ class Fishing(commands.Cog):
         try:
             user_data = self.get_user_data(interaction.user.id)
             current_area = self.areas[user_data['current_area']]
+            current_boat_data = self.boats[user_data.get("boat", "none")]
             economy_cog = self.bot.get_cog("Economy")
             balance = economy_cog.get_balance(interaction.user.id) if economy_cog else 0
             
             embed = discord.Embed(
                 title="🗺️ Fishing Areas",
-                description=f"**Your Balance:** {balance} PsyCoins\n"
-                            f"**Current Location:** 📍 {current_area['name']}\n"
-                            f"**Unlocked Areas:** {len(user_data['unlocked_areas'])}/{len(self.areas)}\n\n"
-                            "**Select an area from the dropdown below to travel or unlock!**",
+                description=f"💰 **Balance:** {balance:,} PsyCoins\n"
+                            f"📍 **Current Location:** {current_area['name']}\n"
+                            f"🛶 **Your Boat:** {current_boat_data['name']}\n"
+                            f"✅ **Unlocked:** {len(user_data['unlocked_areas'])}/{len(self.areas)}\n\n"
+                            "*Select an area from the menu below to travel or unlock!*",
                 color=discord.Color.green()
             )
             
             # Add all areas as fields
             for area_id, area in self.areas.items():
                 unlocked = area_id in user_data["unlocked_areas"]
-                current = area_id == user_data["current_area"]
+                current_loc = area_id == user_data["current_area"]
                 
-                if current:
-                    status = "📍 Current Location"
-                elif unlocked:
-                    status = "✅ Unlocked"
+                # Check boat requirements
+                required_boat = area.get("required_boat", "none")
+                current_boat = user_data.get("boat", "none")
+                current_boat_data = self.boats.get(current_boat, {})
+                allowed_areas = current_boat_data.get("areas", [])
+                has_boat = area_id in allowed_areas
+                
+                # Status icons
+                if current_loc:
+                    status_icon = "📍"
+                    status_text = "**[CURRENT]**"
+                elif unlocked and has_boat:
+                    status_icon = "✅"
+                    status_text = "Available"
                 else:
-                    status = f"🔒 Locked - {area['unlock_cost']} PsyCoins"
+                    status_icon = "🔒"
+                    status_text = "Locked"
+                
+                # Requirements
+                requirements = []
+                
+                if not has_boat:
+                    req_boat_data = self.boats.get(required_boat, {})
+                    requirements.append(f"🛶 Requires: **{req_boat_data.get('name', 'Unknown')}** ({req_boat_data.get('cost', 0):,} 💰)")
+                
+                if not unlocked and area.get("unlock_cost", 0) > 0:
+                    requirements.append(f"💰 Unlock cost: **{area['unlock_cost']:,} PsyCoins**")
+                
+                req_text = "\n".join(requirements) if requirements else "✅ Ready to explore!"
                 
                 embed.add_field(
-                    name=f"{area['name']}",
-                    value=f"{area['description']}\n**Status:** {status}",
+                    name=f"{status_icon} {area['name']}",
+                    value=f"{area['description']}\n{req_text}\n_{status_text}_",
                     inline=False
                 )
             
