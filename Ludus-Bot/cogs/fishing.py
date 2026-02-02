@@ -1234,7 +1234,6 @@ class FishingHelpView(discord.ui.View):
 
 class Fishing(commands.Cog):
     """Ultimate Fishing Simulator - Boats, Bait, Rods, Areas, Weather, and More!"""
-
     @app_commands.command(name="fishhelp", description="View all fishing commands and info (paginated)")
     async def fishhelp_slash(self, interaction: discord.Interaction):
         view = FishingHelpView(self)
@@ -1603,14 +1602,12 @@ class Fishing(commands.Cog):
     @app_commands.command(name="fish", description="🎣 Advanced Fishing Simulator")
     @app_commands.describe(
         action="What would you like to do?",
-        bait="Bait type for casting (worm, cricket, minnow, squid, golden_lure)",
     )
     @app_commands.choices(action=[
         app_commands.Choice(name="🏠 Main Menu", value="menu"),
         app_commands.Choice(name="🎣 Cast Line", value="cast"),
         app_commands.Choice(name="🎒 Inventory", value="inventory"),
         app_commands.Choice(name="🏪 Shop", value="shop"),
-        app_commands.Choice(name="🛒 Buy Item", value="buy"),
         app_commands.Choice(name="🗺️ Areas", value="areas"),
         app_commands.Choice(name="📖 Encyclopedia", value="encyclopedia"),
         app_commands.Choice(name="📊 Stats", value="stats"),
@@ -1641,8 +1638,6 @@ class Fishing(commands.Cog):
             await self.fish_inventory_action(interaction)
         elif action == "shop":
             await self.fish_shop_action(interaction)
-        elif action == "buy":
-            await self.fish_buy_action(interaction, item)
         elif action == "areas":
             await self.fish_areas_action(interaction)
         elif action == "encyclopedia":
@@ -1982,70 +1977,6 @@ class Fishing(commands.Cog):
             except:
                 await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
     
-    async def fish_buy_action(self, interaction: discord.Interaction, item: Optional[str] = None):
-        """Handle purchasing rods, boats, and bait from the fishing shop"""
-        user_data = self.get_user_data(interaction.user.id)
-        economy_cog = self.bot.get_cog("Economy")
-
-        if not item:
-            await interaction.response.send_message("Please specify an `item` to buy. Example: `/fish action:buy item:worm`", ephemeral=True)
-            return
-
-        item_key = item.lower()
-
-        # Buying a rod
-        if item_key in self.rods:
-            rod = self.rods[item_key]
-            cost = rod.get("cost", 0)
-            if user_data.get("rod") == item_key:
-                await interaction.response.send_message(f"You already own {rod['name']}.", ephemeral=True)
-                return
-            if not economy_cog:
-                await interaction.response.send_message("Economy cog not available.", ephemeral=True)
-                return
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                user_data["rod"] = item_key
-                self.save_fishing_data()
-                await interaction.response.send_message(f"Purchased {rod['name']} for {cost} PsyCoins.")
-            else:
-                await interaction.response.send_message(f"You don't have enough PsyCoins to buy {rod['name']} (cost: {cost}).", ephemeral=True)
-            return
-
-        # Buying a boat
-        if item_key in self.boats:
-            boat = self.boats[item_key]
-            cost = boat.get("cost", 0)
-            if user_data.get("boat") == item_key:
-                await interaction.response.send_message(f"You already own {boat['name']}.", ephemeral=True)
-                return
-            if not economy_cog:
-                await interaction.response.send_message("Economy cog not available.", ephemeral=True)
-                return
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                user_data["boat"] = item_key
-                self.save_fishing_data()
-                await interaction.response.send_message(f"Purchased {boat['name']} for {cost} PsyCoins.")
-            else:
-                await interaction.response.send_message(f"You don't have enough PsyCoins to buy {boat['name']} (cost: {cost}).", ephemeral=True)
-            return
-
-        # Buying bait (adds to bait_inventory)
-        if item_key in self.baits:
-            bait = self.baits[item_key]
-            cost = bait.get("cost", 0)
-            if not economy_cog:
-                await interaction.response.send_message("Economy cog not available.", ephemeral=True)
-                return
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                inv = user_data.setdefault("bait_inventory", {})
-                inv[item_key] = inv.get(item_key, 0) + 1
-                self.save_fishing_data()
-                await interaction.response.send_message(f"Purchased 1 x {bait['name']} for {cost} PsyCoins.")
-            else:
-                await interaction.response.send_message(f"You don't have enough PsyCoins to buy {bait['name']} (cost: {cost}).", ephemeral=True)
-            return
-
-        await interaction.response.send_message(f"Item `{item}` not found in the fishing shop.", ephemeral=True)
     
     async def fish_areas_action(self, interaction: discord.Interaction):
         """View fishing areas with dropdown to travel/unlock"""
