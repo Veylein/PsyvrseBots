@@ -1,5 +1,7 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
+from typing import Optional
 import random
 import asyncio
 from datetime import datetime
