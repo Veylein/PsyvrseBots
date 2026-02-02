@@ -344,13 +344,45 @@ class FishingMinigameView(discord.ui.View):
         if hasattr(interaction, 'guild_id') and interaction.guild_id:
             self.cog.record_tournament_catch(interaction.guild_id, self.user.id, self.fish_id, weight)
         
+        # TCG Card Drop chance (based on fish rarity)
+        card_dropped = None
+        if tcg_manager and CARD_DATABASE:
+            rarity_chances = {
+                "Common": 0.05,      # 5% chance
+                "Uncommon": 0.10,    # 10% chance
+                "Rare": 0.15,        # 15% chance
+                "Epic": 0.25,        # 25% chance
+                "Legendary": 0.35,   # 35% chance
+                "Mythic": 0.50       # 50% chance
+            }
+            
+            drop_chance = rarity_chances.get(fish_data["rarity"], 0.05)
+            if random.random() < drop_chance:
+                try:
+                    # Get random card from database
+                    available_cards = list(CARD_DATABASE.keys())
+                    if available_cards:
+                        card_id = random.choice(available_cards)
+                        card_data = CARD_DATABASE[card_id]
+                        
+                        # Add card to player's collection
+                        tcg_manager.add_card_to_collection(self.user.id, card_id)
+                        card_dropped = f"🎴 **Bonus!** You found a card: **{card_data.get('name', card_id)}** ({card_data.get('rarity', 'Common')})"
+                except Exception as e:
+                    print(f"[FISHING] Card drop error: {e}")
+        
+        description = (f"**You caught:** {fish_data['name']}\n"
+                      f"**Rarity:** {fish_data['rarity']}\n"
+                      f"**Weight:** {weight}kg\n"
+                      f"**Value:** +{fish_data['value']} coins\n\n"
+                      f"Great job! The fish is added to your collection.")
+        
+        if card_dropped:
+            description += f"\n\n{card_dropped}"
+        
         embed = discord.Embed(
             title="🎉 Fish Caught!",
-            description=f"**You caught:** {fish_data['name']}\n"
-                       f"**Rarity:** {fish_data['rarity']}\n"
-                       f"**Weight:** {weight}kg\n"
-                       f"**Value:** +{fish_data['value']} coins\n\n"
-                       f"Great job! The fish is added to your collection.",
+            description=description,
             color=discord.Color.green()
         )
         
@@ -1612,7 +1644,7 @@ class Fishing(commands.Cog):
         app_commands.Choice(name="📖 Encyclopedia", value="encyclopedia"),
         app_commands.Choice(name="📊 Stats", value="stats"),
     ])
-    async def fish_main(self, interaction: discord.Interaction, action: Optional[str] = "menu", bait: Optional[str] = None, rarity: Optional[str] = None, item: Optional[str] = None):
+    async def fish_main(self, interaction: discord.Interaction, action: Optional[str] = "menu"):
         """Main fishing command with optional actions"""
         if action == "cast":
             # Check if user has bait and no bait was specified
@@ -1620,7 +1652,7 @@ class Fishing(commands.Cog):
             bait_inventory = user_data.get("bait_inventory", {})
             has_bait = bool(bait_inventory) and any(count > 0 for count in bait_inventory.values())
             
-            if has_bait and bait is None:
+            if has_bait:
                 # Show bait selection menu
                 embed = discord.Embed(
                     title="🎣 Select Your Bait",
@@ -1632,8 +1664,8 @@ class Fishing(commands.Cog):
                 view = BaitSelectView(self, user_data, interaction)
                 await interaction.response.send_message(embed=embed, view=view)
             else:
-                # Cast directly (no bait available or bait was specified)
-                await self.cast_action(interaction, bait)
+                # Cast directly (no bait available)
+                await self.cast_action(interaction, None)
         elif action == "inventory":
             await self.fish_inventory_action(interaction)
         elif action == "shop":
@@ -1641,76 +1673,11 @@ class Fishing(commands.Cog):
         elif action == "areas":
             await self.fish_areas_action(interaction)
         elif action == "encyclopedia":
-            await self.fish_encyclopedia_action(interaction, rarity)
+            await self.fish_encyclopedia_action(interaction, None)
         elif action == "stats":
             await self.fish_stats_action(interaction)
         else:  # menu
             await self.fish_menu_action(interaction)
-
-    async def fish_buy_action(self, interaction: discord.Interaction, item: Optional[str] = None):
-        """Handle purchasing rods, boats, and bait from the fishing shop"""
-        user_data = self.get_user_data(interaction.user.id)
-        economy_cog = self.bot.get_cog("Economy")
-
-        if not item:
-            await interaction.response.send_message("Please specify an `item` to buy. Example: `/fish action:buy item:worm`", ephemeral=True)
-            return
-
-        item_key = item.lower()
-
-        # Buying a rod
-        if item_key in self.rods:
-            rod = self.rods[item_key]
-            cost = rod.get("cost", 0)
-            if user_data.get("rod") == item_key:
-                await interaction.response.send_message(f"You already own {rod['name']}.", ephemeral=True)
-                return
-            if not economy_cog:
-                await interaction.response.send_message("Economy cog not available.", ephemeral=True)
-                return
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                user_data["rod"] = item_key
-                self.save_fishing_data()
-                await interaction.response.send_message(f"Purchased {rod['name']} for {cost} PsyCoins.")
-            else:
-                await interaction.response.send_message(f"You don't have enough PsyCoins to buy {rod['name']} (cost: {cost}).", ephemeral=True)
-            return
-
-        # Buying a boat
-        if item_key in self.boats:
-            boat = self.boats[item_key]
-            cost = boat.get("cost", 0)
-            if user_data.get("boat") == item_key:
-                await interaction.response.send_message(f"You already own {boat['name']}.", ephemeral=True)
-                return
-            if not economy_cog:
-                await interaction.response.send_message("Economy cog not available.", ephemeral=True)
-                return
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                user_data["boat"] = item_key
-                self.save_fishing_data()
-                await interaction.response.send_message(f"Purchased {boat['name']} for {cost} PsyCoins.")
-            else:
-                await interaction.response.send_message(f"You don't have enough PsyCoins to buy {boat['name']} (cost: {cost}).", ephemeral=True)
-            return
-
-        # Buying bait (adds to bait_inventory)
-        if item_key in self.baits:
-            bait = self.baits[item_key]
-            cost = bait.get("cost", 0)
-            if not economy_cog:
-                await interaction.response.send_message("Economy cog not available.", ephemeral=True)
-                return
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                inv = user_data.setdefault("bait_inventory", {})
-                inv[item_key] = inv.get(item_key, 0) + 1
-                self.save_fishing_data()
-                await interaction.response.send_message(f"Purchased 1 x {bait['name']} for {cost} PsyCoins.")
-            else:
-                await interaction.response.send_message(f"You don't have enough PsyCoins to buy {bait['name']} (cost: {cost}).", ephemeral=True)
-            return
-
-        await interaction.response.send_message(f"Item `{item}` not found in the fishing shop.", ephemeral=True)
     
     async def fish_menu_action(self, interaction: discord.Interaction):
         """Show fishing main menu"""
