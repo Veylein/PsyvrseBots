@@ -14,6 +14,6 @@
     "discord.js": "^14.14.0",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "@vitalets/google-translate-api": "^8.1.0"
+    "@vitalets/google-translate-api": "^8.0.0"
   }
 }
