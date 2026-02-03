@@ -35,8 +35,36 @@ class Minigames(commands.Cog):
             except Exception:
                 # don't break the game if economy fails
                 pass
+        # notify user
         try:
             await ctx.send(f"You received **{amount}** PsyCoins!")
+        except Exception:
+            pass
+
+        # Record the win in persistent user storage if available.
+        try:
+            # try common import paths; prefer non-blocking execution
+            record_fn = None
+            try:
+                from utils.user_storage import record_minigame_result as _r
+                record_fn = _r
+            except Exception:
+                try:
+                    from ..utils.user_storage import record_minigame_result as _r
+                    record_fn = _r
+                except Exception:
+                    record_fn = None
+
+            if record_fn:
+                # run in executor to avoid blocking the event loop
+                try:
+                    self.bot.loop.run_in_executor(None, record_fn, int(ctx.author.id), game_name, 'win', int(amount), str(getattr(ctx.author, 'name', ctx.author)))
+                except Exception:
+                    # last-resort: call synchronously (best-effort)
+                    try:
+                        record_fn(int(ctx.author.id), game_name, 'win', int(amount), str(getattr(ctx.author, 'name', ctx.author)))
+                    except Exception:
+                        pass
         except Exception:
             pass
 
