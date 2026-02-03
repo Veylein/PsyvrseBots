@@ -453,18 +453,34 @@ class Help(commands.Cog):
         # Special-case the minigames category: list all registered minigame
         # prefix commands dynamically (these are created by the Minigames cog).
         if category_data.get('key') == 'mini':
-            # collect commands from the Minigames cog
-            cmds = [c for c in self.bot.commands if getattr(c, 'cog_name', None) == 'Minigames' and isinstance(c, commands.Command)]
-            cmds = [c for c in cmds if c.name not in ('gamelist',)]
-            if not cmds:
+            # collect commands from the Minigames cog directly (robust)
+            mg_cog = self.bot.get_cog('Minigames')
+            entries = []
+            if mg_cog:
+                cmds = [c for c in mg_cog.get_commands() if isinstance(c, commands.Command)]
+                # exclude the gamelist helper command (may be renamed on collisions)
+                cmds = [c for c in cmds if 'gamelist' not in c.name]
+                if cmds:
+                    entries = [(f"L!{c.name}", c.help or "-") for c in sorted(cmds, key=lambda x: x.name)]
+                else:
+                    # fallback to any pre-recorded registered list on the cog
+                    reg = getattr(mg_cog, '_registered_games', None)
+                    if reg:
+                        entries = list(reg)
+            else:
+                # last-resort: scan bot.commands for anything tagged with the Minigames cog
+                cmds = [c for c in self.bot.commands if getattr(c, 'cog_name', None) == 'Minigames' and isinstance(c, commands.Command)]
+                cmds = [c for c in cmds if 'gamelist' not in c.name]
+                if cmds:
+                    entries = [(f"L!{c.name}", c.help or "-") for c in sorted(cmds, key=lambda x: x.name)]
+
+            if not entries:
                 msg = "No minigames available."
                 if is_slash:
                     await ctx.response.send_message(msg, ephemeral=True)
                 else:
                     await ctx.send(msg)
                 return
-
-            entries = [(f"L!{c.name}", c.help or "-") for c in sorted(cmds, key=lambda x: x.name)]
             per_page = 10
             pages = [entries[i:i+per_page] for i in range(0, len(entries), per_page)]
 

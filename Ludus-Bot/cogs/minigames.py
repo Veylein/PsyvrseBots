@@ -17,6 +17,7 @@ class Minigames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.active = {}
+        self._registered_games = []
     def _author_channel_check(self, ctx):
         return lambda m: m.author == ctx.author and m.channel == ctx.channel
 
@@ -878,6 +879,10 @@ async def setup(bot: commands.Bot):
             existing.add(safe_name)
             for a in aliases:
                 existing.add(a)
+            try:
+                cog._registered_games.append((safe_name, help_text))
+            except Exception:
+                pass
         except Exception:
             # ignore and continue
             pass
@@ -885,10 +890,20 @@ async def setup(bot: commands.Bot):
     # Add a gamelist command to this cog
     async def gamelist(ctx):
         cmds = [c for c in cog.get_commands() if isinstance(c, commands.Command)]
-        if not cmds:
+        entries = []
+        if cmds:
+            entries = [(c.name, c.help or "-") for c in sorted(cmds, key=lambda x: x.name)]
+        else:
+            # fallback to the cog's registered list (populated during setup)
+            try:
+                reg = getattr(cog, '_registered_games', None)
+                if reg:
+                    entries = list(reg)
+            except Exception:
+                entries = []
+        if not entries:
             await ctx.send("No minigames available.")
             return
-        entries = [(c.name, c.help or "-") for c in sorted(cmds, key=lambda x: x.name)]
         per_page = 12
         pages = [entries[i:i+per_page] for i in range(0, len(entries), per_page)]
 
