@@ -394,7 +394,7 @@ class ProfileView(View):
         )
         
         embed.add_field(
-            name=f"{Emojis.GAME} Minigames",
+            name=f"🎮 Minigames",
             value=f"**{p['minigames_played']}** played\n"
                   f"**{p['minigames_won']}** won",
             inline=True
@@ -417,7 +417,7 @@ class ProfileView(View):
         p = self.profile_data
         
         embed = EmbedBuilder.create(
-            title=f"{Emojis.GAME} {self.user.display_name}'s Gaming Stats",
+            title=f"🎮 {self.user.display_name}'s Gaming Stats",
             description="Complete overview of all gaming activities!",
             color=Colors.SUCCESS
         )
@@ -488,7 +488,7 @@ class ProfileView(View):
         p = self.profile_data
         
         embed = EmbedBuilder.create(
-            title=f"{Emojis.MONEY} {self.user.display_name}'s Economy Stats",
+            title=f"{Emojis.COIN} {self.user.display_name}'s Economy Stats",
             description="Financial overview and business stats!",
             color=Colors.WARNING
         )
