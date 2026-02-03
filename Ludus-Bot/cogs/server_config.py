@@ -45,6 +45,14 @@ class ServerConfig(commands.Cog):
             self._save_configs()
         return self.configs[guild_id]
     
+    def update_server_config(self, guild_id, key, value):
+        """Update a specific config value and save"""
+        guild_id = str(guild_id)
+        config = self.get_server_config(guild_id)
+        config[key] = value
+        self.configs[guild_id] = config
+        self._save_configs()
+    
     @commands.command(name="serverconfig", aliases=["servercfg", "botconfig"])
     @commands.has_permissions(administrator=True)
     async def server_config(self, ctx):
@@ -149,7 +157,8 @@ class ServerConfig(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def toggle_setting(self, ctx, setting: str):
         """Toggle server settings (Admin only)"""
-        config = self.get_server_config(ctx.guild.id)
+        guild_id = str(ctx.guild.id)
+        config = self.get_server_config(guild_id)
         setting = setting.lower()
         
         setting_map = {
@@ -164,18 +173,22 @@ class ServerConfig(commands.Cog):
             return
         
         key = setting_map[setting]
-        config[key] = not config[key]
-        self.configs[str(ctx.guild.id)] = config
+        new_value = not config[key]
+        
+        # Update and save
+        config[key] = new_value
+        self.configs[guild_id] = config
         self._save_configs()
         
-        status = "✅ Enabled" if config[key] else "❌ Disabled"
+        status = "✅ Enabled" if new_value else "❌ Disabled"
         await ctx.send(f"{status} **{setting}** for this server!")
     
     @commands.command(name="disablecmd", aliases=["disablecommand"])
     @commands.has_permissions(administrator=True)
     async def disable_command(self, ctx, command: str):
         """Disable a command in this server (Admin only)"""
-        config = self.get_server_config(ctx.guild.id)
+        guild_id = str(ctx.guild.id)
+        config = self.get_server_config(guild_id)
         
         # Prevent disabling config commands
         protected = ["serverconfig", "toggle", "disablecmd", "enablecmd", "listdisabled"]
@@ -188,7 +201,7 @@ class ServerConfig(commands.Cog):
             return
         
         config["disabled_commands"].append(command)
-        self.configs[str(ctx.guild.id)] = config
+        self.configs[guild_id] = config
         self._save_configs()
         
         await ctx.send(f"✅ Disabled command: `{command}`\nUsers will receive a clean error message when attempting to use it.")
@@ -196,15 +209,15 @@ class ServerConfig(commands.Cog):
     @commands.command(name="enablecmd", aliases=["enablecommand"])
     @commands.has_permissions(administrator=True)
     async def enable_command(self, ctx, command: str):
-        """Enable a previously disabled command (Admin only)"""
-        config = self.get_server_config(ctx.guild.id)
+        guild_id = str(ctx.guild.id)
+        config = self.get_server_config(guild_id)
         
         if command not in config["disabled_commands"]:
             await ctx.send(f"❌ Command `{command}` is not disabled!")
             return
         
         config["disabled_commands"].remove(command)
-        self.configs[str(ctx.guild.id)] = config
+        self.configs[guild_id] = config
         self._save_configs()
         
         await ctx.send(f"✅ Enabled command: `{command}`")
@@ -231,18 +244,18 @@ class ServerConfig(commands.Cog):
     @commands.command(name="setlogchannel", aliases=["logchannel"])
     @commands.has_permissions(administrator=True)
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
-        """Set the channel for bot action logs (Admin only)"""
-        config = self.get_server_config(ctx.guild.id)
+        guild_id = str(ctx.guild.id)
+        config = self.get_server_config(guild_id)
         
         if channel is None:
             config["log_channel"] = None
-            self.configs[str(ctx.guild.id)] = config
+            self.configs[guild_id] = config
             self._save_configs()
             await ctx.send("✅ Disabled logging for this server.")
             return
         
         config["log_channel"] = channel.id
-        self.configs[str(ctx.guild.id)] = config
+        self.configs[guild_id] = config
         self._save_configs()
         
         await ctx.send(f"✅ Set log channel to {channel.mention}")
