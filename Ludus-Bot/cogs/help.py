@@ -450,7 +450,74 @@ class Help(commands.Cog):
                 await ctx.send(msg)
             return
         
-        # Create embed
+        # Special-case the minigames category: list all registered minigame
+        # prefix commands dynamically (these are created by the Minigames cog).
+        if category_data.get('key') == 'mini':
+            # collect commands from the Minigames cog
+            cmds = [c for c in self.bot.commands if getattr(c, 'cog_name', None) == 'Minigames' and isinstance(c, commands.Command)]
+            cmds = [c for c in cmds if c.name not in ('gamelist',)]
+            if not cmds:
+                msg = "No minigames available."
+                if is_slash:
+                    await ctx.response.send_message(msg, ephemeral=True)
+                else:
+                    await ctx.send(msg)
+                return
+
+            entries = [(f"L!{c.name}", c.help or "-") for c in sorted(cmds, key=lambda x: x.name)]
+            per_page = 10
+            pages = [entries[i:i+per_page] for i in range(0, len(entries), per_page)]
+
+            def make_embed(page_index: int):
+                page = pages[page_index]
+                embed = discord.Embed(title=f"🎮 Minigames (page {page_index+1}/{len(pages)})",
+                                      description=category_data.get('desc', ''),
+                                      color=discord.Color.blue())
+                for name_, brief in page:
+                    embed.add_field(name=name_, value=brief, inline=False)
+                embed.set_footer(text="Use the buttons to navigate — Prefix: L! or /")
+                return embed
+
+            class MiniPaginator(discord.ui.View):
+                def __init__(self, author, timeout: int = 120):
+                    super().__init__(timeout=timeout)
+                    self.page = 0
+                    self.author = author
+
+                async def interaction_check(self, interaction: discord.Interaction) -> bool:
+                    return interaction.user.id == self.author.id
+
+                @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
+                async def prev(self, button: discord.ui.Button, interaction: discord.Interaction):
+                    if self.page > 0:
+                        self.page -= 1
+                        await interaction.response.edit_message(embed=make_embed(self.page), view=self)
+                    else:
+                        await interaction.response.defer()
+
+                @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
+                async def next(self, button: discord.ui.Button, interaction: discord.Interaction):
+                    if self.page < len(pages) - 1:
+                        self.page += 1
+                        await interaction.response.edit_message(embed=make_embed(self.page), view=self)
+                    else:
+                        await interaction.response.defer()
+
+                @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
+                async def close(self, button: discord.ui.Button, interaction: discord.Interaction):
+                    try:
+                        await interaction.message.delete()
+                    except Exception:
+                        await interaction.response.defer()
+
+            view = MiniPaginator(ctx.user if is_slash else ctx.author)
+            if is_slash:
+                await ctx.response.send_message(embed=make_embed(0), view=view)
+            else:
+                await ctx.send(embed=make_embed(0), view=view)
+            return
+
+        # Create embed for normal categories
         embed = discord.Embed(
             title=f"{category_name} Commands",
             description=category_data['desc'],
