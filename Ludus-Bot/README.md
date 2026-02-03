@@ -343,6 +343,13 @@ Prefix commands also available: `L!pet <action>`
 
 All pet data is stored automatically per user!
 
+New: Pets now provide gameplay bonuses!
+- **Cats & Axolotls:** Improve fishing chances and increase odds for Rare+ catches.
+- **Dogs / Horses / Hamsters / Pandas:** Boost farm harvest yields and sometimes auto-tend hungry animals.
+- **Dragons / Tigers:** Provide small coin bonuses on pet interactions (adopt/play/walk).
+
+See `/pet status` to view your pet's active bonuses.
+
 ---
 
 ## 🎵 **Music System (Stable, Smooth, Modern)**

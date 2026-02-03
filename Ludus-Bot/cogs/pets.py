@@ -319,6 +319,26 @@ class Pets(commands.Cog):
         farm_desc = self.farm_behaviors.get(farm_impact, "No special behavior")
         embed.add_field(name="🌾 Farm Behavior", value=farm_desc, inline=False)
 
+        # Show pet bonuses for fishing/farming/coins
+        try:
+            fish_mult = self.get_fishing_multiplier(user.id)
+            farm_mult = self.get_farm_yield_multiplier(user.id)
+            coin_bonus = self.get_coin_bonus(user.id)
+
+            if fish_mult and fish_mult != 1.0:
+                embed.add_field(name="🎣 Fishing Bonus", value=f"+{int((fish_mult-1)*100)}% catch chance", inline=True)
+            else:
+                embed.add_field(name="🎣 Fishing Bonus", value="None", inline=True)
+
+            if farm_mult and farm_mult != 1.0:
+                embed.add_field(name="🌾 Farm Yield Bonus", value=f"+{int((farm_mult-1)*100)}% harvest", inline=True)
+            else:
+                embed.add_field(name="🌾 Farm Yield Bonus", value="None", inline=True)
+
+            embed.add_field(name="💰 Coin Bonus", value=(f"+{coin_bonus} coins on pet actions" if coin_bonus else "None"), inline=False)
+        except Exception:
+            pass
+
         # Warning if pet is hungry
         if pet['hunger'] < 30:
             embed.add_field(
@@ -357,6 +377,118 @@ class Pets(commands.Cog):
                 }
         
         return {"interaction": False}
+
+    def get_fishing_multiplier(self, user_id: int) -> float:
+        """Return a multiplier to improve fishing chances based on pet type."""
+        uid = str(user_id)
+        if uid not in self.pets_data:
+            return 1.0
+
+        pet = self.pets_data[uid]
+        pet_type = pet.get('type', '').lower()
+
+        # Tuned multipliers: make fish-friendly pets more meaningful
+        if pet_type in ('cat', 'cat 🐱'):
+            return 1.20
+        if pet_type in ('axolotl', 'axolotl 🦎'):
+            return 1.30
+
+        # small baseline bump for friendly pets
+        if pet_type in ('hamster', 'hamster 🐹'):
+            return 1.05
+
+        return 1.0
+
+    def get_farm_yield_multiplier(self, user_id: int) -> float:
+        """Return a multiplier applied to farm collection yields based on pet type."""
+        uid = str(user_id)
+        if uid not in self.pets_data:
+            return 1.0
+
+        pet = self.pets_data[uid]
+        pet_type = pet.get('type', '').lower()
+
+        # Tuned farm yield multipliers
+        if pet_type in ('dog', 'dog 🐶'):
+            return 1.15
+        if pet_type in ('horse', 'horse 🐴'):
+            return 1.18
+        if pet_type in ('hamster', 'hamster 🐹'):
+            return 1.10
+        if pet_type in ('panda', 'panda 🐼'):
+            return 1.07
+
+        return 1.0
+
+    def get_coin_bonus(self, user_id: int) -> int:
+        """Return a small flat coin bonus applied on certain pet interactions."""
+        uid = str(user_id)
+        if uid not in self.pets_data:
+            return 0
+
+        pet = self.pets_data[uid]
+        pet_type = pet.get('type', '').lower()
+
+        # Some pets give a small passive coin bonus when interacting
+        if pet_type in ('dragon', 'dragon 🐉'):
+            return 15
+        if pet_type in ('tiger', 'tiger 🐯'):
+            return 8
+
+        # cats give a small coin-on-play bonus
+        if pet_type in ('cat', 'cat 🐱'):
+            return 3
+
+        return 0
+
+    def get_rarity_multiplier(self, user_id: int, rarity: str) -> float:
+        """Return an extra multiplier for specific rarities based on pet.
+
+        Used to slightly boost chances for Rare+ catches when the pet
+        has affinity (eg. cat/axolotl)."""
+        uid = str(user_id)
+        if uid not in self.pets_data:
+            return 1.0
+
+        pet = self.pets_data[uid]
+        pet_type = pet.get('type', '').lower()
+        rarity = (rarity or '').lower()
+
+        # Axolotl gives bigger boosts for uncommon+ aquatic finds
+        if pet_type in ('axolotl', 'axolotl 🦎'):
+            if rarity in ('rare', 'epic'):
+                return 1.25
+            if rarity in ('legendary', 'mythic'):
+                return 1.40
+
+        # Cat gives moderate boosts
+        if pet_type in ('cat', 'cat 🐱'):
+            if rarity in ('rare', 'epic'):
+                return 1.15
+            if rarity in ('legendary', 'mythic'):
+                return 1.25
+
+        return 1.0
+
+    def get_auto_tend_chance(self, user_id: int) -> float:
+        """Return chance [0-1] that pet auto-tends hungry animals during collection."""
+        uid = str(user_id)
+        if uid not in self.pets_data:
+            return 0.0
+
+        pet = self.pets_data[uid]
+        pet_type = pet.get('type', '').lower()
+
+        if pet_type in ('dog', 'dog 🐶'):
+            return 0.40
+        if pet_type in ('horse', 'horse 🐴'):
+            return 0.35
+        if pet_type in ('hamster', 'hamster 🐹'):
+            return 0.20
+        if pet_type in ('panda', 'panda 🐼'):
+            return 0.12
+
+        return 0.0
 
 async def setup(bot):
     await bot.add_cog(Pets(bot))

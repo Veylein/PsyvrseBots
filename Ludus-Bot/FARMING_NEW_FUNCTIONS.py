@@ -250,8 +250,20 @@ async def farm_collect_action(self, interaction: discord.Interaction):
             last_fed = datetime.fromisoformat(animal["last_fed"])
             hours_since_fed = (datetime.now() - last_fed).total_seconds() / 3600
             
+            # Hungry animals normally don't produce; pets may auto-tend
             if hours_since_fed > 24:
-                continue  # Hungry animals don't produce
+                auto_tend = False
+                try:
+                    pets_cog = self.bot.get_cog("Pets")
+                    if pets_cog:
+                        chance = pets_cog.get_auto_tend_chance(interaction.user.id)
+                        if chance and random.random() < chance:
+                            auto_tend = True
+                except Exception:
+                    auto_tend = False
+
+                if not auto_tend:
+                    continue  # Hungry animals don't produce
             
             product = animal_data["product"]
             value = animal_data["product_value"]
@@ -282,6 +294,21 @@ async def farm_collect_action(self, interaction: discord.Interaction):
         economy_cog.economy_data[user_id]["farm_tokens"] = economy_cog.economy_data[user_id].get("farm_tokens", 0) + farm_tokens
         economy_cog.economy_dirty = True
         await economy_cog.save_economy()
+    # Apply pet-based farm yield multiplier (if any)
+    try:
+        pets_cog = self.bot.get_cog("Pets")
+        if pets_cog:
+            mult = pets_cog.get_farm_yield_multiplier(interaction.user.id)
+            if mult != 1.0:
+                boosted = int(farm_tokens * mult) - farm_tokens
+                farm_tokens = int(farm_tokens * mult)
+                # also credit the boosted tokens to economy
+                if economy_cog:
+                    economy_cog.economy_data[user_id]["farm_tokens"] += boosted
+                    economy_cog.economy_dirty = True
+                    await economy_cog.save_economy()
+    except Exception:
+        pass
     
     embed = discord.Embed(
         title="📦 Products Collected!",

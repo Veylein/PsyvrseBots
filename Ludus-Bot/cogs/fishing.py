@@ -1755,10 +1755,28 @@ class Fishing(commands.Cog):
         total_multiplier += (rod_bonus + bait_bonus) / 100
         
         # Select fish based on weighted chances
+        # Apply pet-based fishing multiplier if user has a pet
+        pet_multiplier = 1.0
+        try:
+            pets_cog = self.bot.get_cog("Pets")
+            if pets_cog:
+                pet_multiplier = pets_cog.get_fishing_multiplier(interaction.user.id)
+        except Exception:
+            pet_multiplier = 1.0
+
         fish_chances = []
         for fish_id in available_fish:
             fish = self.fish_types[fish_id]
-            adjusted_chance = fish["chance"] * total_multiplier
+            # Apply rarity-specific pet bonuses (e.g., axolotl/cat)
+            rarity_mult = 1.0
+            try:
+                pets_cog = self.bot.get_cog("Pets")
+                if pets_cog:
+                    rarity_mult = pets_cog.get_rarity_multiplier(interaction.user.id, fish.get("rarity"))
+            except Exception:
+                rarity_mult = 1.0
+
+            adjusted_chance = fish["chance"] * total_multiplier * pet_multiplier * rarity_mult
             fish_chances.append((fish_id, adjusted_chance))
         
         # Pick fish
