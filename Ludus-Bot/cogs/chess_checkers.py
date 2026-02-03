@@ -1411,14 +1411,18 @@ def create_board_image(board: chess.Board, last_move=None, board_theme='classic'
                 symbol = piece.symbol()
                 piece_char = PIECE_SYMBOLS.get(symbol, symbol)
                 
-                try:
-                    # Segoe UI Symbol has good chess emoji
-                    font = ImageFont.truetype("seguisym.ttf", 60)
-                except:
+                # Try multiple fonts for chess symbols
+                font = None
+                font_size = 64
+                for font_name in ["seguisym.ttf", "SEGUISYM.TTF", "segoeuisymbol.ttf", "DejaVuSans.ttf", "arial.ttf", "Arial.ttf"]:
                     try:
-                        font = ImageFont.truetype("arial.ttf", 60)
+                        font = ImageFont.truetype(font_name, font_size)
+                        break
                     except:
-                        font = ImageFont.load_default()
+                        continue
+                
+                if font is None:
+                    font = ImageFont.load_default()
                 
                 bbox = draw.textbbox((0, 0), piece_char, font=font)
                 text_width = bbox[2] - bbox[0]
