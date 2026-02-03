@@ -874,7 +874,14 @@ async def setup(bot: commands.Bot):
 
         cmd = commands.Command(_cmd_wrapper, name=safe_name, help=help_text, aliases=aliases)
         try:
-            cog.add_command(cmd)
+            # Some discord.py versions don't provide Cog.add_command; add to bot
+            # and attach the cog reference to the Command so Cog.get_commands()
+            # will include it.
+            bot.add_command(cmd)
+            try:
+                cmd._cog = cog
+            except Exception:
+                pass
             # record registered names to avoid future collisions
             existing.add(safe_name)
             for a in aliases:
@@ -963,7 +970,12 @@ async def setup(bot: commands.Bot):
             safe_name = f"mg_gamelist_{i}"
             i += 1
     try:
-        cog.add_command(commands.Command(gamelist, name=safe_name, help="List available minigames."))
+        cmd = commands.Command(gamelist, name=safe_name, help="List available minigames.")
+        bot.add_command(cmd)
+        try:
+            cmd._cog = cog
+        except Exception:
+            pass
     except Exception:
         pass
 
