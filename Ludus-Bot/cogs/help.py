@@ -404,13 +404,43 @@ class Help(commands.Cog):
             # remove non-alphanumeric characters (including emoji/punctuation), collapse whitespace
             text = re.sub(r"[^\w\s]", '', text or '')
             return ' '.join(text.split()).strip().lower()
+        
+        # Special case: redirect owner/👑 to ownerhelp command
+        raw_key = (category_key or '').strip()
+        norm_key = _normalize(raw_key)
+        if norm_key == 'owner' or raw_key == '👑':
+            if is_owner:
+                # Invoke ownerhelp command from owner.py
+                owner_cog = self.bot.get_cog('Owner')
+                if owner_cog:
+                    ownerhelp_cmd = owner_cog.owner_help
+                    if is_slash:
+                        # Create fake context for prefix command
+                        class FakeCtx:
+                            def __init__(self, interaction):
+                                self.author = interaction.user
+                                self.guild = interaction.guild
+                                self.channel = interaction.channel
+                                self.bot = interaction.client
+                            async def send(self, *args, **kwargs):
+                                return await ctx.followup.send(*args, **kwargs)
+                        await ctx.response.defer()
+                        fake_ctx = FakeCtx(ctx)
+                        await ownerhelp_cmd(fake_ctx)
+                    else:
+                        await ownerhelp_cmd(ctx)
+                    return
+            else:
+                msg = "❌ This category is owner-only!"
+                if is_slash:
+                    await ctx.response.send_message(msg, ephemeral=True)
+                else:
+                    await ctx.send(msg)
+                return
+        
         # Find category
         category_data = None
         category_name = None
-        
-        # Normalize input for robust matching (handles emoji, punctuation, case)
-        raw_key = (category_key or '').strip()
-        norm_key = _normalize(raw_key)
 
         # Check regular categories
         for cat_name, cat_data in self.categories.items():
@@ -426,21 +456,6 @@ class Help(commands.Cog):
                 category_data = cat_data
                 category_name = cat_name
                 break
-        
-        # Check owner category if owner
-        if not category_data and is_owner:
-            for cat_name, cat_data in self.owner_category.items():
-                cat_name_lower = cat_name.lower()
-                norm_cat = _normalize(cat_name_lower)
-                if (
-                    cat_data.get('key') == raw_key
-                    or cat_data.get('key') == norm_key
-                    or raw_key in cat_name_lower
-                    or norm_key and norm_key in norm_cat
-                ):
-                    category_data = cat_data
-                    category_name = cat_name
-                    break
         
         if not category_data:
             msg = f"❌ Category `{category_key}` not found!\nUse `L!help` to see all categories."
