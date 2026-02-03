@@ -476,7 +476,7 @@ class Social(commands.Cog):
 
     # ==================== NEW SOCIAL COMMANDS ====================
     
-    @commands.command(name="ship")
+    @commands.command(name="shipold")
     async def ship_prefix(self, ctx, user1: discord.Member, user2: discord.Member = None):
         """Ship two users together"""
         if user2 is None:

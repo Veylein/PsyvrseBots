@@ -104,6 +104,7 @@ class Help(commands.Cog):
                     (f"/fish cast", "Cast your line with advanced options"),
                     (f"/fish inventory", "View your catches and equipment"),
                     (f"/fish shop", "Buy rods, bait, and boats"),
+                    (f"/fish craft", "Craft special items"),
                     (f"/fish areas", "Explore fishing locations"),
                     (f"/fish encyclopedia", "View all available fish"),
                     (f"/fish stats", "Check your fishing statistics"),

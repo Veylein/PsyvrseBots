@@ -12,6 +12,7 @@ from discord import app_commands
 from discord.ui import View, Button
 from cogs.minigames import PaginatedHelpView
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
+import traceback
 try:
     from .tcg import manager as tcg_manager
     from .psyvrse_tcg import CARD_DATABASE
@@ -95,22 +96,41 @@ class EncyclopediaView(discord.ui.View):
 class FishingMinigameView(discord.ui.View):
     """Interactive fishing minigame"""
     
-    def __init__(self, cog, user, fish_id, difficulty):
+    def __init__(self, cog, user, fish_id, difficulty, rod_name="basic_rod"):
         super().__init__(timeout=180)  # 3 minutes timeout
         self.cog = cog
         self.user = user
         self.fish_id = fish_id
         self.difficulty = difficulty  # 1-5
+        self.rod_name = rod_name
         self.position = 5  # Fish position (0-10)
         self.player_position = 5  # Player position (0-10)
         self.catches = 0
         self.escapes = 0
+        
+        # ROD BONUS SYSTEM - Better rods make minigames easier!
+        rod_difficulty_bonus = {
+            "basic_rod": 0.0,           # No bonus
+            "sturdy_rod": 0.15,         # 15% easier
+            "carbon_fiber_rod": 0.25,   # 25% easier
+            "master_rod": 0.35,         # 35% easier
+            "legendary_rod": 0.45       # 45% easier
+        }
+        rod_bonus = rod_difficulty_bonus.get(rod_name, 0.0)
+        
         # Harder difficulties need more catches and allow fewer escapes
-        self.required_catches = 3 + (difficulty // 2)  # 3-5 catches needed
-        self.max_escapes = 4 - (difficulty // 2)  # 4-2 escapes allowed
+        base_required = 3 + (difficulty // 2)  # 3-5 catches needed
+        base_max_escapes = 4 - (difficulty // 2)  # 4-2 escapes allowed
+        
+        # Apply rod bonuses - reduce required catches, increase allowed escapes
+        self.required_catches = max(2, int(base_required * (1 - rod_bonus * 0.6)))  # Min 2 catches
+        self.max_escapes = min(6, int(base_max_escapes * (1 + rod_bonus)))  # Max 6 escapes
+        
         self.game_over = False
         self.fish_move_range = 1 + difficulty  # Fish moves further on higher difficulties
-        self.move_interval = 3.0 - (difficulty * 0.3)  # Fish moves faster on higher difficulties
+        # Better rod = slower fish movement
+        base_interval = 3.0 - (difficulty * 0.3)
+        self.move_interval = base_interval * (1 + rod_bonus * 0.3)  # Up to 13.5% slower
         self.message = None
         self.auto_move_task = None
         self.start_time = None
@@ -410,6 +430,458 @@ class FishingMinigameView(discord.ui.View):
             await interaction.response.edit_message(embed=embed, view=None)
         except:
             await interaction.edit_original_response(embed=embed, view=None)
+
+
+# ==================== KRAKEN BOSS FIGHT ====================
+
+class KrakenBossFight(discord.ui.View):
+    """Epic Kraken boss fight - EXTREME fishing minigame with attacks"""
+    
+    def __init__(self, cog, user: discord.User, rod_name="basic_rod"):
+        super().__init__(timeout=300)  # 5 minutes
+        self.cog = cog
+        self.user = user
+        self.rod_name = rod_name
+        self.player_position = 5  # Middle of 11 positions (0-10)
+        self.kraken_position = 5
+        self.catches = 0
+        self.escapes = 0
+        self.game_over = False
+        self.message = None
+        self.start_time = 0
+        self.auto_move_task = None
+        
+        # ROD BONUS SYSTEM - Better rods help with BOSS FIGHT!
+        rod_difficulty_bonus = {
+            "basic_rod": 0.0,           # No bonus
+            "sturdy_rod": 0.10,         # 10% easier
+            "carbon_fiber_rod": 0.20,   # 20% easier
+            "master_rod": 0.30,         # 30% easier
+            "legendary_rod": 0.40       # 40% easier
+        }
+        rod_bonus = rod_difficulty_bonus.get(rod_name, 0.0)
+        
+        # Scale boss difficulty with rod
+        self.required_catches = max(5, int(8 * (1 - rod_bonus * 0.4)))  # 8 -> 5 catches
+        self.max_escapes = min(6, int(3 * (1 + rod_bonus * 0.6)))  # 3 -> 6 escapes
+        
+        # KRAKEN ATTACK SYSTEM - BOSS MECHANICS!
+        self.attack_warning = False  # Red warning phase
+        self.attack_active = False  # Purple attack phase
+        self.attack_positions = []  # Multiple attack positions!
+        self.attack_pattern = None  # Current attack pattern name
+        self.attack_countdown = 0  # Turns until next attack
+        self.next_attack_in = random.randint(2, 4)  # Faster attacks!
+        
+        # Boss attack patterns - różne wzorce!
+        self.attack_patterns = {
+            "edges": {"name": "🌊 TIDAL WAVE", "positions": [0, 1, 9, 10]},  # Krańce
+            "center": {"name": "🌀 WHIRLPOOL", "positions": [4, 5, 6]},  # Środek
+            "checkerboard": {"name": "⚡ LIGHTNING STORM", "positions": [0, 2, 4, 6, 8, 10]},  # Szachownica
+            "random_triple": {"name": "🦑 TENTACLE STRIKE", "positions": []},  # 3 losowe
+            "sweep_left": {"name": "💨 SWEEPING TIDE", "positions": [0, 1, 2, 3, 4]},  # Lewo
+            "sweep_right": {"name": "💨 SWEEPING TIDE", "positions": [6, 7, 8, 9, 10]},  # Prawo
+            "corners": {"name": "🔱 TRIDENT STRIKE", "positions": [0, 5, 10]},  # Narożniki
+            "barrage": {"name": "☄️ METEOR BARRAGE", "positions": []},  # 5 losowych!
+        }
+        
+        # Kraken moves VERY fast and erratically (rod bonus makes it slightly slower)
+        self.kraken_move_range = 3  # Can move 1-3 spaces per turn
+        self.kraken_move_speed = 1.2 * (1 + rod_bonus * 0.25)  # Up to 10% slower with legendary rod
+        
+    async def start_fight(self, interaction: discord.Interaction):
+        """Start the epic Kraken battle"""
+        kraken_art = """```
+⠀⠀⠀⠀⠀⠀⢀⣀⣠⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⣠⣾⣿⣿⣿⣿⣿⣿⣷⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡀⠀⠀⠀⣠⣶⣾⣷⣶⣄⠀⠀⠀⠀⠀
+⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⢰⣿⠟⠉⠻⣿⣿⣷⠀⠀⠀⠀
+⠀⠀⠀⠈⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⢷⣄⠘⠿⠀⠀⠀⢸⣿⣿⡆⠀⠀⠀
+⠀⠀⠀⠀⠈⠿⣿⣿⣿⣿⣿⣀⣸⣿⣷⣤⣴⠟⠀⠀⠀⠀⢀⣼⣿⣿⠁⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠈⠙⣛⣿⣿⣿⣿⣿⣿⣿⣿⣦⣀⣀⣀⣴⣾⣿⣿⡟⠀⠀⠀⠀
+⠀⠀⠀⢀⣠⣴⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠟⠋⣠⣤⣀⠀⠀
+⠀⠀⣴⣿⣿⣿⠿⠟⠛⠛⢛⣿⣿⣿⣿⣿⣿⣧⡈⠉⠁⠀⠀⠀⠈⠉⢻⣿⣧⠀
+⠀⣼⣿⣿⠋⠀⠀⠀⠀⢠⣾⣿⣿⠟⠉⠻⣿⣿⣿⣦⣄⠀⠀⠀⠀⠀⣸⣿⣿⠃
+⠀⣿⣿⡇⠀⠀⠀⠀⠀⣿⣿⡿⠃⠀⠀⠀⠈⠛⢿⣿⣿⣿⣿⣶⣿⣿⣿⡿⠋⠀
+⠀⢿⣿⣧⡀⠀⣶⣄⠘⣿⣿⡇⠀⠀⠠⠶⣿⣶⡄⠈⠙⠛⠻⠟⠛⠛⠁⠀⠀⠀
+⠀⠈⠻⣿⣿⣿⣿⠏⠀⢻⣿⣿⣄⠀⠀⠀⣸⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⣿⣿⣿⣶⣾⣿⣿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠛⠛⠛⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```"""
+        
+        embed = discord.Embed(
+            title="🦑 THE KRAKEN AWAKENS! 🦑",
+            description=f"{kraken_art}\n"
+                       "**The ancient terror of the deep emerges from the abyss...**\n\n"
+                       "⚠️ *The water turns black as ink...*\n"
+                       "⚠️ *Massive tentacles rise from the depths...*\n"
+                       "⚠️ *The very ocean trembles with its roar...*\n\n"
+                       "🎣 **You've used the Kraken Bait in the Mariana Trench!**\n"
+                       "💀 **The legendary beast has been summoned!**\n\n"
+                       "**This is no ordinary catch... Prepare yourself!**",
+            color=discord.Color.dark_red()
+        )
+        embed.set_footer(text="The most challenging fishing battle of your life begins...")
+        
+        if interaction.response.is_done():
+            self.message = await interaction.edit_original_response(embed=embed, view=None)
+        else:
+            await interaction.response.send_message(embed=embed)
+            self.message = await interaction.original_response()
+        
+        await asyncio.sleep(3)
+        
+        # Start the battle
+        self.start_time = asyncio.get_event_loop().time()
+        await self.update_display()
+        
+        # Start auto-movement
+        self.auto_move_task = asyncio.create_task(self.auto_move_kraken())
+    
+    async def auto_move_kraken(self):
+        """Kraken moves automatically - FAST and ERRATIC!"""
+        try:
+            while not self.game_over:
+                await asyncio.sleep(self.kraken_move_speed)
+                
+                if self.game_over:
+                    break
+                
+                # Move Kraken erratically (1-3 spaces)
+                move = random.randint(-self.kraken_move_range, self.kraken_move_range)
+                self.kraken_position += move
+                self.kraken_position = max(0, min(10, self.kraken_position))
+                
+                # Check for attack countdown
+                self.attack_countdown += 1
+                
+                # BOSS ATTACK SYSTEM - MULTIPLE PATTERNS!
+                if self.attack_countdown >= self.next_attack_in:
+                    if not self.attack_warning and not self.attack_active:
+                        # Start warning phase - choose attack pattern!
+                        self.attack_warning = True
+                        self.attack_active = False
+                        
+                        # Select random pattern
+                        pattern_key = random.choice(list(self.attack_patterns.keys()))
+                        pattern = self.attack_patterns[pattern_key]
+                        self.attack_pattern = pattern["name"]
+                        
+                        # Generate attack positions based on pattern
+                        if pattern_key == "random_triple":
+                            # 3 random positions
+                            self.attack_positions = random.sample(range(11), 3)
+                        elif pattern_key == "barrage":
+                            # 5 random positions (DANGEROUS!)
+                            self.attack_positions = random.sample(range(11), 5)
+                        else:
+                            # Use predefined pattern
+                            self.attack_positions = pattern["positions"].copy()
+                        
+                    elif self.attack_warning and not self.attack_active:
+                        # Warning → Attack!
+                        self.attack_active = True
+                        self.attack_warning = False
+                        
+                        # Check if player is hit by any attack position
+                        if self.player_position in self.attack_positions:
+                            self.escapes += 1
+                            if self.escapes >= self.max_escapes:
+                                await self.lose_game()
+                                break
+                    elif self.attack_active:
+                        # Reset attack
+                        self.attack_active = False
+                        self.attack_positions = []
+                        self.attack_pattern = None
+                        self.attack_countdown = 0
+                        self.next_attack_in = random.randint(2, 4)  # Szybsze ataki!
+                
+                # Update display
+                if self.message:
+                    try:
+                        await self._update_display()
+                    except:
+                        break
+        except asyncio.CancelledError:
+            pass
+    
+    async def _update_display(self):
+        """Update the message display"""
+        if self.game_over:
+            return
+        
+        # Calculate remaining time
+        elapsed = asyncio.get_event_loop().time() - self.start_time
+        remaining = max(0, 300 - int(elapsed))  # 300 seconds = 5 minutes
+        minutes = remaining // 60
+        seconds = remaining % 60
+        time_display = f"{minutes}:{seconds:02d}"
+        
+        # Check timeout
+        if remaining <= 0:
+            await self.lose_game()
+            return
+        
+        # Create visual representation
+        line = ["⬜"] * 11
+        line[self.player_position] = "🎣"
+        
+        # Show Kraken position (can overlap with attacks)
+        if self.player_position == self.kraken_position and not self.attack_positions:
+            line[self.kraken_position] = "🟢"  # Perfect alignment!
+        elif line[self.kraken_position] == "⬜":
+            line[self.kraken_position] = "🦑"  # Kraken
+        
+        # Show MULTIPLE attack indicators!
+        if self.attack_positions:
+            if self.attack_active:
+                # PURPLE ATTACKS - Happening NOW!
+                for pos in self.attack_positions:
+                    if self.player_position == pos:
+                        line[pos] = "💥"  # HIT!
+                    elif line[pos] == "🎣":
+                        line[pos] = "💥"  # Hit player
+                    elif line[pos] == "🦑":
+                        line[pos] = "🦑"  # Keep kraken visible
+                    else:
+                        line[pos] = "🟪"  # Purple attack
+            elif self.attack_warning:
+                # RED WARNINGS - Multiple positions incoming!
+                for pos in self.attack_positions:
+                    if line[pos] == "🎣":
+                        line[pos] = "⚠️"  # Warning on player
+                    elif line[pos] == "🦑":
+                        line[pos] = "🦑"  # Keep kraken visible
+                    else:
+                        line[pos] = "🟥"  # Red warning
+        
+        visual = "".join(line)
+        
+        # Build progress bars
+        catches_bar = "🟢" * self.catches + "⚪" * (self.required_catches - self.catches)
+        escapes_bar = "🔴" * self.escapes + "⚪" * (self.max_escapes - self.escapes)
+        
+        # Attack status with PATTERN NAME!
+        attack_status = ""
+        if self.attack_active:
+            attack_status = f"🔥 **{self.attack_pattern}!** 🔥\n💥 **ATTACKING NOW!** Dodge or die!"
+        elif self.attack_warning:
+            attack_status = f"⚠️ **{self.attack_pattern} INCOMING!** ⚠️\n🟥 Move to safe position NOW!"
+        
+        embed = discord.Embed(
+            title="🦑 CATCHING THE KRAKEN 🦑",
+            description=f"**Battling:** THE KRAKEN (LEGENDARY BOSS)\n"
+                       f"**Progress:** {catches_bar} ({self.required_catches} catches needed)\n"
+                       f"**Hits Taken:** {escapes_bar} ({self.max_escapes} max)\n"
+                       f"⏱️ **Time Remaining:** {time_display}\n\n"
+                       f"{visual}\n\n"
+                       f"{attack_status}\n\n"
+                       f"**Legend:**\n"
+                       f"🎣 Your Rod | 🦑 Kraken | 🟢 Perfect! | 🟥 Warning | 🟪 ATTACK! | 💥 HIT!\n\n"
+                       f"**Tips:**\n"
+                       f"• Move ⬅️ ➡️ to align with the Kraken\n"
+                       f"• Press 🎣 when aligned (🟢) to catch!\n"
+                       f"• 🟥 RED = Attack warning at those positions!\n"
+                       f"• 🟪 PURPLE = ATTACK! Move away from ALL purple tiles!\n"
+                       f"• Multiple attacks = BOSS PATTERN! Stay alert!\n"
+                       f"• Difficulty: ⭐⭐⭐⭐⭐⭐⭐⭐ LEGENDARY BOSS",
+            color=discord.Color.dark_purple() if self.attack_active else 
+                  (discord.Color.dark_red() if self.attack_warning else discord.Color.dark_blue())
+        )
+        
+        await self.message.edit(embed=embed, view=self)
+    
+    async def update_display(self):
+        """Public update method"""
+        await self._update_display()
+    
+    def stop(self):
+        """Stop the view and cancel auto-movement"""
+        if self.auto_move_task:
+            self.auto_move_task.cancel()
+        super().stop()
+    
+    @discord.ui.button(label="⬅️ Left", style=discord.ButtonStyle.primary, custom_id="kraken_left")
+    async def move_left(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This isn't your fight!", ephemeral=True)
+            return
+        
+        if self.game_over:
+            await interaction.response.send_message("❌ Battle is over!", ephemeral=True)
+            return
+        
+        self.player_position = max(0, self.player_position - 1)
+        await self.update_game(interaction)
+    
+    @discord.ui.button(label="➡️ Right", style=discord.ButtonStyle.primary, custom_id="kraken_right")
+    async def move_right(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This isn't your fight!", ephemeral=True)
+            return
+        
+        if self.game_over:
+            await interaction.response.send_message("❌ Battle is over!", ephemeral=True)
+            return
+        
+        self.player_position = min(10, self.player_position + 1)
+        await self.update_game(interaction)
+    
+    @discord.ui.button(label="🎣 Reel In", style=discord.ButtonStyle.success, custom_id="kraken_reel")
+    async def reel_in(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This isn't your fight!", ephemeral=True)
+            return
+        
+        if self.game_over:
+            await interaction.response.send_message("❌ Battle is over!", ephemeral=True)
+            return
+        
+        # Check if player is EXACTLY aligned with Kraken
+        if self.player_position == self.kraken_position and not self.attack_active:
+            self.catches += 1
+            if self.catches >= self.required_catches:
+                await self.win_game(interaction)
+                return
+        else:
+            # Missed or during attack
+            self.escapes += 1
+            if self.escapes >= self.max_escapes:
+                await self.lose_game()
+                return
+        
+        # Kraken moves MORE erratically after failed catch
+        move_range = random.randint(2, 4)
+        self.kraken_position += random.randint(-move_range, move_range)
+        self.kraken_position = max(0, min(10, self.kraken_position))
+        
+        await self.update_game(interaction)
+    
+    async def update_game(self, interaction: discord.Interaction):
+        """Update game display after action"""
+        try:
+            await interaction.response.defer()
+        except:
+            pass
+        await self._update_display()
+    
+    async def win_game(self, interaction: discord.Interaction):
+        """Player caught the Kraken!"""
+        self.game_over = True
+        self.stop()
+        
+        # Calculate time taken
+        elapsed = int(asyncio.get_event_loop().time() - self.start_time)
+        minutes = elapsed // 60
+        seconds = elapsed % 60
+        
+        # Give rewards
+        economy_cog = self.cog.bot.get_cog("Economy")
+        reward_coins = random.randint(5000, 10000)
+        
+        if economy_cog:
+            economy_cog.add_coins(self.user.id, reward_coins, "kraken_victory")
+        
+        # Add Kraken to collection
+        user_data = self.cog.get_user_data(self.user.id)
+        if "kraken" not in user_data["fish_caught"]:
+            user_data["fish_caught"]["kraken"] = {"count": 0, "biggest": 0}
+        
+        kraken_weight = random.uniform(1000, 2000)
+        user_data["fish_caught"]["kraken"]["count"] += 1
+        if kraken_weight > user_data["fish_caught"]["kraken"].get("biggest", 0):
+            user_data["fish_caught"]["kraken"]["biggest"] = kraken_weight
+        
+        user_data["total_catches"] += 1
+        user_data["total_value"] += 50000  # Kraken is worth a lot!
+        
+        self.cog.save_fishing_data()
+        
+        kraken_defeated = """```
+         ⚔️ SLAIN ⚔️
+    ╔════════════════════╗
+    ║☠️  THE KRAKEN  ☠️ ║
+    ║    HAS FALLEN!     ║
+    ╚════════════════════╝
+          \\  |  /
+         ☠️--🦑--☠️
+           /  |  \\
+      ⚡ ⚡ ⚡ ⚡ ⚡ ⚡
+       The ancient terror
+        descends back to
+         the dark abyss
+      ⚡ ⚡ ⚡ ⚡ ⚡ ⚡
+```"""
+        
+        embed = discord.Embed(
+            title="🏆 LEGENDARY VICTORY! 🏆",
+            description=f"{kraken_defeated}\n\n"
+                       f"**🎉 YOU HAVE DEFEATED THE LEGENDARY KRAKEN! 🎉**\n\n"
+                       f"After an intense battle lasting {minutes}m {seconds}s, "
+                       f"you have conquered the ancient terror of the deep!\n\n"
+                       f"**Rewards:**\n"
+                       f"🦑 **THE KRAKEN Caught!** (Weight: {kraken_weight:.1f}kg)\n"
+                       f"💰 **{reward_coins:,} PsyCoins**\n"
+                       f"🏆 **Achievement Unlocked: Kraken Slayer**\n"
+                       f"⭐ **Catches:** {self.catches}/{self.required_catches}\n"
+                       f"💥 **Hits Taken:** {self.escapes}/{self.max_escapes}\n\n"
+                       f"*The ocean trembles with your might...*\n"
+                       f"*You are now legend among fishermen...*\n"
+                       f"*The abyss itself bows to your skill...*",
+            color=discord.Color.gold()
+        )
+        embed.set_footer(text=f"Battle completed in {minutes}m {seconds}s | You are a true master angler!")
+        
+        try:
+            await interaction.response.edit_message(embed=embed, view=None)
+        except:
+            await self.message.edit(embed=embed, view=None)
+    
+    async def lose_game(self):
+        """Kraken defeated the player"""
+        self.game_over = True
+        self.stop()
+        
+        kraken_victorious = """```
+       💀 GAME OVER 💀
+    ╔════════════════════╗
+    ║ YOU HAVE BEEN...   ║
+    ║    🦑 CONSUMED 🦑 ║
+    ╚════════════════════╝
+          \\  |  /
+         💀--🦑--💀
+           /  | \\
+      🌊 🌊 🌊 🌊 🌊 🌊
+       The Kraken drags
+        you down into the
+        endless darkness
+      🌊 🌊 🌊 🌊 🌊 🌊
+        ☠️  R.I.P  ☠️
+```"""
+        
+        embed = discord.Embed(
+            title="💀 CONSUMED BY THE ABYSS 💀",
+            description=f"{kraken_victorious}\n\n"
+                       f"**💀 THE KRAKEN HAS CONSUMED YOU 💀**\n\n"
+                       f"The ancient beast was too powerful...\n"
+                       f"Your rod snapped, your line broke, and the darkness claimed you.\n\n"
+                       f"**Battle Stats:**\n"
+                       f"⭐ **Catches:** {self.catches}/{self.required_catches}\n"
+                       f"💥 **Hits Taken:** {self.escapes}/{self.max_escapes}\n\n"
+                       f"*The ocean claims another victim...*\n"
+                       f"*The Kraken descends back into the abyss, waiting...*\n"
+                       f"*Perhaps with more skill, you could have prevailed...*\n\n"
+                       f"💡 **Boss Tips:**\n"
+                       f"• Watch for attack pattern names (TIDAL WAVE, WHIRLPOOL, etc.)\n"
+                       f"• Multiple RED tiles = multi-hit attack pattern!\n"
+                       f"• Find safe spaces between attack zones!\n"
+                       f"• BARRAGE and LIGHTNING STORM are the deadliest!",
+            color=discord.Color.dark_red()
+        )
+        embed.set_footer(text="The legend of the Kraken lives on... Will you try again?")
+        
+        await self.message.edit(embed=embed, view=None)
 
 
 # ==================== ENCYCLOPEDIA WITH RARITY FILTER + PAGINATION ====================
@@ -735,17 +1207,36 @@ class AreaSelectView(discord.ui.View):
             unlocked = area_id in user_data["unlocked_areas"]
             current = area_id == user_data["current_area"]
             
+            # Sprawdź wymagania łódki
+            required_boat = area.get("required_boat", "none")
+            current_boat = user_data.get("boat", "none")
+            current_boat_data = fishing_cog.boats.get(current_boat, {})
+            allowed_areas = current_boat_data.get("areas", [])
+            has_boat = area_id in allowed_areas
+            
+            # Label with icons
             if current:
                 label = f"📍 {area['name']} (Current)"
-            elif unlocked:
+            elif unlocked and has_boat:
                 label = f"✅ {area['name']}"
+            elif not has_boat:
+                req_boat = fishing_cog.boats.get(required_boat, {})
+                label = f"🔒 {area['name']} - 🛶 {req_boat.get('name', 'Boat')}"
             else:
-                label = f"🔒 {area['name']} - {area['unlock_cost']} coins"
+                label = f"🔒 {area['name']} - {area['unlock_cost']:,}💰"
+            
+            # Description with requirements
+            desc_parts = [area['description'][:60]]
+            if not has_boat:
+                req_boat = fishing_cog.boats.get(required_boat, {})
+                desc_parts.append(f"Requires: {req_boat.get('name', 'Boat')}")
+            elif not unlocked:
+                desc_parts.append(f"Cost: {area['unlock_cost']:,} PsyCoins")
             
             options.append(discord.SelectOption(
                 label=label[:100],
                 value=area_id,
-                description=area['description'][:100]
+                description=" | ".join(desc_parts)[:100]
             ))
         
         self.area_select_menu = discord.ui.Select(
@@ -767,7 +1258,40 @@ class AreaSelectView(discord.ui.View):
                 await interaction.followup.send("📍 You are already at this location!", ephemeral=True)
                 return
             
-            # Check if unlocked
+            # FIRST check boat requirements
+            required_boat = area.get("required_boat", "none")
+            current_boat = self.user_data.get("boat", "none")
+            required_boat_data = self.fishing_cog.boats.get(required_boat, {})
+            current_boat_data = self.fishing_cog.boats.get(current_boat, {})
+            
+            # Check if current_boat can reach this area
+            allowed_areas = current_boat_data.get("areas", [])
+            if area_id not in allowed_areas:
+                # Missing required boat!
+                embed = discord.Embed(
+                    title=f"🔒 {area['name']} - Access Denied",
+                    description=f"This area requires a better boat!",
+                    color=discord.Color.red()
+                )
+                embed.add_field(
+                    name="🛶 Your Boat",
+                    value=f"**{current_boat_data.get('name', 'None')}**",
+                    inline=True
+                )
+                embed.add_field(
+                    name="🛶 Required Boat",
+                    value=f"**{required_boat_data.get('name', 'Unknown')}**\n💰 {required_boat_data.get('cost', 0):,} PsyCoins",
+                    inline=True
+                )
+                embed.add_field(
+                    name="💡 What to do?",
+                    value=f"Buy **{required_boat_data.get('name', 'Unknown')}** at:\n`/fish shop` → **Boats** tab",
+                    inline=False
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                return
+            
+            # POTEM sprawdź czy obszar jest odblokowany
             success_message = None
             if area_id not in self.user_data["unlocked_areas"]:
                 # Try to unlock
@@ -776,16 +1300,43 @@ class AreaSelectView(discord.ui.View):
                     return
                 
                 cost = area["unlock_cost"]
-                if economy_cog.remove_coins(interaction.user.id, cost):
+                balance = economy_cog.get_balance(interaction.user.id)
+                
+                if balance >= cost:
+                    economy_cog.remove_coins(interaction.user.id, cost)
                     self.user_data["unlocked_areas"].append(area_id)
                     self.user_data["current_area"] = area_id
                     self.fishing_cog.save_fishing_data()
-                    success_message = f"🎉 Unlocked and traveled to **{area['name']}** for {cost} PsyCoins!"
+                    success_message = f"🎉 Unlocked and traveled to **{area['name']}** for {cost:,} PsyCoins!"
                 else:
-                    await interaction.followup.send(
-                        f"❌ You need {cost} PsyCoins to unlock **{area['name']}**.",
-                        ephemeral=True
+                    # Not enough money!
+                    needed = cost - balance
+                    embed = discord.Embed(
+                        title=f"💰 Not Enough PsyCoins!",
+                        description=f"You can't afford to unlock **{area['name']}**",
+                        color=discord.Color.orange()
                     )
+                    embed.add_field(
+                        name="💳 Your Balance",
+                        value=f"**{balance:,}** PsyCoins",
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="💰 Area Cost",
+                        value=f"**{cost:,}** PsyCoins",
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="📉 Need",
+                        value=f"**{needed:,}** PsyCoins",
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="💡 How to earn?",
+                        value="🎣 Catch and sell fish!\n💰 Use `/fish cast` to fish",
+                        inline=False
+                    )
+                    await interaction.followup.send(embed=embed, ephemeral=True)
                     return
             else:
                 # Just travel
@@ -821,18 +1372,41 @@ class AreaSelectView(discord.ui.View):
                 # Add all areas as fields
                 for area_id_iter, area_iter in self.fishing_cog.areas.items():
                     unlocked = area_id_iter in self.user_data["unlocked_areas"]
-                    current = area_id_iter == self.user_data["current_area"]
+                    current_loc = area_id_iter == self.user_data["current_area"]
                     
-                    if current:
-                        status = "📍 Current Location"
-                    elif unlocked:
-                        status = "✅ Unlocked"
+                    # Check boat requirements
+                    required_boat = area_iter.get("required_boat", "none")
+                    current_boat = self.user_data.get("boat", "none")
+                    current_boat_data = self.fishing_cog.boats.get(current_boat, {})
+                    allowed_areas = current_boat_data.get("areas", [])
+                    has_boat = area_id_iter in allowed_areas
+                    
+                    # Status icons
+                    if current_loc:
+                        status_icon = "📍"
+                        status_text = "**[CURRENT]**"
+                    elif unlocked and has_boat:
+                        status_icon = "✅"
+                        status_text = "Available"
                     else:
-                        status = f"🔒 Locked - {area_iter['unlock_cost']} PsyCoins"
+                        status_icon = "🔒"
+                        status_text = "Locked"
+                    
+                    # Requirements
+                    requirements = []
+                    
+                    if not has_boat:
+                        req_boat_data = self.fishing_cog.boats.get(required_boat, {})
+                        requirements.append(f"🛶 Requires: **{req_boat_data.get('name', 'Unknown')}** ({req_boat_data.get('cost', 0):,} 💰)")
+                    
+                    if not unlocked and area_iter.get("unlock_cost", 0) > 0:
+                        requirements.append(f"💰 Unlock cost: **{area_iter['unlock_cost']:,} PsyCoins**")
+                    
+                    req_text = "\n".join(requirements) if requirements else "✅ Ready to explore!"
                     
                     new_embed.add_field(
-                        name=f"{area_iter['name']}",
-                        value=f"{area_iter['description']}\n**Status:** {status}",
+                        name=f"{status_icon} {area_iter['name']}",
+                        value=f"{area_iter['description']}\n{req_text}\n_{status_text}_",
                         inline=False
                     )
                 
@@ -866,10 +1440,16 @@ class BaitSelectView(discord.ui.View):
         for bait_id, count in bait_inventory.items():
             if count > 0 and bait_id in fishing_cog.baits:
                 bait = fishing_cog.baits[bait_id]
+                # Special description for kraken bait
+                if bait_id == "kraken_bait":
+                    description = "🦑 SUMMONS THE KRAKEN! (Mariana Trench only)"
+                else:
+                    description = f"+{bait['catch_bonus']}% catch bonus"
+                
                 bait_options.append(discord.SelectOption(
                     label=f"{bait['name']} (x{count})",
                     value=bait_id,
-                    description=f"+{bait['catch_bonus']}% catch bonus"
+                    description=description
                 ))
         
         self.bait_select = discord.ui.Select(
@@ -890,6 +1470,252 @@ class BaitSelectView(discord.ui.View):
             await self.fishing_cog.cast_action(interaction, bait_choice)
         except Exception as e:
             await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
+
+
+class DetailedInventoryView(discord.ui.View):
+    """Paginated detailed inventory showing all caught fish"""
+    def __init__(self, fishing_cog, user_data, user: discord.User):
+        super().__init__(timeout=180)
+        self.fishing_cog = fishing_cog
+        self.user_data = user_data
+        self.user = user
+        self.current_page = 0
+        self.fish_per_page = 8
+        
+        # Sort fish by count (most caught first)
+        # Validate and fix data structure
+        self.sorted_fish = []
+        for fish_id, data in user_data["fish_caught"].items():
+            # Fix old format if needed
+            if not isinstance(data, dict):
+                data = {"count": int(data) if data else 0, "biggest": 0}
+                user_data["fish_caught"][fish_id] = data  # Update in place
+            
+            # Ensure required keys
+            if "count" not in data:
+                data["count"] = 0
+            if "biggest" not in data:
+                data["biggest"] = 0
+            
+            # Only add fish with count > 0
+            if data["count"] > 0:
+                self.sorted_fish.append((fish_id, data))
+        
+        # Sort by count
+        self.sorted_fish.sort(key=lambda x: x[1]["count"], reverse=True)
+        
+        self.total_pages = max(1, (len(self.sorted_fish) + self.fish_per_page - 1) // self.fish_per_page)
+        self.message = None
+        
+        # Add navigation buttons
+        self.update_buttons()
+    
+    def update_buttons(self):
+        """Update button states based on current page"""
+        self.clear_items()
+        
+        # Previous button
+        prev_button = discord.ui.Button(
+            label="◀️ Previous",
+            style=discord.ButtonStyle.primary,
+            disabled=(self.current_page == 0),
+            row=0
+        )
+        prev_button.callback = self.previous_page
+        self.add_item(prev_button)
+        
+        # Page indicator button (disabled, just for show)
+        page_button = discord.ui.Button(
+            label=f"Page {self.current_page + 1}/{self.total_pages}",
+            style=discord.ButtonStyle.secondary,
+            disabled=True,
+            row=0
+        )
+        self.add_item(page_button)
+        
+        # Next button
+        next_button = discord.ui.Button(
+            label="Next ▶️",
+            style=discord.ButtonStyle.primary,
+            disabled=(self.current_page >= self.total_pages - 1),
+            row=0
+        )
+        next_button.callback = self.next_page
+        self.add_item(next_button)
+        
+        # Equipment button (new row)
+        equip_button = discord.ui.Button(
+            label="⚙️ Change Equipment",
+            style=discord.ButtonStyle.success,
+            row=1
+        )
+        equip_button.callback = self.show_equipment
+        self.add_item(equip_button)
+    
+    def get_embed(self):
+        """Generate embed for current page"""
+        start_idx = self.current_page * self.fish_per_page
+        end_idx = start_idx + self.fish_per_page
+        page_fish = self.sorted_fish[start_idx:end_idx]
+        
+        embed = discord.Embed(
+            title=f"🎒 {self.user.display_name}'s Fishing Inventory",
+            description=f"**Overall Statistics:**\n"
+                       f"🐟 **Total Catches:** {self.user_data['total_catches']}\n"
+                       f"💰 **Total Value:** {self.user_data['total_value']:,} coins\n"
+                       f"🏆 **Species Caught:** {len(self.user_data['fish_caught'])}/{len(self.fishing_cog.fish_types)}\n"
+                       f"━━━━━━━━━━━━━━━━━━━━━━",
+            color=discord.Color.blue()
+        )
+        
+        # Equipment section
+        embed.add_field(
+            name="⚙️ Equipment",
+            value=f"🎣 **Rod:** {self.fishing_cog.rods[self.user_data['rod']]['name']}\n"
+                  f"🛶 **Boat:** {self.fishing_cog.boats[self.user_data['boat']]['name']}\n"
+                  f"📍 **Area:** {self.fishing_cog.areas[self.user_data['current_area']]['name']}",
+            inline=False
+        )
+        
+        # Bait inventory section
+        if self.user_data.get("bait_inventory"):
+            bait_text = ""
+            for bait_id, count in self.user_data["bait_inventory"].items():
+                if bait_id in self.fishing_cog.baits:
+                    bait_text += f"🪱 {self.fishing_cog.baits[bait_id]['name']}: **{count}x**\n"
+            if bait_text:
+                embed.add_field(name="🎒 Bait Inventory", value=bait_text, inline=False)
+        
+        # Fish collection section
+        embed.add_field(
+            name=f"🐟 Fish Collection (Page {self.current_page + 1}/{self.total_pages})",
+            value="━━━━━━━━━━━━━━━━━━━━━━",
+            inline=False
+        )
+        
+        # Add fish details
+        for fish_id, data in page_fish:
+            if fish_id not in self.fishing_cog.fish_types:
+                continue
+            
+            # Validate data structure (fix old format)
+            if not isinstance(data, dict):
+                # Old format: just a number
+                data = {"count": int(data) if data else 0, "biggest": 0}
+            
+            # Ensure required keys exist
+            if "count" not in data:
+                data["count"] = 0
+            if "biggest" not in data:
+                data["biggest"] = 0
+                
+            fish = self.fishing_cog.fish_types[fish_id]
+            
+            # Rarity emoji
+            rarity_emojis = {
+                "Common": "⚪",
+                "Uncommon": "🟢",
+                "Rare": "🔵",
+                "Epic": "🟣",
+                "Legendary": "🟠",
+                "Mythic": "🔴",
+                "BOSS": "💀"
+            }
+            rarity_emoji = rarity_emojis.get(fish["rarity"], "⚪")
+            
+            # Calculate total value
+            total_value = fish["value"] * data["count"]
+            
+            fish_info = (
+                f"{rarity_emoji} **{fish['rarity']}**\n"
+                f"📊 **Caught:** {data['count']}x\n"
+                f"⚖️ **Biggest:** {data['biggest']:.1f}kg\n"
+                f"💰 **Total Value:** {total_value:,} coins"
+            )
+            
+            embed.add_field(
+                name=f"{fish['name']}",
+                value=fish_info,
+                inline=True
+            )
+        
+        embed.set_footer(text=f"💡 Page {self.current_page + 1} of {self.total_pages} | Use arrows to navigate")
+        
+        return embed
+    
+    async def send_initial_message(self, interaction: discord.Interaction):
+        """Send the initial inventory message"""
+        embed = self.get_embed()
+        await interaction.response.send_message(embed=embed, view=self)
+        self.message = await interaction.original_response()
+    
+    async def update_message(self):
+        """Update the message with new page"""
+        if self.message:
+            embed = self.get_embed()
+            self.update_buttons()
+            await self.message.edit(embed=embed, view=self)
+    
+    async def previous_page(self, interaction: discord.Interaction):
+        """Go to previous page"""
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This is not your inventory!", ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        if self.current_page > 0:
+            self.current_page -= 1
+            await self.update_message()
+    
+    async def next_page(self, interaction: discord.Interaction):
+        """Go to next page"""
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This is not your inventory!", ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            await self.update_message()
+    
+    async def show_equipment(self, interaction: discord.Interaction):
+        """Show equipment change interface"""
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This is not your inventory!", ephemeral=True)
+            return
+        
+        # Create equipment selection embed
+        embed = discord.Embed(
+            title="⚙️ Change Equipment",
+            description=f"**Current Equipment:**\n"
+                       f"🎣 **Rod:** {self.fishing_cog.rods[self.user_data['rod']]['name']}\n"
+                       f"🛶 **Boat:** {self.fishing_cog.boats[self.user_data['boat']]['name']}\n\n"
+                       f"Use the dropdowns below to change your equipment!",
+            color=discord.Color.gold()
+        )
+        
+        # Create equipment view
+        equip_view = InventoryEquipView(self.fishing_cog, self.user_data)
+        
+        # Add back button to return to inventory
+        back_button = discord.ui.Button(
+            label="⬅️ Back to Inventory",
+            style=discord.ButtonStyle.secondary
+        )
+        
+        async def back_callback(back_interaction: discord.Interaction):
+            if back_interaction.user.id != self.user.id:
+                await back_interaction.response.send_message("❌ This is not your inventory!", ephemeral=True)
+                return
+            
+            await back_interaction.response.defer()
+            # Refresh and show inventory
+            await self.update_message()
+        
+        back_button.callback = back_callback
+        equip_view.add_item(back_button)
+        
+        await interaction.response.edit_message(embed=embed, view=equip_view)
 
 
 class InventoryEquipView(discord.ui.View):
@@ -956,15 +1782,27 @@ class InventoryEquipView(discord.ui.View):
             self.user_data['rod'] = rod_id
             self.fishing_cog.save_fishing_data()
             
-            temp_embed = discord.Embed(
-                title="✅ Success",
-                description=f"🎣 Equipped **{rod['name']}**!",
-                color=discord.Color.green()
-            )
-            await interaction.edit_original_response(embed=temp_embed, view=None)
-            await asyncio.sleep(2)
+            # Show success message
+            await interaction.followup.send(f"✅ Equipped **{rod['name']}**!", ephemeral=True)
             
-            await self._refresh_inventory(interaction)
+            # Update the equipment view
+            embed = discord.Embed(
+                title="⚙️ Change Equipment",
+                description=f"**Current Equipment:**\n"
+                           f"🎣 **Rod:** {self.fishing_cog.rods[self.user_data['rod']]['name']}\n"
+                           f"🛶 **Boat:** {self.fishing_cog.boats[self.user_data['boat']]['name']}\n\n"
+                           f"Use the dropdowns below to change your equipment!",
+                color=discord.Color.gold()
+            )
+            
+            new_view = InventoryEquipView(self.fishing_cog, self.user_data)
+            # Keep the back button
+            for item in self.children:
+                if isinstance(item, discord.ui.Button) and "Back" in item.label:
+                    new_view.add_item(item)
+                    break
+            
+            await interaction.edit_original_response(embed=embed, view=new_view)
         except Exception as e:
             await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
     
@@ -981,78 +1819,30 @@ class InventoryEquipView(discord.ui.View):
             self.user_data['boat'] = boat_id
             self.fishing_cog.save_fishing_data()
             
-            temp_embed = discord.Embed(
-                title="✅ Success",
-                description=f"🛶 Equipped **{boat['name']}**!",
-                color=discord.Color.green()
-            )
-            await interaction.edit_original_response(embed=temp_embed, view=None)
-            await asyncio.sleep(2)
+            # Show success message
+            await interaction.followup.send(f"✅ Equipped **{boat['name']}**!", ephemeral=True)
             
-            await self._refresh_inventory(interaction)
+            # Update the equipment view
+            embed = discord.Embed(
+                title="⚙️ Change Equipment",
+                description=f"**Current Equipment:**\n"
+                           f"🎣 **Rod:** {self.fishing_cog.rods[self.user_data['rod']]['name']}\n"
+                           f"🛶 **Boat:** {self.fishing_cog.boats[self.user_data['boat']]['name']}\n\n"
+                           f"Use the dropdowns below to change your equipment!",
+                color=discord.Color.gold()
+            )
+            
+            new_view = InventoryEquipView(self.fishing_cog, self.user_data)
+            # Keep the back button
+            for item in self.children:
+                if isinstance(item, discord.ui.Button) and "Back" in item.label:
+                    new_view.add_item(item)
+                    break
+            
+            await interaction.edit_original_response(embed=embed, view=new_view)
         except Exception as e:
             await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
     
-    async def _refresh_inventory(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title=f"🎒 {interaction.user.display_name}'s Fishing Inventory",
-            color=discord.Color.blue()
-        )
-        
-        embed.add_field(
-            name="🎣 Equipped Rod",
-            value=self.fishing_cog.rods[self.user_data["rod"]]["name"],
-            inline=True
-        )
-        embed.add_field(
-            name="🛶 Equipped Boat",
-            value=self.fishing_cog.boats[self.user_data["boat"]]["name"],
-            inline=True
-        )
-        embed.add_field(
-            name="📍 Current Area",
-            value=self.fishing_cog.areas[self.user_data["current_area"]]["name"],
-            inline=True
-        )
-        
-        if self.user_data.get("bait_inventory"):
-            bait_text = ""
-            for bait_id, count in self.user_data["bait_inventory"].items():
-                bait_text += f"{self.fishing_cog.baits[bait_id]['name']}: {count}\n"
-            embed.add_field(name="🪱 Bait Inventory", value=bait_text or "None", inline=False)
-        
-        if self.user_data["fish_caught"]:
-            embed.add_field(
-                name="🐟 Fish Collection",
-                value=f"**Total Catches:** {self.user_data['total_catches']}\n"
-                     f"**Total Value:** {self.user_data['total_value']} coins\n"
-                     f"**Species:** {len(self.user_data['fish_caught'])}/{len(self.fishing_cog.fish_types)}",
-                inline=False
-            )
-            
-            sorted_fish = sorted(
-                self.user_data["fish_caught"].items(),
-                key=lambda x: x[1]["count"],
-                reverse=True
-            )
-            
-            fish_list = ""
-            for fish_id, data in sorted_fish[:5]:
-                fish = self.fishing_cog.fish_types[fish_id]
-                fish_list += f"{fish['name']}: {data['count']} (Biggest: {data['biggest']}kg)\n"
-            
-            embed.add_field(name="🏆 Top 5 Fish", value=fish_list, inline=False)
-        else:
-            embed.add_field(
-                name="🐟 Fish Collection",
-                value="No fish caught yet! Use `/fish cast` to start.",
-                inline=False
-            )
-        
-        embed.set_footer(text="💡 Use the dropdowns above to change your equipment!")
-        
-        new_view = InventoryEquipView(self.fishing_cog, self.user_data)
-        await interaction.edit_original_response(embed=embed, view=new_view)
 
 
 class FishingHelpView(discord.ui.View):
@@ -1079,12 +1869,13 @@ class FishingHelpView(discord.ui.View):
             value="`/fish cast` - Start fishing (with minigame!)\n"
                  "`/fish inventory` - View your collection\n"
                  "`/fish shop` - Buy rods, boats, and bait\n"
+                 "`/fish craft` - Craft special items\n"
                  "`/fish areas` - Travel to fishing locations\n"
                  "`/fish encyclopedia` - Browse all fish\n"
-                 "`/fish stats` - View your statistics",
+                 "`/fish stats` - View your statistics\n",
             inline=False
         )
-        page0.set_footer(text="Page 1/6 • Use arrows to navigate")
+        page0.set_footer(text="Page 1/8 • Use arrows to navigate")
         self.pages.append(page0)
         
         # Page 1: Minigame Guide
@@ -1120,7 +1911,7 @@ class FishingHelpView(discord.ui.View):
                  "**Mythic:** ⭐⭐⭐⭐⭐ (5 catches, 2 escapes, very fast!)",
             inline=False
         )
-        page1.set_footer(text="Page 2/6 • Use arrows to navigate")
+        page1.set_footer(text="Page 2/8 • Use arrows to navigate")
         self.pages.append(page1)
         
         # Page 2: Rods & Equipment
@@ -1145,8 +1936,58 @@ class FishingHelpView(discord.ui.View):
                  "Higher bonuses mean better chances!",
             inline=False
         )
-        page2.set_footer(text="Page 3/6 • Use arrows to navigate")
+        page2.set_footer(text="Page 3/7 • Use arrows to navigate")
         self.pages.append(page2)
+        
+        # Page 2.5: Rod Bonuses for Minigames
+        page2_5 = discord.Embed(
+            title="🎮 Rod Bonuses - Minigame Benefits",
+            description="**Better rods make fishing minigames EASIER!**\n\n"
+                       "Rods don't just increase catch chances - they make the actual gameplay easier too!",
+            color=discord.Color.blue()
+        )
+        page2_5.add_field(
+            name="📊 Normal Fishing Minigames",
+            value="**Basic Rod:** No bonus (standard difficulty)\n"
+                 "**Sturdy Rod:** 📈 +15% - Easier catches, slower fish\n"
+                 "**Carbon Fiber Rod:** 📈 +25% - Noticeably easier\n"
+                 "**Master Rod:** 📈 +35% - Much easier gameplay\n"
+                 "**Legendary Rod:** 📈 +45% - Significantly easier!",
+            inline=False
+        )
+        page2_5.add_field(
+            name="🎯 What Changes With Better Rods:",
+            value="✅ **Fewer catches required** (min 2 catches)\n"
+                 "✅ **More escapes allowed** (max 6 mistakes)\n"
+                 "✅ **Fish moves slower** (up to 13.5% slower)\n"
+                 "✅ **Bonus shown in-game** (rod bonus displayed)",
+            inline=False
+        )
+        page2_5.add_field(
+            name="🦑 KRAKEN BOSS FIGHT Bonuses",
+            value="**Basic Rod:** 8 catches, 3 escapes, 1.2s speed\n"
+                 "**Sturdy Rod:** 7 catches, 3 escapes, 1.23s speed\n"
+                 "**Carbon Fiber:** 6 catches, 4 escapes, 1.26s speed\n"
+                 "**Master Rod:** 6 catches, 4 escapes, 1.29s speed\n"
+                 "**Legendary Rod:** 5 catches, 5 escapes, 1.32s speed\n\n"
+                 "⚔️ Better rods = Easier boss fight!",
+            inline=False
+        )
+        page2_5.add_field(
+            name="💡 Example (Mythic Fish - Difficulty 5)",
+            value="**With Basic Rod:**\n"
+                 "• Need 5 successful catches\n"
+                 "• Only 2 mistakes allowed\n"
+                 "• Very fast fish movement\n\n"
+                 "**With Legendary Rod:**\n"
+                 "• Need only 3 successful catches\n"
+                 "• 3 mistakes allowed\n"
+                 "• Slower fish movement\n\n"
+                 "🎣 *Investing in better rods is worth it!*",
+            inline=False
+        )
+        page2_5.set_footer(text="Page 4/8 • Better rods = Better gameplay!")
+        self.pages.append(page2_5)
         
         # Page 3: Bait & Boats
         page3 = discord.Embed(
@@ -1168,7 +2009,7 @@ class FishingHelpView(discord.ui.View):
         boat_text += "**🛥️ Yacht** - 50,000 coins (+ Arctic, Reef)\n"
         boat_text += "**🚢 Submarine** - 250,000 coins (+ Abyss, Trench)\n"
         page3.add_field(name="🛶 Boats", value=boat_text, inline=False)
-        page3.set_footer(text="Page 4/6 • Use arrows to navigate")
+        page3.set_footer(text="Page 5/8 • Use arrows to navigate")
         self.pages.append(page3)
         
         # Page 4: Fishing Areas
@@ -1195,7 +2036,7 @@ class FishingHelpView(discord.ui.View):
                  "• Rarer areas = Rarer fish = More coins!",
             inline=False
         )
-        page4.set_footer(text="Page 5/6 • Use arrows to navigate")
+        page4.set_footer(text="Page 6/8 • Use arrows to navigate")
         self.pages.append(page4)
         
         # Page 5: Tournaments & Advanced
@@ -1236,8 +2077,46 @@ class FishingHelpView(discord.ui.View):
                  "Filter by rarity and see detailed stats for each fish.",
             inline=False
         )
-        page5.set_footer(text="Page 6/6 • Use arrows to navigate")
+        page5.set_footer(text="Page 7/8 • Use arrows to navigate")
         self.pages.append(page5)
+        
+        # Page 6: KRAKEN BOSS FIGHT
+        page6 = discord.Embed(
+            title="🦑 THE KRAKEN - ULTIMATE CHALLENGE",
+            description="**The legendary beast of the abyss awaits the bravest anglers!**\n\n"
+                       "⚠️ **WARNING:** This is an extremely dangerous encounter!",
+            color=discord.Color.dark_red()
+        )
+        page6.add_field(
+            name="🔨 How to Summon",
+            value="**1.** Catch 8x 🦑 Kraken Tentacles in the Mariana Trench\n"
+                 "**2.** Use `/fish craft` to craft Kraken Bait\n"
+                 "**3.** Travel to 🕳️ Mariana Trench\n"
+                 "**4.** Cast with Kraken Bait selected\n"
+                 "**5.** Face the beast in epic combat!",
+            inline=False
+        )
+        page6.add_field(
+            name="⚔️ Combat System",
+            value="**⚔️ Heavy Strike** - High damage, high risk (80-120 dmg)\n"
+                 "**🎯 Quick Strike** - Moderate damage, safer (40-70 dmg)\n"
+                 "**🛡️ Defend** - Reduce damage taken by 50%\n"
+                 "**❤️ Heal** - Restore 25-40 HP (vulnerable!)\n\n"
+                 "⚠️ The Kraken has 1000 HP and devastating attacks!",
+            inline=False
+        )
+        page6.add_field(
+            name="🏆 Rewards",
+            value="**Victory:**\n"
+                 "• 🦑 THE KRAKEN added to collection\n"
+                 "• 💰 5,000-10,000 PsyCoins\n"
+                 "• 🏆 Achievement: Kraken Slayer\n"
+                 "• Eternal glory!\n\n"
+                 "*Only the strongest will prevail...*",
+            inline=False
+        )
+        page6.set_footer(text="Page 8/8 • The abyss awaits...")
+        self.pages.append(page6)
     
     def get_current_embed(self):
         """Get the current page embed"""
@@ -1382,6 +2261,16 @@ class Fishing(commands.Cog):
                 "catch_bonus": 75,
                 "rare_bonus": 50,
                 "uses": 1
+            },
+            "kraken_bait": {
+                "name": "🦑 Kraken Bait",
+                "description": "Summons the legendary Kraken! Only works in Mariana Trench. Requires 8 Kraken Tentacles to craft.",
+                "cost": 0,  # Cannot buy, must craft
+                "catch_bonus": 0,
+                "rare_bonus": 0,
+                "uses": 1,
+                "craftable": True,
+                "craft_recipe": {"kraken_tentacle": 8}
             }
         }
         
@@ -1555,6 +2444,9 @@ class Fishing(commands.Cog):
             "kraken_tentacle": {"name": "🦑 Kraken Tentacle", "rarity": "Mythic", "value": 10000, "weight": [100, 500], "chance": 2},
             "atlantis_relic": {"name": "🏺 Atlantis Relic", "rarity": "Mythic", "value": 15000, "weight": [5, 20], "chance": 1.5},
             "cosmic_jellyfish": {"name": "🌌 Cosmic Jellyfish", "rarity": "Mythic", "value": 25000, "weight": [0.5, 5], "chance": 0.5},
+            
+            # Boss - Kraken (special catch, only from boss fight)
+            "kraken": {"name": "🦑 THE KRAKEN", "rarity": "BOSS", "value": 50000, "weight": [1000, 2000], "chance": 0},
         }
         
         # Achievements
@@ -1580,6 +2472,18 @@ class Fishing(commands.Cog):
     def save_fishing_data(self):
         """Save fishing data to JSON"""
         try:
+            # Clean up empty fish entries before saving
+            for user_id, user_data in self.fishing_data.items():
+                if "fish_caught" in user_data:
+                    # Remove fish with count <= 0
+                    to_remove = []
+                    for fish_id, data in user_data["fish_caught"].items():
+                        if isinstance(data, dict) and data.get("count", 0) <= 0:
+                            to_remove.append(fish_id)
+                    
+                    for fish_id in to_remove:
+                        del user_data["fish_caught"][fish_id]
+            
             with open(self.fishing_data_file, 'w') as f:
                 json.dump(self.fishing_data, f, indent=4)
         except Exception as e:
@@ -1640,6 +2544,7 @@ class Fishing(commands.Cog):
         app_commands.Choice(name="🎣 Cast Line", value="cast"),
         app_commands.Choice(name="🎒 Inventory", value="inventory"),
         app_commands.Choice(name="🏪 Shop", value="shop"),
+        app_commands.Choice(name="🔨 Craft", value="craft"),
         app_commands.Choice(name="🗺️ Areas", value="areas"),
         app_commands.Choice(name="📖 Encyclopedia", value="encyclopedia"),
         app_commands.Choice(name="📊 Stats", value="stats"),
@@ -1670,6 +2575,8 @@ class Fishing(commands.Cog):
             await self.fish_inventory_action(interaction)
         elif action == "shop":
             await self.fish_shop_action(interaction)
+        elif action == "craft":
+            await self.fish_craft_action(interaction)
         elif action == "areas":
             await self.fish_areas_action(interaction)
         elif action == "encyclopedia":
@@ -1696,9 +2603,10 @@ class Fishing(commands.Cog):
                        "• `cast` - Cast your line and fish!\n"
                        "• `inventory` - View catches & equipment\n"
                        "• `shop` - Purchase equipment & bait\n"
+                       "• `craft` - Craft special items (Kraken Bait!)\n"
                        "• `areas` - View locations & travel\n"
                        "• `encyclopedia` - View fish encyclopedia\n"
-                       "• `stats` - View your statistics",
+                       "• `stats` - View your statistics\n",
             color=discord.Color.blue()
         )
         
@@ -1707,6 +2615,47 @@ class Fishing(commands.Cog):
     async def cast_action(self, interaction: discord.Interaction, bait: Optional[str] = None):
         """Cast fishing line"""
         user_data = self.get_user_data(interaction.user.id)
+        
+        # SPECIAL: Check for Kraken Bait in Mariana Trench
+        if bait == "kraken_bait":
+            if user_data["current_area"] != "trench":
+                embed = discord.Embed(
+                    title="❌ Wrong Location",
+                    description="**The Kraken Bait only works in the Mariana Trench!**\n\n"
+                               "🕳️ You must be in the deepest, darkest waters to summon the beast.\n"
+                               "Travel to the Mariana Trench to use this legendary bait.",
+                    color=discord.Color.red()
+                )
+                if interaction.response.is_done():
+                    await interaction.edit_original_response(embed=embed, view=None)
+                else:
+                    await interaction.response.send_message(embed=embed)
+                return
+            
+            # Check if user has kraken_bait
+            if "kraken_bait" not in user_data.get("bait_inventory", {}) or user_data["bait_inventory"]["kraken_bait"] <= 0:
+                embed = discord.Embed(
+                    title="❌ No Kraken Bait",
+                    description="**You don't have any Kraken Bait!**\n\n"
+                               "🦑 Craft it using `/fish craft` with 8 Kraken Tentacles.",
+                    color=discord.Color.red()
+                )
+                if interaction.response.is_done():
+                    await interaction.edit_original_response(embed=embed, view=None)
+                else:
+                    await interaction.response.send_message(embed=embed)
+                return
+            
+            # Use the bait
+            user_data["bait_inventory"]["kraken_bait"] -= 1
+            if user_data["bait_inventory"]["kraken_bait"] <= 0:
+                del user_data["bait_inventory"]["kraken_bait"]
+            self.save_fishing_data()
+            
+            # START KRAKEN BOSS FIGHT!
+            boss_fight = KrakenBossFight(self, interaction.user, user_data["rod"])
+            await boss_fight.start_fight(interaction)
+            return
         
         # Get conditions
         weather = self.get_current_weather()
@@ -1816,15 +2765,26 @@ class Fishing(commands.Cog):
         }
         difficulty = difficulty_map.get(caught_fish["rarity"], 3)
         
-        # Start minigame
-        minigame_view = FishingMinigameView(self, interaction.user, caught_fish_id, difficulty)
+        # Start minigame with rod bonus
+        minigame_view = FishingMinigameView(self, interaction.user, caught_fish_id, difficulty, user_data["rod"])
+        
+        # Get rod bonus info for display
+        rod_bonus_text = ""
+        if user_data["rod"] != "basic_rod":
+            rod_bonus_map = {
+                "sturdy_rod": "📈 +15% Rod Bonus",
+                "carbon_fiber_rod": "📈 +25% Rod Bonus",
+                "master_rod": "📈 +35% Rod Bonus",
+                "legendary_rod": "📈 +45% Rod Bonus"
+            }
+            rod_bonus_text = f"\n{rod_bonus_map.get(user_data['rod'], '')}"
         
         embed = discord.Embed(
             title="🎣 Fishing Minigame",
             description=f"**Catching:** {caught_fish['name']} ({caught_fish['rarity']})\n"
-                       f"**Progress:** ⚪⚪⚪ ({3 + (difficulty // 2)} needed)\n"
-                       f"**Escapes:** ⚪⚪⚪ ({4 - (difficulty // 2)} max)\n"
-                       f"⏱️ **Time Remaining:** 3:00\n\n"
+                       f"**Progress:** {'⚪' * minigame_view.required_catches} ({minigame_view.required_catches} needed)\n"
+                       f"**Escapes:** {'⚪' * minigame_view.max_escapes} ({minigame_view.max_escapes} max)\n"
+                       f"⏱️ **Time Remaining:** 3:00{rod_bonus_text}\n\n"
                        f"⬜⬜⬜⬜⬜🎣⬜⬜⬜⬜⬜\n\n"
                        f"**Tips:**\n"
                        f"• Move ⬅️ ➡️ to align EXACTLY with the fish\n"
@@ -1846,71 +2806,53 @@ class Fishing(commands.Cog):
             profile_cog.profile_manager.record_game_played(interaction.user.id, "fishing")
     
     async def fish_inventory_action(self, interaction: discord.Interaction):
-        """View fishing inventory with equipment"""
-        user_data = self.get_user_data(interaction.user.id)
-        embed = discord.Embed(
-            title=f"🎒 {interaction.user.display_name}'s Fishing Inventory",
-            color=discord.Color.blue()
-        )
-        
-        # Show equipped items
-        embed.add_field(
-            name="🎣 Equipped Rod",
-            value=self.rods[user_data["rod"]]["name"],
-            inline=True
-        )
-        embed.add_field(
-            name="🛶 Equipped Boat",
-            value=self.boats[user_data["boat"]]["name"],
-            inline=True
-        )
-        embed.add_field(
-            name="📍 Current Area",
-            value=self.areas[user_data["current_area"]]["name"],
-            inline=True
-        )
-        
-        # Show bait inventory
-        if user_data.get("bait_inventory"):
-            bait_text = ""
-            for bait_id, count in user_data["bait_inventory"].items():
-                bait_text += f"{self.baits[bait_id]['name']}: {count}\n"
-            embed.add_field(name="🪱 Bait Inventory", value=bait_text or "None", inline=False)
-        
-        # Show fish stats
-        if user_data["fish_caught"]:
-            embed.add_field(
-                name="🐟 Fish Collection",
-                value=f"**Total Catches:** {user_data['total_catches']}\n"
-                     f"**Total Value:** {user_data['total_value']} coins\n"
-                     f"**Species:** {len(user_data['fish_caught'])}/{len(self.fish_types)}",
-                inline=False
-            )
+        """View fishing inventory with equipment and detailed fish collection"""
+        try:
+            user_data = self.get_user_data(interaction.user.id)
             
-            # Show top 5 fish
-            sorted_fish = sorted(
-                user_data["fish_caught"].items(),
-                key=lambda x: x[1]["count"],
-                reverse=True
-            )
+            # Check if user has any fish
+            if not user_data.get("fish_caught") or len(user_data["fish_caught"]) == 0:
+                embed = discord.Embed(
+                    title=f"🎒 {interaction.user.display_name}'s Fishing Inventory",
+                    description="**No fish caught yet!**\n\n"
+                               "🎣 Use `/fish cast` to start fishing!\n"
+                               "🗺️ Visit different areas to catch new species!\n"
+                               "🪱 Use bait to increase your catch rate!",
+                    color=discord.Color.blue()
+                )
+                
+                # Show equipped items
+                embed.add_field(
+                    name="🎣 Equipped Rod",
+                    value=self.rods[user_data["rod"]]["name"],
+                    inline=True
+                )
+                embed.add_field(
+                    name="🛶 Equipped Boat",
+                    value=self.boats[user_data["boat"]]["name"],
+                    inline=True
+                )
+                embed.add_field(
+                    name="📍 Current Area",
+                    value=self.areas[user_data["current_area"]]["name"],
+                    inline=True
+                )
+                
+                view = InventoryEquipView(self, user_data)
+                await interaction.response.send_message(embed=embed, view=view)
+                return
             
-            fish_list = ""
-            for fish_id, data in sorted_fish[:5]:
-                fish = self.fish_types[fish_id]
-                fish_list += f"{fish['name']}: {data['count']} (Biggest: {data['biggest']}kg)\n"
-            
-            embed.add_field(name="🏆 Top 5 Fish", value=fish_list, inline=False)
-        else:
-            embed.add_field(
-                name="🐟 Fish Collection",
-                value="No fish caught yet! Use `/fish cast` to start.",
-                inline=False
-            )
-        
-        embed.set_footer(text="💡 Use the dropdowns above to change your equipment!")
-        
-        view = InventoryEquipView(self, user_data)
-        await interaction.response.send_message(embed=embed, view=view)
+            # Create paginated inventory view with detailed fish info
+            view = DetailedInventoryView(self, user_data, interaction.user)
+            await view.send_initial_message(interaction)
+        except Exception as e:
+            print(f"[FISHING INVENTORY ERROR] {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            try:
+                await interaction.response.send_message(f"❌ Inventory Error: {str(e)}", ephemeral=True)
+            except:
+                await interaction.followup.send(f"❌ Inventory Error: {str(e)}", ephemeral=True)
     
     async def fish_shop_action(self, interaction: discord.Interaction):
         """View fishing shop with dropdowns"""
@@ -1968,33 +2910,58 @@ class Fishing(commands.Cog):
         try:
             user_data = self.get_user_data(interaction.user.id)
             current_area = self.areas[user_data['current_area']]
+            current_boat_data = self.boats[user_data.get("boat", "none")]
             economy_cog = self.bot.get_cog("Economy")
             balance = economy_cog.get_balance(interaction.user.id) if economy_cog else 0
             
             embed = discord.Embed(
                 title="🗺️ Fishing Areas",
-                description=f"**Your Balance:** {balance} PsyCoins\n"
-                            f"**Current Location:** 📍 {current_area['name']}\n"
-                            f"**Unlocked Areas:** {len(user_data['unlocked_areas'])}/{len(self.areas)}\n\n"
-                            "**Select an area from the dropdown below to travel or unlock!**",
+                description=f"💰 **Balance:** {balance:,} PsyCoins\n"
+                            f"📍 **Current Location:** {current_area['name']}\n"
+                            f"🛶 **Your Boat:** {current_boat_data['name']}\n"
+                            f"✅ **Unlocked:** {len(user_data['unlocked_areas'])}/{len(self.areas)}\n\n"
+                            "*Select an area from the menu below to travel or unlock!*",
                 color=discord.Color.green()
             )
             
             # Add all areas as fields
             for area_id, area in self.areas.items():
                 unlocked = area_id in user_data["unlocked_areas"]
-                current = area_id == user_data["current_area"]
+                current_loc = area_id == user_data["current_area"]
                 
-                if current:
-                    status = "📍 Current Location"
-                elif unlocked:
-                    status = "✅ Unlocked"
+                # Check boat requirements
+                required_boat = area.get("required_boat", "none")
+                current_boat = user_data.get("boat", "none")
+                current_boat_data = self.boats.get(current_boat, {})
+                allowed_areas = current_boat_data.get("areas", [])
+                has_boat = area_id in allowed_areas
+                
+                # Status icons
+                if current_loc:
+                    status_icon = "📍"
+                    status_text = "**[CURRENT]**"
+                elif unlocked and has_boat:
+                    status_icon = "✅"
+                    status_text = "Available"
                 else:
-                    status = f"🔒 Locked - {area['unlock_cost']} PsyCoins"
+                    status_icon = "🔒"
+                    status_text = "Locked"
+                
+                # Requirements
+                requirements = []
+                
+                if not has_boat:
+                    req_boat_data = self.boats.get(required_boat, {})
+                    requirements.append(f"🛶 Requires: **{req_boat_data.get('name', 'Unknown')}** ({req_boat_data.get('cost', 0):,} 💰)")
+                
+                if not unlocked and area.get("unlock_cost", 0) > 0:
+                    requirements.append(f"💰 Unlock cost: **{area['unlock_cost']:,} PsyCoins**")
+                
+                req_text = "\n".join(requirements) if requirements else "✅ Ready to explore!"
                 
                 embed.add_field(
-                    name=f"{area['name']}",
-                    value=f"{area['description']}\n**Status:** {status}",
+                    name=f"{status_icon} {area['name']}",
+                    value=f"{area['description']}\n{req_text}\n_{status_text}_",
                     inline=False
                 )
             
@@ -2065,6 +3032,118 @@ class Fishing(commands.Cog):
         embed.add_field(name="📍 Current Area", value=self.areas[user_data["current_area"]]["name"], inline=True)
         
         await interaction.response.send_message(embed=embed)
+    
+    async def fish_craft_action(self, interaction: discord.Interaction):
+        """Craft special fishing items like Kraken Bait"""
+        user_data = self.get_user_data(interaction.user.id)
+        fish_caught = user_data.get("fish_caught", {})
+        
+        # Check for Kraken Tentacles
+        kraken_tentacles = 0
+        if "kraken_tentacle" in fish_caught and isinstance(fish_caught["kraken_tentacle"], dict):
+            kraken_tentacles = fish_caught["kraken_tentacle"].get("count", 0)
+        
+        embed = discord.Embed(
+            title="🔨 Crafting Station",
+            description="**Craft legendary items from your catches!**\n\n"
+                       "Here you can combine rare materials to create powerful items.",
+            color=discord.Color.purple()
+        )
+        
+        # Kraken Bait Recipe
+        can_craft_kraken = kraken_tentacles >= 8
+        status = "✅ **Can Craft!**" if can_craft_kraken else "❌ **Not enough materials**"
+        
+        embed.add_field(
+            name="🦑 Kraken Bait",
+            value=f"**Recipe:** 8x Kraken Tentacle\n"
+                  f"**You have:** {kraken_tentacles}/8 Kraken Tentacles\n"
+                  f"**Status:** {status}\n\n"
+                  f"*Summons the legendary Kraken when used in the Mariana Trench!*\n"
+                  f"*Only the bravest dare to face this ancient terror...*",
+            inline=False
+        )
+        
+        if can_craft_kraken:
+            embed.set_footer(text="Click the button below to craft Kraken Bait!")
+        else:
+            embed.set_footer(text="Catch more Kraken Tentacles in the Mariana Trench!")
+        
+        # Create craft button
+        view = discord.ui.View(timeout=60)
+        
+        async def craft_kraken_callback(button_interaction: discord.Interaction):
+            if button_interaction.user.id != interaction.user.id:
+                await button_interaction.response.send_message("❌ This is not your crafting menu!", ephemeral=True)
+                return
+            
+            try:
+                # Re-check materials
+                fresh_user_data = self.get_user_data(button_interaction.user.id)
+                fresh_fish_caught = fresh_user_data.get("fish_caught", {})
+                fresh_tentacles = 0
+                if "kraken_tentacle" in fresh_fish_caught and isinstance(fresh_fish_caught["kraken_tentacle"], dict):
+                    fresh_tentacles = fresh_fish_caught["kraken_tentacle"].get("count", 0)
+                
+                if fresh_tentacles < 8:
+                    await button_interaction.response.send_message(
+                        "❌ You don't have enough Kraken Tentacles! (Need 8)",
+                        ephemeral=True
+                    )
+                    return
+                
+                # Consume tentacles
+                fresh_fish_caught["kraken_tentacle"]["count"] -= 8
+                if fresh_fish_caught["kraken_tentacle"]["count"] <= 0:
+                    # Remove the entry completely if count is 0
+                    del fresh_fish_caught["kraken_tentacle"]
+                
+                # Adjust total catches
+                if fresh_user_data["total_catches"] >= 8:
+                    fresh_user_data["total_catches"] -= 8
+                
+                # Give kraken bait
+                if "bait_inventory" not in fresh_user_data:
+                    fresh_user_data["bait_inventory"] = {}
+                if "kraken_bait" not in fresh_user_data["bait_inventory"]:
+                    fresh_user_data["bait_inventory"]["kraken_bait"] = 0
+                fresh_user_data["bait_inventory"]["kraken_bait"] += 1
+                
+                # Save data
+                self.save_fishing_data()
+                
+                success_embed = discord.Embed(
+                    title="✨ Crafting Successful! ✨",
+                    description="**You have crafted Kraken Bait!**\n\n"
+                               "🦑 8x Kraken Tentacles have been consumed.\n"
+                               "🦑 1x Kraken Bait has been added to your inventory!\n\n"
+                               "**How to use:**\n"
+                               "1. Travel to the 🕳️ Mariana Trench\n"
+                               "2. Use `/fish cast` and select Kraken Bait\n"
+                               "3. Face the legendary beast in epic combat!\n\n"
+                               "⚠️ **Warning:** The Kraken is extremely dangerous. Prepare yourself!",
+                    color=discord.Color.gold()
+                )
+                success_embed.set_footer(text="May the depths be ever in your favor...")
+                
+                await button_interaction.response.edit_message(embed=success_embed, view=None)
+            except Exception as e:
+                print(f"[FISHING CRAFT ERROR] {e}")
+                traceback.print_exc()
+                try:
+                    await button_interaction.response.send_message(f"❌ Error while crafting: {str(e)}", ephemeral=True)
+                except:
+                    await button_interaction.followup.send(f"❌ Error while crafting: {str(e)}", ephemeral=True)
+        
+        craft_button = discord.ui.Button(
+            label="🔨 Craft Kraken Bait",
+            style=discord.ButtonStyle.success if can_craft_kraken else discord.ButtonStyle.secondary,
+            disabled=not can_craft_kraken
+        )
+        craft_button.callback = craft_kraken_callback
+        view.add_item(craft_button)
+        
+        await interaction.response.send_message(embed=embed, view=view)
     
     # ==================== TOURNAMENT SYSTEM ====================
     # Tournament commands are owner-only via owner.py
@@ -2319,6 +3398,7 @@ class Fishing(commands.Cog):
         {prefix}fish cast - Cast your fishing line
         {prefix}fish inventory - View your fish collection
         {prefix}fish shop - Buy fishing equipment
+        {prefix}fish craft - Craft special items
         {prefix}fish areas - View fishing areas
         {prefix}fish encyclopedia - View all fish types
         {prefix}fish stats - View your fishing statistics
@@ -2340,6 +3420,7 @@ class Fishing(commands.Cog):
                 value=f"**{prefix}fish cast** - Cast your line (start minigame)\n"
                      f"**{prefix}fish inventory** - View your collection\n"
                      f"**{prefix}fish shop** - Purchase equipment & bait\n"
+                     f"**{prefix}fish craft** - Craft special items\n"
                      f"**{prefix}fish areas** - View locations & travel\n"
                      f"**{prefix}fish encyclopedia** - See all fish types\n"
                      f"**{prefix}fish stats** - View your statistics",
