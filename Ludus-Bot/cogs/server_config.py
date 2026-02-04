@@ -40,7 +40,8 @@ class ServerConfig(commands.Cog):
                 "mod_roles": [],
                 "log_channel": None,
                 "rate_limit_enabled": True,
-                "nsfw_filter": True
+                "nsfw_filter": True,
+                "shared_mining_world": False
             }
             self._save_configs()
         return self.configs[guild_id]
@@ -80,6 +81,7 @@ class ServerConfig(commands.Cog):
                 f"**Personality Reactions:** {'✅ Enabled' if config['personality_reactions'] else '❌ Disabled'}\n"
                 f"**Rate Limiting:** {'✅ Enabled' if config['rate_limit_enabled'] else '❌ Disabled'}\n"
                 f"**NSFW Filter:** {'✅ Enabled' if config['nsfw_filter'] else '❌ Disabled'}\n"
+                f"**⛏️ Shared Mining World:** {'✅ Enabled' if config.get('shared_mining_world', False) else '❌ Disabled'}\n"
                 f"**Disabled Commands:** {len(config['disabled_commands'])} commands\n"
                 f"**Log Channel:** {'<#'+str(config['log_channel'])+'>' if config['log_channel'] else 'None'}\n"
                 f"**🎣 Tournament Channel:** {'<#'+str(tournament_channel)+'>' if tournament_channel else 'Random'}"
@@ -92,6 +94,7 @@ class ServerConfig(commands.Cog):
             value="`L!toggle welcomedm` - Toggle welcome DMs\n"
                   "`L!toggle personality` - Toggle bot reactions\n"
                   "`L!toggle ratelimit` - Toggle spam protection\n"
+                  "`L!toggle sharedmining` - Toggle shared mining world\n"
                   "`L!disablecmd <command>` - Disable a command\n"
                   "`L!enablecmd <command>` - Enable a command\n"
                   "`L!setlogchannel <channel>` - Set log channel\n"
@@ -165,15 +168,16 @@ class ServerConfig(commands.Cog):
             "welcomedm": "welcome_dm",
             "personality": "personality_reactions",
             "ratelimit": "rate_limit_enabled",
-            "nsfw": "nsfw_filter"
+            "nsfw": "nsfw_filter",
+            "sharedmining": "shared_mining_world"
         }
         
         if setting not in setting_map:
-            await ctx.send(f"❌ Unknown setting! Options: `welcomedm`, `personality`, `ratelimit`, `nsfw`")
+            await ctx.send(f"❌ Unknown setting! Options: `welcomedm`, `personality`, `ratelimit`, `nsfw`, `sharedmining`")
             return
         
         key = setting_map[setting]
-        new_value = not config[key]
+        new_value = not config.get(key, False)  # Use .get() with default False
         
         # Update and save
         config[key] = new_value

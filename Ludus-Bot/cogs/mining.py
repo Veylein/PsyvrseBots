@@ -35,8 +35,10 @@ class MiningGame:
         "air": (135, 206, 235), "shop": (139, 69, 19), "player": (255, 255, 0)
     }
     
-    def __init__(self, user_id: int, seed: int = None):
+    def __init__(self, user_id: int, seed: int = None, guild_id: int = None, is_shared: bool = False):
         self.user_id = user_id
+        self.guild_id = guild_id
+        self.is_shared = is_shared
         self.seed = seed or random.randint(1, 999999)
         self.rng = random.Random(self.seed)  # Local RNG, doesn't affect global random
         
@@ -64,6 +66,10 @@ class MiningGame:
         self.height = 10  # View height
         self.map_data = {}  # {(x, y): block_type}
         self.last_map_regen = datetime.utcnow()
+        
+        # Multiplayer support (guild-wide tracking)
+        self.other_players = {}  # {user_id: {x, y, last_update, username}}
+        
         self.generate_world()
         
     def generate_world(self, regenerate=False):
@@ -172,10 +178,7 @@ class MiningGame:
         return True, f"⛏️ Mined {block}! (+{value} value)", (x, y)
     
     def move_player(self, dx: int, dy: int) -> tuple[bool, str]:
-        """Move player by delta"""
-        if self.energy <= 0:
-            return False, "**❌ No energy! Wait for regeneration.**"
-        
+        """Move player by delta (no energy cost for movement)"""
         new_x = self.x + dx
         new_y = self.y + dy
         
@@ -187,8 +190,7 @@ class MiningGame:
         if not self.can_move(new_x, new_y):
             return False, "**❌ Blocked! Mine the block first.**"
         
-        # Energy cost
-        self.energy -= 1
+        # No energy cost for movement
         self.x = new_x
         self.y = new_y
         
@@ -311,6 +313,85 @@ class MiningGame:
                 y1 = dy * block_size
                 texture = load_texture(block)
                 img.paste(texture, (x1, y1), texture if texture.mode == 'RGBA' else None)
+        
+        # Draw other players in multiplayer mode (before drawing current player)
+        if self.is_shared and self.other_players:
+            img_rgba = img.convert('RGBA')
+            
+            # Player colors for multiplayer
+            player_colors = [
+                (255, 100, 100),  # Red
+                (100, 255, 100),  # Green
+                (100, 100, 255),  # Blue
+                (255, 255, 100),  # Yellow
+                (255, 100, 255),  # Magenta
+                (100, 255, 255),  # Cyan
+                (255, 165, 0),    # Orange
+                (255, 192, 203),  # Pink
+            ]
+            
+            for idx, (other_user_id, other_data) in enumerate(self.other_players.items()):
+                other_x = other_data["x"]
+                other_y = other_data["y"]
+                
+                # Check if other player is in current view
+                view_dx = other_x - start_x
+                view_dy = other_y - start_y
+                
+                if 0 <= view_dx < self.width and 0 <= view_dy < self.height:
+                    # Draw other player as colored circle
+                    color = player_colors[idx % len(player_colors)]
+                    
+                    # Create a semi-transparent player marker
+                    marker_size = block_size
+                    marker = Image.new('RGBA', (marker_size, marker_size), (0, 0, 0, 0))
+                    marker_draw = ImageDraw.Draw(marker)
+                    
+                    center = marker_size // 2
+                    radius = marker_size // 3
+                    
+                    # Draw colored circle with border
+                    marker_draw.ellipse([center - radius, center - radius,
+                                       center + radius, center + radius],
+                                      fill=color + (200,),  # Add alpha
+                                      outline=(255, 255, 255, 255),
+                                      width=2)
+                    
+                    # Paste marker on map
+                    paste_x = view_dx * block_size
+                    paste_y = view_dy * block_size
+                    img_rgba.paste(marker, (paste_x, paste_y), marker)
+                    
+                    # Draw username above player marker
+                    username = other_data.get("username", "Player")
+                    # Create small font for username
+                    try:
+                        name_font = ImageFont.truetype("arial.ttf", 10)
+                    except:
+                        name_font = ImageFont.load_default()
+                    
+                    # Draw username with background
+                    img_rgba_draw = ImageDraw.Draw(img_rgba)
+                    text_bbox = img_rgba_draw.textbbox((0, 0), username, font=name_font)
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_height = text_bbox[3] - text_bbox[1]
+                    
+                    # Center text above marker
+                    text_x = paste_x + (block_size - text_width) // 2
+                    text_y = paste_y - text_height - 2
+                    
+                    # Draw semi-transparent background for text
+                    bg_padding = 2
+                    img_rgba_draw.rectangle(
+                        [text_x - bg_padding, text_y - bg_padding,
+                         text_x + text_width + bg_padding, text_y + text_height + bg_padding],
+                        fill=(0, 0, 0, 180)
+                    )
+                    
+                    # Draw text
+                    img_rgba_draw.text((text_x, text_y), username, fill=(255, 255, 255, 255), font=name_font)
+            
+            img = img_rgba.convert('RGB')
         
         # Draw player overlay
         player_x = self.width // 2
@@ -457,7 +538,7 @@ class MiningGame:
                 center_y = img_height // 2
                 
                 # Draw semi-transparent background
-                padding = 25
+                padding = 30
                 bg_x1 = center_x - total_width // 2 - padding
                 bg_y1 = center_y - max(energy_warning_size, text_height) // 2 - padding
                 bg_x2 = center_x + total_width // 2 + padding
@@ -546,6 +627,8 @@ class MiningGame:
         
         return {
             "user_id": self.user_id,
+            "guild_id": self.guild_id,
+            "is_shared": self.is_shared,
             "seed": self.seed,
             "x": self.x,
             "y": self.y,
@@ -558,7 +641,8 @@ class MiningGame:
             "inventory": self.inventory,
             "coins": self.coins,
             "last_map_regen": self.last_map_regen.isoformat(),
-            "map_data": map_data_serialized
+            "map_data": map_data_serialized,
+            "other_players": self.other_players
         }
     
     @classmethod
@@ -566,6 +650,8 @@ class MiningGame:
         """Deserialize game state from dictionary"""
         game = cls.__new__(cls)
         game.user_id = data["user_id"]
+        game.guild_id = data.get("guild_id")
+        game.is_shared = data.get("is_shared", False)
         game.seed = data["seed"]
         game.rng = random.Random(game.seed)
         game.x = data["x"]
@@ -582,6 +668,7 @@ class MiningGame:
         game.last_map_regen = datetime.fromisoformat(data["last_map_regen"])
         game.width = 11
         game.height = 10
+        game.other_players = data.get("other_players", {})
         
         # Deserialize map_data
         game.map_data = {}
@@ -612,13 +699,14 @@ class MiningView(discord.ui.LayoutView):
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
         mine_btn = discord.ui.Button(style=discord.ButtonStyle.success, emoji="⛏️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn_move = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
         up_btn_surface = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
         
+
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
-        up_btn_move.callback = self.up_move_callback
+        up_btn.callback = self.up_move_callback
         up_btn_surface.callback = self.surface_callback
         
         # Create container as class attribute
@@ -665,7 +753,7 @@ class MiningView(discord.ui.LayoutView):
         
         container_items.extend([
             discord.ui.ActionRow(left_btn, mine_btn, right_btn),
-            discord.ui.ActionRow(up_btn_move, up_btn_surface),
+            discord.ui.ActionRow(up_btn, up_btn_surface),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(inventory_select),
         ])
@@ -837,12 +925,9 @@ class MiningView(discord.ui.LayoutView):
         
         # Check if can move down (already empty)
         if self.game.can_move(target_x, target_y):
-            # Fall down until hitting ground
+            # Fall down until hitting ground (no energy cost for falling)
             while self.game.can_move(self.game.x, self.game.y + 1):
                 self.game.y += 1
-                self.game.energy = max(0, self.game.energy - 1)
-                if self.game.energy <= 0:
-                    break
             msg = f"⬇️ Fell to ground at y={self.game.y}"
         else:
             # Try to mine if blocked
@@ -904,13 +989,13 @@ class MiningView(discord.ui.LayoutView):
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
         mine_btn = discord.ui.Button(style=discord.ButtonStyle.success, emoji="⛏️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn_move = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
         up_btn_surface = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
         
+        up_btn.callback = self.up_move_callback
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
-        up_btn_move.callback = self.up_move_callback
         up_btn_surface.callback = self.surface_callback
         
         # Check if at shop to add dropdown
@@ -955,7 +1040,7 @@ class MiningView(discord.ui.LayoutView):
         
         container_items.extend([
             discord.ui.ActionRow(left_btn, mine_btn, right_btn),
-            discord.ui.ActionRow(up_btn_move, up_btn_surface),
+            discord.ui.ActionRow(up_btn, up_btn_surface),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(inventory_select),
         ])
@@ -986,6 +1071,49 @@ class MiningView(discord.ui.LayoutView):
         # Save game state after action
         cog = interaction.client.get_cog("Mining")
         if cog:
+            # Update player data in shared world if applicable
+            if self.game.is_shared and self.game.guild_id:
+                if self.game.guild_id in cog.shared_worlds:
+                    world_info = cog.shared_worlds[self.game.guild_id]
+                    
+                    # Update this player's data
+                    player_key = str(self.user_id)
+                    world_info["players"][player_key] = {
+                        "x": self.game.x,
+                        "y": self.game.y,
+                        "depth": self.game.depth,
+                        "energy": self.game.energy,
+                        "max_energy": self.game.max_energy,
+                        "last_energy_regen": self.game.last_energy_regen.isoformat(),
+                        "pickaxe_level": self.game.pickaxe_level,
+                        "backpack_capacity": self.game.backpack_capacity,
+                        "inventory": self.game.inventory,
+                        "coins": self.game.coins,
+                        "last_update": datetime.utcnow().isoformat()
+                    }
+                    
+                    # Update world data (shared map)
+                    world_info["world_data"].map_data = self.game.map_data
+                    world_info["world_data"].last_map_regen = self.game.last_map_regen
+                    
+                    # Refresh other players positions for next render
+                    self.game.other_players = {}
+                    for other_user_id, other_data in world_info["players"].items():
+                        if str(other_user_id) != str(self.user_id):
+                            # Try to get username from Discord
+                            try:
+                                user = interaction.client.get_user(int(other_user_id))
+                                username = user.name if user else f"User {other_user_id}"
+                            except:
+                                username = f"User {other_user_id}"
+                            
+                            self.game.other_players[other_user_id] = {
+                                "x": other_data["x"],
+                                "y": other_data["y"],
+                                "last_update": other_data.get("last_update", datetime.utcnow().isoformat()),
+                                "username": username
+                            }
+            
             cog.save_data()
 
 
@@ -994,7 +1122,8 @@ class Mining(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        self.active_games = {}  # {user_id: MiningGame}
+        self.active_games = {}  # Personal mode: {user_id: MiningGame}
+        self.shared_worlds = {}  # Shared mode: {guild_id: {world_data: MiningGame, players: {user_id: player_data}}}
         self.data_file = "data/mining_data.json"
         self.load_data()
     
@@ -1004,14 +1133,23 @@ class Mining(commands.Cog):
             try:
                 with open(self.data_file, 'r') as f:
                     data = json.load(f)
-                    # Load saved games
+                    
+                    # Load personal games (old format compatibility)
                     for user_id_str, game_data in data.get("games", {}).items():
                         user_id = int(user_id_str)
                         game = MiningGame.from_dict(game_data)
-                        # Don't regenerate map on load - preserve mined areas
-                        # Map regeneration will be checked when player interacts with game
                         self.active_games[user_id] = game
-                #print(f"[Mining] Loaded {len(self.active_games)} saved games")
+                    
+                    # Load shared worlds (new format)
+                    for guild_id_str, world_data in data.get("shared_worlds", {}).items():
+                        guild_id = int(guild_id_str)
+                        # Shared world stores one map_data + multiple players
+                        world_game = MiningGame.from_dict(world_data["world_data"])
+                        self.shared_worlds[guild_id] = {
+                            "world_data": world_game,
+                            "players": world_data.get("players", {})
+                        }
+                        
             except Exception as e:
                 print(f"[Mining] Error loading data: {e}")
                 pass
@@ -1020,55 +1158,138 @@ class Mining(commands.Cog):
         """Save mining data"""
         os.makedirs(os.path.dirname(self.data_file), exist_ok=True)
         
-        # Serialize all active games
+        # Serialize all personal games
         games_data = {}
         for user_id, game in self.active_games.items():
             games_data[str(user_id)] = game.to_dict()
         
+        # Serialize shared worlds
+        shared_worlds_data = {}
+        for guild_id, world_info in self.shared_worlds.items():
+            shared_worlds_data[str(guild_id)] = {
+                "world_data": world_info["world_data"].to_dict(),
+                "players": world_info["players"]
+            }
+        
         data = {
-            "games": games_data
+            "games": games_data,
+            "shared_worlds": shared_worlds_data
         }
         
         with open(self.data_file, 'w') as f:
             json.dump(data, f, indent=4)
-        
-        #print(f"[Mining] Saved {len(games_data)} games")
     
     @commands.command(name="mine")
     async def mine_prefix(self, ctx):
         """Start a mining adventure! (Prefix version)"""
-        await self.start_mining(ctx, ctx.author.id)
+        await self.start_mining(ctx, ctx.author.id, ctx.guild.id if ctx.guild else None)
     
     @app_commands.command(name="mine", description="⛏️ Start a procedurally generated mining adventure!")
     async def mine_slash(self, interaction: discord.Interaction):
         """Start a mining adventure! (Slash version)"""
         await interaction.response.defer()
-        await self.start_mining(interaction, interaction.user.id)
+        await self.start_mining(interaction, interaction.user.id, interaction.guild.id if interaction.guild else None)
     
-    async def start_mining(self, ctx, user_id: int):
+    async def start_mining(self, ctx, user_id: int, guild_id: int = None):
         """Start or resume mining game"""
         # Get economy cog for coin sync
         economy_cog = self.bot.get_cog("Economy")
         
-        # Check if user already has active game
-        if user_id in self.active_games:
-            game = self.active_games[user_id]
-            # Sync coins with main economy on resume
-            if economy_cog:
-                economy_balance = economy_cog.get_balance(user_id)
-                game.coins = economy_balance
-        else:
-            # Create new game
-            game = MiningGame(user_id)
-            
-            # Sync coins with main economy
-            if economy_cog:
-                economy_balance = economy_cog.get_balance(user_id)
-                game.coins = economy_balance
-            
-            self.active_games[user_id] = game
+        # Check if server has shared mining enabled
+        is_shared = False
+        if guild_id:
+            server_config_cog = self.bot.get_cog("ServerConfig")
+            if server_config_cog:
+                server_config = server_config_cog.get_server_config(guild_id)
+                is_shared = server_config.get("shared_mining_world", False)
         
-        await self.send_game_view(ctx, game, user_id, "🎮 Mining adventure!")
+        if is_shared and guild_id:
+            # SHARED WORLD MODE
+            if guild_id not in self.shared_worlds:
+                # Create new shared world for this guild
+                world_game = MiningGame(user_id=0, guild_id=guild_id, is_shared=True)  # user_id=0 for world
+                self.shared_worlds[guild_id] = {
+                    "world_data": world_game,
+                    "players": {}
+                }
+            
+            world_info = self.shared_worlds[guild_id]
+            world_game = world_info["world_data"]
+            
+            # Get or create player data in shared world
+            if str(user_id) not in world_info["players"]:
+                # New player in shared world
+                economy_balance = economy_cog.get_balance(user_id) if economy_cog else 100
+                world_info["players"][str(user_id)] = {
+                    "x": 1, "y": -1, "depth": 0,
+                    "energy": 60, "max_energy": 60,
+                    "last_energy_regen": datetime.utcnow().isoformat(),
+                    "pickaxe_level": 1, "backpack_capacity": 20,
+                    "inventory": {}, "coins": economy_balance
+                }
+            
+            player_data = world_info["players"][str(user_id)]
+            
+            # Create a game instance for this player (uses shared world map)
+            game = MiningGame(user_id=user_id, seed=world_game.seed, guild_id=guild_id, is_shared=True)
+            game.map_data = world_game.map_data  # Share the world map
+            game.last_map_regen = world_game.last_map_regen
+            
+            # Load player-specific data
+            game.x = player_data["x"]
+            game.y = player_data["y"]
+            game.depth = player_data["depth"]
+            game.energy = player_data["energy"]
+            game.max_energy = player_data["max_energy"]
+            game.last_energy_regen = datetime.fromisoformat(player_data["last_energy_regen"])
+            game.pickaxe_level = player_data["pickaxe_level"]
+            game.backpack_capacity = player_data["backpack_capacity"]
+            game.inventory = player_data["inventory"]
+            game.coins = player_data["coins"]
+            
+            # Sync coins with economy
+            if economy_cog:
+                game.coins = economy_cog.get_balance(user_id)
+                player_data["coins"] = game.coins
+            
+            # Update other players positions for rendering
+            game.other_players = {}
+            for other_user_id, other_data in world_info["players"].items():
+                if str(other_user_id) != str(user_id):
+                    # Try to get username from Discord
+                    try:
+                        user = self.bot.get_user(int(other_user_id))
+                        username = user.name if user else f"User {other_user_id}"
+                    except:
+                        username = f"User {other_user_id}"
+                    
+                    game.other_players[other_user_id] = {
+                        "x": other_data["x"],
+                        "y": other_data["y"],
+                        "last_update": other_data.get("last_update", datetime.utcnow().isoformat()),
+                        "username": username
+                    }
+            
+        else:
+            # PERSONAL MODE (original behavior)
+            if user_id in self.active_games:
+                game = self.active_games[user_id]
+                # Sync coins with main economy on resume
+                if economy_cog:
+                    economy_balance = economy_cog.get_balance(user_id)
+                    game.coins = economy_balance
+            else:
+                # Create new game
+                game = MiningGame(user_id, guild_id=guild_id, is_shared=False)
+                
+                # Sync coins with main economy
+                if economy_cog:
+                    economy_balance = economy_cog.get_balance(user_id)
+                    game.coins = economy_balance
+                
+                self.active_games[user_id] = game
+        
+        await self.send_game_view(ctx, game, user_id, "🎮 Mining adventure!" + (" 🌍 Shared World!" if is_shared else ""))
     
     async def send_game_view(self, ctx, game: MiningGame, user_id: int, message: str):
         """Send game view"""
