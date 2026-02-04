@@ -133,17 +133,17 @@ class MiningGame:
         """Mine block at position"""
         # Check distance - can only mine adjacent blocks
         if abs(x - self.x) + abs(y - self.y) != 1:
-            return False, "❌ Too far! Can only mine adjacent blocks."
+            return False, "**❌ Too far! Can only mine adjacent blocks.**"
         
         if y < 0:
-            return False, "❌ Can't mine in the sky!"
+            return False, "**❌ Can't mine in the sky!**"
         
         block = self.get_block(x, y)
         if block == "air":
-            return False, "❌ Nothing to mine here!"
+            return False, "**❌ Nothing to mine here!**"
         
         if block == "bedrock":
-            return False, "❌ Bedrock is unbreakable!"
+            return False, "**❌ Bedrock is unbreakable!**"
         
         # Energy cost based on biome hardness and pickaxe level
         biome = self.get_biome(y)
@@ -151,12 +151,12 @@ class MiningGame:
         energy_cost = max(1, int(biome["hardness"] / speed_bonus))
         
         if self.energy < energy_cost:
-            return False, f"❌ Not enough energy! Need {energy_cost}"
+            return False, f"**❌ Not enough energy! Need {energy_cost}**"
         
         # Check inventory space
         total_items = sum(self.inventory.values())
         if total_items >= self.backpack_capacity:
-            return False, "❌ Backpack full! Return to surface to sell."
+            return False, "**❌ Backpack full! Return to surface to sell.**"
         
         # Mine successful
         self.energy -= energy_cost
@@ -174,18 +174,18 @@ class MiningGame:
     def move_player(self, dx: int, dy: int) -> tuple[bool, str]:
         """Move player by delta"""
         if self.energy <= 0:
-            return False, "❌ No energy! Wait for regeneration."
+            return False, "**❌ No energy! Wait for regeneration.**"
         
         new_x = self.x + dx
         new_y = self.y + dy
         
         # Check bounds
         if new_x < -50 or new_x > 50:
-            return False, "❌ World boundary!"
+            return False, "**❌ World boundary!**"
         
         # Check if position is blocked
         if not self.can_move(new_x, new_y):
-            return False, "❌ Blocked! Mine the block first."
+            return False, "**❌ Blocked! Mine the block first.**"
         
         # Energy cost
         self.energy -= 1
@@ -224,7 +224,7 @@ class MiningGame:
     def sell_inventory(self, bot=None) -> tuple[int, str]:
         """Sell all inventory items"""
         if not self.inventory:
-            return 0, "❌ Inventory is empty!"
+            return 0, "**❌ Inventory is empty!**"
         
         total_value = 0
         items_sold = []
@@ -423,7 +423,7 @@ class MiningGame:
             try:
                 # Create warning overlay with proper error handling
                 try:
-                    warning_font = ImageFont.truetype("arial.ttf", 24)
+                    warning_font = ImageFont.truetype("arial.ttf", 36)
                 except:
                     warning_font = font
                 
@@ -434,7 +434,7 @@ class MiningGame:
                 try:
                     energy_warning_icon = load_ui_icon("assets/mining/ui/energy.png")
                     if energy_warning_icon:
-                        energy_warning_size = 32
+                        energy_warning_size = 48
                         energy_warning_icon = energy_warning_icon.resize((energy_warning_size, energy_warning_size), Image.LANCZOS)
                 except:
                     energy_warning_icon = None
@@ -446,8 +446,8 @@ class MiningGame:
                 
                 # Adjust total width based on whether we have icon
                 if energy_warning_icon:
-                    energy_warning_size = 32
-                    total_width = energy_warning_size + 10 + text_width
+                    energy_warning_size = 48
+                    total_width = energy_warning_size + 12 + text_width
                 else:
                     total_width = text_width
                     energy_warning_size = 0
@@ -457,7 +457,7 @@ class MiningGame:
                 center_y = img_height // 2
                 
                 # Draw semi-transparent background
-                padding = 20
+                padding = 25
                 bg_x1 = center_x - total_width // 2 - padding
                 bg_y1 = center_y - max(energy_warning_size, text_height) // 2 - padding
                 bg_x2 = center_x + total_width // 2 + padding
@@ -484,7 +484,7 @@ class MiningGame:
                 
                 # Draw warning text
                 if energy_warning_icon:
-                    text_x = center_x - total_width // 2 + energy_warning_size + 10
+                    text_x = center_x - total_width // 2 + energy_warning_size + 12
                 else:
                     text_x = center_x - text_width // 2
                 text_y = center_y - text_height // 2
@@ -612,12 +612,14 @@ class MiningView(discord.ui.LayoutView):
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
         mine_btn = discord.ui.Button(style=discord.ButtonStyle.success, emoji="⛏️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
+        up_btn_move = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
+        up_btn_surface = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
         
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
-        up_btn.callback = self.up_callback
+        up_btn_move.callback = self.up_move_callback
+        up_btn_surface.callback = self.surface_callback
         
         # Create container as class attribute
         container_items = [
@@ -643,7 +645,10 @@ class MiningView(discord.ui.LayoutView):
                 ]
             )
             shop_select.callback = self.shop_callback
-            container_items.append(discord.ui.ActionRow(shop_select))
+            container_items.append(
+                discord.ui.ActionRow(shop_select),
+                discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small)
+            )
         
         # Add inventory dropdown (always visible)
         inventory_select = discord.ui.Select(
@@ -660,7 +665,8 @@ class MiningView(discord.ui.LayoutView):
         
         container_items.extend([
             discord.ui.ActionRow(left_btn, mine_btn, right_btn),
-            discord.ui.ActionRow(up_btn),
+            discord.ui.ActionRow(up_btn_move, up_btn_surface),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(inventory_select),
         ])
         
@@ -675,7 +681,7 @@ class MiningView(discord.ui.LayoutView):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Only allow game owner to interact"""
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            await interaction.response.send_message("**❌ This isn't your game!**", ephemeral=True)
             return False
         return True
     
@@ -716,7 +722,7 @@ class MiningView(discord.ui.LayoutView):
         
         if action == "sell":
             if not self.game.inventory:
-                await self.refresh(interaction, "❌ Inventory is empty!")
+                await self.refresh(interaction, "**❌ Inventory is empty!**")
                 return
             value, items = self.game.sell_inventory(interaction.client)
             await self.refresh(interaction, f"💰 Sold items for {value} psycoins!")
@@ -726,7 +732,7 @@ class MiningView(discord.ui.LayoutView):
             economy_cog = self.bot.get_cog('Economy')
             
             if not economy_cog:
-                await self.refresh(interaction, "❌ Economy system not available.")
+                await self.refresh(interaction, "**❌ Economy system not available.**")
                 return
             
             if economy_cog.remove_coins(interaction.user.id, cost):
@@ -734,14 +740,14 @@ class MiningView(discord.ui.LayoutView):
                 self.game.pickaxe_level += 1
                 await self.refresh(interaction, f"⛏️ Upgraded pickaxe to level {self.game.pickaxe_level}!")
             else:
-                await self.refresh(interaction, f"❌ Need {cost} psycoins!")
+                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
         
         elif action == "backpack":
             cost = self.game.backpack_capacity * 100
             economy_cog = self.bot.get_cog('Economy')
             
             if not economy_cog:
-                await self.refresh(interaction, "❌ Economy system not available.")
+                await self.refresh(interaction, "**❌ Economy system not available.**")
                 return
             
             if economy_cog.remove_coins(interaction.user.id, cost):
@@ -749,14 +755,14 @@ class MiningView(discord.ui.LayoutView):
                 self.game.backpack_capacity += 10
                 await self.refresh(interaction, f"🎒 Upgraded backpack to {self.game.backpack_capacity} slots!")
             else:
-                await self.refresh(interaction, f"❌ Need {cost} psycoins!")
+                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
         
         elif action == "energy":
             cost = self.game.max_energy * 50
             economy_cog = self.bot.get_cog('Economy')
             
             if not economy_cog:
-                await self.refresh(interaction, "❌ Economy system not available.")
+                await self.refresh(interaction, "**❌ Economy system not available.**")
                 return
             
             if economy_cog.remove_coins(interaction.user.id, cost):
@@ -765,7 +771,7 @@ class MiningView(discord.ui.LayoutView):
                 self.game.energy = self.game.max_energy
                 await self.refresh(interaction, f"⚡ Upgraded max energy to {self.game.max_energy}!")
             else:
-                await self.refresh(interaction, f"❌ Need {cost} psycoins!")
+                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
     
     async def left_callback(self, interaction: discord.Interaction):
         """Mine and move left"""
@@ -784,6 +790,25 @@ class MiningView(discord.ui.LayoutView):
         else:
             _, msg = self.game.move_player(-1, 0)
         
+        await self.refresh(interaction, msg)
+
+    async def up_move_callback(self, interaction: discord.Interaction):
+        """Mine and move up"""
+        target_x = self.game.x
+        target_y = self.game.y - 1
+    
+        # Try to mine if blocked
+        if not self.game.can_move(target_x, target_y):
+            result = self.game.mine_block(target_x, target_y)
+            if len(result) == 3 and result[0]:  # Successful mine
+                self.game.x = target_x
+                self.game.y = target_y
+                _, msg, _ = result
+            else:
+                _, msg = result
+        else:
+            _, msg = self.game.move_player(0, -1)
+    
         await self.refresh(interaction, msg)
     
     async def right_callback(self, interaction: discord.Interaction):
@@ -838,7 +863,7 @@ class MiningView(discord.ui.LayoutView):
         
         await self.refresh(interaction, msg)
     
-    async def up_callback(self, interaction: discord.Interaction):
+    async def surface_callback(self, interaction: discord.Interaction):
         """Return to surface"""
         self.game.x = 1
         self.game.y = -1
@@ -879,12 +904,14 @@ class MiningView(discord.ui.LayoutView):
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
         mine_btn = discord.ui.Button(style=discord.ButtonStyle.success, emoji="⛏️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
+        up_btn_move = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
+        up_btn_surface = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
         
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
-        up_btn.callback = self.up_callback
+        up_btn_move.callback = self.up_move_callback
+        up_btn_surface.callback = self.surface_callback
         
         # Check if at shop to add dropdown
         container_items = [
@@ -928,7 +955,8 @@ class MiningView(discord.ui.LayoutView):
         
         container_items.extend([
             discord.ui.ActionRow(left_btn, mine_btn, right_btn),
-            discord.ui.ActionRow(up_btn),
+            discord.ui.ActionRow(up_btn_move, up_btn_surface),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(inventory_select),
         ])
         
@@ -1062,7 +1090,7 @@ class Mining(commands.Cog):
     async def show_shop(self, interaction: discord.Interaction, game: MiningGame):
         """Show shop interface"""
         if game.y != -1 or game.x not in [4, 5]:
-            await interaction.response.send_message("❌ You need to be at the shop to trade!", ephemeral=True)
+            await interaction.response.send_message("**❌ You need to be at the shop to trade!**", ephemeral=True)
             return
         
         # Sell inventory first
