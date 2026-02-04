@@ -1287,6 +1287,7 @@ class Owner(commands.Cog):
                   "L!eval <code> - Evaluate Python code\n"
                   "L!reload <cog> - Reload specific cog\n"
                   "L!reloadall - Reload all cogs\n"
+                  "L!ownermine - Developer mining mode with testing features\n"
                   "```",
             inline=False
         )

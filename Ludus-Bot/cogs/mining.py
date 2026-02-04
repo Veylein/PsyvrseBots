@@ -61,6 +61,13 @@ class MiningGame:
         self.inventory = {}
         self.coins = 100
         
+        # Developer mode flags
+        self.infinite_energy = False
+        self.infinite_backpack = False
+        
+        # Auto reset setting (for singleplayer)
+        self.auto_reset_enabled = True
+        
         # Map generation
         self.width = 11  # View width
         self.height = 10  # View height
@@ -156,16 +163,19 @@ class MiningGame:
         speed_bonus = 1 + (self.pickaxe_level * 0.15)
         energy_cost = max(1, int(biome["hardness"] / speed_bonus))
         
-        if self.energy < energy_cost:
+        # Check energy (skip if infinite)
+        if not self.infinite_energy and self.energy < energy_cost:
             return False, f"**❌ Not enough energy! Need {energy_cost}**"
         
-        # Check inventory space
-        total_items = sum(self.inventory.values())
-        if total_items >= self.backpack_capacity:
-            return False, "**❌ Backpack full! Return to surface to sell.**"
+        # Check inventory space (skip if infinite backpack)
+        if not self.infinite_backpack:
+            total_items = sum(self.inventory.values())
+            if total_items >= self.backpack_capacity:
+                return False, "**❌ Backpack full! Return to surface to sell.**"
         
-        # Mine successful
-        self.energy -= energy_cost
+        # Mine successful (consume energy if not infinite)
+        if not self.infinite_energy:
+            self.energy -= energy_cost
         old_block = self.map_data.get((x, y), "unknown")
         self.map_data[(x, y)] = "air"
         self.inventory[block] = self.inventory.get(block, 0) + 1
@@ -212,14 +222,21 @@ class MiningGame:
             self.last_energy_regen += timedelta(seconds=regen_count * 30)
     
     def check_map_regeneration(self, bot=None, guild_id: int = None) -> bool:
-        """Check if map should regenerate (12 hours) - respects server config"""
-        # Check if server has map reset disabled
-        if bot and guild_id:
-            server_config_cog = bot.get_cog("ServerConfig")
-            if server_config_cog:
-                config = server_config_cog.get_server_config(guild_id)
-                if not config.get("mining_map_reset", True):
-                    return False  # Map reset disabled for this server
+        """Check if map should regenerate (12 hours) - respects server config for shared, self setting for singleplayer"""
+        # For singleplayer, check personal auto_reset_enabled flag
+        if not self.is_shared:
+            if not self.auto_reset_enabled:
+                return False  # User disabled auto reset in their singleplayer game
+        else:
+            # For shared world, check server config
+            if bot:
+                server_config_cog = bot.get_cog("ServerConfig")
+                if server_config_cog:
+                    check_guild_id = guild_id or self.guild_id
+                    if check_guild_id:
+                        config = server_config_cog.get_server_config(check_guild_id)
+                        if not config.get("mining_map_reset", True):
+                            return False  # Map reset disabled for this server
         
         now = datetime.utcnow()
         elapsed = (now - self.last_map_regen).total_seconds()
@@ -458,14 +475,14 @@ class MiningGame:
                 # Return transparent fallback
                 return Image.new('RGBA', (icon_size, icon_size), (0, 0, 0, 0))
         
-        # Energy icon and text
+        # Energy icon and text (show "inf/inf" if infinite energy)
         energy_icon = load_ui_icon("assets/mining/ui/energy.png")
         img_rgba = img.convert('RGBA')
         img_rgba.paste(energy_icon, (5, 3), energy_icon)
         img = img_rgba.convert('RGB')
         draw = ImageDraw.Draw(img)
         
-        energy_text = f"{self.energy}/{self.max_energy}"
+        energy_text = "inf/inf" if self.infinite_energy else f"{self.energy}/{self.max_energy}"
         draw.text((28, 5), energy_text, fill=(255, 255, 100), font=font)
         
         # Energy bar visualization
@@ -491,7 +508,7 @@ class MiningGame:
         coins_text = f"{self.coins}"
         draw.text((118, 5), coins_text, fill=(255, 215, 0), font=font)
         
-        # Inventory/backpack icon and text
+        # Inventory/backpack icon and text (show "blocks/inf" if infinite backpack)
         # Determine backpack level based on capacity
         backpack_level = (self.backpack_capacity - 20) // 10 + 1  # Level 1 = 20 cap, Level 2 = 30, etc.
         backpack_icon = load_ui_icon(f"assets/mining/ui/backpack/backpack{backpack_level}.png")
@@ -500,8 +517,13 @@ class MiningGame:
         img = img_rgba.convert('RGB')
         draw = ImageDraw.Draw(img)
         
-        inv_text = f"{inventory_size}/{self.backpack_capacity}"
-        inv_color = (255, 100, 100) if inventory_size >= self.backpack_capacity else (100, 255, 100)
+        if self.infinite_backpack:
+            # Show inventory size when infinite (number of blocks, not value)
+            inv_text = f"{inventory_size}/inf"
+            inv_color = (100, 255, 100)
+        else:
+            inv_text = f"{inventory_size}/{self.backpack_capacity}"
+            inv_color = (255, 100, 100) if inventory_size >= self.backpack_capacity else (100, 255, 100)
         draw.text((248, 5), inv_text, fill=inv_color, font=font)
         
         # Pickaxe icon and level
@@ -574,9 +596,13 @@ class MiningGame:
         # Draw biome info below top UI
         biome = self.get_biome(self.y)
         
-        # Check if map reset is enabled for this server
+        # Check if map reset is enabled
         reset_enabled = True
-        if bot and self.guild_id:
+        if not self.is_shared:
+            # For singleplayer, check personal auto_reset_enabled flag
+            reset_enabled = self.auto_reset_enabled
+        elif bot and self.guild_id:
+            # For shared world, check server config
             server_config_cog = bot.get_cog("ServerConfig")
             if server_config_cog:
                 config = server_config_cog.get_server_config(self.guild_id)
@@ -650,7 +676,10 @@ class MiningGame:
             "coins": self.coins,
             "last_map_regen": self.last_map_regen.isoformat(),
             "map_data": map_data_serialized,
-            "other_players": self.other_players
+            "other_players": self.other_players,
+            "infinite_energy": self.infinite_energy,
+            "infinite_backpack": self.infinite_backpack,
+            "auto_reset_enabled": self.auto_reset_enabled
         }
     
     @classmethod
@@ -677,6 +706,9 @@ class MiningGame:
         game.width = 11
         game.height = 10
         game.other_players = data.get("other_players", {})
+        game.infinite_energy = data.get("infinite_energy", False)
+        game.infinite_backpack = data.get("infinite_backpack", False)
+        game.auto_reset_enabled = data.get("auto_reset_enabled", True)
         
         # Deserialize map_data
         game.map_data = {}
@@ -780,6 +812,19 @@ class MiningView(discord.ui.LayoutView):
             discord.ui.ActionRow(inventory_select),
         ])
         
+        # Add auto-reset toggle button for singleplayer
+        if not self.game.is_shared:
+            reset_status = "ON" if self.game.auto_reset_enabled else "OFF"
+            reset_btn = discord.ui.Button(
+                style=discord.ButtonStyle.primary if self.game.auto_reset_enabled else discord.ButtonStyle.secondary,
+                label=f"🔄 Auto-Reset: {reset_status}",
+            )
+            reset_btn.callback = self.toggle_reset_callback
+            container_items.extend([
+                discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+                discord.ui.ActionRow(reset_btn),
+            ])
+        
         self.container1 = discord.ui.Container(
             *container_items,
             accent_colour=discord.Colour(0x5D4E37),
@@ -819,6 +864,12 @@ class MiningView(discord.ui.LayoutView):
             await interaction.response.send_message(inv_text, ephemeral=True)
         else:
             await interaction.response.send_message("⚠️ This item is coming soon!", ephemeral=True)
+    
+    async def toggle_reset_callback(self, interaction: discord.Interaction):
+        """Toggle auto-reset for singleplayer"""
+        self.game.auto_reset_enabled = not self.game.auto_reset_enabled
+        status = "ENABLED" if self.game.auto_reset_enabled else "DISABLED"
+        await self.refresh(interaction, f"🔄 Auto-Reset {status}! Map will {'reset' if self.game.auto_reset_enabled else 'NOT reset'} after 12h.")
     
     async def shop_callback(self, interaction: discord.Interaction):
         """Handle shop dropdown selection"""
@@ -1070,6 +1121,20 @@ class MiningView(discord.ui.LayoutView):
             discord.ui.ActionRow(inventory_select),
         ])
         
+        # Add auto-reset toggle button for singleplayer
+        if not self.game.is_shared:
+            reset_status = "ON" if self.game.auto_reset_enabled else "OFF"
+            reset_btn = discord.ui.Button(
+                style=discord.ButtonStyle.primary if self.game.auto_reset_enabled else discord.ButtonStyle.secondary,
+                label=f"🔄 Auto-Reset: {reset_status}",
+            )
+            reset_btn.callback = self.toggle_reset_callback
+            container_items.extend([
+                discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+                discord.ui.ActionRow(reset_btn),
+            ])
+        
+
         # Replace container in THIS view
         self.container1 = discord.ui.Container(
             *container_items,
@@ -1126,6 +1191,798 @@ class MiningView(discord.ui.LayoutView):
                     for other_user_id, other_data in world_info["players"].items():
                         if str(other_user_id) != str(self.user_id):
                             # Try to get username from Discord
+                            try:
+                                user = interaction.client.get_user(int(other_user_id))
+                                username = user.name if user else f"User {other_user_id}"
+                            except:
+                                username = f"User {other_user_id}"
+                            
+                            self.game.other_players[other_user_id] = {
+                                "x": other_data["x"],
+                                "y": other_data["y"],
+                                "last_update": other_data.get("last_update", datetime.utcnow().isoformat()),
+                                "username": username
+                            }
+            
+            cog.save_data()
+
+
+class OwnerMiningView(discord.ui.LayoutView):
+    """Developer mining interface with additional testing features"""
+    
+    def __init__(self, game: MiningGame, user_id: int, bot):
+        self.game = game
+        self.user_id = user_id
+        self.bot = bot
+        self.message = None
+        self.map_file = None
+        self.dev_menu_state = "main"  # Track submenu state: main, teleport, place_blocks
+        super().__init__(timeout=300)
+    
+    @classmethod
+    async def create(cls, game: MiningGame, user_id: int, bot):
+        """Async factory method to create view with rendered map"""
+        view = cls(game, user_id, bot)
+        
+        # Regenerate energy before rendering
+        view.game.regenerate_energy()
+        
+        # Render map image in executor (prevents blocking)
+        loop = asyncio.get_event_loop()
+        map_image = await loop.run_in_executor(None, view.game.render_map, bot)
+        view.map_file = discord.File(map_image, filename="mining_map.png")
+        
+        # Build UI after render completes
+        await view._build_ui()
+        return view
+    
+    async def _build_ui(self):
+        """Build the UI components with developer menu"""
+        # Create buttons with callbacks
+        left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
+        down_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬇️")
+        right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️")
+        surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⤴️", label="Surface")
+        blank_btn_1 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
+        blank_btn_2 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
+
+        left_btn.callback = self.left_callback
+        down_btn.callback = self.mine_callback
+        right_btn.callback = self.right_callback
+        up_btn.callback = self.up_callback
+        surface_btn.callback = self.surface_callback
+        
+        # Create container as class attribute
+        container_items = [
+            discord.ui.TextDisplay(content=f"# ⛏ MINING ADVENTURE [DEV MODE]\n\n{self.game.get_stats_text()}"),
+            discord.ui.MediaGallery(
+                discord.MediaGalleryItem(
+                    media="attachment://mining_map.png",
+                    description=f"Seed: {self.game.seed} (Developer Mode)"
+                ),
+            ),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        ]
+        
+        # Add developer menu (changes based on state)
+        if self.dev_menu_state == "main":
+            dev_select = discord.ui.Select(
+                placeholder="🔧 Developer Menu",
+                options=[
+                    discord.SelectOption(label="⚡ Toggle Infinite Energy", value="infinite_energy", description=f"Currently: {'ON' if self.game.infinite_energy else 'OFF'}"),
+                    discord.SelectOption(label="🎒 Toggle Infinite Backpack", value="infinite_backpack", description=f"Currently: {'ON' if self.game.infinite_backpack else 'OFF'}"),
+                    discord.SelectOption(label="🗑️ Clear Area (5x5)", value="cleararea", description="Clear 5x5 area around you"),
+                    discord.SelectOption(label="📍 Teleport Menu", value="teleport_menu", description="Teleport to depths or players"),
+                    discord.SelectOption(label="🧱 Place Blocks Menu", value="place_menu", description="Place any block type"),
+                    discord.SelectOption(label="📥 Force Map Reset", value="forcereset", description="Regenerate entire map now"),
+                    discord.SelectOption(label="🌱 Change Seed", value="customseed", description="Enter custom world seed"),
+                    discord.SelectOption(label="� Spawn Rare Items", value="spawnitems", description="Add valuable items"),
+                    discord.SelectOption(label="💰 Max All Upgrades", value="maxupgrades", description="Max pickaxe/backpack/energy"),
+                    discord.SelectOption(label="🗺️ World Info", value="mapinfo", description="View map details"),
+                ]
+            )
+        elif self.dev_menu_state == "teleport":
+            # Teleport submenu
+            teleport_options = [
+                discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                discord.SelectOption(label="📍 Surface", value="tp_surface", description="Y = -1"),
+                discord.SelectOption(label="📍 Underground", value="tp_underground", description="Y = 10"),
+                discord.SelectOption(label="📍 Deep Caves", value="tp_deep", description="Y = 25"),
+                discord.SelectOption(label="📍 Mineral Depths", value="tp_mineral", description="Y = 50"),
+                discord.SelectOption(label="📍 Ancient Depths", value="tp_ancient", description="Y = 75"),
+                discord.SelectOption(label="📍 Abyss", value="tp_abyss", description="Y = 100"),
+            ]
+            
+            # Add teleports to other players
+            if self.game.is_shared and self.game.other_players:
+                for player_id, player_data in list(self.game.other_players.items())[:18]:  # Max 25 options total
+                    username = player_data.get("username", f"User {player_id}")
+                    teleport_options.append(
+                        discord.SelectOption(
+                            label=f"👤 {username[:20]}", 
+                            value=f"tp_player_{player_id}",
+                            description=f"X={player_data['x']}, Y={player_data['y']}"
+                        )
+                    )
+            
+            dev_select = discord.ui.Select(
+                placeholder="📍 Teleport Options",
+                options=teleport_options
+            )
+        elif self.dev_menu_state == "place_blocks":
+            # Block placement submenu
+            dev_select = discord.ui.Select(
+                placeholder="🧱 Place Block",
+                options=[
+                    discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                    discord.SelectOption(label="🏪 Shop", value="place_shop", description="Place a shop block"),
+                    discord.SelectOption(label="🪨 Stone", value="place_stone", description="Place stone"),
+                    discord.SelectOption(label="💎 Diamond", value="place_diamond", description="Place diamond ore"),
+                    discord.SelectOption(label="💚 Emerald", value="place_emerald", description="Place emerald ore"),
+                    discord.SelectOption(label="🟡 Gold", value="place_gold", description="Place gold ore"),
+                    discord.SelectOption(label="⬛ Netherite", value="place_netherite", description="Place netherite"),
+                    discord.SelectOption(label="🟫 Ancient Debris", value="place_ancient_debris", description="Place ancient debris"),
+                    discord.SelectOption(label="🔷 Lapis", value="place_lapis", description="Place lapis ore"),
+                    discord.SelectOption(label="🔴 Redstone", value="place_redstone", description="Place redstone ore"),
+                    discord.SelectOption(label="⚫ Coal", value="place_coal", description="Place coal ore"),
+                    discord.SelectOption(label="🟠 Copper", value="place_copper", description="Place copper ore"),
+                    discord.SelectOption(label="⚪ Iron", value="place_iron", description="Place iron ore"),
+                    discord.SelectOption(label="🟦 Sapphire", value="place_sapphire", description="Place sapphire ore"),
+                    discord.SelectOption(label="🟪 Amethyst", value="place_amethyst", description="Place amethyst"),
+                    discord.SelectOption(label="⬜ Quartz", value="place_quartz", description="Place quartz"),
+                    discord.SelectOption(label="🌫️ Air", value="place_air", description="Remove block"),
+                ]
+            )
+        
+        dev_select.callback = self.dev_menu_callback
+        container_items.append(discord.ui.ActionRow(dev_select))
+        container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        
+        # Add shop dropdown if at shop
+        if self.game.y == -1 and self.game.x in [4, 5]:
+            shop_select = discord.ui.Select(
+                placeholder="🏪 Shop Options",
+                options=[
+                    discord.SelectOption(label="💰 Sell Inventory", value="sell", description="Sell all items in inventory"),
+                    discord.SelectOption(label="⛏️ Upgrade Pickaxe", value="pickaxe", description=f"Cost: {self.game.pickaxe_level * 500} coins"),
+                    discord.SelectOption(label="🎒 Upgrade Backpack", value="backpack", description=f"Cost: {self.game.backpack_capacity * 100} coins"),
+                    discord.SelectOption(label="⚡ Upgrade Max Energy", value="energy", description=f"Cost: {self.game.max_energy * 50} coins"),
+                ]
+            )
+            shop_select.callback = self.shop_callback
+            container_items.append(discord.ui.ActionRow(shop_select))
+            container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        
+        # Add inventory dropdown (always visible)
+        inventory_select = discord.ui.Select(
+            placeholder="🎒 Inventory & Items",
+            options=[
+                discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
+                discord.SelectOption(label="🔦 Torch (Coming Soon)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
+                discord.SelectOption(label="🪜 Ladder (Coming Soon)", value="ladder", description="Climb back up easily"),
+                discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
+            ]
+        )
+        inventory_select.callback = self.inventory_callback
+        
+        container_items.extend([
+            discord.ui.ActionRow(blank_btn_1, up_btn, blank_btn_2),
+            discord.ui.ActionRow(left_btn, down_btn, right_btn),
+            discord.ui.ActionRow(surface_btn),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(inventory_select),
+        ])
+        
+        # Add auto-reset toggle button for singleplayer
+        if not self.game.is_shared:
+            reset_status = "ON" if self.game.auto_reset_enabled else "OFF"
+            reset_btn = discord.ui.Button(
+                style=discord.ButtonStyle.primary if self.game.auto_reset_enabled else discord.ButtonStyle.secondary,
+                label=f"🔄 Auto-Reset: {reset_status}",
+            )
+            reset_btn.callback = self.toggle_reset_callback
+            container_items.extend([
+                discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+                discord.ui.ActionRow(reset_btn),
+            ])
+        
+        self.container1 = discord.ui.Container(
+            *container_items,
+            accent_colour=discord.Colour(0xFF6600),  # Orange for dev mode
+        )
+        
+        self.add_item(self.container1)
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only allow game owner to interact"""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("**❌ This isn't your game!**", ephemeral=True)
+            return False
+        return True
+    
+    async def toggle_reset_callback(self, interaction: discord.Interaction):
+        """Toggle auto-reset for singleplayer"""
+        self.game.auto_reset_enabled = not self.game.auto_reset_enabled
+        status = "ENABLED" if self.game.auto_reset_enabled else "DISABLED"
+        await self.refresh(interaction, f"🔄 Auto-Reset {status}! Map will {'reset' if self.game.auto_reset_enabled else 'NOT reset'} after 12h.")
+    
+    async def dev_menu_callback(self, interaction: discord.Interaction):
+        """Handle developer menu selection"""
+        selected = interaction.data.get('values', [])
+        if not selected:
+            await interaction.response.defer()
+            return
+        
+        action = selected[0]
+        
+        # Handle submenu navigation
+        if action == "back_main":
+            self.dev_menu_state = "main"
+            await self.refresh(interaction, "🔙 Returned to main developer menu")
+            return
+        
+        elif action == "teleport_menu":
+            self.dev_menu_state = "teleport"
+            await self.refresh(interaction, "📍 **Teleport Menu** - Select destination")
+            return
+        
+        elif action == "place_menu":
+            self.dev_menu_state = "place_blocks"
+            await self.refresh(interaction, "🧱 **Place Blocks Menu** - Select block to place")
+            return
+        
+        # Main menu actions
+        if action == "infinite_energy":
+            self.game.infinite_energy = not self.game.infinite_energy
+            status = "**ENABLED** (inf/inf)" if self.game.infinite_energy else "**DISABLED**"
+            if self.game.infinite_energy:
+                self.game.energy = self.game.max_energy
+            await self.refresh(interaction, f"⚡ Infinite Energy: {status}")
+        
+        elif action == "infinite_backpack":
+            self.game.infinite_backpack = not self.game.infinite_backpack
+            inv_size = sum(self.game.inventory.values())
+            status = f"**ENABLED** ({inv_size}/inf)" if self.game.infinite_backpack else "**DISABLED**"
+            await self.refresh(interaction, f"🎒 Infinite Backpack: {status}")
+        
+        elif action == "cleararea":
+            cleared = 0
+            for dx in range(-2, 3):
+                for dy in range(-2, 3):
+                    x = self.game.x + dx
+                    y = self.game.y + dy
+                    if (x, y) in self.game.map_data and y >= 0:
+                        self.game.map_data[(x, y)] = "air"
+                        cleared += 1
+            await self.refresh(interaction, f"🗑️ Cleared {cleared} blocks in 5x5 area!")
+        
+        elif action == "forcereset":
+            # Force regenerate entire map - clear map_data first!
+            self.game.map_data = {}
+            self.game.generate_world(regenerate=True)
+            self.game.last_map_regen = datetime.utcnow()
+            self.game.x = 5  # Reset to centerL!ownermine
+            self.game.y = -1  # Reset to surface
+            await self.refresh(interaction, f"Force Reset! World regenerated with seed {self.game.seed}")
+        
+        elif action == "customseed":
+            # Show modal for custom seed input
+            modal = discord.ui.Modal(title="Enter Custom Seed")
+            seed_input = discord.ui.TextInput(
+                label="World Seed",
+                placeholder="Enter seed number (e.g., 12345)",
+                required=True,
+                max_length=20
+            )
+            modal.add_item(seed_input)
+            
+            async def modal_callback(modal_interaction: discord.Interaction):
+                try:
+                    new_seed = int(seed_input.value)
+                    self.game.seed = new_seed
+                    self.game.rng = random.Random(new_seed)
+                    self.game.map_data = {}  # Clear map first!
+                    self.game.generate_world(regenerate=True)
+                    self.game.last_map_regen = datetime.utcnow()
+                    self.game.x = 5
+                    self.game.y = -1
+                    await self.refresh(modal_interaction, f"Custom Seed {new_seed} Applied! World regenerated")
+                except ValueError:
+                    await self.refresh(modal_interaction, "Invalid seed! Please enter a valid number.")
+            
+            modal.on_submit = modal_callback
+            await interaction.response.send_modal(modal)
+            return
+        
+        # Teleport actions
+        elif action.startswith("tp_player_"):
+            player_id = action.replace("tp_player_", "")
+            if player_id in self.game.other_players:
+                player_data = self.game.other_players[player_id]
+                self.game.x = player_data["x"]
+                self.game.y = player_data["y"]
+                username = player_data.get("username", f"User {player_id}")
+                await self.refresh(interaction, f"📍 Teleported to **{username}** at ({self.game.x}, {self.game.y})!")
+            else:
+                await self.refresh(interaction, "❌ Player not found!")
+        
+        elif action.startswith("tp_"):
+            teleport_depths = {
+                "tp_surface": (-1, "Surface"),
+                "tp_underground": (10, "Underground"),
+                "tp_deep": (25, "Deep Caves"),
+                "tp_mineral": (50, "Mineral Depths"),
+                "tp_ancient": (75, "Ancient Depths"),
+                "tp_abyss": (100, "The Abyss")
+            }
+            
+            if action in teleport_depths:
+                depth, name = teleport_depths[action]
+                self.game.y = depth
+                self.game.x = 5
+                await self.refresh(interaction, f"📍 Teleported to **{name}** (Y = {depth})!")
+        
+        # Block placement actions
+        elif action.startswith("place_"):
+            block_type = action.replace("place_", "")
+            target_x = self.game.x
+            target_y = self.game.y + 1  # Place below player
+            
+            # Place the block
+            self.game.map_data[(target_x, target_y)] = block_type
+            
+            block_names = {
+                "shop": "🏪 Shop",
+                "stone": "🪨 Stone",
+                "diamond": "💎 Diamond Ore",
+                "emerald": "💚 Emerald Ore",
+                "gold": "🟡 Gold Ore",
+                "netherite": "⬛ Netherite",
+                "ancient_debris": "🟫 Ancient Debris",
+                "lapis": "🔷 Lapis Ore",
+                "redstone": "🔴 Redstone Ore",
+                "coal": "⚫ Coal Ore",
+                "copper": "🟠 Copper Ore",
+                "iron": "⚪ Iron Ore",
+                "sapphire": "🟦 Sapphire Ore",
+                "amethyst": "🟪 Amethyst",
+                "quartz": "⬜ Quartz",
+                "air": "🌫️ Air (removed block)"
+            }
+            
+            block_name = block_names.get(block_type, block_type)
+            await self.refresh(interaction, f"🧱 Placed **{block_name}** at ({target_x}, {target_y})!")
+        
+        elif action == "spawnitems":
+            self.game.inventory["diamond"] = self.game.inventory.get("diamond", 0) + 10
+            self.game.inventory["emerald"] = self.game.inventory.get("emerald", 0) + 10
+            self.game.inventory["gold"] = self.game.inventory.get("gold", 0) + 10
+            self.game.inventory["netherite"] = self.game.inventory.get("netherite", 0) + 10
+            self.game.inventory["ancient_debris"] = self.game.inventory.get("ancient_debris", 0) + 10
+            await self.refresh(interaction, "💎 **Spawned Items:** Diamond x10, Emerald x10, Gold x10, Netherite x10, Ancient Debris x10")
+        
+        elif action == "maxupgrades":
+            self.game.pickaxe_level = 10
+            self.game.backpack_capacity = 200
+            self.game.max_energy = 200
+            self.game.energy = self.game.max_energy
+            await self.refresh(interaction, "🚀 **Maxed Upgrades:** Pickaxe Lv.10, Backpack 200, Energy 200!")
+        
+        elif action == "mapinfo":
+            biome = self.game.get_biome(self.game.y)
+            info = (
+                f"🗺️ **World Information:**\n"
+                f"• **Seed:** {self.game.seed}\n"
+                f"• **Blocks Generated:** {len(self.game.map_data)}\n"
+                f"• **Current Biome:** {biome['name']}\n"
+                f"• **Position:** ({self.game.x}, {self.game.y})\n"
+                f"• **Max Depth:** {self.game.depth}\n"
+                f"• **Shared World:** {'Yes' if self.game.is_shared else 'No'}\n"
+                f"• **Other Players:** {len(self.game.other_players)}\n"
+                f"• **Infinite Energy:** {'ON' if self.game.infinite_energy else 'OFF'}\n"
+                f"• **Infinite Backpack:** {'ON' if self.game.infinite_backpack else 'OFF'}"
+            )
+            await self.refresh(interaction, info)
+    
+    # Copy all callback methods from MiningView
+    async def inventory_callback(self, interaction: discord.Interaction):
+        """Handle inventory dropdown selection"""
+        selected = interaction.data.get('values', [])
+        if not selected:
+            await interaction.response.defer()
+            return
+        
+        action = selected[0]
+        
+        if action == "view_inv":
+            if not self.game.inventory:
+                await interaction.response.send_message("🎒 **Inventory is empty!**", ephemeral=True)
+                return
+            
+            inv_text = "🎒 **Current Inventory:**\n"
+            for block, count in self.game.inventory.items():
+                value = self.game.BLOCK_VALUES.get(block, 0)
+                inv_text += f"• {count}x {block} (${value * count})\n"
+            
+            total_value = sum(self.game.BLOCK_VALUES.get(b, 0) * c for b, c in self.game.inventory.items())
+            inv_text += f"\n💰 **Total Value:** {total_value} psycoins"
+            
+            await interaction.response.send_message(inv_text, ephemeral=True)
+        else:
+            await interaction.response.send_message("⚠️ This item is coming soon!", ephemeral=True)
+    
+    async def shop_callback(self, interaction: discord.Interaction):
+        """Handle shop dropdown selection"""
+        selected = interaction.data.get('values', [])
+        if not selected:
+            await interaction.response.defer()
+            return
+        
+        action = selected[0]
+        
+        if action == "sell":
+            if not self.game.inventory:
+                await self.refresh(interaction, "**❌ Inventory is empty!**")
+                return
+            value, items = self.game.sell_inventory(interaction.client)
+            await self.refresh(interaction, f"💰 Sold items for {value} psycoins!")
+        
+        elif action == "pickaxe":
+            cost = self.game.pickaxe_level * 500
+            economy_cog = self.bot.get_cog('Economy')
+            
+            if not economy_cog:
+                await self.refresh(interaction, "**❌ Economy system not available.**")
+                return
+            
+            if economy_cog.remove_coins(interaction.user.id, cost):
+                self.game.coins = economy_cog.get_balance(interaction.user.id)
+                self.game.pickaxe_level += 1
+                await self.refresh(interaction, f"⛏️ Upgraded pickaxe to level {self.game.pickaxe_level}!")
+            else:
+                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
+        
+        elif action == "backpack":
+            cost = self.game.backpack_capacity * 100
+            economy_cog = self.bot.get_cog('Economy')
+            
+            if not economy_cog:
+                await self.refresh(interaction, "**❌ Economy system not available.**")
+                return
+            
+            if economy_cog.remove_coins(interaction.user.id, cost):
+                self.game.coins = economy_cog.get_balance(interaction.user.id)
+                self.game.backpack_capacity += 10
+                await self.refresh(interaction, f"🎒 Upgraded backpack to {self.game.backpack_capacity} slots!")
+            else:
+                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
+        
+        elif action == "energy":
+            cost = self.game.max_energy * 50
+            economy_cog = self.bot.get_cog('Economy')
+            
+            if not economy_cog:
+                await self.refresh(interaction, "**❌ Economy system not available.**")
+                return
+            
+            if economy_cog.remove_coins(interaction.user.id, cost):
+                self.game.coins = economy_cog.get_balance(interaction.user.id)
+                self.game.max_energy += 20
+                self.game.energy = self.game.max_energy
+                await self.refresh(interaction, f"⚡ Upgraded max energy to {self.game.max_energy}!")
+            else:
+                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
+    
+    async def left_callback(self, interaction: discord.Interaction):
+        """Mine and move left"""
+        target_x = self.game.x - 1
+        target_y = self.game.y
+        
+        if not self.game.can_move(target_x, target_y):
+            result = self.game.mine_block(target_x, target_y)
+            if len(result) == 3 and result[0]:
+                self.game.x = target_x
+                self.game.y = target_y
+                _, msg, _ = result
+            else:
+                _, msg = result
+        else:
+            _, msg = self.game.move_player(-1, 0)
+        
+        await self.refresh(interaction, msg)
+
+    async def up_callback(self, interaction: discord.Interaction):
+        """Mine and move up"""
+        target_x = self.game.x
+        target_y = self.game.y - 1
+    
+        if not self.game.can_move(target_x, target_y):
+            result = self.game.mine_block(target_x, target_y)
+            if len(result) == 3 and result[0]:
+                self.game.x = target_x
+                self.game.y = target_y
+                _, msg, _ = result
+            else:
+                _, msg = result
+        else:
+            _, msg = self.game.move_player(0, -1)
+    
+        await self.refresh(interaction, msg)
+    
+    async def right_callback(self, interaction: discord.Interaction):
+        """Mine and move right"""
+        target_x = self.game.x + 1
+        target_y = self.game.y
+        
+        if not self.game.can_move(target_x, target_y):
+            result = self.game.mine_block(target_x, target_y)
+            if len(result) == 3 and result[0]:
+                self.game.x = target_x
+                self.game.y = target_y
+                _, msg, _ = result
+            else:
+                _, msg = result
+        else:
+            _, msg = self.game.move_player(1, 0)
+        
+        await self.refresh(interaction, msg)
+    
+    async def mine_callback(self, interaction: discord.Interaction):
+        """Mine block below and fall to ground"""
+        target_x = self.game.x
+        target_y = self.game.y + 1
+        
+        if self.game.can_move(target_x, target_y):
+            while self.game.can_move(self.game.x, self.game.y + 1):
+                self.game.y += 1
+            msg = f"⬇️ Fell to ground at y={self.game.y}"
+        else:
+            result = self.game.mine_block(target_x, target_y)
+            if len(result) == 3 and result[0]:
+                success, msg, (new_x, new_y) = result
+                self.game.x = new_x
+                self.game.y = new_y
+                
+                while self.game.can_move(self.game.x, self.game.y + 1):
+                    self.game.y += 1
+                    if self.game.y > new_y:
+                        msg += f" → Fell to y={self.game.y}"
+                        break
+            else:
+                _, msg = result
+        
+        await self.refresh(interaction, msg)
+    
+    async def surface_callback(self, interaction: discord.Interaction):
+        """Return to surface"""
+        self.game.x = 1
+        self.game.y = -1
+        await self.refresh(interaction, "⬆️ Returned to surface!")
+    
+    async def on_timeout(self):
+        """Handle timeout"""
+        if self.message:
+            try:
+                await self.message.edit(view=None)
+            except:
+                pass
+    
+    async def refresh(self, interaction: discord.Interaction, message: str = None):
+        """Refresh the game view"""
+        self.game.regenerate_energy()
+        
+        if self.game.check_map_regeneration(bot=interaction.client, guild_id=self.game.guild_id):
+            if message:
+                message += "\n\n🔄 **Map regenerated after 12 hours!**"
+            else:
+                message = "🔄 **Map regenerated after 12 hours!**"
+        
+        loop = asyncio.get_event_loop()
+        map_image = await loop.run_in_executor(None, self.game.render_map, interaction.client)
+        self.map_file = discord.File(map_image, filename="mining_map.png")
+        
+        display_text = f"# ⛏ MINING ADVENTURE [DEV MODE]\n\n{self.game.get_stats_text()}"
+        if message:
+            display_text += f"\n\n{message}"
+        
+        self.clear_items()
+        
+        left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
+        down_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬇️")
+        right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️")
+        surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⤴️", label="Surface")
+        blank_btn_1 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
+        blank_btn_2 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
+        
+        up_btn.callback = self.up_callback
+        left_btn.callback = self.left_callback
+        down_btn.callback = self.mine_callback
+        right_btn.callback = self.right_callback
+        surface_btn.callback = self.surface_callback
+        
+        container_items = [
+            discord.ui.TextDisplay(content=display_text),
+            discord.ui.MediaGallery(
+                discord.MediaGalleryItem(
+                    media="attachment://mining_map.png",
+                    description=f"Seed: {self.game.seed} (Developer Mode)"
+                ),
+            ),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        ]
+        
+        # Add developer menu (changes based on state)
+        if self.dev_menu_state == "main":
+            dev_select = discord.ui.Select(
+                placeholder="🔧 Developer Menu",
+                options=[
+                    discord.SelectOption(label="⚡ Toggle Infinite Energy", value="infinite_energy", description=f"Currently: {'ON' if self.game.infinite_energy else 'OFF'}"),
+                    discord.SelectOption(label="🎒 Toggle Infinite Backpack", value="infinite_backpack", description=f"Currently: {'ON' if self.game.infinite_backpack else 'OFF'}"),
+                    discord.SelectOption(label="🗑️ Clear Area (5x5)", value="cleararea", description="Clear 5x5 area around you"),
+                    discord.SelectOption(label="📍 Teleport Menu", value="teleport_menu", description="Teleport to depths or players"),
+                    discord.SelectOption(label="🧱 Place Blocks Menu", value="place_menu", description="Place any block type"),
+                    discord.SelectOption(label="🔄 Force Map Reset", value="forcereset", description="Regenerate entire map now"),
+                    discord.SelectOption(label="🌱 Change Seed", value="customseed", description="Enter custom world seed"),
+                    discord.SelectOption(label="💎 Spawn Rare Items", value="spawnitems", description="Add valuable items"),
+                    discord.SelectOption(label="💰 Max All Upgrades", value="maxupgrades", description="Max pickaxe/backpack/energy"),
+                    discord.SelectOption(label="🗺️ World Info", value="mapinfo", description="View map details"),
+                ]
+            )
+        elif self.dev_menu_state == "teleport":
+            # Teleport submenu
+            teleport_options = [
+                discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                discord.SelectOption(label="📍 Surface", value="tp_surface", description="Y = -1"),
+                discord.SelectOption(label="📍 Underground", value="tp_underground", description="Y = 10"),
+                discord.SelectOption(label="📍 Deep Caves", value="tp_deep", description="Y = 25"),
+                discord.SelectOption(label="📍 Mineral Depths", value="tp_mineral", description="Y = 50"),
+                discord.SelectOption(label="📍 Ancient Depths", value="tp_ancient", description="Y = 75"),
+                discord.SelectOption(label="📍 Abyss", value="tp_abyss", description="Y = 100"),
+            ]
+            
+            # Add teleports to other players
+            if self.game.is_shared and self.game.other_players:
+                for player_id, player_data in list(self.game.other_players.items())[:18]:  # Max 25 options total
+                    username = player_data.get("username", f"User {player_id}")
+                    teleport_options.append(
+                        discord.SelectOption(
+                            label=f"👤 {username[:20]}", 
+                            value=f"tp_player_{player_id}",
+                            description=f"X={player_data['x']}, Y={player_data['y']}"
+                        )
+                    )
+            
+            dev_select = discord.ui.Select(
+                placeholder="📍 Teleport Options",
+                options=teleport_options
+            )
+        elif self.dev_menu_state == "place_blocks":
+            # Block placement submenu
+            dev_select = discord.ui.Select(
+                placeholder="🧱 Place Block",
+                options=[
+                    discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                    discord.SelectOption(label="🏪 Shop", value="place_shop", description="Place a shop block"),
+                    discord.SelectOption(label="🪨 Stone", value="place_stone", description="Place stone"),
+                    discord.SelectOption(label="💎 Diamond", value="place_diamond", description="Place diamond ore"),
+                    discord.SelectOption(label="💚 Emerald", value="place_emerald", description="Place emerald ore"),
+                    discord.SelectOption(label="🟡 Gold", value="place_gold", description="Place gold ore"),
+                    discord.SelectOption(label="⬛ Netherite", value="place_netherite", description="Place netherite"),
+                    discord.SelectOption(label="🟫 Ancient Debris", value="place_ancient_debris", description="Place ancient debris"),
+                    discord.SelectOption(label="🔷 Lapis", value="place_lapis", description="Place lapis ore"),
+                    discord.SelectOption(label="🔴 Redstone", value="place_redstone", description="Place redstone ore"),
+                    discord.SelectOption(label="⚫ Coal", value="place_coal", description="Place coal ore"),
+                    discord.SelectOption(label="🟠 Copper", value="place_copper", description="Place copper ore"),
+                    discord.SelectOption(label="⚪ Iron", value="place_iron", description="Place iron ore"),
+                    discord.SelectOption(label="🟦 Sapphire", value="place_sapphire", description="Place sapphire ore"),
+                    discord.SelectOption(label="🟪 Amethyst", value="place_amethyst", description="Place amethyst"),
+                    discord.SelectOption(label="⬜ Quartz", value="place_quartz", description="Place quartz"),
+                    discord.SelectOption(label="🌫️ Air", value="place_air", description="Remove block"),
+                ]
+            )
+        
+        dev_select.callback = self.dev_menu_callback
+        container_items.append(discord.ui.ActionRow(dev_select))
+        container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        
+        if self.game.y == -1 and self.game.x in [4, 5]:
+            shop_select = discord.ui.Select(
+                placeholder="🏪 Shop Options",
+                options=[
+                    discord.SelectOption(label="💰 Sell Inventory", value="sell", description="Sell all items in inventory"),
+                    discord.SelectOption(label="⛏️ Upgrade Pickaxe", value="pickaxe", description=f"Cost: {self.game.pickaxe_level * 500} coins"),
+                    discord.SelectOption(label="🎒 Upgrade Backpack", value="backpack", description=f"Cost: {self.game.backpack_capacity * 100} coins"),
+                    discord.SelectOption(label="⚡ Upgrade Max Energy", value="energy", description=f"Cost: {self.game.max_energy * 50} coins"),
+                ]
+            )
+            shop_select.callback = self.shop_callback
+            container_items.append(discord.ui.ActionRow(shop_select))
+            container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        
+        inventory_select = discord.ui.Select(
+            placeholder="🎒 Inventory & Items",
+            options=[
+                discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
+                discord.SelectOption(label="🔦 Torch (Coming Soon)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
+                discord.SelectOption(label="🪜 Ladder (Coming Soon)", value="ladder", description="Climb back up easily"),
+                discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
+            ]
+        )
+        inventory_select.callback = self.inventory_callback
+        
+        container_items.extend([
+            discord.ui.ActionRow(blank_btn_1, up_btn, blank_btn_2),
+            discord.ui.ActionRow(left_btn, down_btn, right_btn),
+            discord.ui.ActionRow(surface_btn),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(inventory_select),
+        ])
+        
+        # Add auto-reset toggle button for singleplayer
+        if not self.game.is_shared:
+            reset_status = "ON" if self.game.auto_reset_enabled else "OFF"
+            reset_btn = discord.ui.Button(
+                style=discord.ButtonStyle.primary if self.game.auto_reset_enabled else discord.ButtonStyle.secondary,
+                label=f"🔄 Auto-Reset: {reset_status}",
+            )
+            reset_btn.callback = self.toggle_reset_callback
+            container_items.extend([
+                discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+                discord.ui.ActionRow(reset_btn),
+            ])
+        
+        self.container1 = discord.ui.Container(
+            *container_items,
+            accent_colour=discord.Colour(0xFF6600),
+        )
+        
+        self.add_item(self.container1)
+        
+        try:
+            await interaction.response.edit_message(
+                content=None,
+                embed=None,
+                view=self, 
+                attachments=[self.map_file]
+            )
+        except discord.errors.NotFound:
+            return
+        except Exception as e:
+            print(f"[Mining] Error refreshing view: {e}")
+            return
+        
+        # Save game state after action
+        cog = interaction.client.get_cog("Mining")
+        if cog:
+            if self.game.is_shared and self.game.guild_id:
+                if self.game.guild_id in cog.shared_worlds:
+                    world_info = cog.shared_worlds[self.game.guild_id]
+                    
+                    player_key = str(self.user_id)
+                    world_info["players"][player_key] = {
+                        "x": self.game.x,
+                        "y": self.game.y,
+                        "depth": self.game.depth,
+                        "energy": self.game.energy,
+                        "max_energy": self.game.max_energy,
+                        "last_energy_regen": self.game.last_energy_regen.isoformat(),
+                        "pickaxe_level": self.game.pickaxe_level,
+                        "backpack_capacity": self.game.backpack_capacity,
+                        "inventory": self.game.inventory,
+                        "coins": self.game.coins,
+                        "last_update": datetime.utcnow().isoformat()
+                    }
+                    
+                    world_info["world_data"].map_data = self.game.map_data
+                    world_info["world_data"].last_map_regen = self.game.last_map_regen
+                    
+                    self.game.other_players = {}
+                    for other_user_id, other_data in world_info["players"].items():
+                        if str(other_user_id) != str(self.user_id):
                             try:
                                 user = interaction.client.get_user(int(other_user_id))
                                 username = user.name if user else f"User {other_user_id}"
@@ -1210,8 +2067,14 @@ class Mining(commands.Cog):
         await interaction.response.defer()
         await self.start_mining(interaction, interaction.user.id, interaction.guild.id if interaction.guild else None)
     
-    async def start_mining(self, ctx, user_id: int, guild_id: int = None):
-        """Start or resume mining game"""
+    @commands.command(name="ownermine")
+    @commands.is_owner()
+    async def ownermine_prefix(self, ctx: commands.Context):
+        """🔧 Start mining in developer mode with extra features (owner only)"""
+        await self.start_mining(ctx, ctx.author.id, ctx.guild.id if ctx.guild else None, dev_mode=True)
+    
+    async def start_mining(self, ctx, user_id: int, guild_id: int = None, dev_mode: bool = False):
+        """Start or resume mining game (optionally in developer mode)"""
         # Get economy cog for coin sync
         economy_cog = self.bot.get_cog("Economy")
         
@@ -1315,10 +2178,13 @@ class Mining(commands.Cog):
                 
                 self.active_games[user_id] = game
         
-        await self.send_game_view(ctx, game, user_id, "🎮 Mining adventure!" + (" 🌍 Shared World!" if is_shared else ""))
+        message = "🎮 Mining adventure!" + (" 🌍 Shared World!" if is_shared else "")
+        if dev_mode:
+            message += " 🔧 [Developer Mode]"
+        await self.send_game_view(ctx, game, user_id, message, dev_mode=dev_mode)
     
-    async def send_game_view(self, ctx, game: MiningGame, user_id: int, message: str):
-        """Send game view"""
+    async def send_game_view(self, ctx, game: MiningGame, user_id: int, message: str, dev_mode: bool = False):
+        """Send game view (optionally in developer mode)"""
         # Get bot instance - handle both Interaction and Context
         if hasattr(ctx, 'client'):  # Interaction
             bot = ctx.client
@@ -1333,7 +2199,11 @@ class Mining(commands.Cog):
         if game.check_map_regeneration(bot=bot, guild_id=guild_id):
             message += "\n\n🔄 **Map regenerated after 12 hours!**"
         
-        view = await MiningView.create(game, user_id, self.bot)
+        # Use OwnerMiningView if in developer mode, otherwise regular MiningView
+        if dev_mode:
+            view = await OwnerMiningView.create(game, user_id, self.bot)
+        else:
+            view = await MiningView.create(game, user_id, self.bot)
         
         if hasattr(ctx, 'response'):  # Slash command
             view.message = await ctx.followup.send(view=view, files=[view.map_file])
