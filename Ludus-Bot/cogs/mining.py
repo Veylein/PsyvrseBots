@@ -840,27 +840,26 @@ class MiningView(discord.ui.LayoutView):
         
         # Render new map image and store as file
         map_image = self.game.render_map()
+        self.map_file = discord.File(map_image, filename="mining_map.png")
         
-        # Create new view instance
-        new_view = MiningView(self.game, self.user_id, self.bot)
-        new_view.message = self.message
-        new_view.map_file = discord.File(map_image, filename="mining_map.png")
-        
-        # Update container with new data
+        # Update display text
         display_text = f"# ⛏ MINING ADVENTURE\n\n{self.game.get_stats_text()}"
         if message:
             display_text += f"\n\n{message}"
         
-        # Create buttons with callbacks for new view
+        # Clear ALL old items from THIS view
+        self.clear_items()
+        
+        # Create buttons with callbacks for THIS view
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
         mine_btn = discord.ui.Button(style=discord.ButtonStyle.success, emoji="⛏️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
         up_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
         
-        left_btn.callback = new_view.left_callback
-        mine_btn.callback = new_view.mine_callback
-        right_btn.callback = new_view.right_callback
-        up_btn.callback = new_view.up_callback
+        left_btn.callback = self.left_callback
+        mine_btn.callback = self.mine_callback
+        right_btn.callback = self.right_callback
+        up_btn.callback = self.up_callback
         
         # Check if at shop to add dropdown
         container_items = [
@@ -885,7 +884,7 @@ class MiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="⚡ Upgrade Max Energy", value="energy", description=f"Cost: {self.game.max_energy * 50} coins"),
                 ]
             )
-            shop_select.callback = new_view.shop_callback
+            shop_select.callback = self.shop_callback
             container_items.append(discord.ui.ActionRow(shop_select))
 
         
@@ -900,7 +899,7 @@ class MiningView(discord.ui.LayoutView):
                 discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
             ]
         )
-        inventory_select.callback = new_view.inventory_callback
+        inventory_select.callback = self.inventory_callback
         
         container_items.extend([
             discord.ui.ActionRow(left_btn, mine_btn, right_btn),
@@ -908,26 +907,28 @@ class MiningView(discord.ui.LayoutView):
             discord.ui.ActionRow(inventory_select),
         ])
         
-        new_view.container1 = discord.ui.Container(
+        # Replace container in THIS view
+        self.container1 = discord.ui.Container(
             *container_items,
             accent_colour=discord.Colour(0x5D4E37),
         )
         
-        new_view.add_item(new_view.container1)
+        self.add_item(self.container1)
         
         try:
-            await interaction.response.edit_message(view=new_view, attachments=[new_view.map_file])
+            # Edit message with SAME view (self)
+            await interaction.response.edit_message(
+                content=None,
+                embed=None,
+                view=self, 
+                attachments=[self.map_file]
+            )
         except discord.errors.NotFound:
-            # Message was deleted, stop the view
-            self.stop()
+            # Message was deleted
             return
         except Exception as e:
             print(f"[Mining] Error refreshing view: {e}")
-            self.stop()
             return
-        
-        # Only stop old view and save if edit was successful
-        self.stop()
         
         # Save game state after action
         cog = interaction.client.get_cog("Mining")
