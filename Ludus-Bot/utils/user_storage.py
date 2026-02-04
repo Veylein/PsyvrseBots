@@ -2,6 +2,8 @@ import json
 import threading
 from pathlib import Path
 from shutil import move
+import os
+import sys
 from datetime import datetime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,16 +79,31 @@ def save_user(user_obj: dict):
     p = user_file(user_id)
     lock = _get_lock(user_id)
     tmp = p.with_suffix('.tmp')
+    # ensure users dir exists (defensive)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
     with lock:
         try:
             tmp.write_text(json.dumps(user_obj, ensure_ascii=False, indent=2), encoding="utf-8")
-            move(str(tmp), str(p))
-        except Exception:
-            if tmp.exists():
-                try:
+            # use atomic replace where available to avoid Windows move issues
+            try:
+                os.replace(str(tmp), str(p))
+            except Exception:
+                # fallback to shutil.move for compatibility
+                move(str(tmp), str(p))
+        except Exception as e:
+            # best-effort cleanup of tmp file and emit a short error to stderr
+            try:
+                if tmp.exists():
                     tmp.unlink()
-                except Exception:
-                    pass
+            except Exception:
+                pass
+            try:
+                print(f"[user_storage] failed to save user {user_id}: {e}", file=sys.stderr)
+            except Exception:
+                pass
 
 
 def record_minigame_result(user_id: int, game_name: str, result: str, coins: int = 0, username: str | None = None):

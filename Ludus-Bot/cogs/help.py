@@ -141,43 +141,8 @@ class Help(commands.Cog):
                     ("event war <hours>", "Server faction war"),
                     ("joinfaction <name>", "Join faction"),
                     ("warleaderboard", "War standings"),
-                    ("event worldboss", "Global boss raid"),
-                    ("attack", "Attack world boss"),
-                    ("bossstats", "Boss health/stats"),
-                    ("event hunt <mins>", "Global scavenger hunt"),
-                    ("event list", "Active events"),
-                    ("event end <type>", "End event"),
-                ]
-            },
-            "👥 Social": {
-                "key": "social",
-                "desc": "Interact with community",
-                "commands": [
-                    ("compliment @user", "Give compliment (+15 coins)"),
-                    ("roast @user", "Light roast (+10 coins)"),
-                    ("wyr", "Would You Rather (10-25 coins)"),
-                    ("wyr_add <A> <B>", "Submit WYR question (+20)"),
-                    ("story <starter>", "Start collaborative story"),
-                    ("story_view", "Read completed stories"),
-                    ("highfive @user", "Celebrate (+5 coins)"),
-                    ("reputation @user", "Check reputation"),
-                    ("rep @user", "Give daily reputation point"),
-                    ("slap @user", "Slap someone with GIF"),
-                    ("punch @user", "Punch someone with GIF"),
-                    ("kick @user", "Kick someone with GIF"),
-                    ("kiss @user", "Kiss someone with GIF"),
-                    ("dance @user", "Dance with someone with GIF"),
-                    ("stab @user", "Stab someone with GIF"),
-                    ("shoot @user", "Shoot someone with GIF"),
-                ]
-            },
-            "🐾 Pets": {
-                "key": "pets",
-                "desc": "Virtual companion system",
-                "commands": [
-                    ("pet adopt", "Adopt a pet (9 types)"),
-                    ("pet status", "Check pet stats"),
-                    ("pet feed", "Feed your pet"),
+                    # Removed obsolete categories: Progression (leveling), Fun++ and Music
+                    # They did not match the current cogs available in the repository.
                     ("pet play", "Play with pet"),
                     ("pet walk", "Walk your pet"),
                     ("pet rename <name>", "Rename pet"),
