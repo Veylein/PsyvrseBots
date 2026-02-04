@@ -695,7 +695,7 @@ class MiningView(discord.ui.LayoutView):
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
-        up_btn.callback = self.up_move_callback
+        up_btn.callback = self.up_callback
         up_btn_surface.callback = self.surface_callback
         
         # Create container as class attribute
@@ -869,7 +869,7 @@ class MiningView(discord.ui.LayoutView):
         
         await self.refresh(interaction, msg)
 
-    async def up_move_callback(self, interaction: discord.Interaction):
+    async def up_callback(self, interaction: discord.Interaction):
         """Mine and move up"""
         target_x = self.game.x
         target_y = self.game.y - 1
@@ -981,7 +981,7 @@ class MiningView(discord.ui.LayoutView):
         up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
         up_btn_surface = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
         
-        up_btn.callback = self.up_move_callback
+        up_btn.callback = self.up_callback
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
