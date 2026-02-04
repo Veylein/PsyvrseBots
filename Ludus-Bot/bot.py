@@ -167,7 +167,7 @@ async def on_ready():
     # ===== DEV GUILD COMMAND SYNC SYSTEM =====
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
-    DEV_ONLY_COMMANDS = ['mine']  # Add command names here for dev guild testing
+    DEV_ONLY_COMMANDS = []  # Add command names here for dev guild testing
     
     # Log all commands available before sync
     print(f"[BOT] Total app commands in tree: {len(bot.tree.get_commands())}")
