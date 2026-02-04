@@ -689,14 +689,14 @@ class MiningView(discord.ui.LayoutView):
         mine_btn = discord.ui.Button(style=discord.ButtonStyle.success, emoji="⛏️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
         up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
-        up_btn_surface = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
+         = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
         
 
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
         up_btn.callback = self.up_callback
-        up_btn_surface.callback = self.surface_callback
+        .callback = self.surface_callback
         
         # Create container as class attribute
         container_items = [
@@ -742,7 +742,7 @@ class MiningView(discord.ui.LayoutView):
         
         container_items.extend([
             discord.ui.ActionRow(left_btn, mine_btn, right_btn),
-            discord.ui.ActionRow(up_btn, up_btn_surface),
+            discord.ui.ActionRow(up_btn, surface_btn),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(inventory_select),
         ])
@@ -979,13 +979,13 @@ class MiningView(discord.ui.LayoutView):
         mine_btn = discord.ui.Button(style=discord.ButtonStyle.success, emoji="⛏️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
         up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
-        up_btn_surface = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
+        surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
         
         up_btn.callback = self.up_callback
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
-        up_btn_surface.callback = self.surface_callback
+        surface_btn.callback = self.surface_callback
         
         # Check if at shop to add dropdown
         container_items = [
@@ -1029,7 +1029,7 @@ class MiningView(discord.ui.LayoutView):
         
         container_items.extend([
             discord.ui.ActionRow(left_btn, mine_btn, right_btn),
-            discord.ui.ActionRow(up_btn, up_btn_surface),
+            discord.ui.ActionRow(up_btn, surface_btn),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(inventory_select),
         ])
