@@ -122,8 +122,8 @@ class Help(commands.Cog):
                     ("/akinator start", "Mind-reading game"),
                 ]
             },
-            "🎪 Fun++": {
-                "key": "funplus",
+            "🎪 Extra": {
+                "key": "extra",
                 "desc": "Extra entertainment",
                 "commands": [
                     ("/animal", "Random animal images"),
@@ -203,20 +203,6 @@ class Help(commands.Cog):
                     ("panda", "Panda images"),
                     ("gif <search>", "Search GIFs"),
                     ("poll <question>", "Create poll"),
-                ]
-            },
-            "🎵 Music": {
-                "key": "music",
-                "desc": "Voice channel music player",
-                "commands": [
-                    ("music play <song>", "Play song/URL"),
-                    ("music pause", "Pause playback"),
-                    ("music resume", "Resume playback"),
-                    ("music skip", "Skip song"),
-                    ("music stop", "Stop and disconnect"),
-                    ("music queue", "View queue"),
-                    ("music radio <genre>", "Start radio (18 genres)"),
-                    ("music volume <0-100>", "Adjust volume"),
                 ]
             },
             "⚙️ Utility": {
@@ -380,15 +366,19 @@ class Help(commands.Cog):
                 if owner_cog:
                     ownerhelp_cmd = owner_cog.owner_help
                     if is_slash:
-                        # Create fake context for prefix command
+                        # Create fake context for prefix command that forwards to interaction followup
                         class FakeCtx:
-                            def __init__(self, interaction):
+                            def __init__(self, interaction: discord.Interaction):
+                                self._interaction = interaction
                                 self.author = interaction.user
                                 self.guild = interaction.guild
                                 self.channel = interaction.channel
                                 self.bot = interaction.client
+
                             async def send(self, *args, **kwargs):
-                                return await ctx.followup.send(*args, **kwargs)
+                                # use followup to send after deferring
+                                return await self._interaction.followup.send(*args, **kwargs)
+
                         await ctx.response.defer()
                         fake_ctx = FakeCtx(ctx)
                         await ownerhelp_cmd(fake_ctx)
@@ -545,6 +535,3 @@ async def setup(bot):
     # Add cog and ensure the slash command is registered with the app command tree
     cog = Help(bot)
     await bot.add_cog(cog)
-    # App commands defined on the Cog are registered automatically when the cog
-    # is added. Avoid manually calling `bot.tree.add_command` here to prevent
-    # duplicate registrations during extension reloads.
