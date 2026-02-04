@@ -211,8 +211,16 @@ class MiningGame:
             # Don't lose leftover time
             self.last_energy_regen += timedelta(seconds=regen_count * 30)
     
-    def check_map_regeneration(self) -> bool:
-        """Check if map should regenerate (12 hours)"""
+    def check_map_regeneration(self, bot=None, guild_id: int = None) -> bool:
+        """Check if map should regenerate (12 hours) - respects server config"""
+        # Check if server has map reset disabled
+        if bot and guild_id:
+            server_config_cog = bot.get_cog("ServerConfig")
+            if server_config_cog:
+                config = server_config_cog.get_server_config(guild_id)
+                if not config.get("mining_map_reset", True):
+                    return False  # Map reset disabled for this server
+        
         now = datetime.utcnow()
         elapsed = (now - self.last_map_regen).total_seconds()
         hours_elapsed = elapsed / 3600
@@ -958,7 +966,7 @@ class MiningView(discord.ui.LayoutView):
         self.game.regenerate_energy()
         
         # Check for map regeneration
-        if self.game.check_map_regeneration():
+        if self.game.check_map_regeneration(bot=interaction.client, guild_id=self.game.guild_id):
             if message:
                 message += "\n\n🔄 **Map regenerated after 12 hours!**"
             else:
@@ -1173,11 +1181,6 @@ class Mining(commands.Cog):
         with open(self.data_file, 'w') as f:
             json.dump(data, f, indent=4)
     
-    @commands.command(name="mine")
-    async def mine_prefix(self, ctx):
-        """Start a mining adventure! (Prefix version)"""
-        await self.start_mining(ctx, ctx.author.id, ctx.guild.id if ctx.guild else None)
-    
     @app_commands.command(name="mine", description="⛏️ Start a procedurally generated mining adventure!")
     async def mine_slash(self, interaction: discord.Interaction):
         """Start a mining adventure! (Slash version)"""
@@ -1288,7 +1291,10 @@ class Mining(commands.Cog):
     async def send_game_view(self, ctx, game: MiningGame, user_id: int, message: str):
         """Send game view"""
         # Check for map regeneration
-        if game.check_map_regeneration():
+        bot = ctx if hasattr(ctx, 'bot') else (ctx.client if hasattr(ctx, 'client') else None)
+        guild_id = ctx.guild.id if hasattr(ctx, 'guild') and ctx.guild else game.guild_id
+        
+        if game.check_map_regeneration(bot=bot, guild_id=guild_id):
             message += "\n\n🔄 **Map regenerated after 12 hours!**"
         
         view = MiningView(game, user_id, self.bot)

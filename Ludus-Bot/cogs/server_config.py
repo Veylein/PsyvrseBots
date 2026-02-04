@@ -41,7 +41,8 @@ class ServerConfig(commands.Cog):
                 "log_channel": None,
                 "rate_limit_enabled": True,
                 "nsfw_filter": True,
-                "shared_mining_world": False
+                "shared_mining_world": False,
+                "mining_map_reset": True
             }
             self._save_configs()
         return self.configs[guild_id]
@@ -82,6 +83,7 @@ class ServerConfig(commands.Cog):
                 f"**Rate Limiting:** {'✅ Enabled' if config['rate_limit_enabled'] else '❌ Disabled'}\n"
                 f"**NSFW Filter:** {'✅ Enabled' if config['nsfw_filter'] else '❌ Disabled'}\n"
                 f"**⛏️ Shared Mining World:** {'✅ Enabled' if config.get('shared_mining_world', False) else '❌ Disabled'}\n"
+                f"**⛏️ Mining Map Reset:** {'✅ Enabled' if config.get('mining_map_reset', True) else '❌ Disabled'}\n"
                 f"**Disabled Commands:** {len(config['disabled_commands'])} commands\n"
                 f"**Log Channel:** {'<#'+str(config['log_channel'])+'>' if config['log_channel'] else 'None'}\n"
                 f"**🎣 Tournament Channel:** {'<#'+str(tournament_channel)+'>' if tournament_channel else 'Random'}"
@@ -95,6 +97,7 @@ class ServerConfig(commands.Cog):
                   "`L!toggle personality` - Toggle bot reactions\n"
                   "`L!toggle ratelimit` - Toggle spam protection\n"
                   "`L!toggle sharedmining` - Toggle shared mining world\n"
+                  "`L!toggle miningreset` - Toggle mining map reset (12h)\n"
                   "`L!disablecmd <command>` - Disable a command\n"
                   "`L!enablecmd <command>` - Enable a command\n"
                   "`L!setlogchannel <channel>` - Set log channel\n"
@@ -169,11 +172,12 @@ class ServerConfig(commands.Cog):
             "personality": "personality_reactions",
             "ratelimit": "rate_limit_enabled",
             "nsfw": "nsfw_filter",
-            "sharedmining": "shared_mining_world"
+            "sharedmining": "shared_mining_world",
+            "miningreset": "mining_map_reset"
         }
         
         if setting not in setting_map:
-            await ctx.send(f"❌ Unknown setting! Options: `welcomedm`, `personality`, `ratelimit`, `nsfw`, `sharedmining`")
+            await ctx.send(f"❌ Unknown setting! Options: `welcomedm`, `personality`, `ratelimit`, `nsfw`, `sharedmining`, `miningreset`")
             return
         
         key = setting_map[setting]
