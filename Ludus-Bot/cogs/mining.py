@@ -618,8 +618,8 @@ class MiningView(discord.ui.LayoutView):
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
-        up_btn_move.callback = self.up_callback
-        up_btn_surface.callback = self.up_callback
+        up_btn_move.callback = self.up_move_callback
+        up_btn_surface.callback = self.surface_callback
         
         # Create container as class attribute
         container_items = [
@@ -791,6 +791,25 @@ class MiningView(discord.ui.LayoutView):
             _, msg = self.game.move_player(-1, 0)
         
         await self.refresh(interaction, msg)
+
+    async def up_move_callback(self, interaction: discord.Interaction):
+        """Mine and move up"""
+        target_x = self.game.x
+        target_y = self.game.y - 1
+    
+        # Try to mine if blocked
+        if not self.game.can_move(target_x, target_y):
+            result = self.game.mine_block(target_x, target_y)
+            if len(result) == 3 and result[0]:  # Successful mine
+                self.game.x = target_x
+                self.game.y = target_y
+                _, msg, _ = result
+            else:
+                _, msg = result
+        else:
+            _, msg = self.game.move_player(0, -1)
+    
+        await self.refresh(interaction, msg)
     
     async def right_callback(self, interaction: discord.Interaction):
         """Mine and move right"""
@@ -844,7 +863,7 @@ class MiningView(discord.ui.LayoutView):
         
         await self.refresh(interaction, msg)
     
-    async def up_callback(self, interaction: discord.Interaction):
+    async def surface_callback(self, interaction: discord.Interaction):
         """Return to surface"""
         self.game.x = 1
         self.game.y = -1
@@ -891,8 +910,8 @@ class MiningView(discord.ui.LayoutView):
         left_btn.callback = self.left_callback
         mine_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
-        up_btn_move.callback = self.up_callback
-        up_btn_surface.callback = self.up_callback
+        up_btn_move.callback = self.up_move_callback
+        up_btn_surface.callback = self.surface_callback
         
         # Check if at shop to add dropdown
         container_items = [
