@@ -8,7 +8,7 @@ from typing import Optional
 class Counting(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.file_path = "cogs/counting.json"
+        self.file_path = "data/counting.json"
         self.load_data()
 
         # Milestone rewards: count -> PsyCoins bonus
@@ -35,7 +35,7 @@ class Counting(commands.Cog):
     
     def load_user_counts(self):
         """Load user count tracking for rewards"""
-        counts_file = "cogs/counting_user_counts.json"
+        counts_file = "data/counting_user_counts.json"
         if os.path.exists(counts_file):
             with open(counts_file, "r") as f:
                 return json.load(f)
@@ -43,7 +43,7 @@ class Counting(commands.Cog):
     
     def save_user_counts(self):
         """Save user count tracking"""
-        counts_file = "cogs/counting_user_counts.json"
+        counts_file = "data/counting_user_counts.json"
         with open(counts_file, "w") as f:
             json.dump(self.user_counts, f, indent=4)
 

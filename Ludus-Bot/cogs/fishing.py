@@ -2151,7 +2151,7 @@ class Fishing(commands.Cog):
         await interaction.response.send_message(embed=view.get_current_embed(), view=view)
     def __init__(self, bot):
         self.bot = bot
-        data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        data_dir = os.getenv("RENDER_DISK_PATH", "data")
         self.fishing_data_file = os.path.join(data_dir, "fishing_data.json")
         self.fishing_data = self.load_fishing_data()
         self.active_tournaments = {}

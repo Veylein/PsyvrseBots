@@ -55,7 +55,7 @@ class GameStatsView(View):
 class GameStats(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        self.data_dir = os.getenv("RENDER_DISK_PATH", "data")
         self.stats_file = os.path.join(self.data_dir, "game_stats.json")
         self.stats = self._load_stats()
     

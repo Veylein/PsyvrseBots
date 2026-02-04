@@ -4,7 +4,7 @@ from discord import app_commands
 import json
 import os
 
-STARBOARD_FILE = "starboard.json"
+STARBOARD_FILE = "data/starboard.json"
 
 def load_starboards():
     if not os.path.exists(STARBOARD_FILE):

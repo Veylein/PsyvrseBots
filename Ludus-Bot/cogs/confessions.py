@@ -9,7 +9,7 @@ class Confessions(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        self.config_file = "confession_config.json"
+        self.config_file = "data/confession_config.json"
         self.load_config()
     
     def load_config(self):
