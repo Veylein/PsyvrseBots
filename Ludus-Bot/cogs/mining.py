@@ -501,83 +501,60 @@ class MiningGame:
         
         # Draw no energy warning in center if energy is 0
         if self.energy <= 0:
+            # Create warning overlay
             try:
-                # Create warning overlay with proper error handling
+                warning_font = ImageFont.truetype("assets/mining/fonts/Arial.ttf", 36)
+            except:
                 try:
                     warning_font = ImageFont.truetype("arial.ttf", 36)
                 except:
-                    try:
-                        # Try alternative font paths
-                        warning_font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 36)
-                    except:
-                        # Last resort - create larger default font
-                        warning_font = ImageFont.load_default()
-                
-                warning_text = "NO ENERGY!"
-                
-                # Try to load energy icon, fallback to text-only if fails
-                energy_warning_icon = None
-                try:
-                    energy_warning_icon = load_ui_icon("assets/mining/ui/energy.png")
-                    if energy_warning_icon:
-                        energy_warning_size = 48
-                        energy_warning_icon = energy_warning_icon.resize((energy_warning_size, energy_warning_size), Image.LANCZOS)
-                except:
-                    energy_warning_icon = None
-                
-                # Calculate dimensions
-                bbox = draw.textbbox((0, 0), warning_text, font=warning_font)
-                text_width = bbox[2] - bbox[0]
-                text_height = bbox[3] - bbox[1]
-                
-                # Adjust total width based on whether we have icon
-                if energy_warning_icon:
-                    energy_warning_size = 48
-                    total_width = energy_warning_size + 12 + text_width
-                else:
-                    total_width = text_width
-                    energy_warning_size = 0
-                
-                # Center position
-                center_x = img_width // 2
-                center_y = img_height // 2
-                
-                # Draw semi-transparent background
-                padding = 30
-                bg_x1 = center_x - total_width // 2 - padding
-                bg_y1 = center_y - max(energy_warning_size, text_height) // 2 - padding
-                bg_x2 = center_x + total_width // 2 + padding
-                bg_y2 = center_y + max(energy_warning_size, text_height) // 2 + padding
-                
-                overlay_warning = Image.new('RGBA', (img_width, img_height), (0, 0, 0, 0))
-                draw_warning = ImageDraw.Draw(overlay_warning)
-                draw_warning.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(139, 0, 0, 200))
-                
-                img_rgba = img.convert('RGBA')
-                img_rgba = Image.alpha_composite(img_rgba, overlay_warning)
-                
-                # Paste energy icon
-                if energy_warning_icon:
-                    icon_x = center_x - total_width // 2
-                    icon_y = center_y - energy_warning_size // 2
-                    try:
-                        img_rgba.paste(energy_warning_icon, (icon_x, icon_y), energy_warning_icon)
-                    except:
-                        pass
-                
-                img = img_rgba.convert('RGB')
-                draw = ImageDraw.Draw(img)
-                
-                # Draw warning text
-                if energy_warning_icon:
-                    text_x = center_x - total_width // 2 + energy_warning_size + 12
-                else:
-                    text_x = center_x - text_width // 2
-                text_y = center_y - text_height // 2
-                draw.text((text_x, text_y), warning_text, fill=(255, 255, 100), font=warning_font)
-                
-            except:
-                pass
+                    warning_font = font
+            
+            warning_text = "NO ENERGY!"
+            
+            # Load energy icon for warning
+            energy_warning_icon = load_ui_icon("assets/mining/ui/energy.png")
+            energy_warning_size = 40
+            energy_warning_icon = energy_warning_icon.resize((energy_warning_size, energy_warning_size), Image.LANCZOS)
+            
+            # Get text size
+            bbox = draw.textbbox((0, 0), warning_text, font=warning_font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            
+            # Total width including icon and spacing
+            total_width = energy_warning_size + 12 + text_width
+            
+            # Center position
+            center_x = img_width // 2
+            center_y = img_height // 2
+            
+            # Draw semi-transparent background
+            padding = 25
+            bg_x1 = center_x - total_width // 2 - padding
+            bg_y1 = center_y - max(energy_warning_size, text_height) // 2 - padding
+            bg_x2 = center_x + total_width // 2 + padding
+            bg_y2 = center_y + max(energy_warning_size, text_height) // 2 + padding
+            
+            overlay_warning = Image.new('RGBA', (img_width, img_height), (0, 0, 0, 0))
+            draw_warning = ImageDraw.Draw(overlay_warning)
+            draw_warning.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(139, 0, 0, 200))
+            
+            img_rgba = img.convert('RGBA')
+            img_rgba = Image.alpha_composite(img_rgba, overlay_warning)
+            
+            # Paste energy icon
+            icon_x = center_x - total_width // 2
+            icon_y = center_y - energy_warning_size // 2
+            img_rgba.paste(energy_warning_icon, (icon_x, icon_y), energy_warning_icon)
+            
+            img = img_rgba.convert('RGB')
+            draw = ImageDraw.Draw(img)
+            
+            # Draw warning text
+            text_x = icon_x + energy_warning_size + 12
+            text_y = center_y - text_height // 2
+            draw.text((text_x, text_y), warning_text, fill=(255, 255, 100), font=warning_font)
         
         # Draw biome info below top UI
         biome = self.get_biome(self.y)
