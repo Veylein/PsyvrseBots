@@ -420,53 +420,84 @@ class MiningGame:
         
         # Draw no energy warning in center if energy is 0
         if self.energy <= 0:
-            # Create warning overlay
-            warning_font = ImageFont.truetype("arial.ttf", 24) if font != ImageFont.load_default() else font
-            warning_text = "NO ENERGY!"
-            
-            # Load energy icon for warning
-            energy_warning_icon = load_ui_icon("assets/mining/ui/energy.png")
-            energy_warning_size = 32
-            energy_warning_icon = energy_warning_icon.resize((energy_warning_size, energy_warning_size), Image.LANCZOS)
-            
-            # Get text size
-            bbox = draw.textbbox((0, 0), warning_text, font=warning_font)
-            text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
-            
-            # Total width including icon and spacing
-            total_width = energy_warning_size + 10 + text_width
-            
-            # Center position
-            center_x = img_width // 2
-            center_y = img_height // 2
-            
-            # Draw semi-transparent background
-            padding = 20
-            bg_x1 = center_x - total_width // 2 - padding
-            bg_y1 = center_y - max(energy_warning_size, text_height) // 2 - padding
-            bg_x2 = center_x + total_width // 2 + padding
-            bg_y2 = center_y + max(energy_warning_size, text_height) // 2 + padding
-            
-            overlay_warning = Image.new('RGBA', (img_width, img_height), (0, 0, 0, 0))
-            draw_warning = ImageDraw.Draw(overlay_warning)
-            draw_warning.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(139, 0, 0, 200))
-            
-            img_rgba = img.convert('RGBA')
-            img_rgba = Image.alpha_composite(img_rgba, overlay_warning)
-            
-            # Paste energy icon
-            icon_x = center_x - total_width // 2
-            icon_y = center_y - energy_warning_size // 2
-            img_rgba.paste(energy_warning_icon, (icon_x, icon_y), energy_warning_icon)
-            
-            img = img_rgba.convert('RGB')
-            draw = ImageDraw.Draw(img)
-            
-            # Draw warning text
-            text_x = icon_x + energy_warning_size + 10
-            text_y = center_y - text_height // 2
-            draw.text((text_x, text_y), warning_text, fill=(255, 255, 100), font=warning_font)
+            print(f"[Mining] Drawing NO ENERGY overlay (energy={self.energy})")
+            try:
+                # Create warning overlay with proper error handling
+                try:
+                    warning_font = ImageFont.truetype("arial.ttf", 24)
+                except:
+                    # Fallback to default font if arial not available
+                    warning_font = font
+                
+                warning_text = "NO ENERGY!"
+                
+                # Try to load energy icon, fallback to text-only if fails
+                energy_warning_icon = None
+                try:
+                    energy_warning_icon = load_ui_icon("assets/mining/ui/energy.png")
+                    if energy_warning_icon:
+                        energy_warning_size = 32
+                        energy_warning_icon = energy_warning_icon.resize((energy_warning_size, energy_warning_size), Image.LANCZOS)
+                except Exception as e:
+                    print(f"[Mining] Warning: Could not load energy icon: {e}")
+                    energy_warning_icon = None
+                
+                # Calculate dimensions
+                bbox = draw.textbbox((0, 0), warning_text, font=warning_font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                
+                # Adjust total width based on whether we have icon
+                if energy_warning_icon:
+                    energy_warning_size = 32
+                    total_width = energy_warning_size + 10 + text_width
+                else:
+                    total_width = text_width
+                    energy_warning_size = 0
+                
+                # Center position
+                center_x = img_width // 2
+                center_y = img_height // 2
+                
+                # Draw semi-transparent background
+                padding = 20
+                bg_x1 = center_x - total_width // 2 - padding
+                bg_y1 = center_y - max(energy_warning_size, text_height) // 2 - padding
+                bg_x2 = center_x + total_width // 2 + padding
+                bg_y2 = center_y + max(energy_warning_size, text_height) // 2 + padding
+                
+                overlay_warning = Image.new('RGBA', (img_width, img_height), (0, 0, 0, 0))
+                draw_warning = ImageDraw.Draw(overlay_warning)
+                draw_warning.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(139, 0, 0, 200))
+                
+                img_rgba = img.convert('RGBA')
+                img_rgba = Image.alpha_composite(img_rgba, overlay_warning)
+                
+                # Paste energy icon if available
+                if energy_warning_icon:
+                    icon_x = center_x - total_width // 2
+                    icon_y = center_y - energy_warning_size // 2
+                    try:
+                        img_rgba.paste(energy_warning_icon, (icon_x, icon_y), energy_warning_icon)
+                    except Exception as e:
+                        print(f"[Mining] Could not paste icon: {e}")
+                
+                img = img_rgba.convert('RGB')
+                draw = ImageDraw.Draw(img)
+                
+                # Draw warning text
+                if energy_warning_icon:
+                    text_x = center_x - total_width // 2 + energy_warning_size + 10
+                else:
+                    text_x = center_x - text_width // 2
+                text_y = center_y - text_height // 2
+                draw.text((text_x, text_y), warning_text, fill=(255, 255, 100), font=warning_font)
+                
+                print(f"[Mining] NO ENERGY overlay drawn successfully!")
+            except Exception as e:
+                print(f"[Mining] ERROR drawing NO ENERGY overlay: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Draw biome info below top UI
         biome = self.get_biome(self.y)
