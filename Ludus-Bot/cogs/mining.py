@@ -754,17 +754,12 @@ class MiningView(discord.ui.LayoutView):
                 self.game.x = target_x
                 self.game.y = target_y
                 _, msg, _ = result
-                await self.refresh(interaction, msg)
             else:
-                # Mining failed - just show error without refresh
                 _, msg = result
-                await interaction.response.send_message(msg, ephemeral=True)
         else:
-            success, msg = self.game.move_player(-1, 0)
-            if success:
-                await self.refresh(interaction, msg)
-            else:
-                await interaction.response.send_message(msg, ephemeral=True)
+            _, msg = self.game.move_player(-1, 0)
+        
+        await self.refresh(interaction, msg)
     
     async def right_callback(self, interaction: discord.Interaction):
         """Mine and move right"""
@@ -778,17 +773,12 @@ class MiningView(discord.ui.LayoutView):
                 self.game.x = target_x
                 self.game.y = target_y
                 _, msg, _ = result
-                await self.refresh(interaction, msg)
             else:
-                # Mining failed - just show error without refresh
                 _, msg = result
-                await interaction.response.send_message(msg, ephemeral=True)
         else:
-            success, msg = self.game.move_player(1, 0)
-            if success:
-                await self.refresh(interaction, msg)
-            else:
-                await interaction.response.send_message(msg, ephemeral=True)
+            _, msg = self.game.move_player(1, 0)
+        
+        await self.refresh(interaction, msg)
     
     async def mine_callback(self, interaction: discord.Interaction):
         """Mine block below and fall to ground"""
@@ -804,7 +794,6 @@ class MiningView(discord.ui.LayoutView):
                 if self.game.energy <= 0:
                     break
             msg = f"⬇️ Fell to ground at y={self.game.y}"
-            await self.refresh(interaction, msg)
         else:
             # Try to mine if blocked
             result = self.game.mine_block(target_x, target_y)
@@ -819,11 +808,10 @@ class MiningView(discord.ui.LayoutView):
                     if self.game.y > new_y:
                         msg += f" → Fell to y={self.game.y}"
                         break
-                await self.refresh(interaction, msg)
             else:
-                # Mining failed - just show error without refresh
                 _, msg = result
-                await interaction.response.send_message(msg, ephemeral=True)
+        
+        await self.refresh(interaction, msg)
     
     async def up_callback(self, interaction: discord.Interaction):
         """Return to surface"""
@@ -929,16 +917,22 @@ class MiningView(discord.ui.LayoutView):
         
         try:
             await interaction.response.edit_message(view=new_view, attachments=[new_view.map_file])
+        except discord.errors.NotFound:
+            # Message was deleted, stop the view
             self.stop()
-            # Save game state after action
-            cog = interaction.client.get_cog("Mining")
-            if cog:
-                cog.save_data()
-        except:
-            try:
-                await interaction.followup.send("❌ Error updating game!", ephemeral=True)
-            except:
-                pass
+            return
+        except Exception as e:
+            print(f"[Mining] Error refreshing view: {e}")
+            self.stop()
+            return
+        
+        # Only stop old view and save if edit was successful
+        self.stop()
+        
+        # Save game state after action
+        cog = interaction.client.get_cog("Mining")
+        if cog:
+            cog.save_data()
 
 
 class Mining(commands.Cog):
