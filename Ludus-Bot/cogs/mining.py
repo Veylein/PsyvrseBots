@@ -686,17 +686,18 @@ class MiningView(discord.ui.LayoutView):
         
         # Create buttons with callbacks
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
-        mine_btn = discord.ui.Button(style=discord.ButtonStyle.success, emoji="⛏️")
+        down_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬇️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
-         = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
-        
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️")
+        surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⤴️", label="Surface")
+        blank_btn_1 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
+        blank_btn_2 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
 
         left_btn.callback = self.left_callback
-        mine_btn.callback = self.mine_callback
+        down_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
         up_btn.callback = self.up_callback
-        .callback = self.surface_callback
+        surface_btn.callback = self.surface_callback
         
         # Create container as class attribute
         container_items = [
@@ -741,8 +742,9 @@ class MiningView(discord.ui.LayoutView):
         inventory_select.callback = self.inventory_callback
         
         container_items.extend([
-            discord.ui.ActionRow(left_btn, mine_btn, right_btn),
-            discord.ui.ActionRow(up_btn, surface_btn),
+            discord.ui.ActionRow(blank_btn_1, up_btn, blank_btn_2),
+            discord.ui.ActionRow(left_btn, down_btn, right_btn),
+            discord.ui.ActionRow(surface_btn),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(inventory_select),
         ])
@@ -976,14 +978,16 @@ class MiningView(discord.ui.LayoutView):
         
         # Create buttons with callbacks for THIS view
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
-        mine_btn = discord.ui.Button(style=discord.ButtonStyle.success, emoji="⛏️")
+        down_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬇️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
-        surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⬆️", label="Surface")
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️")
+        surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⤴️", label="Surface")
+        blank_btn_1 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
+        blank_btn_2 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
         
         up_btn.callback = self.up_callback
         left_btn.callback = self.left_callback
-        mine_btn.callback = self.mine_callback
+        down_btn.callback = self.mine_callback
         right_btn.callback = self.right_callback
         surface_btn.callback = self.surface_callback
         
@@ -1028,8 +1032,9 @@ class MiningView(discord.ui.LayoutView):
         inventory_select.callback = self.inventory_callback
         
         container_items.extend([
-            discord.ui.ActionRow(left_btn, mine_btn, right_btn),
-            discord.ui.ActionRow(up_btn, surface_btn),
+            discord.ui.ActionRow(blank_btn_1, up_btn, blank_btn_2),
+            discord.ui.ActionRow(left_btn, down_btn, right_btn),
+            discord.ui.ActionRow(surface_btn),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(inventory_select),
         ])
