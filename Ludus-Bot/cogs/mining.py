@@ -366,9 +366,12 @@ class MiningGame:
                     username = other_data.get("username", "Player")
                     # Create small font for username
                     try:
-                        name_font = ImageFont.truetype("arial.ttf", 10)
+                        name_font = ImageFont.truetype("assets/mining/fonts/Arial.ttf", 10)
                     except:
-                        name_font = ImageFont.load_default()
+                        try:
+                            name_font = ImageFont.truetype("Arial.ttf", 10)
+                        except:
+                            name_font = ImageFont.load_default()
                     
                     # Draw username with background
                     img_rgba_draw = ImageDraw.Draw(img_rgba)
@@ -415,11 +418,15 @@ class MiningGame:
         
         # Try to load font
         try:
-            font = ImageFont.truetype("arial.ttf", 14)
-            font_small = ImageFont.truetype("arial.ttf", 12)
+            font = ImageFont.truetype("assets/mining/fonts/Arial.ttf", 14)
+            font_small = ImageFont.truetype("assets/mining/fonts/Arial.ttf", 12)
         except:
-            font = ImageFont.load_default()
-            font_small = ImageFont.load_default()
+            try:
+                font = ImageFont.truetype("Arial.ttf", 14)
+                font_small = ImageFont.truetype("Arial.ttf", 12)
+            except:
+                font = ImageFont.load_default()
+                font_small = ImageFont.load_default()
         
         # UI background (semi-transparent dark overlay at top)
         ui_height = 35
@@ -506,7 +513,7 @@ class MiningGame:
                 warning_font = ImageFont.truetype("assets/mining/fonts/Arial.ttf", 36)
             except:
                 try:
-                    warning_font = ImageFont.truetype("arial.ttf", 36)
+                    warning_font = ImageFont.truetype("Arial.ttf", 36)
                 except:
                     warning_font = font
             
@@ -553,7 +560,7 @@ class MiningGame:
             
             # Draw warning text
             text_x = icon_x + energy_warning_size + 12
-            text_y = center_y - text_height // 2
+            text_y = center_y - text_height // 2 - 10 
             draw.text((text_x, text_y), warning_text, fill=(255, 255, 100), font=warning_font)
         
         # Draw biome info below top UI
