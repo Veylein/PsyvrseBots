@@ -478,7 +478,7 @@ class Gambling(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        data_dir = os.getenv("RENDER_DISK_PATH", "data")
         self.gambling_stats_file = os.path.join(data_dir, "gambling_stats.json")
         self.gambling_stats = self.load_stats()
     

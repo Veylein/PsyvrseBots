@@ -34,7 +34,7 @@ class Quests(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        data_dir = os.getenv("RENDER_DISK_PATH", "data")
         self.quests_file = os.path.join(data_dir, "quests_data.json")
         self.achievements_file = os.path.join(data_dir, "achievements_data.json")
         self.quests_data = self.load_quests()

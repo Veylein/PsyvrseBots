@@ -29,7 +29,7 @@ class Pets(commands.Cog):
         await view.send()
     def __init__(self, bot):
         self.bot = bot
-        data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        data_dir = os.getenv("RENDER_DISK_PATH", "data")
         self.pets_file = os.path.join(data_dir, "pets.json")
         self.pets_data = self.load_pets()
         

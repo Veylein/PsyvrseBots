@@ -18,8 +18,8 @@ class Economy(commands.Cog):
         self.bot = bot
         
         # Use persistent directory if on Render with disk mounted
-        # Otherwise use current directory
-        data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        # Otherwise use data directory
+        data_dir = os.getenv("RENDER_DISK_PATH", "data")
         self.economy_file = os.path.join(data_dir, "economy.json")
         self.inventory_file = os.path.join(data_dir, "inventory.json")
         

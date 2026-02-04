@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 class LeaderboardManager:
     def __init__(self, filename: str = "leaderboard_stats.json"):
         # Use persistent directory if available
-        data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        data_dir = os.getenv("RENDER_DISK_PATH", "data")
         self.filename = os.path.join(data_dir, filename)
         print(f"[LeaderboardManager] Loading stats from: {self.filename}")
         self.stats = self.load_stats()

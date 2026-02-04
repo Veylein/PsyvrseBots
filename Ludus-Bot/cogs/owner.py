@@ -1201,11 +1201,11 @@ class Owner(commands.Cog):
 
     # ==================== HELP COMMAND ====================
 
-    @commands.command(name="ownerhelp")
+    @commands.command(name="ownerhelp", aliases=["👑", "owner", "helpowner"])
     async def owner_help(self, ctx):
         """Show all secret owner commands"""
         embed = discord.Embed(
-            title="👑 Secret Owner Commands",
+            title="👑 Owner Commands",
             description="Commands only you can use!",
             color=discord.Color.gold()
         )

@@ -12,7 +12,7 @@ class Lottery(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        self.file_path = "cogs/lottery.json"
+        self.file_path = "data/lottery.json"
         self.load_data()
         
         # Ticket price
