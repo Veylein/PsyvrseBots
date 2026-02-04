@@ -255,7 +255,7 @@ class MiningGame:
         
         return total_value, "\n".join(items_sold)
     
-    def render_map(self) -> io.BytesIO:
+    def render_map(self, bot=None) -> io.BytesIO:
         """Render current view as image"""
         block_size = 32
         img_width = self.width * block_size
@@ -574,20 +574,31 @@ class MiningGame:
         # Draw biome info below top UI
         biome = self.get_biome(self.y)
         
-        # Calculate time until map reset
-        now = datetime.utcnow()
-        elapsed = (now - self.last_map_regen).total_seconds()
-        hours_left = 12 - (elapsed / 3600)
+        # Check if map reset is enabled for this server
+        reset_enabled = True
+        if bot and self.guild_id:
+            server_config_cog = bot.get_cog("ServerConfig")
+            if server_config_cog:
+                config = server_config_cog.get_server_config(self.guild_id)
+                reset_enabled = config.get("mining_map_reset", True)
         
-        if hours_left <= 0:
-            reset_text = "Ready!"
-        elif hours_left < 1:
-            minutes_left = int(hours_left * 60)
-            reset_text = f"reset in {minutes_left}m"
+        # Calculate time until map reset or show "reset is off"
+        if not reset_enabled:
+            reset_text = "reset is off"
         else:
-            hours = int(hours_left)
-            minutes = int((hours_left - hours) * 60)
-            reset_text = f"reset in {hours}h {minutes}m"
+            now = datetime.utcnow()
+            elapsed = (now - self.last_map_regen).total_seconds()
+            hours_left = 12 - (elapsed / 3600)
+            
+            if hours_left <= 0:
+                reset_text = "Ready!"
+            elif hours_left < 1:
+                minutes_left = int(hours_left * 60)
+                reset_text = f"reset in {minutes_left}m"
+            else:
+                hours = int(hours_left)
+                minutes = int((hours_left - hours) * 60)
+                reset_text = f"reset in {hours}h {minutes}m"
         
         biome_text = f"{biome['name']} (Y: {self.y}) | {reset_text}"
         
@@ -689,7 +700,7 @@ class MiningView(discord.ui.LayoutView):
         self.game.regenerate_energy()
         
         # Render map image and store as file
-        map_image = self.game.render_map()
+        map_image = self.game.render_map(bot=bot)
         self.map_file = discord.File(map_image, filename="mining_map.png")
         
         # Create buttons with callbacks
@@ -973,7 +984,7 @@ class MiningView(discord.ui.LayoutView):
                 message = "🔄 **Map regenerated after 12 hours!**"
         
         # Render new map image and store as file
-        map_image = self.game.render_map()
+        map_image = self.game.render_map(bot=interaction.client)
         self.map_file = discord.File(map_image, filename="mining_map.png")
         
         # Update display text
