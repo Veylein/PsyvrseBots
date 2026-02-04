@@ -506,7 +506,12 @@ class MiningGame:
                 try:
                     warning_font = ImageFont.truetype("arial.ttf", 36)
                 except:
-                    warning_font = font
+                    try:
+                        # Try alternative font paths
+                        warning_font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 36)
+                    except:
+                        # Last resort - create larger default font
+                        warning_font = ImageFont.load_default()
                 
                 warning_text = "NO ENERGY!"
                 
