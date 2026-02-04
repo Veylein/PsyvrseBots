@@ -16,6 +16,347 @@ except Exception:
     tcg_manager = None
     CARD_DATABASE = {}
 
+class MinesweeperGame:
+    """Represents a single Minesweeper game session"""
+    
+    def __init__(self, rows: int, cols: int, mines: int, user_id: int):
+        self.rows = rows
+        self.cols = cols
+        self.mines = mines
+        self.user_id = user_id
+        
+        # Load emoji mapping
+        try:
+            with open("data/minesweeper_emoji_mapping.json", "r") as f:
+                self.emoji = json.load(f)
+        except:
+            self.emoji = {
+                "mine": "💣", "flag": "🚩", "hidden": "⬜",
+                "revealed_empty": "⬛", "exploded": "💥",
+                "0": "0️⃣", "1": "1️⃣", "2": "2️⃣", "3": "3️⃣",
+                "4": "4️⃣", "5": "5️⃣", "6": "6️⃣", "7": "7️⃣", "8": "8️⃣"
+            }
+        
+        # Game state
+        self.board = [[0 for _ in range(cols)] for _ in range(rows)]
+        self.revealed = [[False for _ in range(cols)] for _ in range(rows)]
+        self.flagged = [[False for _ in range(cols)] for _ in range(rows)]
+        self.game_over = False
+        self.won = False
+        self.mines_placed = False
+        self.mine_positions = set()
+        self.moves = 0
+    
+    def place_mines(self, safe_r: int, safe_c: int):
+        """Place mines avoiding the first clicked position"""
+        placed = 0
+        while placed < self.mines:
+            r = random.randint(0, self.rows - 1)
+            c = random.randint(0, self.cols - 1)
+            
+            # Avoid first click and adjacent cells
+            if abs(r - safe_r) <= 1 and abs(c - safe_c) <= 1:
+                continue
+            
+            if (r, c) not in self.mine_positions:
+                self.mine_positions.add((r, c))
+                self.board[r][c] = -1
+                placed += 1
+        
+        # Calculate numbers
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if self.board[r][c] == -1:
+                    continue
+                count = 0
+                for dr in [-1, 0, 1]:
+                    for dc in [-1, 0, 1]:
+                        nr, nc = r + dr, c + dc
+                        if 0 <= nr < self.rows and 0 <= nc < self.cols:
+                            if self.board[nr][nc] == -1:
+                                count += 1
+                self.board[r][c] = count
+        
+        self.mines_placed = True
+    
+    def reveal(self, r: int, c: int) -> tuple[bool, str]:
+        """Reveal a cell, return (success, message)"""
+        if self.game_over:
+            return False, "Game is over!"
+        
+        if self.flagged[r][c]:
+            return False, "Remove flag first!"
+        
+        if self.revealed[r][c]:
+            return False, "Already revealed!"
+        
+        # Place mines on first move
+        if not self.mines_placed:
+            self.place_mines(r, c)
+        
+        self.moves += 1
+        
+        # Hit a mine
+        if self.board[r][c] == -1:
+            self.revealed[r][c] = True
+            self.game_over = True
+            return True, "💥 BOOM! Hit a mine!"
+        
+        # Reveal cell
+        self._flood_reveal(r, c)
+        
+        # Check win
+        revealed_count = sum(sum(row) for row in self.revealed)
+        if revealed_count == self.rows * self.cols - self.mines:
+            self.game_over = True
+            self.won = True
+            return True, "🎉 You won!"
+        
+        return True, f"Revealed ({r}, {c})"
+    
+    def _flood_reveal(self, r: int, c: int):
+        """Flood fill reveal for empty cells"""
+        if r < 0 or r >= self.rows or c < 0 or c >= self.cols:
+            return
+        if self.revealed[r][c] or self.flagged[r][c]:
+            return
+        
+        self.revealed[r][c] = True
+        
+        # If cell has number, stop
+        if self.board[r][c] > 0:
+            return
+        
+        # If empty, reveal adjacent
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                self._flood_reveal(r + dr, c + dc)
+    
+    def toggle_flag(self, r: int, c: int) -> tuple[bool, str]:
+        """Toggle flag on cell"""
+        if self.game_over:
+            return False, "Game is over!"
+        
+        if self.revealed[r][c]:
+            return False, "Can't flag revealed cell!"
+        
+        self.flagged[r][c] = not self.flagged[r][c]
+        action = "Flagged" if self.flagged[r][c] else "Unflagged"
+        return True, f"{action} ({r}, {c})"
+    
+    def render_board(self) -> str:
+        """Render board as emoji grid"""
+        lines = []
+        
+        # Add column numbers
+        header = "  " + " ".join(str(i) for i in range(min(self.cols, 10)))
+        lines.append(header)
+        
+        for r in range(self.rows):
+            line = f"{r} "
+            for c in range(self.cols):
+                if self.flagged[r][c]:
+                    line += self.emoji["flag"] + " "
+                elif not self.revealed[r][c]:
+                    line += self.emoji["hidden"] + " "
+                elif self.board[r][c] == -1:
+                    if self.game_over:
+                        line += self.emoji["exploded"] + " "
+                    else:
+                        line += self.emoji["mine"] + " "
+                elif self.board[r][c] == 0:
+                    line += self.emoji["revealed_empty"] + " "
+                else:
+                    line += self.emoji[str(self.board[r][c])] + " "
+            lines.append(line)
+        
+        return "\n".join(lines)
+    
+    def get_stats(self) -> str:
+        """Get game statistics"""
+        flags_placed = sum(sum(row) for row in self.flagged)
+        cells_revealed = sum(sum(row) for row in self.revealed)
+        cells_remaining = self.rows * self.cols - self.mines - cells_revealed
+        
+        return (f"💣 Mines: {self.mines} | 🚩 Flags: {flags_placed}\n"
+                f"📊 Revealed: {cells_revealed} | Remaining: {cells_remaining}\n"
+                f"🎯 Moves: {self.moves}")
+
+
+class MinesweeperMoveModal(discord.ui.Modal, title="Make Move"):
+    """Modal for inputting move coordinates"""
+    
+    row_input = discord.ui.TextInput(
+        label="Row",
+        placeholder="Enter row number",
+        required=True,
+        max_length=2
+    )
+    
+    col_input = discord.ui.TextInput(
+        label="Column",
+        placeholder="Enter column number",
+        required=True,
+        max_length=2
+    )
+    
+    def __init__(self, view: 'MinesweeperView'):
+        super().__init__()
+        self.view = view
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle move submission"""
+        try:
+            r = int(self.row_input.value)
+            c = int(self.col_input.value)
+        except ValueError:
+            await interaction.response.send_message("❌ Please enter valid numbers!", ephemeral=True)
+            return
+        
+        game = self.view.game
+        
+        if r < 0 or r >= game.rows or c < 0 or c >= game.cols:
+            await interaction.response.send_message(
+                f"❌ Out of bounds! Row: 0-{game.rows-1}, Column: 0-{game.cols-1}",
+                ephemeral=True
+            )
+            return
+        
+        # Make move
+        if self.view.mode == "reveal":
+            success, message = game.reveal(r, c)
+        else:
+            success, message = game.toggle_flag(r, c)
+        
+        if not success:
+            await interaction.response.send_message(f"❌ {message}", ephemeral=True)
+            return
+        
+        # Update view
+        self.view.build_ui()
+        
+        # Check if game ended
+        if game.game_over:
+            await interaction.response.edit_message(view=self.view)
+            
+            if game.won:
+                reward = 500 - (game.moves * 10)
+                reward_msg = f"🎉 **You won in {game.moves} moves!**\n\n**+{reward} PsyCoins!** 🪙"
+                
+                # Award TCG card for winning
+                if tcg_manager:
+                    try:
+                        awarded = tcg_manager.award_for_game_event(str(interaction.user.id), 'mythic')
+                        if awarded:
+                            names = [CARD_DATABASE.get(card, {}).get('name', card) for card in awarded]
+                            reward_msg += f"\n🎴 **Bonus Card:** {', '.join(names)}"
+                    except:
+                        pass
+                
+                await interaction.followup.send(reward_msg)
+            else:
+                await interaction.followup.send("💥 **Game Over!** Better luck next time!")
+        else:
+            await interaction.response.edit_message(view=self.view)
+
+
+class MinesweeperView(discord.ui.LayoutView):
+    """Minesweeper game interface"""
+    
+    def __init__(self, game: MinesweeperGame, user_id: int):
+        self.game = game
+        self.user_id = user_id
+        self.message = None
+        self.mode = "reveal"  # reveal or flag
+        
+        super().__init__(timeout=600)
+        self.build_ui()
+    
+    def build_ui(self):
+        """Build the UI layout"""
+        self.clear_items()
+        
+        # Title and stats
+        if self.game.game_over:
+            if self.game.won:
+                title = "# 🎉 VICTORY! YOU WON!"
+            else:
+                title = "# 💥 GAME OVER!"
+        else:
+            title = "# 💣 MINESWEEPER"
+        
+        board_display = f"```\n{self.game.render_board()}\n```"
+        stats = self.game.get_stats()
+        
+        content = f"{title}\n\n{stats}\n\n{board_display}\n\n**Mode:** {'⛏️ Reveal' if self.mode == 'reveal' else '🚩 Flag'}"
+        
+        container_items = [
+            discord.ui.TextDisplay(content=content),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        ]
+        
+        # Only add buttons if game not over
+        if not self.game.game_over:
+            # Mode toggle button
+            mode_btn = discord.ui.Button(
+                style=discord.ButtonStyle.primary if self.mode == "reveal" else discord.ButtonStyle.danger,
+                emoji="⛏️" if self.mode == "reveal" else "🚩",
+                label="Switch Mode"
+            )
+            mode_btn.callback = self.toggle_mode_callback
+            
+            # Make move button
+            move_btn = discord.ui.Button(
+                style=discord.ButtonStyle.success,
+                emoji="🎯",
+                label="Make Move"
+            )
+            move_btn.callback = self.make_move_callback
+            
+            container_items.append(discord.ui.ActionRow(mode_btn, move_btn))
+        
+        self.container = discord.ui.Container(
+            *container_items,
+            accent_colour=discord.Colour.red() if self.game.game_over else discord.Colour.blue()
+        )
+        
+        self.add_item(self.container)
+    
+    async def toggle_mode_callback(self, interaction: discord.Interaction):
+        """Toggle between reveal and flag mode"""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        self.mode = "flag" if self.mode == "reveal" else "reveal"
+        self.build_ui()
+        
+        await interaction.response.edit_message(view=self)
+    
+    async def make_move_callback(self, interaction: discord.Interaction):
+        """Open modal for making a move"""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        modal = MinesweeperMoveModal(self)
+        await interaction.response.send_modal(modal)
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only allow game owner to interact"""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return False
+        return True
+    
+    async def on_timeout(self):
+        """Handle timeout"""
+        if self.message:
+            try:
+                await self.message.edit(view=None)
+            except:
+                pass
+
 class PuzzleGames(commands.Cog):
     """Puzzle and mystery games"""
 
@@ -73,52 +414,16 @@ class PuzzleGames(commands.Cog):
         
         rows, cols, mines = difficulties[difficulty.lower()]
         
-        # Generate board
-        board = [[0 for _ in range(cols)] for _ in range(rows)]
-        mine_positions = set()
+        # Create game
+        game = MinesweeperGame(rows, cols, mines, interaction.user.id)
+        game_id = f"{interaction.guild.id}_{interaction.user.id}_minesweeper"
+        self.active_games[game_id] = game
         
-        # Place mines
-        while len(mine_positions) < mines:
-            r, c = random.randint(0, rows-1), random.randint(0, cols-1)
-            mine_positions.add((r, c))
+        # Create view
+        view = MinesweeperView(game, interaction.user.id)
         
-        for r, c in mine_positions:
-            board[r][c] = -1
-        
-        # Calculate numbers
-        for r in range(rows):
-            for c in range(cols):
-                if board[r][c] == -1:
-                    continue
-                count = 0
-                for dr in [-1, 0, 1]:
-                    for dc in [-1, 0, 1]:
-                        nr, nc = r + dr, c + dc
-                        if 0 <= nr < rows and 0 <= nc < cols and board[nr][nc] == -1:
-                            count += 1
-                board[r][c] = count
-        
-        # Create spoiler board
-        lines = []
-        for row in board:
-            line = ""
-            for cell in row:
-                if cell == -1:
-                    line += "||💣||"
-                elif cell == 0:
-                    line += "||⬜||"
-                else:
-                    line += f"||{cell}️⃣||"
-            lines.append(line)
-        
-        embed = discord.Embed(
-            title=f"💣 Minesweeper - {difficulty.title()}",
-            description=f"**{mines} mines hidden!**\n\nClick tiles to reveal. Don't hit a mine!\n\n" + "\n".join(lines),
-            color=discord.Color.red()
-        )
-        embed.set_footer(text=f"Good luck, {interaction.user.name}!")
-        
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(view=view)
+        view.message = await interaction.original_response()
     
     async def game_memory_action(self, interaction: discord.Interaction, difficulty: str = "medium"):
         """Memory Grid game"""

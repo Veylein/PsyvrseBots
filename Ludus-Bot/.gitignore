@@ -7,3 +7,4 @@ venv/
 !data/uno_emoji_mapping.json
 !data/uno_translations.json
 !config.json
+!data/minesweeper_emoji_mapping.json
