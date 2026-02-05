@@ -24,7 +24,9 @@ class MiningGame:
     BLOCK_VALUES = {
         "dirt": 1, "stone": 2, "coal": 5, "iron": 15, "gold": 50,
         "redstone": 30, "diamond": 200, "emerald": 300, "deepslate": 10,
-        "netherite": 1000, "ancient_debris": 500, "bedrock": 0, "grass": 1
+        "netherite": 1000, "ancient_debris": 500, "bedrock": 0, "grass": 1,
+        "mineshaft_wood": 2, "mineshaft_support": 3, "mineshaft_rail": 5, "mineshaft_entrance": 0,
+        "chest": 0  # Special block with loot
     }
     
     BLOCK_COLORS = {
@@ -33,7 +35,10 @@ class MiningGame:
         "diamond": (0, 191, 255), "emerald": (0, 201, 87), "deepslate": (64, 64, 64),
         "netherite": (50, 35, 35), "ancient_debris": (101, 67, 33), "bedrock": (32, 32, 32),
         "air": (135, 206, 235), "shop": (139, 69, 19), "player": (255, 255, 0),
-        "ladder": (139, 90, 0), "portal": (128, 0, 128), "torch": (255, 200, 0)
+        "ladder": (139, 90, 0), "portal": (128, 0, 128), "torch": (255, 200, 0),
+        "mineshaft_wood": (101, 67, 33), "mineshaft_support": (139, 69, 19),
+        "mineshaft_rail": (160, 160, 160), "mineshaft_entrance": (90, 60, 30),
+        "chest": (139, 69, 19)  # Brown chest color
     }
     
     def __init__(self, user_id: int, seed: int = None, guild_id: int = None, is_shared: bool = False):
@@ -88,6 +93,10 @@ class MiningGame:
         self.torches = {}  # {(x, y): True} - placed torches
         self.portal_counter = 0  # For generating unique portal IDs
         
+        # Generated structures
+        self.structures = {}  # {structure_id: {type, name, x, y, width, height, discovered}}
+        self.structure_counter = 0  # For generating unique structure IDs
+        
         # Multiplayer support (guild-wide tracking)
         self.other_players = {}  # {user_id: {x, y, last_update, username}}
         
@@ -95,6 +104,12 @@ class MiningGame:
         
     def generate_world(self, regenerate=False):
         """Generate procedural world"""
+        # If regenerating, clear structures and torches for fresh generation
+        if regenerate:
+            self.structures = {}
+            self.structure_counter = 0
+            self.torches = {}
+        
         # Generate shop at y=-1 (above grass surface)
         for x in range(-50, 50):
             if x == 4:  # Shop left
@@ -134,6 +149,80 @@ class MiningGame:
                     block = blocks[-1]  # Rarest
                 
                 self.map_data[(x, y)] = block
+        
+        # Generate structures on both first generation and regeneration
+        self.generate_structures()
+    
+    def generate_structures(self):
+        """Generate world structures like mineshafts"""
+        # Generate 2-5 mineshafts at random positions
+        num_mineshafts = self.rng.randint(2, 5)
+        for i in range(num_mineshafts):
+            # Random starting X position, avoiding shop area
+            start_x = self.rng.choice([x for x in range(-45, 35) if x not in range(3, 7)])
+            # Random depth (Y position) for the tunnel
+            tunnel_y = self.rng.randint(15, 50)
+            # Random height (4-5 blocks tall)
+            tunnel_height = self.rng.randint(4, 5)
+            # Tunnel length (20-35 blocks)
+            tunnel_length = self.rng.randint(20, 35)
+            
+            # Create mineshaft structure
+            structure_id = f"mineshaft_{self.structure_counter}"
+            self.structure_counter += 1
+            
+            self.structures[structure_id] = {
+                "type": "mineshaft",
+                "name": f"Mineshaft #{i+1}",
+                "x": start_x,
+                "y": tunnel_y - tunnel_height + 1,  # Top of tunnel
+                "width": tunnel_length,
+                "height": tunnel_height,
+                "discovered": False
+            }
+            
+            # Build the horizontal mineshaft tunnel
+            for x_offset in range(tunnel_length):
+                current_x = start_x + x_offset
+                
+                # Build tunnel from TOP to BOTTOM (correct orientation)
+                for height_offset in range(tunnel_height):
+                    current_y = tunnel_y - height_offset  # Start from tunnel_y and go UP
+                    
+                    # Floor (bottom layer) - rails (at tunnel_y, the deepest/lowest point)
+                    if height_offset == 0:
+                        self.map_data[(current_x, current_y)] = "mineshaft_rail"
+                    # Ceiling (top layer) - wood (at tunnel_y - tunnel_height + 1, the highest point)
+                    elif height_offset == tunnel_height - 1:
+                        self.map_data[(current_x, current_y)] = "mineshaft_wood"
+                    # Middle layers - air for passage
+                    else:
+                        self.map_data[(current_x, current_y)] = "air"
+                
+                # Full support beams every 6 blocks
+                if x_offset % 6 == 0 and x_offset > 0:
+                    for height_offset in range(tunnel_height):
+                        current_y = tunnel_y - height_offset
+                        # Full pillar from floor to ceiling
+                        if height_offset == 0 or height_offset == tunnel_height - 1:
+                            self.map_data[(current_x, current_y)] = "mineshaft_support"
+                        else:
+                            self.map_data[(current_x, current_y)] = "mineshaft_support"
+                
+                # Torches every 5 blocks on ceiling
+                if x_offset % 5 == 2:
+                    torch_y = tunnel_y - 1  # One block below ceiling
+                    self.torches[(current_x, torch_y)] = True
+                
+                # Chests (loot) - random placement (10% chance)
+                if x_offset > 3 and self.rng.random() < 0.10:
+                    chest_y = tunnel_y - 1  # One block above floor
+                    self.map_data[(current_x, chest_y)] = "chest"
+                
+                # Entrance marker at the start
+                if x_offset == 0:
+                    entrance_y = tunnel_y - tunnel_height + 2
+                    self.map_data[(current_x, entrance_y)] = "mineshaft_entrance"
     
     def get_biome(self, depth: int):
         """Get biome data for given depth"""
@@ -180,6 +269,96 @@ class MiningGame:
         # Check energy (skip if infinite)
         if not self.infinite_energy and self.energy < energy_cost:
             return False, f"**❌ Not enough energy! Need {energy_cost}**"
+        
+        # Special handling for chest blocks (loot system)
+        if block == "chest":
+            # Check inventory space
+            if not self.infinite_backpack:
+                current_inventory_size = sum(self.inventory.values())
+                if current_inventory_size >= self.backpack_capacity:
+                    return False, "**❌ Inventory full!**"
+            
+            # Consume energy if not infinite
+            if not self.infinite_energy:
+                self.energy -= energy_cost
+            
+            # Remove chest
+            self.map_data[(x, y)] = "air"
+            
+            # Loot table (40% nothing, 60% loot)
+            import random
+            loot_roll = random.random()
+            
+            if loot_roll < 0.40:
+                # 40% - Nothing
+                return True, "📦 **Chest opened... but it's empty!**", (x, y)
+            else:
+                # 60% - Get loot (blocks OR items)
+                # First decide: blocks (70%) or items (30%)
+                loot_type_roll = random.random()
+                
+                if loot_type_roll < 0.70:
+                    # 70% - Block loot (ores)
+                    loot_options = [
+                        ("coal", 3, 0.25),      # 25% - 3x coal
+                        ("iron", 2, 0.20),      # 20% - 2x iron
+                        ("gold", 1, 0.15),      # 15% - 1x gold
+                        ("redstone", 2, 0.15),  # 15% - 2x redstone
+                        ("diamond", 1, 0.10),   # 10% - 1x diamond
+                        ("emerald", 1, 0.08),   # 8% - 1x emerald
+                        ("ancient_debris", 1, 0.05),  # 5% - 1x ancient debris
+                        ("netherite", 1, 0.02)  # 2% - 1x netherite
+                    ]
+                    
+                    # Weighted random selection
+                    total_weight = sum(w for _, _, w in loot_options)
+                    rand_val = random.random() * total_weight
+                    
+                    cumulative = 0
+                    selected_loot = None
+                    selected_count = 0
+                    
+                    for loot_type, count, weight in loot_options:
+                        cumulative += weight
+                        if rand_val <= cumulative:
+                            selected_loot = loot_type
+                            selected_count = count
+                            break
+                    
+                    # Add loot to inventory
+                    self.inventory[selected_loot] = self.inventory.get(selected_loot, 0) + selected_count
+                    value = self.BLOCK_VALUES.get(selected_loot, 0) * selected_count
+                    
+                    return True, f"📦 **Chest opened! Found {selected_count}x {selected_loot}!** (+${value})", (x, y)
+                
+                else:
+                    # 30% - Item loot (ladder, torch, portal)
+                    item_options = [
+                        ("ladder", 3, 0.50),   # 50% - 3x ladder
+                        ("torch", 5, 0.40),    # 40% - 5x torch
+                        ("portal", 1, 0.10)    # 10% - 1x portal
+                    ]
+                    
+                    # Weighted random selection
+                    total_weight = sum(w for _, _, w in item_options)
+                    rand_val = random.random() * total_weight
+                    
+                    cumulative = 0
+                    selected_item = None
+                    selected_count = 0
+                    
+                    for item_type, count, weight in item_options:
+                        cumulative += weight
+                        if rand_val <= cumulative:
+                            selected_item = item_type
+                            selected_count = count
+                            break
+                    
+                    # Add item to items
+                    self.items[selected_item] = self.items.get(selected_item, 0) + selected_count
+                    emoji = {"ladder": "🪜", "torch": "🔦", "portal": "🌀"}.get(selected_item, "📦")
+                    
+                    return True, f"📦 **Chest opened! Found {selected_count}x {emoji} {selected_item}!**", (x, y)
         
         # Check inventory space (skip if infinite backpack)
         if not self.infinite_backpack:
@@ -296,6 +475,16 @@ class MiningGame:
         self.items["torch"] -= 1
         return True, f"🔦 Torch placed! ({self.items['torch']} left)"
     
+    def discover_nearby_structures(self, radius: int = 10):
+        """Discover structures within radius of player"""
+        for structure_id, structure_data in self.structures.items():
+            if not structure_data["discovered"]:
+                # Check if player is within radius
+                dx = abs(structure_data["x"] - self.x)
+                dy = abs(structure_data["y"] - self.y)
+                if dx <= radius and dy <= radius:
+                    structure_data["discovered"] = True
+    
     def sell_inventory(self, bot=None) -> tuple[int, str]:
         """Sell all inventory items"""
         if not self.inventory:
@@ -354,6 +543,10 @@ class MiningGame:
                 "bedrock": "assets/mining/blocks/layer1/coal.png",  # Fallback
                 "shop_left": "assets/mining/shop/shop1_left.png",
                 "shop_right": "assets/mining/shop/shop1_right.png",
+                "mineshaft_wood": "assets/mining/structures/mineshaft/wood.png",
+                "mineshaft_support": "assets/mining/structures/mineshaft/support.png",
+                "mineshaft_rail": "assets/mining/structures/mineshaft/rail.png",
+                "mineshaft_entrance": "assets/mining/structures/mineshaft/entrance.png",
             }
             
             try:
@@ -844,7 +1037,9 @@ class MiningGame:
             "ladders": {f"{x},{y}": True for (x, y) in self.ladders.keys()},
             "portals": self.portals,
             "torches": {f"{x},{y}": True for (x, y) in self.torches.keys()},
-            "portal_counter": self.portal_counter
+            "portal_counter": self.portal_counter,
+            "structures": self.structures,
+            "structure_counter": self.structure_counter
         }
     
     @classmethod
@@ -878,6 +1073,8 @@ class MiningGame:
         # Deserialize items and structures
         game.items = data.get("items", {"ladder": 5, "portal": 2, "torch": 10})
         game.portal_counter = data.get("portal_counter", 0)
+        game.structures = data.get("structures", {})
+        game.structure_counter = data.get("structure_counter", 0)
         
         # Deserialize ladders
         game.ladders = {}
@@ -1396,13 +1593,20 @@ class MiningView(discord.ui.LayoutView):
         
         # Check if player is standing on a portal
         standing_on_portal = False
+        current_portal_is_private = False
+        current_portal_owner = None
         for portal_id, portal_data in self.game.portals.items():
             if portal_data["x"] == self.game.x and portal_data["y"] == self.game.y:
                 standing_on_portal = True
+                current_portal_is_private = not portal_data["public"]
+                current_portal_owner = portal_data["owner_id"]
                 break
         
         # Add portal teleportation menu if standing on portal
         if standing_on_portal:
+            # Check if player can use this portal
+            can_use_portal = not current_portal_is_private or current_portal_owner == self.user_id
+            
             portal_options = []
             
             # Add available portals (public + own private)
@@ -1422,13 +1626,25 @@ class MiningView(discord.ui.LayoutView):
                         )
                     )
             
-            # Only show portal menu if there are other portals
-            if len(portal_options) > 0:
+            # Show portal menu
+            if can_use_portal and len(portal_options) > 0:
+                # Normal working portal menu
                 portal_select = discord.ui.Select(
                     placeholder="🌀 Portal Teleportation",
                     options=portal_options[:25]  # Discord limit
                 )
                 portal_select.callback = self.inventory_callback
+                container_items.append(discord.ui.ActionRow(portal_select))
+                container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+            elif not can_use_portal:
+                # Private portal - show disabled menu
+                portal_select = discord.ui.Select(
+                    placeholder="🔒 This portal is private - you cannot use it",
+                    options=[
+                        discord.SelectOption(label="Private Portal", value="private", description="Only the owner can use this portal")
+                    ],
+                    disabled=True
+                )
                 container_items.append(discord.ui.ActionRow(portal_select))
                 container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
@@ -1614,10 +1830,21 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="📍 Teleport Menu", value="teleport_menu", description="Teleport to depths or players"),
                     discord.SelectOption(label="🧱 Place Blocks Menu", value="place_menu", description="Place any block type"),
                     discord.SelectOption(label="📦 Items Menu", value="items_menu", description="Spawn items (ladder/torch/portal)"),
+                    discord.SelectOption(label="🏗️ Generate Structures", value="structures_menu", description="Generate mineshafts and structures"),
                     discord.SelectOption(label="📥 Force Map Reset", value="forcereset", description="Regenerate entire map now"),
                     discord.SelectOption(label="🌱 Change Seed", value="customseed", description="Enter custom world seed"),
                     discord.SelectOption(label="💎 Spawn Rare Items", value="spawnitems", description="Add valuable items"),
                     discord.SelectOption(label="💰 Max All Upgrades", value="maxupgrades", description="Max pickaxe/backpack/energy"),
+                ]
+            )
+        elif self.dev_menu_state == "structures":
+            # Structures submenu
+            dev_select = discord.ui.Select(
+                placeholder="🏗️ Generate Structures",
+                options=[
+                    discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                    discord.SelectOption(label="⛏️ Generate Mineshaft", value="gen_mineshaft", description="Create a vertical mineshaft"),
+                    discord.SelectOption(label="🏛️ Discover All Structures", value="discover_all", description="Reveal all hidden structures"),
                 ]
             )
         elif self.dev_menu_state == "items":
@@ -1645,7 +1872,7 @@ class OwnerMiningView(discord.ui.LayoutView):
             
             # Add teleports to other players
             if self.game.is_shared and self.game.other_players:
-                for player_id, player_data in list(self.game.other_players.items())[:18]:  # Max 25 options total
+                for player_id, player_data in list(self.game.other_players.items())[:10]:  # Limit to leave room for structures/portals
                     username = player_data.get("username", f"User {player_id}")
                     teleport_options.append(
                         discord.SelectOption(
@@ -1654,6 +1881,38 @@ class OwnerMiningView(discord.ui.LayoutView):
                             description=f"X={player_data['x']}, Y={player_data['y']}"
                         )
                     )
+            
+            # Discover nearby structures
+            self.game.discover_nearby_structures(radius=10)
+            
+            # Add ALL structures (developer can see all, not just discovered)
+            for structure_id, structure_data in self.game.structures.items():
+                if len(teleport_options) < 23:
+                    structure_type_emoji = {"mineshaft": "⛏️"}.get(structure_data["type"], "🏛️")
+                    teleport_options.append(
+                        discord.SelectOption(
+                            label=f"{structure_type_emoji} {structure_data['name']}", 
+                            value=f"tp_structure_{structure_id}",
+                            description=f"Structure at ({structure_data['x']}, {structure_data['y']})"
+                        )
+                    )
+            
+            # Add ALL portals (developer can see all, not just public)
+            for portal_id, portal_data in self.game.portals.items():
+                if len(teleport_options) >= 25:
+                    break
+                visibility = "🌍" if portal_data["public"] else "🔒"
+                # Show owner info for private portals
+                owner_info = ""
+                if not portal_data["public"]:
+                    owner_info = f" (Owner: {portal_data['owner_id']})"
+                teleport_options.append(
+                    discord.SelectOption(
+                        label=f"{visibility} {portal_data['name'][:15]}", 
+                        value=f"tp_portal_{portal_id}",
+                        description=f"Portal at ({portal_data['x']}, {portal_data['y']}){owner_info}"
+                    )
+                )
             
             dev_select = discord.ui.Select(
                 placeholder="📍 Teleport Options",
@@ -1675,11 +1934,14 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="🔷 Lapis", value="place_lapis", description="Place lapis ore"),
                     discord.SelectOption(label="🔴 Redstone", value="place_redstone", description="Place redstone ore"),
                     discord.SelectOption(label="⚫ Coal", value="place_coal", description="Place coal ore"),
-                    discord.SelectOption(label="🟠 Copper", value="place_copper", description="Place copper ore"),
                     discord.SelectOption(label="⚪ Iron", value="place_iron", description="Place iron ore"),
-                    discord.SelectOption(label="🟦 Sapphire", value="place_sapphire", description="Place sapphire ore"),
-                    discord.SelectOption(label="🟪 Amethyst", value="place_amethyst", description="Place amethyst"),
-                    discord.SelectOption(label="⬜ Quartz", value="place_quartz", description="Place quartz"),
+                    discord.SelectOption(label="🟤 Deepslate", value="place_deepslate", description="Place deepslate"),
+                    discord.SelectOption(label="🟫 Dirt", value="place_dirt", description="Place dirt"),
+                    discord.SelectOption(label="📦 Chest", value="place_chest", description="Loot chest"),
+                    discord.SelectOption(label="🪵 M.Wood", value="place_mineshaft_wood", description="Mineshaft wood"),
+                    discord.SelectOption(label="🏗️ M.Support", value="place_mineshaft_support", description="Support beam"),
+                    discord.SelectOption(label="🛤️ M.Rail", value="place_mineshaft_rail", description="Rail"),
+                    discord.SelectOption(label="🚪 M.Entrance", value="place_mineshaft_entrance", description="Entrance"),
                     discord.SelectOption(label="🌫️ Air", value="place_air", description="Remove block"),
                 ]
             )
@@ -1914,6 +2176,11 @@ class OwnerMiningView(discord.ui.LayoutView):
             await self.refresh(interaction, "📦 **Items Menu** - Select item to spawn")
             return
         
+        elif action == "structures_menu":
+            self.dev_menu_state = "structures"
+            await self.refresh(interaction, "🏗️ **Structures Menu** - Generate world structures")
+            return
+        
         # Main menu actions
         if action == "infinite_energy":
             self.game.infinite_energy = not self.game.infinite_energy
@@ -2015,6 +2282,26 @@ class OwnerMiningView(discord.ui.LayoutView):
                 return
         
         # Teleport actions
+        elif action.startswith("tp_structure_"):
+            structure_id = action.replace("tp_structure_", "")
+            if structure_id in self.game.structures:
+                structure = self.game.structures[structure_id]
+                self.game.x = structure["x"]
+                self.game.y = structure["y"]
+                await self.refresh(interaction, f"🏛️ Teleported to {structure['name']}!")
+            else:
+                await self.refresh(interaction, "❌ Structure not found!")
+        
+        elif action.startswith("tp_portal_"):
+            portal_id = action.replace("tp_portal_", "")
+            if portal_id in self.game.portals:
+                portal = self.game.portals[portal_id]
+                self.game.x = portal["x"]
+                self.game.y = portal["y"]
+                await self.refresh(interaction, f"🌀 Teleported to portal '{portal['name']}'!")
+            else:
+                await self.refresh(interaction, "❌ Portal not found!")
+        
         elif action.startswith("tp_player_"):
             player_id = action.replace("tp_player_", "")
             if player_id in self.game.other_players:
@@ -2059,14 +2346,16 @@ class OwnerMiningView(discord.ui.LayoutView):
                 "gold": "🟡 Gold Ore",
                 "netherite": "⬛ Netherite",
                 "ancient_debris": "🟫 Ancient Debris",
-                "lapis": "🔷 Lapis Ore",
                 "redstone": "🔴 Redstone Ore",
                 "coal": "⚫ Coal Ore",
-                "copper": "🟠 Copper Ore",
                 "iron": "⚪ Iron Ore",
-                "sapphire": "🟦 Sapphire Ore",
-                "amethyst": "🟪 Amethyst",
-                "quartz": "⬜ Quartz",
+                "deepslate": "🟤 Deepslate",
+                "dirt": "🟫 Dirt",
+                "chest": "📦 Loot Chest",
+                "mineshaft_wood": "🪵 Mineshaft Wood",
+                "mineshaft_support": "🏗️ Support Beam",
+                "mineshaft_rail": "🛤️ Rail",
+                "mineshaft_entrance": "🚪 Entrance",
                 "air": "🌫️ Air (removed block)"
             }
             
@@ -2103,6 +2392,80 @@ class OwnerMiningView(discord.ui.LayoutView):
                 f"• **Infinite Backpack:** {'ON' if self.game.infinite_backpack else 'OFF'}"
             )
             await self.refresh(interaction, info)
+        
+        # Structures generation actions
+        elif action == "gen_mineshaft":
+            # Generate a horizontal mineshaft at current position
+            structure_id = f"mineshaft_{self.game.structure_counter}"
+            self.game.structure_counter += 1
+            
+            start_x = self.game.x
+            tunnel_y = self.game.y
+            tunnel_height = self.game.rng.randint(4, 5)  # 4-5 blocks
+            tunnel_length = self.game.rng.randint(20, 35)  # 20-35 blocks
+            
+            self.game.structures[structure_id] = {
+                "type": "mineshaft",
+                "name": f"Mineshaft #{len([s for s in self.game.structures.values() if s['type'] == 'mineshaft']) + 1}",
+                "x": start_x,
+                "y": tunnel_y - tunnel_height + 1,
+                "width": tunnel_length,
+                "height": tunnel_height,
+                "discovered": True
+            }
+            
+            # Build the horizontal mineshaft tunnel (CORRECT orientation)
+            for x_offset in range(tunnel_length):
+                current_x = start_x + x_offset
+                
+                # Build tunnel from TOP to BOTTOM
+                for height_offset in range(tunnel_height):
+                    current_y = tunnel_y - height_offset
+                    
+                    # Floor (bottom layer) - rails
+                    if height_offset == 0:
+                        self.game.map_data[(current_x, current_y)] = "mineshaft_rail"
+                    # Ceiling (top layer) - wood
+                    elif height_offset == tunnel_height - 1:
+                        self.game.map_data[(current_x, current_y)] = "mineshaft_wood"
+                    # Middle layers - air
+                    else:
+                        self.game.map_data[(current_x, current_y)] = "air"
+                
+                # Full support beams every 6 blocks
+                if x_offset % 6 == 0 and x_offset > 0:
+                    for height_offset in range(tunnel_height):
+                        current_y = tunnel_y - height_offset
+                        self.game.map_data[(current_x, current_y)] = "mineshaft_support"
+                
+                # Torches every 5 blocks
+                if x_offset % 5 == 2:
+                    torch_y = tunnel_y - 1
+                    self.game.torches[(current_x, torch_y)] = True
+                
+                # Chests (10% chance)
+                if x_offset > 3 and self.game.rng.random() < 0.10:
+                    chest_y = tunnel_y - 1  # One block above floor
+                    self.game.map_data[(current_x, chest_y)] = "chest"
+                
+                # Entrance marker at start
+                if x_offset == 0:
+                    entrance_y = tunnel_y - tunnel_height + 2
+                    self.game.map_data[(current_x, entrance_y)] = "mineshaft_entrance"
+            
+            cog = interaction.client.get_cog("Mining")
+            if cog:
+                cog.save_data()
+            
+            await self.refresh(interaction, f"⛏️ Horizontal mineshaft generated! Length: {tunnel_length}, Height: {tunnel_height}")
+        
+        elif action == "discover_all":
+            count = 0
+            for structure_data in self.game.structures.values():
+                if not structure_data["discovered"]:
+                    structure_data["discovered"] = True
+                    count += 1
+            await self.refresh(interaction, f"🏛️ Discovered {count} hidden structures!")
     
     async def shop_callback(self, interaction: discord.Interaction):
         """Handle shop dropdown selection"""
@@ -2318,11 +2681,22 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="📍 Teleport Menu", value="teleport_menu", description="Teleport to depths or players"),
                     discord.SelectOption(label="🧱 Place Blocks Menu", value="place_menu", description="Place any block type"),
                     discord.SelectOption(label="📦 Items Menu", value="items_menu", description="Spawn items (ladder/torch/portal)"),
+                    discord.SelectOption(label="🏗️ Structures Menu", value="structures_menu", description="Generate mineshafts and discover structures"),
                     discord.SelectOption(label="🔄 Force Map Reset", value="forcereset", description="Regenerate entire map now"),
                     discord.SelectOption(label="🌱 Change Seed", value="customseed", description="Enter custom world seed"),
                     discord.SelectOption(label="💎 Spawn Rare Items", value="spawnitems", description="Add valuable items"),
                     discord.SelectOption(label="💰 Max All Upgrades", value="maxupgrades", description="Max pickaxe/backpack/energy"),
                     discord.SelectOption(label="🗺️ World Info", value="mapinfo", description="View map details"),
+                ]
+            )
+        elif self.dev_menu_state == "structures":
+            # Structures submenu
+            dev_select = discord.ui.Select(
+                placeholder="🏗️ Generate Structures",
+                options=[
+                    discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                    discord.SelectOption(label="⛏️ Generate Mineshaft", value="gen_mineshaft", description="Create a vertical mineshaft"),
+                    discord.SelectOption(label="🏛️ Discover All Structures", value="discover_all", description="Reveal all hidden structures"),
                 ]
             )
         elif self.dev_menu_state == "items":
@@ -2350,7 +2724,7 @@ class OwnerMiningView(discord.ui.LayoutView):
             
             # Add teleports to other players
             if self.game.is_shared and self.game.other_players:
-                for player_id, player_data in list(self.game.other_players.items())[:18]:  # Max 25 options total
+                for player_id, player_data in list(self.game.other_players.items())[:10]:  # Limit to leave room for structures/portals
                     username = player_data.get("username", f"User {player_id}")
                     teleport_options.append(
                         discord.SelectOption(
@@ -2359,6 +2733,38 @@ class OwnerMiningView(discord.ui.LayoutView):
                             description=f"X={player_data['x']}, Y={player_data['y']}"
                         )
                     )
+            
+            # Discover nearby structures
+            self.game.discover_nearby_structures(radius=10)
+            
+            # Add ALL structures (developer can see all, not just discovered)
+            for structure_id, structure_data in self.game.structures.items():
+                if len(teleport_options) < 23: 
+                    structure_type_emoji = {"mineshaft": "⛏️"}.get(structure_data["type"], "🏛️")
+                    teleport_options.append(
+                        discord.SelectOption(
+                            label=f"{structure_type_emoji} {structure_data['name']}", 
+                            value=f"tp_structure_{structure_id}",
+                            description=f"Structure at ({structure_data['x']}, {structure_data['y']})"
+                        )
+                    )
+            
+            # Add ALL portals (developer can see all, not just public)
+            for portal_id, portal_data in self.game.portals.items():
+                if len(teleport_options) >= 25:
+                    break
+                visibility = "🌍" if portal_data["public"] else "🔒"
+                # Show owner info for private portals
+                owner_info = ""
+                if not portal_data["public"]:
+                    owner_info = f" (Owner: {portal_data['owner_id']})"
+                teleport_options.append(
+                    discord.SelectOption(
+                        label=f"{visibility} {portal_data['name'][:15]}", 
+                        value=f"tp_portal_{portal_id}",
+                        description=f"Portal at ({portal_data['x']}, {portal_data['y']}){owner_info}"
+                    )
+                )
             
             dev_select = discord.ui.Select(
                 placeholder="📍 Teleport Options",
@@ -2380,11 +2786,14 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="🔷 Lapis", value="place_lapis", description="Place lapis ore"),
                     discord.SelectOption(label="🔴 Redstone", value="place_redstone", description="Place redstone ore"),
                     discord.SelectOption(label="⚫ Coal", value="place_coal", description="Place coal ore"),
-                    discord.SelectOption(label="🟠 Copper", value="place_copper", description="Place copper ore"),
                     discord.SelectOption(label="⚪ Iron", value="place_iron", description="Place iron ore"),
-                    discord.SelectOption(label="🟦 Sapphire", value="place_sapphire", description="Place sapphire ore"),
-                    discord.SelectOption(label="🟪 Amethyst", value="place_amethyst", description="Place amethyst"),
-                    discord.SelectOption(label="⬜ Quartz", value="place_quartz", description="Place quartz"),
+                    discord.SelectOption(label="🟤 Deepslate", value="place_deepslate", description="Place deepslate"),
+                    discord.SelectOption(label="🟫 Dirt", value="place_dirt", description="Place dirt"),
+                    discord.SelectOption(label="📦 Chest", value="place_chest", description="Loot chest"),
+                    discord.SelectOption(label="🪵 M.Wood", value="place_mineshaft_wood", description="Mineshaft wood"),
+                    discord.SelectOption(label="🏗️ M.Support", value="place_mineshaft_support", description="Support beam"),
+                    discord.SelectOption(label="🛤️ M.Rail", value="place_mineshaft_rail", description="Rail"),
+                    discord.SelectOption(label="🚪 M.Entrance", value="place_mineshaft_entrance", description="Entrance"),
                     discord.SelectOption(label="🌫️ Air", value="place_air", description="Remove block"),
                 ]
             )
@@ -2409,13 +2818,20 @@ class OwnerMiningView(discord.ui.LayoutView):
         
         # Check if player is standing on a portal
         standing_on_portal = False
+        current_portal_is_private = False
+        current_portal_owner = None
         for portal_id, portal_data in self.game.portals.items():
             if portal_data["x"] == self.game.x and portal_data["y"] == self.game.y:
                 standing_on_portal = True
+                current_portal_is_private = not portal_data["public"]
+                current_portal_owner = portal_data["owner_id"]
                 break
         
         # Add portal teleportation menu if standing on portal
         if standing_on_portal:
+            # Check if player can use this portal
+            can_use_portal = not current_portal_is_private or current_portal_owner == self.user_id
+            
             portal_options = []
             
             # Add available portals (public + own private)
@@ -2435,13 +2851,25 @@ class OwnerMiningView(discord.ui.LayoutView):
                         )
                     )
             
-            # Only show portal menu if there are other portals
-            if len(portal_options) > 0:
+            # Show portal menu
+            if can_use_portal and len(portal_options) > 0:
+                # Normal working portal menu
                 portal_select = discord.ui.Select(
                     placeholder="🌀 Portal Teleportation",
                     options=portal_options[:25]  # Discord limit
                 )
                 portal_select.callback = self.inventory_callback
+                container_items.append(discord.ui.ActionRow(portal_select))
+                container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+            elif not can_use_portal:
+                # Private portal - show disabled menu
+                portal_select = discord.ui.Select(
+                    placeholder="🔒 Ten portal jest prywatny - nie możesz go użyć",
+                    options=[
+                        discord.SelectOption(label="Prywatny Portal", value="private", description="Tylko właściciel może użyć tego portalu")
+                    ],
+                    disabled=True
+                )
                 container_items.append(discord.ui.ActionRow(portal_select))
                 container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
