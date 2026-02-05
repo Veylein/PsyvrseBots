@@ -32,7 +32,8 @@ class MiningGame:
         "iron": (192, 192, 192), "gold": (255, 215, 0), "redstone": (255, 0, 0),
         "diamond": (0, 191, 255), "emerald": (0, 201, 87), "deepslate": (64, 64, 64),
         "netherite": (50, 35, 35), "ancient_debris": (101, 67, 33), "bedrock": (32, 32, 32),
-        "air": (135, 206, 235), "shop": (139, 69, 19), "player": (255, 255, 0)
+        "air": (135, 206, 235), "shop": (139, 69, 19), "player": (255, 255, 0),
+        "ladder": (139, 90, 0), "portal": (128, 0, 128), "torch": (255, 200, 0)
     }
     
     def __init__(self, user_id: int, seed: int = None, guild_id: int = None, is_shared: bool = False):
@@ -61,6 +62,13 @@ class MiningGame:
         self.inventory = {}
         self.coins = 100
         
+        # Items inventory (tools/utilities)
+        self.items = {
+            "ladder": 5,    # Temporary: 5 ladders to start
+            "portal": 2,    # Temporary: 2 portals to start
+            "torch": 10     # Temporary: 10 torches to start
+        }
+        
         # Developer mode flags
         self.infinite_energy = False
         self.infinite_backpack = False
@@ -73,6 +81,12 @@ class MiningGame:
         self.height = 10  # View height
         self.map_data = {}  # {(x, y): block_type}
         self.last_map_regen = datetime.utcnow()
+        
+        # Placed structures
+        self.ladders = {}  # {(x, y): True} - placed ladders
+        self.portals = {}  # {portal_id: {name, x, y, owner_id, public, linked_to}}
+        self.torches = {}  # {(x, y): True} - placed torches
+        self.portal_counter = 0  # For generating unique portal IDs
         
         # Multiplayer support (guild-wide tracking)
         self.other_players = {}  # {user_id: {x, y, last_update, username}}
@@ -136,8 +150,11 @@ class MiningGame:
     
     def can_move(self, new_x: int, new_y: int) -> bool:
         """Check if player can move to position"""
-        if new_y < -1:  # Can't go above sky limit
-            return False
+        # Allow movement above y=-1 if there's a ladder
+        if new_y < -1:
+            # Check if there's a ladder at the target position or current position
+            if (new_x, new_y) not in self.ladders and (self.x, self.y) not in self.ladders:
+                return False
         
         block = self.get_block(new_x, new_y)
         return block in ["air", "shop_left", "shop_right"]  # Removed grass - it must be mined first
@@ -147,9 +164,6 @@ class MiningGame:
         # Check distance - can only mine adjacent blocks
         if abs(x - self.x) + abs(y - self.y) != 1:
             return False, "**❌ Too far! Can only mine adjacent blocks.**"
-        
-        if y < 0:
-            return False, "**❌ Can't mine in the sky!**"
         
         block = self.get_block(x, y)
         if block == "air":
@@ -248,6 +262,40 @@ class MiningGame:
             return True
         return False
     
+    def can_move_up(self) -> bool:
+        """Check if player can move up (requires ladder)"""
+        # Check if there's a ladder at current position or adjacent
+        if (self.x, self.y) in self.ladders:
+            return True
+        if (self.x, self.y - 1) in self.ladders:
+            return True
+        return False
+    
+    def place_ladder(self) -> tuple[bool, str]:
+        """Place a ladder at current position"""
+        if self.items.get("ladder", 0) <= 0:
+            return False, "❌ No ladders in inventory!"
+        
+        if (self.x, self.y) in self.ladders:
+            return False, "❌ Ladder already placed here!"
+        
+        # Can place ladder anywhere (including surface)
+        self.ladders[(self.x, self.y)] = True
+        self.items["ladder"] -= 1
+        return True, f"🪜 Ladder placed! ({self.items['ladder']} left)"
+    
+    def place_torch(self) -> tuple[bool, str]:
+        """Place a torch at current position"""
+        if self.items.get("torch", 0) <= 0:
+            return False, "❌ No torches in inventory!"
+        
+        if (self.x, self.y) in self.torches:
+            return False, "❌ Torch already placed here!"
+        
+        self.torches[(self.x, self.y)] = True
+        self.items["torch"] -= 1
+        return True, f"🔦 Torch placed! ({self.items['torch']} left)"
+    
     def sell_inventory(self, bot=None) -> tuple[int, str]:
         """Sell all inventory items"""
         if not self.inventory:
@@ -338,6 +386,118 @@ class MiningGame:
                 y1 = dy * block_size
                 texture = load_texture(block)
                 img.paste(texture, (x1, y1), texture if texture.mode == 'RGBA' else None)
+                
+                # Draw ladder overlay if placed here
+                if (world_x, world_y) in self.ladders:
+                    try:
+                        ladder_img = Image.open("assets/mining/items/ladder.png").convert("RGBA")
+                        ladder_img = ladder_img.resize((block_size, block_size), Image.LANCZOS)
+                        img.paste(ladder_img, (x1, y1), ladder_img)
+                    except:
+                        # Fallback: brown vertical lines
+                        draw_temp = ImageDraw.Draw(img)
+                        ladder_color = self.BLOCK_COLORS.get("ladder", (139, 90, 0))
+                        draw_temp.rectangle([x1 + 5, y1, x1 + 8, y1 + block_size], fill=ladder_color)
+                        draw_temp.rectangle([x1 + block_size - 8, y1, x1 + block_size - 5, y1 + block_size], fill=ladder_color)
+                
+                # Draw torch overlay if placed here
+                if (world_x, world_y) in self.torches:
+                    try:
+                        torch_img = Image.open("assets/mining/items/torch.png").convert("RGBA")
+                        torch_img = torch_img.resize((block_size // 2, block_size), Image.LANCZOS)
+                        img.paste(torch_img, (x1 + block_size // 4, y1), torch_img)
+                    except:
+                        # Fallback: yellow/orange glow
+                        draw_temp = ImageDraw.Draw(img)
+                        torch_color = self.BLOCK_COLORS.get("torch", (255, 200, 0))
+                        draw_temp.ellipse([x1 + block_size//3, y1 + 5, x1 + 2*block_size//3, y1 + block_size//2], fill=torch_color)
+                
+                # Draw portal overlay if placed here
+                for portal_id, portal_data in self.portals.items():
+                    if portal_data["x"] == world_x and portal_data["y"] == world_y:
+                        try:
+                            portal_img = Image.open("assets/mining/items/portal.png").convert("RGBA")
+                            portal_img = portal_img.resize((block_size, block_size), Image.LANCZOS)
+                            img.paste(portal_img, (x1, y1), portal_img)
+                            
+                            # Draw portal name ABOVE portal
+                            img_rgba = img.convert('RGBA')
+                            draw_temp = ImageDraw.Draw(img_rgba)
+                            try:
+                                portal_font = ImageFont.truetype("Arial.ttf", 10)
+                            except:
+                                portal_font = ImageFont.load_default()
+                            portal_name = portal_data["name"][:12]  # Limit name length
+                            # Get text size for background
+                            bbox = draw_temp.textbbox((0, 0), portal_name, font=portal_font)
+                            text_width = bbox[2] - bbox[0]
+                            text_height = bbox[3] - bbox[1]
+                            # Center text above portal
+                            text_x = x1 + (block_size - text_width) // 2
+                            text_y = y1 - text_height - 2
+                            # Draw semi-transparent background
+                            bg_padding = 2
+                            draw_temp.rectangle(
+                                [text_x - bg_padding, text_y - bg_padding,
+                                 text_x + text_width + bg_padding, text_y + text_height + bg_padding],
+                                fill=(138, 43, 226, 200)  # Purple background
+                            )
+                            # Draw text
+                            draw_temp.text((text_x, text_y), portal_name, fill=(255, 255, 255, 255), font=portal_font)
+                            img = img_rgba.convert('RGB')
+                        except:
+                            # Fallback: purple swirl
+                            draw_temp = ImageDraw.Draw(img)
+                            portal_color = (138, 43, 226)  # Purple
+                            draw_temp.ellipse([x1 + 5, y1 + 5, x1 + block_size - 5, y1 + block_size - 5], fill=portal_color, outline=(255, 255, 255), width=2)
+                            # Draw portal name above
+                            try:
+                                portal_font = ImageFont.truetype("Arial.ttf", 8)
+                            except:
+                                portal_font = ImageFont.load_default()
+                            portal_name = portal_data["name"][:8]  # Limit name length
+                            draw_temp.text((x1 + 2, y1 - 12), portal_name, fill=(255, 255, 255), font=portal_font)
+                        break
+        
+        # Apply darkness based on depth (darker the deeper you go)
+        if self.y > 5:  # Below surface level
+            darkness_overlay = Image.new('RGBA', (img_width, img_height), (0, 0, 0, 0))
+            darkness_draw = ImageDraw.Draw(darkness_overlay)
+            
+            # Calculate darkness intensity (0-240 alpha based on depth)
+            depth_factor = min((self.y - 5) / 55, 1.0)  # 0 at y=5, 1.0 at y=60
+            darkness_alpha = int(depth_factor * 240)
+            
+            # Draw darkness over entire map
+            for dy in range(self.height):
+                for dx in range(self.width):
+                    world_x = start_x + dx
+                    world_y = start_y + dy
+                    x1 = dx * block_size
+                    y1 = dy * block_size
+                    
+                    # Check if there's a torch nearby (within 5 blocks for brighter radius)
+                    lit = False
+                    light_distance = 999
+                    for tx, ty in self.torches.keys():
+                        distance = abs(tx - world_x) + abs(ty - world_y)
+                        if distance <= 5:  # Increased to 5 blocks
+                            lit = True
+                            light_distance = min(light_distance, distance)
+                    
+                    # Apply darkness if not lit by torch
+                    if not lit:
+                        darkness_draw.rectangle([x1, y1, x1 + block_size, y1 + block_size], 
+                                                fill=(0, 0, 0, darkness_alpha))
+                    else:
+                        # Gradual light based on torch distance (even brighter gradient)
+                        light_alpha = int(darkness_alpha * (light_distance / 6.0))  # Increased from 4.5 to 6.0
+                        darkness_draw.rectangle([x1, y1, x1 + block_size, y1 + block_size], 
+                                                fill=(0, 0, 0, light_alpha))
+            
+            img_rgba = img.convert('RGBA')
+            img_rgba = Image.alpha_composite(img_rgba, darkness_overlay)
+            img = img_rgba.convert('RGB')
         
         # Draw other players in multiplayer mode (before drawing current player)
         if self.is_shared and self.other_players:
@@ -679,7 +839,12 @@ class MiningGame:
             "other_players": self.other_players,
             "infinite_energy": self.infinite_energy,
             "infinite_backpack": self.infinite_backpack,
-            "auto_reset_enabled": self.auto_reset_enabled
+            "auto_reset_enabled": self.auto_reset_enabled,
+            "items": self.items,
+            "ladders": {f"{x},{y}": True for (x, y) in self.ladders.keys()},
+            "portals": self.portals,
+            "torches": {f"{x},{y}": True for (x, y) in self.torches.keys()},
+            "portal_counter": self.portal_counter
         }
     
     @classmethod
@@ -709,6 +874,25 @@ class MiningGame:
         game.infinite_energy = data.get("infinite_energy", False)
         game.infinite_backpack = data.get("infinite_backpack", False)
         game.auto_reset_enabled = data.get("auto_reset_enabled", True)
+        
+        # Deserialize items and structures
+        game.items = data.get("items", {"ladder": 5, "portal": 2, "torch": 10})
+        game.portal_counter = data.get("portal_counter", 0)
+        
+        # Deserialize ladders
+        game.ladders = {}
+        for key in data.get("ladders", {}).keys():
+            x, y = map(int, key.split(","))
+            game.ladders[(x, y)] = True
+        
+        # Deserialize portals
+        game.portals = data.get("portals", {})
+        
+        # Deserialize torches
+        game.torches = {}
+        for key in data.get("torches", {}).keys():
+            x, y = map(int, key.split(","))
+            game.torches[(x, y)] = True
         
         # Deserialize map_data
         game.map_data = {}
@@ -753,7 +937,9 @@ class MiningView(discord.ui.LayoutView):
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
         down_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬇️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️")
+        # Enable up button only if ladder is present
+        can_go_up = self.game.can_move_up()
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=not can_go_up)
         surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⤴️", label="Surface")
         blank_btn_1 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
         blank_btn_2 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
@@ -796,9 +982,10 @@ class MiningView(discord.ui.LayoutView):
             placeholder="🎒 Inventory & Items",
             options=[
                 discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
-                discord.SelectOption(label="🔦 Torch (Coming Soon)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items.get('ladder', 0)} left)", value="ladder", description="Climb back up easily"),
+                discord.SelectOption(label=f"🔦 Place Torch ({self.game.items.get('torch', 0)} left)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label=f"🌀 Place Portal ({self.game.items.get('portal', 0)} left)", value="portal", description="Teleport waystone"),
                 discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
-                discord.SelectOption(label="🪜 Ladder (Coming Soon)", value="ladder", description="Climb back up easily"),
                 discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
             ]
         )
@@ -839,6 +1026,62 @@ class MiningView(discord.ui.LayoutView):
             return False
         return True
     
+    async def show_portal_modal(self, interaction: discord.Interaction):
+        """Show modal for portal placement"""
+        if self.game.items.get("portal", 0) <= 0:
+            await interaction.response.send_message("❌ No portals in inventory!", ephemeral=True)
+            return
+        
+        modal = discord.ui.Modal(title="Place Portal")
+        name_input = discord.ui.TextInput(
+            label="Portal Name",
+            placeholder="Enter portal name (e.g., 'Home', 'Diamond Mine')",
+            required=True,
+            max_length=30
+        )
+        modal.add_item(name_input)
+        
+        # In multiplayer, ask if public
+        if self.game.is_shared:
+            public_input = discord.ui.TextInput(
+                label="Public? (yes/no)",
+                placeholder="yes = everyone can use, no = only you",
+                required=True,
+                max_length=3
+            )
+            modal.add_item(public_input)
+        
+        async def modal_callback(modal_interaction: discord.Interaction):
+            portal_name = name_input.value
+            is_public = True  # Default for singleplayer
+            
+            if self.game.is_shared and len(modal.children) > 1:
+                public_answer = modal.children[1].value.lower()
+                is_public = public_answer in ["yes", "y", "tak", "t"]
+            
+            # Place portal
+            portal_id = f"portal_{self.game.portal_counter}"
+            self.game.portal_counter += 1
+            
+            self.game.portals[portal_id] = {
+                "name": portal_name,
+                "x": self.game.x,
+                "y": self.game.y,
+                "owner_id": self.user_id,
+                "public": is_public,
+                "linked_to": None
+            }
+            
+            self.game.items["portal"] -= 1
+            visibility = "Public" if is_public else "Private"
+            cog = modal_interaction.client.get_cog("Mining")
+            if cog:
+                cog.save_data()
+            await self.refresh(modal_interaction, f"🌀 Portal '{portal_name}' placed! ({visibility}, {self.game.items['portal']} left)")
+        
+        modal.on_submit = modal_callback
+        await interaction.response.send_modal(modal)
+    
     async def inventory_callback(self, interaction: discord.Interaction):
         """Handle inventory dropdown selection"""
         selected = interaction.data.get('values', [])
@@ -848,21 +1091,65 @@ class MiningView(discord.ui.LayoutView):
         
         action = selected[0]
         
+        # Check if teleporting to another portal
+        if action.startswith("teleport_"):
+            portal_id = action.replace("teleport_", "")
+            if portal_id in self.game.portals:
+                target_portal = self.game.portals[portal_id]
+                self.game.x = target_portal["x"]
+                self.game.y = target_portal["y"]
+                await self.refresh(interaction, f"🌀 Teleported to portal '{target_portal['name']}'!")
+            else:
+                await self.refresh(interaction, "❌ Portal not found!")
+            return
+        
         if action == "view_inv":
-            if not self.game.inventory:
+            if not self.game.inventory and not any(self.game.items.values()):
                 await interaction.response.send_message("🎒 **Inventory is empty!**", ephemeral=True)
                 return
             
-            inv_text = "🎒 **Current Inventory:**\n"
-            for block, count in self.game.inventory.items():
-                value = self.game.BLOCK_VALUES.get(block, 0)
-                inv_text += f"• {count}x {block} (${value * count})\n"
+            inv_text = "🎒 **Current Inventory:**\n\n"
             
-            total_value = sum(self.game.BLOCK_VALUES.get(b, 0) * c for b, c in self.game.inventory.items())
-            inv_text += f"\n💰 **Total Value:** {total_value} psycoins"
+            # Show blocks
+            if self.game.inventory:
+                inv_text += "**Blocks:**\n"
+                for block, count in self.game.inventory.items():
+                    value = self.game.BLOCK_VALUES.get(block, 0)
+                    inv_text += f"• {count}x {block} (${value * count})\n"
+                
+                total_value = sum(self.game.BLOCK_VALUES.get(b, 0) * c for b, c in self.game.inventory.items())
+                inv_text += f"\n💰 **Total Value:** {total_value} psycoins\n"
+            
+            # Show items
+            if any(self.game.items.values()):
+                inv_text += "\n**Items:**\n"
+                for item, count in self.game.items.items():
+                    emoji = {"ladder": "🪜", "portal": "🌀", "torch": "🔦"}.get(item, "📦")
+                    inv_text += f"• {emoji} {count}x {item}\n"
             
             await interaction.response.send_message(inv_text, ephemeral=True)
-        else:
+        
+        elif action == "ladder":
+            success, msg = self.game.place_ladder()
+            if success:
+                cog = interaction.client.get_cog("Mining")
+                if cog:
+                    cog.save_data()
+            await self.refresh(interaction, msg)
+        
+        elif action == "torch":
+            success, msg = self.game.place_torch()
+            if success:
+                cog = interaction.client.get_cog("Mining")
+                if cog:
+                    cog.save_data()
+            await self.refresh(interaction, msg)
+        
+        elif action == "portal":
+            # Show modal for portal placement
+            await self.show_portal_modal(interaction)
+        
+        elif action in ["compass", "detector"]:
             await interaction.response.send_message("⚠️ This item is coming soon!", ephemeral=True)
     
     async def toggle_reset_callback(self, interaction: discord.Interaction):
@@ -953,7 +1240,12 @@ class MiningView(discord.ui.LayoutView):
         await self.refresh(interaction, msg)
 
     async def up_callback(self, interaction: discord.Interaction):
-        """Mine and move up"""
+        """Mine and move up (requires ladder)"""
+        # Check if player can move up (needs ladder)
+        if not self.game.can_move_up():
+            await self.refresh(interaction, "⚠️ Can't move up without a ladder! Place one first.")
+            return
+        
         target_x = self.game.x
         target_y = self.game.y - 1
     
@@ -1062,7 +1354,9 @@ class MiningView(discord.ui.LayoutView):
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
         down_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬇️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️")
+        # Enable up button only if ladder is present
+        can_go_up = self.game.can_move_up()
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=not can_go_up)
         surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⤴️", label="Surface")
         blank_btn_1 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
         blank_btn_2 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
@@ -1098,16 +1392,55 @@ class MiningView(discord.ui.LayoutView):
             )
             shop_select.callback = self.shop_callback
             container_items.append(discord.ui.ActionRow(shop_select))
-
+            container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        
+        # Check if player is standing on a portal
+        standing_on_portal = False
+        for portal_id, portal_data in self.game.portals.items():
+            if portal_data["x"] == self.game.x and portal_data["y"] == self.game.y:
+                standing_on_portal = True
+                break
+        
+        # Add portal teleportation menu if standing on portal
+        if standing_on_portal:
+            portal_options = []
+            
+            # Add available portals (public + own private)
+            for portal_id, portal_data in self.game.portals.items():
+                # Skip current portal
+                if portal_data["x"] == self.game.x and portal_data["y"] == self.game.y:
+                    continue
+                
+                # Show if public or owned by player
+                if portal_data["public"] or portal_data["owner_id"] == self.user_id:
+                    visibility = "🌍" if portal_data["public"] else "🔒"
+                    portal_options.append(
+                        discord.SelectOption(
+                            label=f"{visibility} {portal_data['name']}",
+                            value=f"teleport_{portal_id}",
+                            description=f"Teleport to ({portal_data['x']}, {portal_data['y']})"
+                        )
+                    )
+            
+            # Only show portal menu if there are other portals
+            if len(portal_options) > 0:
+                portal_select = discord.ui.Select(
+                    placeholder="🌀 Portal Teleportation",
+                    options=portal_options[:25]  # Discord limit
+                )
+                portal_select.callback = self.inventory_callback
+                container_items.append(discord.ui.ActionRow(portal_select))
+                container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
         # Add inventory dropdown (always visible)
         inventory_select = discord.ui.Select(
             placeholder="🎒 Inventory & Items",
             options=[
                 discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
-                discord.SelectOption(label="🔦 Torch (Coming Soon)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items.get('ladder', 0)} left)", value="ladder", description="Climb back up easily"),
+                discord.SelectOption(label=f"🔦 Place Torch ({self.game.items.get('torch', 0)} left)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label=f"🌀 Place Portal ({self.game.items.get('portal', 0)} left)", value="portal", description="Teleport waystone"),
                 discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
-                discord.SelectOption(label="🪜 Ladder (Coming Soon)", value="ladder", description="Climb back up easily"),
                 discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
             ]
         )
@@ -1182,9 +1515,14 @@ class MiningView(discord.ui.LayoutView):
                         "last_update": datetime.utcnow().isoformat()
                     }
                     
-                    # Update world data (shared map)
+                    # Update world data (shared map and structures)
                     world_info["world_data"].map_data = self.game.map_data
                     world_info["world_data"].last_map_regen = self.game.last_map_regen
+                    world_info["world_data"].ladders = self.game.ladders
+                    world_info["world_data"].torches = self.game.torches
+                    world_info["world_data"].portals = self.game.portals
+                    world_info["world_data"].portal_counter = self.game.portal_counter
+                    world_info["world_data"].items = self.game.items
                     
                     # Refresh other players positions for next render
                     self.game.other_players = {}
@@ -1216,7 +1554,7 @@ class OwnerMiningView(discord.ui.LayoutView):
         self.bot = bot
         self.message = None
         self.map_file = None
-        self.dev_menu_state = "main"  # Track submenu state: main, teleport, place_blocks
+        self.dev_menu_state = "main"  # Track submenu state: main, teleport, place_blocks, items
         super().__init__(timeout=300)
     
     @classmethod
@@ -1242,7 +1580,7 @@ class OwnerMiningView(discord.ui.LayoutView):
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
         down_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬇️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️")
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=True)
         surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⤴️", label="Surface")
         blank_btn_1 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
         blank_btn_2 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
@@ -1275,11 +1613,22 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="🗑️ Clear Area (5x5)", value="cleararea", description="Clear 5x5 area around you"),
                     discord.SelectOption(label="📍 Teleport Menu", value="teleport_menu", description="Teleport to depths or players"),
                     discord.SelectOption(label="🧱 Place Blocks Menu", value="place_menu", description="Place any block type"),
+                    discord.SelectOption(label="📦 Items Menu", value="items_menu", description="Spawn items (ladder/torch/portal)"),
                     discord.SelectOption(label="📥 Force Map Reset", value="forcereset", description="Regenerate entire map now"),
                     discord.SelectOption(label="🌱 Change Seed", value="customseed", description="Enter custom world seed"),
-                    discord.SelectOption(label="� Spawn Rare Items", value="spawnitems", description="Add valuable items"),
+                    discord.SelectOption(label="💎 Spawn Rare Items", value="spawnitems", description="Add valuable items"),
                     discord.SelectOption(label="💰 Max All Upgrades", value="maxupgrades", description="Max pickaxe/backpack/energy"),
-                    discord.SelectOption(label="🗺️ World Info", value="mapinfo", description="View map details"),
+                ]
+            )
+        elif self.dev_menu_state == "items":
+            # Items submenu
+            dev_select = discord.ui.Select(
+                placeholder="📦 Spawn Items",
+                options=[
+                    discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                    discord.SelectOption(label="🪜 Add Ladders", value="spawn_ladder", description=f"Current: {self.game.items.get('ladder', 0)}"),
+                    discord.SelectOption(label="🔦 Add Torches", value="spawn_torch", description=f"Current: {self.game.items.get('torch', 0)}"),
+                    discord.SelectOption(label="🌀 Add Portals", value="spawn_portal", description=f"Current: {self.game.items.get('portal', 0)}"),
                 ]
             )
         elif self.dev_menu_state == "teleport":
@@ -1359,9 +1708,10 @@ class OwnerMiningView(discord.ui.LayoutView):
             placeholder="🎒 Inventory & Items",
             options=[
                 discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
-                discord.SelectOption(label="🔦 Torch (Coming Soon)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items.get('ladder', 0)} left)", value="ladder", description="Climb back up easily"),
+                discord.SelectOption(label=f"🔦 Place Torch ({self.game.items.get('torch', 0)} left)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label=f"🌀 Place Portal ({self.game.items.get('portal', 0)} left)", value="portal", description="Teleport waystone"),
                 discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
-                discord.SelectOption(label="🪜 Ladder (Coming Soon)", value="ladder", description="Climb back up easily"),
                 discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
             ]
         )
@@ -1408,6 +1758,132 @@ class OwnerMiningView(discord.ui.LayoutView):
         status = "ENABLED" if self.game.auto_reset_enabled else "DISABLED"
         await self.refresh(interaction, f"🔄 Auto-Reset {status}! Map will {'reset' if self.game.auto_reset_enabled else 'NOT reset'} after 12h.")
     
+    async def show_portal_modal(self, interaction: discord.Interaction):
+        """Show modal for portal placement"""
+        if self.game.items.get("portal", 0) <= 0:
+            await interaction.response.send_message("❌ No portals in inventory!", ephemeral=True)
+            return
+        
+        modal = discord.ui.Modal(title="Place Portal")
+        name_input = discord.ui.TextInput(
+            label="Portal Name",
+            placeholder="Enter portal name (e.g., 'Home', 'Diamond Mine')",
+            required=True,
+            max_length=30
+        )
+        modal.add_item(name_input)
+        
+        # In multiplayer, ask if public
+        if self.game.is_shared:
+            public_input = discord.ui.TextInput(
+                label="Public? (yes/no)",
+                placeholder="yes = everyone can use, no = only you",
+                required=True,
+                max_length=3
+            )
+            modal.add_item(public_input)
+        
+        async def modal_callback(modal_interaction: discord.Interaction):
+            portal_name = name_input.value
+            is_public = True  # Default for singleplayer
+            
+            if self.game.is_shared and len(modal.children) > 1:
+                public_answer = modal.children[1].value.lower()
+                is_public = public_answer in ["yes", "y", "tak", "t"]
+            
+            # Place portal
+            portal_id = f"portal_{self.game.portal_counter}"
+            self.game.portal_counter += 1
+            
+            self.game.portals[portal_id] = {
+                "name": portal_name,
+                "x": self.game.x,
+                "y": self.game.y,
+                "owner_id": self.user_id,
+                "public": is_public,
+                "linked_to": None
+            }
+            
+            self.game.items["portal"] -= 1
+            visibility = "Public" if is_public else "Private"
+            cog = modal_interaction.client.get_cog("Mining")
+            if cog:
+                cog.save_data()
+            await self.refresh(modal_interaction, f"🌀 Portal '{portal_name}' placed! ({visibility}, {self.game.items['portal']} left)")
+        
+        modal.on_submit = modal_callback
+        await interaction.response.send_modal(modal)
+    
+    async def inventory_callback(self, interaction: discord.Interaction):
+        """Handle inventory dropdown selection in OwnerMiningView"""
+        selected = interaction.data.get('values', [])
+        if not selected:
+            await interaction.response.defer()
+            return
+        
+        action = selected[0]
+        
+        # Check if teleporting to another portal
+        if action.startswith("teleport_"):
+            portal_id = action.replace("teleport_", "")
+            if portal_id in self.game.portals:
+                target_portal = self.game.portals[portal_id]
+                self.game.x = target_portal["x"]
+                self.game.y = target_portal["y"]
+                await self.refresh(interaction, f"🌀 Teleported to portal '{target_portal['name']}'!")
+            else:
+                await self.refresh(interaction, "❌ Portal not found!")
+            return
+        
+        if action == "view_inv":
+            if not self.game.inventory and not any(self.game.items.values()):
+                await interaction.response.send_message("🎒 **Inventory is empty!**", ephemeral=True)
+                return
+            
+            inv_text = "🎒 **Current Inventory:**\n\n"
+            
+            # Show blocks
+            if self.game.inventory:
+                inv_text += "**Blocks:**\n"
+                for block, count in self.game.inventory.items():
+                    value = self.game.BLOCK_VALUES.get(block, 0)
+                    inv_text += f"• {count}x {block} (${value * count})\n"
+                
+                total_value = sum(self.game.BLOCK_VALUES.get(b, 0) * c for b, c in self.game.inventory.items())
+                inv_text += f"\n💰 **Total Value:** {total_value} psycoins\n"
+            
+            # Show items
+            if any(self.game.items.values()):
+                inv_text += "\n**Items:**\n"
+                for item, count in self.game.items.items():
+                    emoji = {"ladder": "🪜", "portal": "🌀", "torch": "🔦"}.get(item, "📦")
+                    inv_text += f"• {emoji} {count}x {item}\n"
+            
+            await interaction.response.send_message(inv_text, ephemeral=True)
+        
+        elif action == "ladder":
+            success, msg = self.game.place_ladder()
+            if success:
+                cog = interaction.client.get_cog("Mining")
+                if cog:
+                    cog.save_data()
+            await self.refresh(interaction, msg)
+        
+        elif action == "torch":
+            success, msg = self.game.place_torch()
+            if success:
+                cog = interaction.client.get_cog("Mining")
+                if cog:
+                    cog.save_data()
+            await self.refresh(interaction, msg)
+        
+        elif action == "portal":
+            # Show modal for portal placement
+            await self.show_portal_modal(interaction)
+        
+        elif action in ["compass", "detector"]:
+            await interaction.response.send_message("⚠️ This item is coming soon!", ephemeral=True)
+    
     async def dev_menu_callback(self, interaction: discord.Interaction):
         """Handle developer menu selection"""
         selected = interaction.data.get('values', [])
@@ -1431,6 +1907,11 @@ class OwnerMiningView(discord.ui.LayoutView):
         elif action == "place_menu":
             self.dev_menu_state = "place_blocks"
             await self.refresh(interaction, "🧱 **Place Blocks Menu** - Select block to place")
+            return
+        
+        elif action == "items_menu":
+            self.dev_menu_state = "items"
+            await self.refresh(interaction, "📦 **Items Menu** - Select item to spawn")
             return
         
         # Main menu actions
@@ -1495,6 +1976,43 @@ class OwnerMiningView(discord.ui.LayoutView):
             modal.on_submit = modal_callback
             await interaction.response.send_modal(modal)
             return
+        
+        # Items spawning actions
+        elif action.startswith("spawn_"):
+            item_type = action.replace("spawn_", "")
+            if item_type in ["ladder", "torch", "portal"]:
+                # Show modal for quantity input
+                modal = discord.ui.Modal(title=f"Add {item_type.title()}s")
+                quantity_input = discord.ui.TextInput(
+                    label="Quantity",
+                    placeholder=f"How many {item_type}s? (e.g., 10)",
+                    required=True,
+                    max_length=5
+                )
+                modal.add_item(quantity_input)
+                
+                async def item_modal_callback(modal_interaction: discord.Interaction):
+                    try:
+                        quantity = int(quantity_input.value)
+                        if quantity < 1:
+                            await self.refresh(modal_interaction, "❌ Quantity must be at least 1!")
+                            return
+                        if quantity > 9999:
+                            await self.refresh(modal_interaction, "❌ Maximum quantity is 9999!")
+                            return
+                        
+                        self.game.items[item_type] = self.game.items.get(item_type, 0) + quantity
+                        emoji = {"ladder": "🪜", "torch": "🔦", "portal": "🌀"}.get(item_type, "📦")
+                        cog = modal_interaction.client.get_cog("Mining")
+                        if cog:
+                            cog.save_data()
+                        await self.refresh(modal_interaction, f"{emoji} Added {quantity}x {item_type}! Total: {self.game.items[item_type]}")
+                    except ValueError:
+                        await self.refresh(modal_interaction, "❌ Invalid quantity! Please enter a number.")
+                
+                modal.on_submit = item_modal_callback
+                await interaction.response.send_modal(modal)
+                return
         
         # Teleport actions
         elif action.startswith("tp_player_"):
@@ -1585,33 +2103,6 @@ class OwnerMiningView(discord.ui.LayoutView):
                 f"• **Infinite Backpack:** {'ON' if self.game.infinite_backpack else 'OFF'}"
             )
             await self.refresh(interaction, info)
-    
-    # Copy all callback methods from MiningView
-    async def inventory_callback(self, interaction: discord.Interaction):
-        """Handle inventory dropdown selection"""
-        selected = interaction.data.get('values', [])
-        if not selected:
-            await interaction.response.defer()
-            return
-        
-        action = selected[0]
-        
-        if action == "view_inv":
-            if not self.game.inventory:
-                await interaction.response.send_message("🎒 **Inventory is empty!**", ephemeral=True)
-                return
-            
-            inv_text = "🎒 **Current Inventory:**\n"
-            for block, count in self.game.inventory.items():
-                value = self.game.BLOCK_VALUES.get(block, 0)
-                inv_text += f"• {count}x {block} (${value * count})\n"
-            
-            total_value = sum(self.game.BLOCK_VALUES.get(b, 0) * c for b, c in self.game.inventory.items())
-            inv_text += f"\n💰 **Total Value:** {total_value} psycoins"
-            
-            await interaction.response.send_message(inv_text, ephemeral=True)
-        else:
-            await interaction.response.send_message("⚠️ This item is coming soon!", ephemeral=True)
     
     async def shop_callback(self, interaction: discord.Interaction):
         """Handle shop dropdown selection"""
@@ -1792,7 +2283,9 @@ class OwnerMiningView(discord.ui.LayoutView):
         left_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬅️")
         down_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬇️")
         right_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="➡️")
-        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️")
+        # Enable up button only if ladder is present
+        can_go_up = self.game.can_move_up()
+        up_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="⬆️", disabled=not can_go_up)
         surface_btn = discord.ui.Button(style=discord.ButtonStyle.primary, emoji="⤴️", label="Surface")
         blank_btn_1 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
         blank_btn_2 = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="<:space:1468655364982702294>", disabled=True)
@@ -1824,11 +2317,23 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="🗑️ Clear Area (5x5)", value="cleararea", description="Clear 5x5 area around you"),
                     discord.SelectOption(label="📍 Teleport Menu", value="teleport_menu", description="Teleport to depths or players"),
                     discord.SelectOption(label="🧱 Place Blocks Menu", value="place_menu", description="Place any block type"),
+                    discord.SelectOption(label="📦 Items Menu", value="items_menu", description="Spawn items (ladder/torch/portal)"),
                     discord.SelectOption(label="🔄 Force Map Reset", value="forcereset", description="Regenerate entire map now"),
                     discord.SelectOption(label="🌱 Change Seed", value="customseed", description="Enter custom world seed"),
                     discord.SelectOption(label="💎 Spawn Rare Items", value="spawnitems", description="Add valuable items"),
                     discord.SelectOption(label="💰 Max All Upgrades", value="maxupgrades", description="Max pickaxe/backpack/energy"),
                     discord.SelectOption(label="🗺️ World Info", value="mapinfo", description="View map details"),
+                ]
+            )
+        elif self.dev_menu_state == "items":
+            # Items submenu
+            dev_select = discord.ui.Select(
+                placeholder="📦 Spawn Items",
+                options=[
+                    discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                    discord.SelectOption(label="🪜 Add Ladders", value="spawn_ladder", description=f"Current: {self.game.items.get('ladder', 0)}"),
+                    discord.SelectOption(label="🔦 Add Torches", value="spawn_torch", description=f"Current: {self.game.items.get('torch', 0)}"),
+                    discord.SelectOption(label="🌀 Add Portals", value="spawn_portal", description=f"Current: {self.game.items.get('portal', 0)}"),
                 ]
             )
         elif self.dev_menu_state == "teleport":
@@ -1902,13 +2407,53 @@ class OwnerMiningView(discord.ui.LayoutView):
             container_items.append(discord.ui.ActionRow(shop_select))
             container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
+        # Check if player is standing on a portal
+        standing_on_portal = False
+        for portal_id, portal_data in self.game.portals.items():
+            if portal_data["x"] == self.game.x and portal_data["y"] == self.game.y:
+                standing_on_portal = True
+                break
+        
+        # Add portal teleportation menu if standing on portal
+        if standing_on_portal:
+            portal_options = []
+            
+            # Add available portals (public + own private)
+            for portal_id, portal_data in self.game.portals.items():
+                # Skip current portal
+                if portal_data["x"] == self.game.x and portal_data["y"] == self.game.y:
+                    continue
+                
+                # Show if public or owned by player
+                if portal_data["public"] or portal_data["owner_id"] == self.user_id:
+                    visibility = "🌍" if portal_data["public"] else "🔒"
+                    portal_options.append(
+                        discord.SelectOption(
+                            label=f"{visibility} {portal_data['name']}",
+                            value=f"teleport_{portal_id}",
+                            description=f"Teleport to ({portal_data['x']}, {portal_data['y']})"
+                        )
+                    )
+            
+            # Only show portal menu if there are other portals
+            if len(portal_options) > 0:
+                portal_select = discord.ui.Select(
+                    placeholder="🌀 Portal Teleportation",
+                    options=portal_options[:25]  # Discord limit
+                )
+                portal_select.callback = self.inventory_callback
+                container_items.append(discord.ui.ActionRow(portal_select))
+                container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        
+        # Add inventory dropdown (always visible)
         inventory_select = discord.ui.Select(
             placeholder="🎒 Inventory & Items",
             options=[
                 discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
-                discord.SelectOption(label="🔦 Torch (Coming Soon)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items.get('ladder', 0)} left)", value="ladder", description="Climb back up easily"),
+                discord.SelectOption(label=f"🔦 Place Torch ({self.game.items.get('torch', 0)} left)", value="torch", description="Light up dark caves"),
+                discord.SelectOption(label=f"🌀 Place Portal ({self.game.items.get('portal', 0)} left)", value="portal", description="Teleport waystone"),
                 discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
-                discord.SelectOption(label="🪜 Ladder (Coming Soon)", value="ladder", description="Climb back up easily"),
                 discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
             ]
         )
@@ -1977,8 +2522,14 @@ class OwnerMiningView(discord.ui.LayoutView):
                         "last_update": datetime.utcnow().isoformat()
                     }
                     
+                    # Synchronize world data and structures
                     world_info["world_data"].map_data = self.game.map_data
                     world_info["world_data"].last_map_regen = self.game.last_map_regen
+                    world_info["world_data"].ladders = self.game.ladders
+                    world_info["world_data"].torches = self.game.torches
+                    world_info["world_data"].portals = self.game.portals
+                    world_info["world_data"].portal_counter = self.game.portal_counter
+                    world_info["world_data"].items = self.game.items
                     
                     self.game.other_players = {}
                     for other_user_id, other_data in world_info["players"].items():
@@ -2117,6 +2668,13 @@ class Mining(commands.Cog):
             game = MiningGame(user_id=user_id, seed=world_game.seed, guild_id=guild_id, is_shared=True)
             game.map_data = world_game.map_data  # Share the world map
             game.last_map_regen = world_game.last_map_regen
+            
+            # Share world structures (ladders, torches, portals)
+            game.ladders = world_game.ladders
+            game.torches = world_game.torches
+            game.portals = world_game.portals
+            game.portal_counter = world_game.portal_counter
+            game.items = world_game.items
             
             # Load player-specific data
             game.x = player_data["x"]
