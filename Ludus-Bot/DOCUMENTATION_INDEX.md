@@ -119,10 +119,54 @@ Complete analysis of lottery.py, heist.py (815 lines total):
   - Business protection system integration
 - **~12,000 words of documentation**
 
+#### **[🃏 PART 5A: Card Games](documentation/FULL_DOCUMENTATION_PART5A.md)** 
+Complete analysis of cardgames.py, cards_enhanced.py (1,014 lines total):
+- **Classic Card Games (cardgames.py - 733 lines):**
+  - Go Fish (vs bot or player, book completion, DM-based hands)
+  - Blackjack (vs dealer, ace handling, hit/stand mechanics)
+  - War (instant high-card comparison)
+  - Turn-based multiplayer support with bot AI
+  - State management per player
+- **Enhanced Card Games (cards_enhanced.py - 283 lines):**
+  - Solitaire (interactive button UI, tableau/stock/waste/foundations)
+  - Spades (4-player trick-taking team game)
+  - Crazy Eights (match suits/ranks, 8s are wild)
+  - Bullshit (bluffing game with challenge system)
+  - Ephemeral messages for privacy
+  - Interactive Discord UI (buttons, dropdowns)
+- **7 total card games** (4 fully implemented, 3 with lobby systems)
+- **~8,000 words of documentation**
+
+#### **[♟️ PART 5B: Board Games & UNO System](documentation/FULL_DOCUMENTATION_PART5B.md)**
+Complete analysis of boardgames.py, boardgames_enhanced.py, chess_checkers.py, uno/ (11,138 lines total - **LARGEST PART**):
+- **Board Games (4,141 lines):**
+  - **Tic-Tac-Toe:** Minimax AI (unbeatable 3x3), 3x3/4x4/5x5 boards, Disappearing Symbols mode, lobby system, rematch
+  - **Connect 4:** 6x7 grid, strategic AI (win/block/center), gravity physics
+  - **Hangman:** 8 categories, hint system (penalty), 6 wrong guesses, ASCII art
+  - **Scrabble:** 15x15 board, 100-tile bag, letter values, word validation, DM privacy
+  - **Backgammon:** Traditional 24-point board, dice rolling, bear-off mechanics
+  - **Tetris:** 7 piece types, rotation, line clearing, level progression, interactive controls
+  - **Chess:** Python-chess library, PIL rendering, 6 themes, modal moves, bot AI, draw offers, resign
+  - **Checkers:** 8x8 board, PIL rendering, kings, multi-jump, bot AI, move notation (3b-4c)
+- **UNO System (6,997 lines - 63% of Part 5B):**
+  - **Classic UNO (5,506 lines - LARGEST SINGLE FILE):** 2-10 players, bot AI with owner names, 19+ settings, multilingual (EN/PL)
+  - **UNO Flip (355 lines):** Light/Dark sides, Flip mechanic, Skip Everyone, +5, Wild Draw Color
+  - **UNO No Mercy (167 lines):** 168 cards, Colored +4, Skip Everyone, Discard All, Wild +6/+10, Color Roulette
+  - **UNO No Mercy+ (303 lines):** Expansion pack, 10's Play Again, Wild Discard All, Reverse Draw 8, Final Attack, Sudden Death
+  - **uno_logic.py (657 lines):** Shared deck/validation, custom emoji mapping (JSON), translation system (uno_translations.json), PNG asset loading
+- **Technical Features:**
+  - Minimax AI with alpha-beta pruning (Tic-Tac-Toe)
+  - PIL board rendering (chess, checkers)
+  - Interactive Discord UI (modals, buttons, dropdowns)
+  - Multi-language support (EN/PL)
+  - Custom emoji system with JSON mapping
+  - Lobby systems with extensive settings
+  - Bot opponents with strategic AI
+- **8 board games + 4 UNO variants = 12 total games**
+- **~30,000 words of documentation**
 
 ---
 
-- **PART 5: Board & Card Games** (Chess, Checkers, UNO, Poker)
 - **PART 6: Multiplayer Games** (Mafia, Werewolf, Among Us style)
 - **PART 7: Minigames** (100+ mini-games)
 - **PART 8: RPG Systems** (D&D, Wizard Wars, Quests)

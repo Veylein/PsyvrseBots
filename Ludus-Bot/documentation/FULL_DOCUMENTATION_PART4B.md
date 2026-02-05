@@ -1500,8 +1500,3 @@ Net Profit
 - High-risk/high-reward gameplay
 - Encourages cooperation and social interaction
 
-**Next Part:** Part 5 will cover Board & Card Games (Chess, Checkers, UNO, Poker, etc.)
-
----
-
-*End of Part 4B Documentation*
