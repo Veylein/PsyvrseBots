@@ -10,6 +10,7 @@ import constants
 import logging
 import logging.handlers
 from pathlib import Path
+import ludus_logging
 
 dotenv.load_dotenv()
 # Configure logging to file+console. If Render provides a disk path, use it.
@@ -83,6 +84,12 @@ bot = commands.Bot(
     description="🎮 The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with ❤️ by Psyvrse Development."
 )
 
+# Initialize Discord log forwarding helper (sends detailed logs to LOG_CHANNEL)
+try:
+    ludus_logging.init(bot)
+except Exception:
+    pass
+
 # Initialize game state storage for UNO and other games
 bot.active_games = {}
 bot.active_lobbies = {}
@@ -144,6 +151,10 @@ async def setup_hook():
     except Exception as e:
         print(f"[BOT] Failed to load UNO emoji: {e}")
         traceback.print_exc()
+        try:
+            ludus_logging.log_exception(e, message="Failed to load UNO emoji during setup_hook")
+        except Exception:
+            pass
     
     # Now load all cogs
     await load_cogs()
@@ -184,8 +195,12 @@ async def load_cogs():
             await bot.load_extension(f"cogs.{cog_name}")
             print(f"Loaded cog: {cog_name}")
         except Exception as e:
-            print(f"Failed to load cog {cog_name}: {e}")
-            traceback.print_exc()
+                print(f"Failed to load cog {cog_name}: {e}")
+                traceback.print_exc()
+                try:
+                    ludus_logging.log_exception(e, message=f"Failed to load cog {cog_name}")
+                except Exception:
+                    pass
 
 @bot.event
 async def on_ready():
@@ -250,6 +265,10 @@ async def on_ready():
     except Exception as e:
         print(f"[BOT] Error syncing commands: {e}")
         traceback.print_exc()
+        try:
+            ludus_logging.log_exception(e, message="Error syncing commands")
+        except Exception:
+            pass
 
 def load_blacklist():
     """Load blacklist data"""
@@ -317,6 +336,10 @@ async def on_command_error(ctx, error):
         await ctx.send(f"❌ I'm missing permissions: {', '.join(error.missing_permissions)}")
     else:
         # Log error but show clean message to users
+        try:
+            ludus_logging.log_exception(error, ctx=ctx, message=f"Command error in {ctx.command}")
+        except Exception:
+            pass
         print(f"[BOT] Command error in {ctx.command}: {error}")
         traceback.print_exception(type(error), error, error.__traceback__)
         await ctx.send("❌ An error occurred. Please try again or contact a server administrator.")
@@ -469,6 +492,10 @@ async def on_interaction(interaction: discord.Interaction):
     except Exception as e:
         logger.exception("Error handling interaction: %s", e)
         try:
+            ludus_logging.log_exception(e, interaction=interaction, message="Error handling interaction")
+        except Exception:
+            pass
+        try:
             if not interaction.response.is_done():
                 await interaction.response.send_message("❌ An error occurred processing your interaction.", ephemeral=True)
         except:
@@ -480,6 +507,10 @@ async def on_error(event_method, *args, **kwargs):
     """Global fallback for uncaught errors in events."""
     try:
         logger.exception("Unhandled error in event %s", event_method)
+        try:
+            ludus_logging.log_message(level="ERROR", title="Unhandled event error", message=f"Event: {event_method}")
+        except Exception:
+            pass
     except Exception:
         print("Unhandled error in event", event_method)
 
