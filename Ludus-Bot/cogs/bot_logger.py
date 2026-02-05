@@ -4,9 +4,24 @@ import traceback
 from datetime import datetime, timezone
 import asyncio
 import aiohttp
+import queue
+import io
 import sys
 import json
 from typing import Optional, List, Dict, Any
+
+class StreamInterceptor(io.TextIOBase):
+    def __init__(self, buffer: queue.Queue, stream_name: str):
+        self.buffer = buffer
+        self.stream_name = stream_name
+
+    def write(self, message: str):
+        if message.strip():
+            self.buffer.put((self.stream_name, message))
+        return len(message)
+
+    def flush(self):
+        pass
 
 class BotLogger(commands.Cog):
     """Comprehensive logging system for all bot activities"""
@@ -14,6 +29,44 @@ class BotLogger(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.log_channel_id = 1442605619835179127
+        self.console_channel_id = 1468974282418950177
+        self.console_queue = queue.Queue()
+        self._stdout = sys.stdout
+        self._stderr = sys.stderr
+
+    async def start_console_capture(self):
+        sys.stdout = StreamInterceptor(self.console_queue, "STDOUT")
+        sys.stderr = StreamInterceptor(self.console_queue, "STDERR")
+        self.console_task = asyncio.create_task(self.console_worker())
+
+    async def stop_console_capture(self):
+        sys.stdout = self._stdout
+        sys.stderr = self._stderr
+        if hasattr(self, "console_task"):
+            self.console_task.cancel()
+
+    async def console_worker(self):
+        await self.bot.wait_until_ready()
+        channel = self.bot.get_channel(self.console_channel_id) or await self.bot.fetch_channel(self.console_channel_id)
+
+        while True:
+            try:
+                stream, message = await asyncio.get_running_loop().run_in_executor(
+                    None, self.console_queue.get
+                )
+
+                content = message.strip()
+                if len(content) > 1900:
+                    content = content[:1900] + "\n... (truncated)"
+
+                await channel.send(
+                    f"**{stream}**\n```text\n{content}\n```"
+                )
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                self._stderr.write(str(e) + "\n")
 
     async def get_log_channel(self):
         """Get the logging channel"""
@@ -441,6 +494,10 @@ class BotLogger(commands.Cog):
                 "WEBSOCKET EVENT",
                 f"📡 **Event:** {event_type}"
             )
+
+    @commands.Cog.listener()
+    async def on_close(self):
+        await self.stop_console_capture()
 
 async def setup(bot):
     await bot.add_cog(BotLogger(bot))
