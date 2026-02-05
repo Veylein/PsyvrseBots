@@ -11,17 +11,24 @@ import json
 from typing import Optional, List, Dict, Any        
 
 class StreamInterceptor(io.TextIOBase):
-    def __init__(self, buffer: queue.Queue, stream_name: str):
+    def __init__(self, buffer: queue.Queue, stream_name: str, original_stream):
         self.buffer = buffer
         self.stream_name = stream_name
+        self.original_stream = original_stream
 
     def write(self, message: str):
+        # Write to BOTH original console AND queue for Discord
+        if self.original_stream:
+            self.original_stream.write(message)
+            self.original_stream.flush()
+        
         if message.strip():
             self.buffer.put((self.stream_name, message))
         return len(message)
 
     def flush(self):
-        pass
+        if self.original_stream:
+            self.original_stream.flush()
 
 class BotLogger(commands.Cog):
     """Comprehensive logging system for all bot activities"""
@@ -35,8 +42,8 @@ class BotLogger(commands.Cog):
         self._stderr = sys.stderr
 
     async def start_console_capture(self):
-        sys.stdout = StreamInterceptor(self.console_queue, "STDOUT")
-        sys.stderr = StreamInterceptor(self.console_queue, "STDERR")
+        sys.stdout = StreamInterceptor(self.console_queue, "STDOUT", self._stdout)
+        sys.stderr = StreamInterceptor(self.console_queue, "STDERR", self._stderr)
         self.console_task = asyncio.create_task(self.console_worker())
 
     async def stop_console_capture(self):
