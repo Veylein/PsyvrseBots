@@ -75,7 +75,7 @@ class BotLogger(commands.Cog):
             if not channel:
                 channel = await self.bot.fetch_channel(self.log_channel_id)
             return channel
-        except():
+        except Exception:
             return None
 
     async def log(

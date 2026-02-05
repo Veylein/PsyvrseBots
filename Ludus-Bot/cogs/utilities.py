@@ -103,8 +103,8 @@ class Utilities(commands.Cog):
                 with open(self.reminders_file, 'r') as f:
                     return json.load(f)
             except Exception:
-                return []
-        return []
+                return {}
+        return {}
     
     def save_reminders(self):
         """Save reminders to JSON"""
