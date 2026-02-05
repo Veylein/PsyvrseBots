@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import json
 import os
+import sys
 from typing import Optional, Literal
 import random
 import asyncio
@@ -338,6 +339,61 @@ class Owner(commands.Cog):
                     inline=False,
                 )
             await ctx.send(embed=embed)
+
+    @commands.command(name="restart")
+    async def restart(self, ctx, *, reason: Optional[str] = None):
+        """Owner-only: Restart the bot process.
+
+        Usage: L!restart [reason]
+        """
+        if getattr(ctx, 'author', None) and ctx.author.id not in self.owner_ids:
+            return await ctx.send("❌ You must be a bot owner to use this command!")
+
+        try:
+            await ctx.send("🔁 Restarting bot now...")
+        except Exception:
+            pass
+
+        # Attempt graceful shutdown then re-exec the process
+        try:
+            await self.bot.close()
+        except Exception:
+            pass
+
+        try:
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception as e:
+            # If execv fails, force exit and rely on process manager
+            try:
+                print(f"[OWNER COG] Restart exec failed: {e}")
+            except Exception:
+                pass
+            os._exit(0)
+
+    @commands.command(name="leave")
+    async def leave(self, ctx, guild_id: Optional[int] = None):
+        """Owner-only: Make the bot leave a guild.
+
+        Usage: L!leave [guild_id]
+        If no guild_id is provided, leaves the current guild.
+        """
+        if getattr(ctx, 'author', None) and ctx.author.id not in self.owner_ids:
+            return await ctx.send("❌ You must be a bot owner to use this command!")
+
+        target_guild = None
+        if guild_id:
+            target_guild = self.bot.get_guild(int(guild_id))
+        else:
+            target_guild = ctx.guild
+
+        if not target_guild:
+            return await ctx.send("❌ Guild not found.")
+
+        try:
+            await target_guild.leave()
+            await ctx.send(f"✅ Left guild: {target_guild.name} ({target_guild.id})")
+        except Exception as e:
+            await ctx.send(f"❌ Failed to leave guild: {e}")
     
     # ==================== ECONOMY MANAGEMENT ====================
 

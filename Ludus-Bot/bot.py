@@ -7,8 +7,37 @@ import asyncio
 import traceback
 import dotenv
 import constants
+import logging
+import logging.handlers
+from pathlib import Path
 
 dotenv.load_dotenv()
+# Configure logging to file+console. If Render provides a disk path, use it.
+LOG_DIR = Path(os.getenv("RENDER_DISK_PATH", ".")) / "logs"
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+log_file = LOG_DIR / "ludus.log"
+handler = logging.handlers.RotatingFileHandler(str(log_file), maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8")
+formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+handler.setFormatter(formatter)
+logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(), handler])
+logger = logging.getLogger("ludus")
+
+# Ensure asyncio unhandled exceptions are routed to our logger
+def handle_asyncio_exception(loop, context):
+    err = context.get("exception") or context.get("message")
+    try:
+        logger.exception("Unhandled async exception: %s", err)
+    except Exception:
+        print("Unhandled async exception:", err)
+
+try:
+    loop = asyncio.get_event_loop()
+    loop.set_exception_handler(handle_asyncio_exception)
+except Exception:
+    pass
 if not os.environ.get("LUDUS_TOKEN"):
         print("LUDUS_TOKEN not set!")
         sys.exit(1)
@@ -438,14 +467,21 @@ async def on_interaction(interaction: discord.Interaction):
         # Add other game handlers here as needed
         
     except Exception as e:
-        print(f"[BOT] Error handling interaction: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error handling interaction: %s", e)
         try:
             if not interaction.response.is_done():
                 await interaction.response.send_message("❌ An error occurred processing your interaction.", ephemeral=True)
         except:
             pass
+
+
+@bot.event
+async def on_error(event_method, *args, **kwargs):
+    """Global fallback for uncaught errors in events."""
+    try:
+        logger.exception("Unhandled error in event %s", event_method)
+    except Exception:
+        print("Unhandled error in event", event_method)
 
 # Blacklist checking
 def is_blacklisted(user_id=None, guild_id=None):
@@ -466,7 +502,9 @@ async def main():
     try:
         await bot.start(token)
     except discord.errors.LoginFailure:
-        print("ERROR: Invalid Discord token!")
+        logger.error("Invalid Discord token provided")
+    except Exception as e:
+        logger.exception("Bot stopped with exception: %s", e)
 
 # --- FIXED: Removed duplicate config reload (it served no purpose) ---
 

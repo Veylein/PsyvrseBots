@@ -1,0 +1,105 @@
+{
+  "user_id": 0,
+  "username": "example#0000",
+  "discriminator": "0000",
+  "created_at": "2026-02-02T00:00:00Z",
+  "last_seen": null,
+
+  "wallet": {
+    "psycoins": 0,
+    "bank": 0
+  },
+
+  "economy": {
+    "total_earned": 0,
+    "total_spent": 0,
+    "transactions": []
+  },
+
+  "minigames": {
+    "total_played": 0,
+    "wins": 0,
+    "losses": 0,
+    "draws": 0,
+    "total_coins_earned": 0,
+    "by_game": {
+      "__template__": {
+        "played": 0,
+        "wins": 0,
+        "losses": 0,
+        "draws": 0,
+        "last_played": null,
+        "total_coins": 0,
+        "history": []
+      }
+    },
+    "recent_plays": []
+  },
+
+  "fishing": {
+    "total_fished": 0,
+    "best_fish": null,
+    "areas_visited": {},
+    "last_fish_time": null
+  },
+
+  "pets": {
+    "owned": [],
+    "active_pet_id": null,
+    "pet_stats": {
+      "__template__": {
+        "pet_id": "",
+        "name": "",
+        "species": "",
+        "level": 1,
+        "xp": 0,
+        "hunger": 100,
+        "happiness": 100,
+        "last_fed": null,
+        "last_played": null
+      }
+    }
+  },
+
+  "inventory": {
+    "items": [],
+    "materials": {}
+  },
+
+  "quests": {
+    "active": [],
+    "completed": []
+  },
+
+  "achievements": [],
+
+  "progression": {
+    "xp": 0,
+    "level": 1,
+    "rank_points": 0
+  },
+
+  "social": {
+    "reputation": 0,
+    "friends": [],
+    "blocks": []
+  },
+
+  "moderation": {
+    "is_flagged": false,
+    "cheat_flags": 0,
+    "notes": [],
+    "last_flagged_at": null
+  },
+
+  "preferences": {
+    "dms_enabled": true,
+    "notify_on_win": true,
+    "locale": "en-US"
+  },
+
+  "meta": {
+    "template_version": 1,
+    "updated_at": null
+  }
+}

@@ -7,7 +7,12 @@ import sys
 from datetime import datetime
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = ROOT / "data"
+# If running on Render or similar, prefer the persistent disk path set in env
+RENDER_DISK = os.getenv("RENDER_DISK_PATH")
+if RENDER_DISK:
+    DATA_DIR = Path(RENDER_DISK)
+else:
+    DATA_DIR = ROOT / "data"
 TEMPLATE_FILE = DATA_DIR / "user_template.json"
 USERS_DIR = DATA_DIR / "users"
 USERS_DIR.mkdir(parents=True, exist_ok=True)
