@@ -8,7 +8,7 @@ import queue
 import io
 import sys
 import json
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any        
 
 class StreamInterceptor(io.TextIOBase):
     def __init__(self, buffer: queue.Queue, stream_name: str):
@@ -349,6 +349,7 @@ class BotLogger(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """Log bot startup"""
+        await self.start_console_capture()
         await self.log_bot_event(
             "STARTUP",
             f"**Bot is online!**\n"
