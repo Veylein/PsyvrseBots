@@ -25,6 +25,7 @@ const {
   PSYVERSE_TOKEN,
   LOG_CHANNEL,
   RENDER_WEBHOOK_SECRET,
+  DISCORD_WEBHOOK_URL,
   RENDER_API_KEY,
   PORT = 3000,
   FAILURE_ROLE_ID,
@@ -104,10 +105,12 @@ function setLogChannelId(id) {
   return saveRuntimeConfig(runtime)
 }
 
-const requiredEnv = {
-  PSYVERSE_TOKEN,
-  LOG_CHANNEL,
-  RENDER_WEBHOOK_SECRET,
+// If a raw Discord webhook URL is provided, allow running without a bot token + channel.
+const usingWebhook = !isPlaceholder(DISCORD_WEBHOOK_URL) && DISCORD_WEBHOOK_URL
+const requiredEnv = { RENDER_WEBHOOK_SECRET }
+if (!usingWebhook) {
+  requiredEnv.PSYVERSE_TOKEN = PSYVERSE_TOKEN
+  requiredEnv.LOG_CHANNEL = LOG_CHANNEL
 }
 
 const missing = Object.entries(requiredEnv).filter(([_k, v]) => isPlaceholder(v)).map(([k]) => k)
@@ -401,7 +404,36 @@ app.post('/render-webhook', async (req, res) => {
 
     if (logsUrl) embed.setURL(logsUrl)
 
-    // Send to channel (prefer runtime-configured channel)
+    // Compose message content: ping on failures, include logs as code block in content (up to 1900 chars)
+    let content = ''
+    if (statusKey === 'failed' && FAILURE_ROLE_ID) content = `<@&${FAILURE_ROLE_ID}> `
+    // Attach logs snippet in message content as code block (ensures we respect embed field limits)
+    if (logsSnippet) content += `\n\n\`\`\`\n${logsSnippet}\n\`\`\``
+
+    // If a raw Discord webhook URL is provided, POST directly to it instead of using the bot+channel flow.
+    if (!isPlaceholder(DISCORD_WEBHOOK_URL) && DISCORD_WEBHOOK_URL) {
+      try {
+        const body = {
+          content: content || undefined,
+          embeds: [embed.toJSON ? embed.toJSON() : embed],
+        }
+        const resp = await fetch(DISCORD_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!resp.ok) {
+          console.error('Discord webhook returned non-OK status', resp.status)
+          return res.status(500).send('Failed to post to Discord webhook')
+        }
+      } catch (err) {
+        console.error('Failed to send message to Discord webhook:', err)
+        return res.status(500).send('Failed to post to Discord webhook')
+      }
+      return res.status(200).send('OK')
+    }
+
+    // Fallback: use bot + channel
     const resolvedLogChannel = getLogChannelId()
     if (!resolvedLogChannel) {
       console.error('LOG_CHANNEL not set; cannot post message')
@@ -413,12 +445,6 @@ app.post('/render-webhook', async (req, res) => {
       console.error('Failed to fetch channel with id', LOG_CHANNEL)
       return res.status(500).send('Discord channel not available')
     }
-
-    // Compose message content: ping on failures, include logs as code block in content (up to 1900 chars)
-    let content = ''
-    if (statusKey === 'failed' && FAILURE_ROLE_ID) content = `<@&${FAILURE_ROLE_ID}> `
-    // Attach logs snippet in message content as code block (ensures we respect embed field limits)
-    if (logsSnippet) content += `\n\n\`\`\`\n${logsSnippet}\n\`\`\``
 
     try {
       await channel.send({ content: content || undefined, embeds: [embed] })
