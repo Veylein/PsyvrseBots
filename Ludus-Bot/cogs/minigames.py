@@ -851,7 +851,7 @@ async def setup(bot: commands.Bot):
         else:
             name, help_text, internal = entry
         # capture internal name correctly in closure
-        async def _cmd_wrapper(ctx, _internal=internal):
+        async def _cmd_wrapper(ctx, *args, _internal=internal):
             await cog._handle_game(ctx, _internal)
 
         # avoid collisions: if it exists, prefix with mg_
@@ -878,10 +878,7 @@ async def setup(bot: commands.Bot):
             # and attach the cog reference to the Command so Cog.get_commands()
             # will include it.
             bot.add_command(cmd)
-            try:
-                cmd._cog = cog
-            except Exception:
-                pass
+            # Don't set cmd._cog to avoid self parameter injection
             # record registered names to avoid future collisions
             existing.add(safe_name)
             for a in aliases:
@@ -895,7 +892,7 @@ async def setup(bot: commands.Bot):
             pass
 
     # Add a gamelist command to this cog
-    async def gamelist(ctx):
+    async def gamelist(ctx, *args):
         cmds = [c for c in cog.get_commands() if isinstance(c, commands.Command)]
         entries = []
         if cmds:
@@ -911,54 +908,52 @@ async def setup(bot: commands.Bot):
         if not entries:
             await ctx.send("No minigames available.")
             return
-        per_page = 12
+        per_page = 10
         pages = [entries[i:i+per_page] for i in range(0, len(entries), per_page)]
 
         def make_embed(page_index: int):
             page = pages[page_index]
             embed = discord.Embed(title=f"🎮 Minigames (page {page_index+1}/{len(pages)})",
+                                  description="",
                                   color=discord.Color.blurple())
             for name_, brief in page:
                 embed.add_field(name=name_, value=brief, inline=False)
+            embed.set_footer(text="💡 Tip: Click Prev/Next to browse, Close to dismiss")
             return embed
 
-        view = discord.ui.View(timeout=120)
-        view.page = 0
-        view.author = ctx.author
+        class GamelistView(discord.ui.View):
+            def __init__(self):
+                super().__init__(timeout=120)
+                self.page = 0
+                self.author = ctx.author
 
-        async def interaction_check(interaction: discord.Interaction) -> bool:
-            return interaction.user.id == ctx.author.id
+            async def interaction_check(self, interaction: discord.Interaction) -> bool:
+                return interaction.user.id == self.author.id
 
-        view.interaction_check = interaction_check
+            @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
+            async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                if self.page > 0:
+                    self.page -= 1
+                    await interaction.response.edit_message(embed=make_embed(self.page), view=self)
+                else:
+                    await interaction.response.defer()
 
-        @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
-        async def prev(button: discord.ui.Button, interaction: discord.Interaction):
-            if view.page > 0:
-                view.page -= 1
-                await interaction.response.edit_message(embed=make_embed(view.page), view=view)
-            else:
-                await interaction.response.defer()
+            @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
+            async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                if self.page < len(pages) - 1:
+                    self.page += 1
+                    await interaction.response.edit_message(embed=make_embed(self.page), view=self)
+                else:
+                    await interaction.response.defer()
 
-        @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
-        async def next(button: discord.ui.Button, interaction: discord.Interaction):
-            if view.page < len(pages) - 1:
-                view.page += 1
-                await interaction.response.edit_message(embed=make_embed(view.page), view=view)
-            else:
-                await interaction.response.defer()
+            @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
+            async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                try:
+                    await interaction.message.delete()
+                except Exception:
+                    await interaction.response.defer()
 
-        @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
-        async def close(button: discord.ui.Button, interaction: discord.Interaction):
-            try:
-                await interaction.message.delete()
-            except Exception:
-                await interaction.response.defer()
-
-        # attach buttons
-        view.add_item(prev)
-        view.add_item(next)
-        view.add_item(close)
-
+        view = GamelistView()
         await ctx.send(embed=make_embed(0), view=view)
 
     # register gamelist avoiding collision
@@ -972,10 +967,7 @@ async def setup(bot: commands.Bot):
     try:
         cmd = commands.Command(gamelist, name=safe_name, help="List available minigames.")
         bot.add_command(cmd)
-        try:
-            cmd._cog = cog
-        except Exception:
-            pass
+        # Don't set cmd._cog to avoid self parameter injection
     except Exception:
         pass
 
@@ -1011,11 +1003,16 @@ class PaginatedHelpView(discord.ui.View):
         self.message: discord.Message | None = None
 
     def _make_embed(self):
+        desc_text = self.category_desc
+        if desc_text:
+            desc_text += "\n\n"
+        desc_text += "🔘 Use the interactive buttons below to navigate!"
         embed = discord.Embed(title=f"{self.category_name} (page {self.page+1}/{len(self.pages)})",
-                              description=self.category_desc,
+                              description=desc_text,
                               color=discord.Color.blurple())
         for name, desc in self.pages[self.page]:
             embed.add_field(name=name, value=desc or "-", inline=False)
+        embed.set_footer(text="💡 Buttons are fully functional - click to interact!")
         return embed
 
     async def send(self):
@@ -1041,7 +1038,7 @@ class PaginatedHelpView(discord.ui.View):
         return interaction.user.id == self.author.id
 
     @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
-    async def prev(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.page > 0:
             self.page -= 1
             await interaction.response.edit_message(embed=self._make_embed(), view=self)
@@ -1049,7 +1046,7 @@ class PaginatedHelpView(discord.ui.View):
             await interaction.response.defer()
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
-    async def next(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.page < len(self.pages) - 1:
             self.page += 1
             await interaction.response.edit_message(embed=self._make_embed(), view=self)
@@ -1057,7 +1054,7 @@ class PaginatedHelpView(discord.ui.View):
             await interaction.response.defer()
 
     @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
-    async def close(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             if self.message:
                 await self.message.delete()
