@@ -99,16 +99,11 @@ bot.pending_rematches = {}
 
 
 def _record_user_activity(user_id: int, username: str | None, activity_type: str, name: str, extra: dict | None = None):
-    """Record user activity without blocking the event loop."""
+    """Record user activity in background without blocking."""
     try:
         loop = bot.loop
         if loop and loop.is_running():
             loop.run_in_executor(None, user_storage.record_activity, int(user_id), username, activity_type, name, extra)
-            return
-    except Exception:
-        pass
-    try:
-        user_storage.record_activity(int(user_id), username, activity_type, name, extra)
     except Exception:
         pass
 

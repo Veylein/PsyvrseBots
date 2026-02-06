@@ -8,6 +8,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 import sys
+from utils import user_storage
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
 from utils import user_storage
@@ -183,8 +184,13 @@ class Economy(commands.Cog):
         self.economy_data[user_key]["balance"] += amount
         self.economy_data[user_key]["total_earned"] += amount
         self.economy_dirty = True
+        
+        # Save to user_storage in background
         try:
-            user_storage.record_game_state(
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(
+                None,
+                user_storage.record_game_state,
                 user_id,
                 None,
                 "economy",
@@ -198,6 +204,7 @@ class Economy(commands.Cog):
             )
         except Exception:
             pass
+        
         return self.economy_data[user_key]["balance"]
 
     def remove_coins(self, user_id: int, amount: int) -> bool:
@@ -209,8 +216,13 @@ class Economy(commands.Cog):
             self.economy_data[user_key]["balance"] -= amount
             self.economy_data[user_key]["total_spent"] += amount
             self.economy_dirty = True
+            
+            # Save to user_storage in background
             try:
-                user_storage.record_game_state(
+                loop = asyncio.get_event_loop()
+                loop.run_in_executor(
+                    None,
+                    user_storage.record_game_state,
                     user_id,
                     None,
                     "economy",
@@ -224,6 +236,7 @@ class Economy(commands.Cog):
                 )
             except Exception:
                 pass
+            
             return True
         return False
 

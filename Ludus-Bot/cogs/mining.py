@@ -8,7 +8,6 @@ import asyncio
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 import io
-from utils import user_storage
 
 class MiningGame:
     """Represents a single mining game session"""
@@ -3041,36 +3040,8 @@ class Mining(commands.Cog):
         with open(self.data_file, 'w') as f:
             json.dump(data, f, indent=4)
         
-        # Snapshot per-user game state into user storage
-        try:
-            for user_id, game in self.active_games.items():
-                try:
-                    user_storage.record_game_state(int(user_id), None, "mining", game.to_dict())
-                except Exception:
-                    pass
-            for guild_id, world_info in self.shared_worlds.items():
-                try:
-                    world_state = world_info["world_data"].to_dict()
-                except Exception:
-                    world_state = {}
-                players = world_info.get("players", {})
-                for user_id_str, player_state in players.items():
-                    try:
-                        user_storage.record_game_state(
-                            int(user_id_str),
-                            None,
-                            "mining",
-                            {
-                                "mode": "shared",
-                                "guild_id": guild_id,
-                                "world": world_state,
-                                "player": player_state
-                            }
-                        )
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        # NOTE: User storage recording removed from save_data() to avoid blocking.
+        # User game states can be saved separately in async context if needed.
     
     @app_commands.command(name="mine", description="⛏️ Start a procedurally generated mining adventure!")
     async def mine_slash(self, interaction: discord.Interaction):
