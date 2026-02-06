@@ -82,7 +82,11 @@ bot = commands.Bot(
     intents=intents, 
     owner_ids=owner_ids_set,
     help_command=None,  # Disable default help to use custom help cog
-    description="🎮 The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with ❤️ by Psyvrse Development."
+    description="🎮 The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with ❤️ by Psyvrse Development.",
+    # Performance/stability settings for cloud hosting
+    max_messages=1000,  # Limit message cache to reduce memory
+    chunk_guilds_at_startup=False,  # Don't fetch all members on startup
+    heartbeat_timeout=120.0,  # Increase heartbeat timeout for unstable connections (default: 60)
 )
 
 # Initialize Discord log forwarding helper (sends detailed logs to LOG_CHANNEL)
@@ -279,6 +283,24 @@ async def load_cogs():
             print(f"   • {cog_name}: {error[:80]}")
     
     print("="*50 + "\n")
+
+@bot.event
+async def on_connect():
+    """Called when bot successfully connects to Discord"""
+    print("✅ Connected to Discord!")
+    logger.info("Bot connected to Discord")
+
+@bot.event
+async def on_disconnect():
+    """Called when bot disconnects from Discord"""
+    print("⚠️ Disconnected from Discord - will attempt reconnect")
+    logger.warning("Bot disconnected from Discord")
+
+@bot.event
+async def on_resume():
+    """Called when bot successfully resumes session after disconnect"""
+    print("✅ Successfully resumed Discord session")
+    logger.info("Bot resumed Discord session")
 
 @bot.event
 async def on_ready():
@@ -747,12 +769,20 @@ async def main():
     if not token:
         print("Error: No Discord token found! Please set LUDUS_TOKEN in Secrets or add 'token' to config.json.")
         return
+    
     try:
-        await bot.start(token)
+        async with bot:
+            await bot.start(token)
     except discord.errors.LoginFailure:
         logger.error("Invalid Discord token provided")
+    except KeyboardInterrupt:
+        logger.info("Bot shutdown requested by user")
+        print("\n👋 Bot shutting down gracefully...")
     except Exception as e:
         logger.exception("Bot stopped with exception: %s", e)
+        print(f"\n❌ Bot crashed: {e}")
+        # On error, wait a bit before letting the process restart
+        await asyncio.sleep(5)
 
 # --- FIXED: Removed duplicate config reload (it served no purpose) ---
 
