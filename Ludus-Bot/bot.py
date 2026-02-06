@@ -214,6 +214,14 @@ async def on_interaction(interaction: discord.Interaction):
 
 
 async def load_cogs():
+    loaded_cogs = []
+    failed_cogs = []
+    skipped_cogs = []
+    
+    print("\n" + "="*50)
+    print("🔧 LOADING COGS...")
+    print("="*50)
+    
     for entry in os.listdir("./cogs"):
         path = os.path.join("./cogs", entry)
 
@@ -229,51 +237,182 @@ async def load_cogs():
 
         # Skip specific legacy or disabled cogs
         if cog_name == "music_new":
-            print("Skipping music_new (using music.py instead)")
+            skipped_cogs.append(f"{cog_name} (using music.py instead)")
             continue
         if cog_name == "uno_gofish":
-            print("Skipping uno_gofish (legacy - using cardgames.py instead)")
+            skipped_cogs.append(f"{cog_name} (legacy - using cardgames.py)")
             continue
         if cog_name == "leveling":
-            print("Skipping leveling (disabled - causes issues)")
+            skipped_cogs.append(f"{cog_name} (disabled - causes issues)")
             continue
         if cog_name == "music" and not config.get("music_enabled", True):
-            print("Skipping music cog (disabled in config.json)")
+            skipped_cogs.append(f"{cog_name} (disabled in config.json)")
             continue
         if cog_name == "tcg":
-            print("Skipping legacy cog 'tcg' to avoid command conflicts")
+            skipped_cogs.append(f"{cog_name} (legacy - conflicts)")
             continue
 
         try:
             await bot.load_extension(f"cogs.{cog_name}")
-            print(f"Loaded cog: {cog_name}")
+            loaded_cogs.append(cog_name)
+            print(f"  ✅ {cog_name}")
         except Exception as e:
-                print(f"Failed to load cog {cog_name}: {e}")
-                traceback.print_exc()
-                try:
-                    ludus_logging.log_exception(e, message=f"Failed to load cog {cog_name}")
-                except Exception:
-                    pass
+            failed_cogs.append((cog_name, str(e)))
+            print(f"  ❌ {cog_name}: {e}")
+            traceback.print_exc()
+            try:
+                ludus_logging.log_exception(e, message=f"Failed to load cog {cog_name}")
+            except Exception:
+                pass
+    
+    # Print summary
+    print("\n" + "="*50)
+    print("📊 COG LOADING SUMMARY")
+    print("="*50)
+    print(f"✅ Loaded: {len(loaded_cogs)} cogs")
+    for cog in sorted(loaded_cogs):
+        print(f"   • {cog}")
+    
+    if skipped_cogs:
+        print(f"\n⏭️  Skipped: {len(skipped_cogs)} cogs")
+        for skip_info in sorted(skipped_cogs):
+            print(f"   • {skip_info}")
+    
+    if failed_cogs:
+        print(f"\n❌ Failed: {len(failed_cogs)} cogs")
+        for cog_name, error in sorted(failed_cogs):
+            print(f"   • {cog_name}: {error[:80]}")
+    
+    print("="*50 + "\n")
 
 @bot.event
 async def on_ready():
-    print(f"[BOT] {bot.user} is online!")
-    print(f"[BOT] Bot owner_ids: {bot.owner_ids}")
-    print(f"[BOT] Bot application info owner: {(await bot.application_info()).owner.id if bot.application else 'Unknown'}")
+    print("\n" + "="*50)
+    print("🚀 BOT IS READY!")
+    print("="*50)
+    print(f"👤 Logged in as: {bot.user.name} (ID: {bot.user.id})")
+    print(f"🔑 Bot owner_ids: {bot.owner_ids}")
+    try:
+        app_info = await bot.application_info()
+        print(f"👑 Application owner: {app_info.owner.id}")
+    except:
+        print(f"👑 Application owner: Unknown")
+    
+    print(f"\n📊 Statistics:")
+    print(f"   • Guilds: {len(bot.guilds)}")
+    print(f"   • Users: {len(bot.users)}")
+    print(f"   • Cogs loaded: {len(bot.cogs)}")
+    
+    # List all loaded cogs
+    print(f"\n🔧 Active Cogs ({len(bot.cogs)}):")
+    for cog_name in sorted(bot.cogs.keys()):
+        cog = bot.cogs[cog_name]
+        # Count commands in this cog
+        cog_commands = [cmd for cmd in bot.walk_commands() if cmd.cog_name == cog_name]
+        cog_app_commands = [cmd for cmd in bot.tree.walk_commands() if hasattr(cmd, 'binding') and cmd.binding == cog]
+        total = len(cog_commands) + len(cog_app_commands)
+        print(f"   • {cog_name} ({total} commands)")
+    
+    # Count and list commands
+    text_commands = [c for c in bot.commands]
+    
+    # Get ALL app commands including those in groups
+    all_app_commands = []
+    for cmd in bot.tree.walk_commands():
+        all_app_commands.append(cmd)
+    
+    print(f"\n⚡ Commands Summary:")
+    print(f"   • Text commands: {len(text_commands)}")
+    print(f"   • Slash commands: {len(all_app_commands)} (walk_commands)")
+    print(f"   • Top-level slash: {len(bot.tree.get_commands())} (get_commands)")
+    print(f"   • Total: {len(text_commands) + len(all_app_commands)}")
+    
+    # List text commands
+    if text_commands:
+        print(f"\n📝 Text Commands ({len(text_commands)}):")
+        for cmd in sorted(text_commands, key=lambda x: x.name):
+            aliases = f" (aliases: {', '.join(cmd.aliases)})" if cmd.aliases else ""
+            cog_name = cmd.cog_name if cmd.cog_name else "No Cog"
+            print(f"   • {config['prefix']}{cmd.name}{aliases} [{cog_name}]")
+    
+    # List slash commands
+    if all_app_commands:
+        # Separate global and guild commands
+        global_cmds = []
+        guild_cmds = []
+        
+        for cmd in all_app_commands:
+            # Check if command has guild_ids (guild-specific)
+            if hasattr(cmd, 'guild_ids') and cmd.guild_ids:
+                guild_cmds.append(cmd)
+            else:
+                global_cmds.append(cmd)
+        
+        print(f"\n⚡ Slash Commands ({len(all_app_commands)} total):")
+        print(f"   🌍 Global: {len(global_cmds)}")
+        print(f"   🏠 Guild-specific: {len(guild_cmds)}")
+        
+        # Show global commands
+        if global_cmds:
+            print(f"\n🌍 Global Commands ({len(global_cmds)}):")
+            
+            # Group by parent
+            root_commands = {}
+            subcommands = {}
+            
+            for cmd in global_cmds:
+                if hasattr(cmd, 'parent') and cmd.parent:
+                    parent_name = cmd.parent.qualified_name
+                    if parent_name not in subcommands:
+                        subcommands[parent_name] = []
+                    subcommands[parent_name].append(cmd)
+                else:
+                    root_commands[cmd.name] = cmd
+            
+            # Display root commands with their subcommands
+            for cmd_name in sorted(root_commands.keys()):
+                cmd = root_commands[cmd_name]
+                cog_name = cmd.binding.__cog_name__ if hasattr(cmd, 'binding') and cmd.binding else "Unknown"
+                
+                # Check if it has subcommands
+                if cmd.qualified_name in subcommands:
+                    print(f"   • /{cmd.name} [GROUP] ({cog_name})")
+                    for subcmd in sorted(subcommands[cmd.qualified_name], key=lambda x: x.name):
+                        print(f"      ├─ /{cmd.name} {subcmd.name}")
+                else:
+                    print(f"   • /{cmd.name} ({cog_name})")
+            
+            # Show orphaned subcommands (shouldn't happen but just in case)
+            for parent_name, subs in subcommands.items():
+                if parent_name not in root_commands:
+                    print(f"   • /{parent_name} [MISSING PARENT]")
+                    for subcmd in subs:
+                        print(f"      ├─ {subcmd.name}")
+        
+        # Show guild-specific commands
+        if guild_cmds:
+            print(f"\n🏠 Guild-Specific Commands ({len(guild_cmds)}):")
+            for cmd in sorted(guild_cmds, key=lambda x: x.qualified_name):
+                guild_ids_str = f" [Guilds: {', '.join(str(g) for g in (cmd.guild_ids or [])[:3])}]"
+                cog_name = cmd.binding.__cog_name__ if hasattr(cmd, 'binding') and cmd.binding else "Unknown"
+                print(f"   • /{cmd.qualified_name} ({cog_name}){guild_ids_str}")
+    
+    print("="*50)
     
     # ===== DEV GUILD COMMAND SYNC SYSTEM =====
+    print("\n" + "="*50)
+    print("🔄 SYNCING SLASH COMMANDS...")
+    print("="*50)
+    
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
     DEV_ONLY_COMMANDS = []  # Add command names here for dev guild testing
-    
-    # Log all commands available before sync
-    print(f"[BOT] Total app commands in tree: {len(bot.tree.get_commands())}")
     
     try:
         import os
         dev_guilds_raw = os.environ.get('DEV_GUILD_IDS') or os.environ.get('DEV_GUILD_ID')
         if dev_guilds_raw:
-            print(f"[BOT] DEV_GUILD_ID detected - splitting commands")
+            print(f"🔧 DEV_GUILD_ID detected - splitting commands")
             guild_ids = [g.strip() for g in dev_guilds_raw.split(',') if g.strip()]
             
             # Save references to dev-only commands before removing
@@ -283,14 +422,17 @@ async def on_ready():
                 if cmd:
                     dev_commands[cmd_name] = cmd
                     bot.tree.remove_command(cmd_name)
-                    print(f"[BOT] Saved {cmd_name} for dev guild only")
+                    print(f"  📌 Saved {cmd_name} for dev guild only")
             
             # Sync global commands (without dev-only)
-            print(f"[BOT] Syncing global commands...")
+            print(f"\n🌍 Syncing global commands...")
             synced_global = await bot.tree.sync()
-            print(f"[BOT] ✅ Synced {len(synced_global)} commands globally")
-            for cmd in synced_global:
-                print(f"  - /{cmd.name} (global)")
+            print(f"✅ Synced {len(synced_global)} commands globally")
+            if len(synced_global) <= 20:
+                for cmd in synced_global:
+                    print(f"   • /{cmd.name}")
+            else:
+                print(f"   (Too many to list - {len(synced_global)} total)")
             
             # Sync dev-only commands to guild
             for dev_gid in guild_ids:
@@ -301,22 +443,49 @@ async def on_ready():
                     # Add saved dev commands to guild tree
                     for cmd_name, cmd in dev_commands.items():
                         bot.tree.add_command(cmd, guild=guild_obj)
-                        print(f"[BOT] Added {cmd_name} to guild {dev_gid}")
+                        print(f"  📌 Added {cmd_name} to guild {dev_gid}")
                     
                     synced_guild = await bot.tree.sync(guild=guild_obj)
-                    print(f"[BOT] ✅ Synced {len(synced_guild)} dev commands to guild {dev_gid}")
-                    for cmd in synced_guild:
-                        print(f"  - /{cmd.name} (guild {dev_gid})")
+                    print(f"✅ Synced {len(synced_guild)} dev commands to guild {dev_gid}")
+                    if len(synced_guild) <= 20:
+                        for cmd in synced_guild:
+                            print(f"   • /{cmd.name}")
                 except Exception as e:
-                    print(f"[BOT] ❌ Failed to sync to guild {dev_gid}: {e}")
+                    print(f"❌ Failed to sync to guild {dev_gid}: {e}")
                     traceback.print_exc()
         else:
+            print(f"\n🌍 Syncing all commands globally...")
             synced = await bot.tree.sync()
-            print(f"[BOT] ✅ Synced {len(synced)} commands globally")
-            for cmd in synced:
-                print(f"  - /{cmd.name}")
+            print(f"✅ Synced {len(synced)} commands globally")
+            
+            if len(synced) <= 30:
+                # Show all commands with groups
+                for cmd in sorted(synced, key=lambda x: x.name):
+                    if hasattr(cmd, 'options') and cmd.options:
+                        # Check if it's a group (has subcommands)
+                        has_subcommands = any(opt.type == 1 for opt in cmd.options if hasattr(opt, 'type'))
+                        if has_subcommands:
+                            print(f"   • /{cmd.name} [GROUP with subcommands]")
+                        else:
+                            print(f"   • /{cmd.name}")
+                    else:
+                        print(f"   • /{cmd.name}")
+            elif len(synced) <= 100:
+                # Just show names
+                cmd_names = sorted([cmd.name for cmd in synced])
+                for i in range(0, len(cmd_names), 5):
+                    batch = cmd_names[i:i+5]
+                    print(f"   • {', '.join(batch)}")
+            else:
+                print(f"   (Too many to list - {len(synced)} total)")
+                # Show first 20
+                for cmd in sorted(synced, key=lambda x: x.name)[:20]:
+                    print(f"   • /{cmd.name}")
+                print(f"   ... and {len(synced) - 20} more")
+        
+        print("="*50 + "\n")
     except Exception as e:
-        print(f"[BOT] Error syncing commands: {e}")
+        print(f"❌ Error syncing commands: {e}")
         traceback.print_exc()
         try:
             ludus_logging.log_exception(e, message="Error syncing commands")

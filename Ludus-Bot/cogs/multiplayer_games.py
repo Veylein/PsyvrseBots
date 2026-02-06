@@ -4,6 +4,210 @@ from discord import app_commands
 import asyncio
 import random
 from typing import Dict, List, Optional
+from datetime import datetime
+
+# ========================================
+# MURDER MYSTERY LOBBY VIEW (v2 Components)
+# ========================================
+
+class MurderMysteryLobbyView(discord.ui.View):
+    """Modern lobby with settings for Murder Mystery"""
+    
+    def __init__(self, cog, lobby_id):
+        super().__init__(timeout=120.0)
+        self.cog = cog
+        self.lobby_id = lobby_id
+    
+    @discord.ui.button(label="Join Game", style=discord.ButtonStyle.green, emoji="✅", custom_id="mm_join")
+    async def join_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        game = self.cog.active_lobbies.get(self.lobby_id)
+        if not game:
+            await interaction.response.send_message("❌ Game no longer exists!", ephemeral=True)
+            return
+        
+        if interaction.user.id in game["players"]:
+            await interaction.response.send_message("❌ You're already in!", ephemeral=True)
+            return
+        
+        if len(game["players"]) >= 10:
+            await interaction.response.send_message("❌ Lobby full! (10/10)", ephemeral=True)
+            return
+        
+        game["players"].append(interaction.user.id)
+        await self.update_lobby_message(interaction)
+        await interaction.response.send_message("✅ Joined!", ephemeral=True)
+    
+    @discord.ui.button(label="Leave", style=discord.ButtonStyle.gray, emoji="🚪", custom_id="mm_leave")
+    async def leave_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        game = self.cog.active_lobbies.get(self.lobby_id)
+        if not game:
+            await interaction.response.send_message("❌ Game no longer exists!", ephemeral=True)
+            return
+        
+        if interaction.user.id not in game["players"]:
+            await interaction.response.send_message("❌ You're not in this game!", ephemeral=True)
+            return
+        
+        if interaction.user.id == game["host"]:
+            await interaction.response.send_message("❌ Host can't leave! Cancel game instead.", ephemeral=True)
+            return
+        
+        game["players"].remove(interaction.user.id)
+        await self.update_lobby_message(interaction)
+        await interaction.response.send_message("✅ Left the game.", ephemeral=True)
+    
+    @discord.ui.button(label="Settings", style=discord.ButtonStyle.blurple, emoji="⚙️", custom_id="mm_settings")
+    async def settings_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        game = self.cog.active_lobbies.get(self.lobby_id)
+        if not game:
+            await interaction.response.send_message("❌ Game no longer exists!", ephemeral=True)
+            return
+        
+        if interaction.user.id != game["host"]:
+            await interaction.response.send_message("❌ Only host can change settings!", ephemeral=True)
+            return
+        
+        await interaction.response.send_modal(MurderMysterySettingsModal(self.cog, self.lobby_id))
+    
+    @discord.ui.button(label="Start Game", style=discord.ButtonStyle.red, emoji="▶️", custom_id="mm_start")
+    async def start_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        game = self.cog.active_lobbies.get(self.lobby_id)
+        if not game:
+            await interaction.response.send_message("❌ Game no longer exists!", ephemeral=True)
+            return
+        
+        if interaction.user.id != game["host"]:
+            await interaction.response.send_message("❌ Only host can start!", ephemeral=True)
+            return
+        
+        if len(game["players"]) < 4:
+            await interaction.response.send_message("❌ Need at least 4 players!", ephemeral=True)
+            return
+        
+        game["started"] = True
+        await interaction.response.send_message("🎮 **Game Starting!** Assigning roles...", ephemeral=True)
+        await self.cog.start_murder_mystery_game(interaction, self.lobby_id)
+    
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, emoji="❌", custom_id="mm_cancel")
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        game = self.cog.active_lobbies.get(self.lobby_id)
+        if not game:
+            await interaction.response.send_message("❌ Game no longer exists!", ephemeral=True)
+            return
+        
+        if interaction.user.id != game["host"]:
+            await interaction.response.send_message("❌ Only host can cancel!", ephemeral=True)
+            return
+        
+        del self.cog.active_lobbies[self.lobby_id]
+        await interaction.response.send_message("❌ **Game cancelled by host.**")
+        await interaction.message.delete()
+    
+    async def update_lobby_message(self, interaction: discord.Interaction):
+        """Update lobby embed"""
+        game = self.cog.active_lobbies.get(self.lobby_id)
+        if not game:
+            return
+        
+        player_list = "\n".join([f"• <@{pid}>" for pid in game["players"]])
+        
+        embed = discord.Embed(
+            title="🔪 MURDER MYSTERY LOBBY",
+            description=f"**Host:** <@{game['host']}>\n\n"
+                       f"**Players ({len(game['players'])}/10):**\n{player_list}\n\n"
+                       "📋 **Game Settings:**\n"
+                       f"• Tasks Required: **{game['tasks_required']}** per player\n"
+                       f"• Round Duration: **{game['round_duration']}s**\n"
+                       f"• Voting Duration: **{game['vote_duration']}s**\n"
+                       f"• Sheriff Mode: **{'ON' if game['has_sheriff'] else 'OFF'}**\n\n"
+                       "**How to Play:**\n"
+                       "• 1 KILLER 🔪, 1 SHERIFF 👮 (optional), rest INNOCENT 😇\n"
+                       "• Innocents complete tasks to win\n"
+                       "• Killer eliminates players each round\n"
+                       "• Vote to eject suspects\n"
+                       "• Sheriff can eliminate someone (risky!)",
+            color=discord.Color.dark_red()
+        )
+        embed.set_footer(text="Click Join to play • Host can Start when ready")
+        
+        await interaction.message.edit(embed=embed, view=self)
+
+class MurderMysterySettingsModal(discord.ui.Modal, title="Murder Mystery Settings"):
+    """Settings modal for lobby"""
+    
+    tasks_required = discord.ui.TextInput(
+        label="Tasks Required (per player)",
+        placeholder="5",
+        default="5",
+        min_length=1,
+        max_length=2,
+        required=True
+    )
+    
+    round_duration = discord.ui.TextInput(
+        label="Round Duration (seconds)",
+        placeholder="90",
+        default="90",
+        min_length=2,
+        max_length=3,
+        required=True
+    )
+    
+    vote_duration = discord.ui.TextInput(
+        label="Voting Duration (seconds)",
+        placeholder="45",
+        default="45",
+        min_length=2,
+        max_length=3,
+        required=True
+    )
+    
+    sheriff_mode = discord.ui.TextInput(
+        label="Sheriff Mode (yes/no)",
+        placeholder="yes",
+        default="yes",
+        min_length=2,
+        max_length=3,
+        required=True
+    )
+    
+    def __init__(self, cog, lobby_id):
+        super().__init__()
+        self.cog = cog
+        self.lobby_id = lobby_id
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        game = self.cog.active_lobbies.get(self.lobby_id)
+        if not game:
+            await interaction.response.send_message("❌ Game no longer exists!", ephemeral=True)
+            return
+        
+        try:
+            tasks = int(self.tasks_required.value)
+            round_dur = int(self.round_duration.value)
+            vote_dur = int(self.vote_duration.value)
+            sheriff = self.sheriff_mode.value.lower() in ["yes", "y", "true", "on"]
+            
+            if not (3 <= tasks <= 10):
+                raise ValueError("Tasks must be 3-10")
+            if not (30 <= round_dur <= 180):
+                raise ValueError("Round duration must be 30-180s")
+            if not (20 <= vote_dur <= 90):
+                raise ValueError("Vote duration must be 20-90s")
+            
+            game["tasks_required"] = tasks
+            game["round_duration"] = round_dur
+            game["vote_duration"] = vote_dur
+            game["has_sheriff"] = sheriff
+            
+            await interaction.response.send_message("✅ Settings updated!", ephemeral=True)
+            
+            # Update lobby display
+            view = MurderMysteryLobbyView(self.cog, self.lobby_id)
+            await view.update_lobby_message(interaction)
+        
+        except ValueError as e:
+            await interaction.response.send_message(f"❌ Invalid settings: {e}", ephemeral=True)
 
 class MultiplayerGames(commands.Cog):
     """Multiplayer social deduction and competitive games"""
@@ -226,7 +430,7 @@ class MultiplayerGames(commands.Cog):
     
     @multiplayer_group.command(name="murdermystery", description="Among Us style! 4-10 players, find the killer!")
     async def murder_mystery(self, interaction: discord.Interaction):
-        """Murder Mystery social deduction game - Full implementation with interactive tasks"""
+        """Murder Mystery social deduction game - MODERN LOBBY v2"""
         
         lobby_id = f"murder_{interaction.channel.id}"
         if lobby_id in self.active_lobbies:
@@ -277,7 +481,7 @@ class MultiplayerGames(commands.Cog):
             }
         }
         
-        # Create lobby
+        # Create lobby with MODERN SETTINGS
         self.active_lobbies[lobby_id] = {
             "type": "murder",
             "host": interaction.user.id,
@@ -288,8 +492,11 @@ class MultiplayerGames(commands.Cog):
             "alive": [],
             "dead": [],
             "tasks_done": {},
-            "active_tasks": {},  # Store current task for each player
+            "active_tasks": {},
             "tasks_required": 5,
+            "round_duration": 90,
+            "vote_duration": 45,
+            "has_sheriff": True,
             "round": 0,
             "death_round": False,
             "killer_kills": {},
@@ -297,75 +504,109 @@ class MultiplayerGames(commands.Cog):
             "task_templates": task_templates
         }
         
+        # Send MODERN LOBBY
+        player_list = f"• <@{interaction.user.id}>"
+        
         embed = discord.Embed(
-            title="🔪 MURDER MYSTERY!",
-            description=f"**{interaction.user.mention} started a Murder Mystery!**\n\n"
-                       "📋 **How to Play:**\n"
-                       "• 4-10 players: 1 KILLER 🔪, 1 SHERIFF 👮, rest INNOCENT 😇\n"
-                       "• Innocents complete tasks (5 each)\n"
-                       "• Killer eliminates 1 player per round (via ephemeral button)\n"
-                       "• Sheriff can kill killer (but if wrong = DEATH ROUND!)\n"
-                       "• Vote each round to eject suspects\n"
-                       "• Innocents win: Killer voted out OR all tasks done\n"
-                       "• Killer wins: Equal/outnumber innocents\n\n"
-                       f"**Players ({len(self.active_lobbies[lobby_id]['players'])}/10):**\n"
-                       f"• {interaction.user.mention}",
+            title="🔪 MURDER MYSTERY LOBBY",
+            description=f"**Host:** <@{interaction.user.id}>\n\n"
+                       f"**Players (1/10):**\n{player_list}\n\n"
+                       "📋 **Game Settings:**\n"
+                       f"• Tasks Required: **5** per player\n"
+                       f"• Round Duration: **90s**\n"
+                       f"• Voting Duration: **45s**\n"
+                       f"• Sheriff Mode: **ON**\n\n"
+                       "**How to Play:**\n"
+                       "• 1 KILLER 🔪, 1 SHERIFF 👮, rest INNOCENT 😇\n"
+                       "• Innocents complete tasks to win\n"
+                       "• Killer eliminates players each round\n"
+                       "• Vote to eject suspects\n"
+                       "• Sheriff can eliminate someone (risky!)",
             color=discord.Color.dark_red()
         )
-        embed.set_footer(text="React ✅ to join (45s) • Host ▶️ to start (min 4 players)")
+        embed.set_footer(text="Click Join to play • Host can Start when ready")
         
-        await interaction.response.send_message(embed=embed)
-        msg = await interaction.original_response()
-        await msg.add_reaction("✅")
-        await msg.add_reaction("▶️")
-        
-        def check_reaction(reaction, user):
-            return (reaction.message.id == msg.id and 
-                   not user.bot and 
-                   str(reaction.emoji) in ["✅", "▶️"])
-        
-        # Lobby phase
-        try:
-            while not self.active_lobbies[lobby_id]["started"]:
-                reaction, user = await self.bot.wait_for('reaction_add', check=check_reaction, timeout=45.0)
-                
-                if str(reaction.emoji) == "✅" and user.id not in self.active_lobbies[lobby_id]["players"]:
-                    if len(self.active_lobbies[lobby_id]["players"]) < 10:
-                        self.active_lobbies[lobby_id]["players"].append(user.id)
-                        
-                        player_list = "\n".join([f"• <@{pid}>" for pid in self.active_lobbies[lobby_id]["players"]])
-                        embed.description = (f"**{interaction.user.mention} started a Murder Mystery!**\n\n"
-                                           "📋 **How to Play:**\n"
-                                           "• 4-10 players: 1 KILLER 🔪, 1 SHERIFF 👮, rest INNOCENT 😇\n"
-                                           "• Innocents complete tasks (5 each)\n"
-                                           "• Killer eliminates 1 player per round (via ephemeral button)\n"
-                                           "• Sheriff can kill killer (but if wrong = DEATH ROUND!)\n"
-                                           "• Vote each round to eject suspects\n"
-                                           "• Innocents win: Killer voted out OR all tasks done\n"
-                                           "• Killer wins: Equal/outnumber innocents\n\n"
-                                           f"**Players ({len(self.active_lobbies[lobby_id]['players'])}/10):**\n"
-                                           f"{player_list}")
-                        await msg.edit(embed=embed)
-                
-                elif str(reaction.emoji) == "▶️" and user.id == self.active_lobbies[lobby_id]["host"]:
-                    if len(self.active_lobbies[lobby_id]["players"]) >= 4:
-                        self.active_lobbies[lobby_id]["started"] = True
-                        break
-                    else:
-                        await interaction.followup.send("❌ Need at least 4 players!", ephemeral=True)
-        
-        except asyncio.TimeoutError:
-            if len(self.active_lobbies[lobby_id]["players"]) >= 4:
-                self.active_lobbies[lobby_id]["started"] = True
-            else:
-                await interaction.followup.send("❌ Game cancelled - not enough players!")
-                del self.active_lobbies[lobby_id]
-                return
+        view = MurderMysteryLobbyView(self, lobby_id)
+        await interaction.response.send_message(embed=embed, view=view)
+    
+    async def start_murder_mystery_game(self, interaction: discord.Interaction, lobby_id: str):
+        """Start the murder mystery game after lobby phase"""
+        game = self.active_lobbies.get(lobby_id)
+        if not game:
+            return
         
         # Assign roles
-        game = self.active_lobbies[lobby_id]
         players = game["players"].copy()
         random.shuffle(players)
+        
+        game["killer"] = players[0]
+        game["sheriff"] = players[1] if game["has_sheriff"] and len(players) >= 4 else None
+        game["alive"] = game["players"].copy()
+        game["tasks_done"] = {pid: 0 for pid in game["players"] if pid != game["killer"]}
+        
+        # Send role DMs
+        for player_id in game["players"]:
+            try:
+                user = await self.bot.fetch_user(player_id)
+                if player_id == game["killer"]:
+                    role_embed = discord.Embed(
+                        title="🔪 YOU ARE THE KILLER!",
+                        description="**Your mission:** Eliminate all innocents without being caught!\n\n"
+                                   "**Your powers:**\n"
+                                   "• Kill 1 player per round (use buttons in your ephemeral panel)\n"
+                                   "• Fake tasks to blend in\n"
+                                   "• Deceive and survive votes!\n\n"
+                                   "**Win condition:** Outnumber or equal innocents",
+                        color=discord.Color.red()
+                    )
+                    await user.send(embed=role_embed)
+                elif player_id == game["sheriff"]:
+                    role_embed = discord.Embed(
+                        title="👮 YOU ARE THE SHERIFF!",
+                        description="**Your mission:** Protect innocents and kill the killer!\n\n"
+                                   "**Your powers:**\n"
+                                   "• Use `/murderkill @user` to eliminate someone\n"
+                                   "• ⚠️ WARNING: If you kill an innocent = DEATH ROUND!\n"
+                                   "• Complete tasks like innocents\n\n"
+                                   "**Win condition:** Find and eliminate the killer!",
+                        color=discord.Color.blue()
+                    )
+                    await user.send(embed=role_embed)
+                else:
+                    role_embed = discord.Embed(
+                        title="😇 YOU ARE INNOCENT!",
+                        description="**Your mission:** Complete tasks and find the killer!\n\n"
+                                   "**Your powers:**\n"
+                                   "• Complete tasks (5 total) via your ephemeral panel\n"
+                                   "• Vote to eject suspects\n"
+                                   "• Discuss and deduce!\n\n"
+                                   "**Win condition:** Complete all tasks OR vote out killer",
+                        color=discord.Color.green()
+                    )
+                    await user.send(embed=role_embed)
+            except:
+                pass
+        
+        # Game start announcement
+        channel = self.bot.get_channel(game["channel"])
+        if not channel:
+            return
+        
+        start_embed = discord.Embed(
+            title="🎮 MURDER MYSTERY - GAME START!",
+            description=f"**Roles assigned! Check your DMs.**\n\n"
+                       f"👥 **{len(game['alive'])} players alive**\n"
+                       f"🎯 **Tasks:** 0/{len(game['tasks_done']) * game['tasks_required']} completed\n"
+                       f"🔪 **Killer:** Hidden among you...\n"
+                       f"{'👮 **Sheriff:** One player can strike...' if game['has_sheriff'] else ''}\n\n"
+                       f"**Round 1 begins!** You have {game['round_duration']} seconds.\n"
+                       "Click the buttons that appear to interact!",
+            color=discord.Color.gold()
+        )
+        await channel.send(embed=start_embed)
+        
+        # Start main game loop
+        await self.run_murder_mystery_game(interaction, lobby_id)
         
         game["killer"] = players[0]
         game["sheriff"] = players[1] if len(players) >= 4 else None
@@ -486,7 +727,7 @@ class MultiplayerGames(commands.Cog):
                            f"👥 **Alive:** {len(game['alive'])} players\n"
                            f"💀 **Dead:** {len(game['dead'])} players\n"
                            f"📊 **Tasks:** {total_tasks}/{required_tasks}\n\n"
-                           "**Check your ephemeral panels!** (90 seconds)",
+                           f"**Check your ephemeral panels!** ({game['round_duration']} seconds)",
                 color=discord.Color.red() if game["death_round"] else discord.Color.blue()
             )
             await interaction.followup.send(embed=round_embed)
@@ -494,8 +735,8 @@ class MultiplayerGames(commands.Cog):
             # Send ephemeral panels to all alive players
             await self.send_ephemeral_panels(interaction, lobby_id)
             
-            # Wait for round duration
-            await asyncio.sleep(90)
+            # Wait for round duration (from settings)
+            await asyncio.sleep(game['round_duration'])
             
             # Process killer's kill (if any)
             if game["killer"] in game["alive"] and lobby_id in self.active_lobbies:
@@ -746,7 +987,7 @@ class MultiplayerGames(commands.Cog):
             description=f"**Time to vote!**\n\n"
                        f"**Alive players:**\n{alive_mentions}\n\n"
                        f"Type `vote @user` to cast your vote!\n"
-                       "(45 seconds)",
+                       f"({game['vote_duration']} seconds)",
             color=discord.Color.gold()
         )
         vote_msg = await interaction.followup.send(embed=vote_embed)
@@ -758,7 +999,7 @@ class MultiplayerGames(commands.Cog):
                    m.author.id in game["alive"] and
                    m.content.lower().startswith("vote"))
         
-        vote_end = asyncio.get_event_loop().time() + 45
+        vote_end = asyncio.get_event_loop().time() + game['vote_duration']
         while asyncio.get_event_loop().time() < vote_end and lobby_id in self.active_lobbies:
             try:
                 msg = await self.bot.wait_for('message', check=check_vote, timeout=max(0.1, vote_end - asyncio.get_event_loop().time()))

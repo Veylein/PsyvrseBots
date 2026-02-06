@@ -1,30 +1,30 @@
-﻿from __future__ import annotations
-import os, json, random, time, tempfile, threading
+from __future__ import annotations
+import os
+import json
+import random
+import time
+import tempfile
+import threading
 from typing import List, Dict, Optional
 import math
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
+from dataclasses import field
 
 import discord
 from discord import app_commands
 from discord.ext import commands
-import asyncio
 from typing import Callable
 
-# Compatibility helper: some discord.py versions don't expose
-# app_commands.checks.is_owner; provide a small wrapper that
-# returns an app_commands.check enforcing owner-only access.
 def app_owner_check() -> Callable:
     async def predicate(interaction: discord.Interaction) -> bool:
-        try:
-            return await interaction.client.is_owner(interaction.user)
-        except Exception:
+        client = interaction.client
+        if not isinstance(client, commands.Bot):
             return False
+        return await client.is_owner(interaction.user)
+
     return app_commands.check(predicate)
 
-# =====================
-# CONFIG / PATHS
-# =====================
 DATA_DIR = os.path.join(os.getcwd(), "Ludus", "data", "tcg")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 CRAFTED_FILE = os.path.join(DATA_DIR, "crafted.json")
@@ -92,6 +92,7 @@ def save_json(path: str, data: dict):
 # =====================
 # CARD CLASS
 # =====================
+
 @dataclass
 class Card:
     id: str
@@ -100,13 +101,14 @@ class Card:
     type: str = ''
     attack: int = 0
     defense: int = 0
-    traits: List[str] = None
+    traits: List[str] = field(default_factory=list)
     description: str = ''
 
     def to_dict(self) -> dict: return asdict(self)
     @staticmethod
     def from_dict(d:dict) -> Optional[Card]:
-        if not d: return None
+        if not d:
+            return None
         return Card(
             id=d.get('id',''),
             name=d.get('name',''),
@@ -147,8 +149,10 @@ class PsyInventory:
 
     def remove_card(self,user_id:int,card_id:str) -> bool:
         user = self.get_user(user_id)
-        try: user['cards'].remove(str(card_id))
-        except ValueError: return False
+        try:
+            user['cards'].remove(str(card_id))
+        except ValueError:
+            return False
         self.save()
         return True
 
@@ -159,8 +163,11 @@ class PsyInventory:
         self.save()
         return cid
 
-    def get_crafted(self,cid:str) -> Optional[Card]:
-        return Card.from_dict(self.crafted.get(str(cid)))
+    def get_crafted(self, cid: str) -> Optional[Card]:
+        data = self.crafted.get(str(cid))
+        if data is None:
+            return None
+        return Card.from_dict(data)
 
 inventory = PsyInventory()
 
@@ -180,7 +187,8 @@ def generate_card_from_seed(seed:int) -> Card:
     return Card(id=str(seed),name=name,rarity=rarity,type=card_type,attack=atk,defense=df,traits=card_traits,description=description)
 
 def get_card_for_id(cid:int) -> Card:
-    if 0 <= cid < TOTAL_CARD_POOL: return generate_card_from_seed(cid)
+    if 0 <= cid < TOTAL_CARD_POOL:
+        return generate_card_from_seed(cid)
     raise ValueError("Invalid numeric card id")
 
 # =====================
@@ -402,6 +410,10 @@ class PsyvrseTCG(commands.Cog):
         lines = []
         for s in shown:
             c = generate_card_from_seed(int(s)) if not str(s).upper().startswith('C') else inventory.get_crafted(s)
+
+            if c is None:
+                continue
+
             lines.append(f"• {c.name} ({c.rarity}) [{c.id}]")
         e = discord.Embed(title="Your Collection", description='\n'.join(lines), color=discord.Color.teal())
         await interaction.response.send_message(embed=e, ephemeral=False)
@@ -449,7 +461,7 @@ class PsyvrseTCG(commands.Cog):
             if cid not in owned:
                 return await interaction.response.send_message(f"You don't own {cid}.", ephemeral=True)
         tid = f"T{int(time.time()*1000)}{random.randint(100,999)}"
-        trade = {'id': tid, 'from': giver, 'to': receiver, 'give': give_list, 'want': want_list, 'status': 'pending', 'created_at': datetime.utcnow().isoformat()}
+        trade = {'id': tid, 'from': giver, 'to': receiver, 'give': give_list, 'want': want_list, 'status': 'pending', 'created_at': datetime.now(timezone.utc).isoformat()}
         inventory.trades[tid] = trade
         try:
             inventory.save()
@@ -498,15 +510,19 @@ class PsyvrseTCG(commands.Cog):
             if cid not in map(str, giver.get('cards', [])):
                 return await interaction.response.send_message(f"Offerer no longer owns {cid}; trade cancelled.", ephemeral=True)
         for cid in give_list:
-            try: giver['cards'].remove(cid)
-            except ValueError: pass
+            try:
+                giver['cards'].remove(cid)
+            except ValueError:
+                pass
             receiver['cards'].append(cid)
         for cid in want_list:
-            try: receiver['cards'].remove(cid)
-            except ValueError: pass
+            try:
+                receiver['cards'].remove(cid)
+            except ValueError:
+                pass
             giver['cards'].append(cid)
         t['status'] = 'completed'
-        t['completed_at'] = datetime.utcnow().isoformat()
+        t['completed_at'] = datetime.now(timezone.utc).isoformat()
         try:
             inventory.save()
         except Exception:
@@ -526,7 +542,7 @@ class PsyvrseTCG(commands.Cog):
         if t.get('status') != 'pending':
             return await interaction.response.send_message('Trade is not pending.', ephemeral=True)
         t['status'] = 'declined'
-        t['declined_at'] = datetime.utcnow().isoformat()
+        t['declined_at'] = datetime.now(timezone.utc).isoformat()
         try:
             inventory.save()
         except Exception:
@@ -544,7 +560,7 @@ class PsyvrseTCG(commands.Cog):
         if t.get('status') != 'pending':
             return await interaction.response.send_message('Trade is not pending.', ephemeral=True)
         t['status'] = 'cancelled'
-        t['cancelled_at'] = datetime.utcnow().isoformat()
+        t['cancelled_at'] = datetime.now(timezone.utc).isoformat()
         try:
             inventory.save()
         except Exception:
@@ -576,14 +592,9 @@ class PsyvrseTCG(commands.Cog):
             await interaction.response.send_message("Card not found in user's collection.", ephemeral=True)
 
 async def setup(bot:commands.Bot):
-    # Avoid adding the cog twice (some deploy systems reload modules)
     if bot.get_cog('PsyvrseTCG') is not None:
         return
     try:
         await bot.add_cog(PsyvrseTCG(bot))
     except Exception:
-        # If adding the cog fails, avoid crashing the loader.
         return
-    # App commands on the Cog are registered automatically when the cog is
-    # added. Avoid calling `bot.tree.add_command` here to prevent duplicate
-    # registrations during extension reloads.

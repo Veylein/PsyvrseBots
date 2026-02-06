@@ -1729,6 +1729,7 @@ class MiningView(discord.ui.LayoutView):
                         "backpack_capacity": self.game.backpack_capacity,
                         "inventory": self.game.inventory,
                         "coins": self.game.coins,
+                        "items": self.game.items,  # Save personal items
                         "last_update": datetime.utcnow().isoformat()
                     }
                     
@@ -1739,7 +1740,6 @@ class MiningView(discord.ui.LayoutView):
                     world_info["world_data"].torches = self.game.torches
                     world_info["world_data"].portals = self.game.portals
                     world_info["world_data"].portal_counter = self.game.portal_counter
-                    world_info["world_data"].items = self.game.items
                     
                     # Refresh other players positions for next render
                     self.game.other_players = {}
@@ -2948,6 +2948,7 @@ class OwnerMiningView(discord.ui.LayoutView):
                         "backpack_capacity": self.game.backpack_capacity,
                         "inventory": self.game.inventory,
                         "coins": self.game.coins,
+                        "items": self.game.items,  # Save personal items
                         "last_update": datetime.utcnow().isoformat()
                     }
                     
@@ -2958,7 +2959,6 @@ class OwnerMiningView(discord.ui.LayoutView):
                     world_info["world_data"].torches = self.game.torches
                     world_info["world_data"].portals = self.game.portals
                     world_info["world_data"].portal_counter = self.game.portal_counter
-                    world_info["world_data"].items = self.game.items
                     
                     self.game.other_players = {}
                     for other_user_id, other_data in world_info["players"].items():
@@ -3119,7 +3119,8 @@ class Mining(commands.Cog):
                     "energy": 60, "max_energy": 60,
                     "last_energy_regen": datetime.utcnow().isoformat(),
                     "pickaxe_level": 1, "backpack_capacity": 20,
-                    "inventory": {}, "coins": economy_balance
+                    "inventory": {}, "coins": economy_balance,
+                    "items": {"ladder": 5, "portal": 2, "torch": 10}  # Personal items per player
                 }
             
             player_data = world_info["players"][str(user_id)]
@@ -3134,9 +3135,9 @@ class Mining(commands.Cog):
             game.torches = world_game.torches
             game.portals = world_game.portals
             game.portal_counter = world_game.portal_counter
-            game.items = world_game.items
             
-            # Load player-specific data
+            # Load player-specific data (including items!)
+            game.items = player_data.get("items", {"ladder": 5, "portal": 2, "torch": 10})
             game.x = player_data["x"]
             game.y = player_data["y"]
             game.depth = player_data["depth"]
