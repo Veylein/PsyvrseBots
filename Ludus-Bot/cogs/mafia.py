@@ -262,6 +262,153 @@ CUSTOM_PRESETS = {
 }
 
 # ========================================
+# TIME PRESETS
+# ========================================
+
+TIME_PRESETS = {
+    "fast": {
+        "name_pl": "⚡ Szybki",
+        "name_en": "⚡ Fast",
+        "day": 60,
+        "night": 30,
+        "vote": 30
+    },
+    "standard": {
+        "name_pl": "⏱️ Standardowy",
+        "name_en": "⏱️ Standard",
+        "day": 180,
+        "night": 90,
+        "vote": 60
+    },
+    "hardcore": {
+        "name_pl": "🔥 Hardcore",
+        "name_en": "🔥 Hardcore",
+        "day": 300,
+        "night": 120,
+        "vote": 90
+    },
+    "roleplay": {
+        "name_pl": "🎭 Roleplay",
+        "name_en": "🎭 Roleplay",
+        "day": 600,
+        "night": 180,
+        "vote": 120
+    }
+}
+
+# ========================================
+# AUTO-BALANCE CHECKER
+# ========================================
+
+def check_role_balance(theme: str, mode: str, custom_roles: list, player_count: int, lang: str = "en") -> dict:
+    """
+    Check balance of custom role selection
+    Returns: {
+        "status": "balanced" | "risky" | "chaotic",
+        "warnings": [],
+        "suggestions": []
+    }
+    """
+    result = {
+        "status": "balanced",
+        "warnings": [],
+        "suggestions": [],
+        "emoji": "✅"
+    }
+    
+    if not custom_roles or mode != "custom":
+        return result
+    
+    # Get role database
+    db_key = f"{theme}_advanced" if mode in ["advanced", "custom"] else f"{theme}_normal"
+    role_db = ROLES_DATABASE.get(db_key, {})
+    
+    # Count factions
+    faction_counts = {}
+    power_counts = {"investigate": 0, "protect": 0, "kill": 0}
+    chaos_count = 0
+    
+    for role_id in custom_roles:
+        for faction, roles in role_db.items():
+            if role_id in roles:
+                faction_counts[faction] = faction_counts.get(faction, 0) + 1
+                
+                role_info = roles[role_id]
+                power = role_info.get("power")
+                
+                # Count specific powers
+                if power == "investigate":
+                    power_counts["investigate"] += 1
+                elif power in ["protect", "guard"]:
+                    power_counts["protect"] += 1
+                elif power in ["kill", "kill_leader"]:
+                    power_counts["kill"] += 1
+                
+                # Count chaos
+                if faction == "CHAOS":
+                    chaos_count += 1
+                
+                break
+    
+    # Determine evil and good factions
+    evil_faction = "MAFIA" if theme == "mafia" else "WEREWOLVES"
+    good_faction = "TOWN" if theme == "mafia" else "VILLAGE"
+    
+    evil_count = faction_counts.get(evil_faction, 0)
+    good_count = faction_counts.get(good_faction, 0)
+    neutral_count = faction_counts.get("NEUTRAL", 0)
+    
+    # Check evil ratio (should be 20-35% of total)
+    if player_count > 0:
+        evil_ratio = evil_count / player_count
+        
+        if evil_ratio > 0.45:
+            result["status"] = "risky"
+            result["warnings"].append(
+                f"⚠️ {'Za dużo złych ról' if lang == 'pl' else 'Too many evil roles'} ({evil_count}/{player_count} = {evil_ratio*100:.0f}%)"
+            )
+        elif evil_ratio < 0.15:
+            result["status"] = "risky"
+            result["warnings"].append(
+                f"⚠️ {'Za mało złych ról' if lang == 'pl' else 'Too few evil roles'} ({evil_count}/{player_count} = {evil_ratio*100:.0f}%)"
+            )
+    
+    # Check chaos ratio
+    if chaos_count > player_count * 0.3:
+        result["status"] = "chaotic"
+        result["warnings"].append(
+            f"🌀 {'Dużo ról chaos' if lang == 'pl' else 'Many chaos roles'} ({chaos_count}/{player_count})"
+        )
+    
+    # Check for investigators
+    if power_counts["investigate"] == 0 and good_count > 3:
+        result["suggestions"].append(
+            f"💡 {'Dodaj detektywa/jasnowidza' if lang == 'pl' else 'Add detective/seer'}"
+        )
+    
+    # Check for healers
+    if power_counts["protect"] == 0 and player_count >= 8:
+        result["suggestions"].append(
+            f"💡 {'Dodaj lekarza/ochroniarza' if lang == 'pl' else 'Add doctor/healer'}"
+        )
+    
+    # Too many investigators
+    if power_counts["investigate"] > 3:
+        result["warnings"].append(
+            f"⚠️ {'Za dużo śledczych' if lang == 'pl' else 'Too many investigators'} ({power_counts['investigate']})"
+        )
+    
+    # Determine final status emoji
+    if result["status"] == "chaotic":
+        result["emoji"] = "🌀"
+    elif result["status"] == "risky":
+        result["emoji"] = "⚠️"
+    elif result["suggestions"]:
+        result["emoji"] = "💡"
+    
+    return result
+
+# ========================================
 # SETTINGS VIEW - Interactive Interface
 # ========================================
 
@@ -428,17 +575,17 @@ class MafiaSettingsView(discord.ui.LayoutView):
         )
         voice_btn.callback = self.toggle_voice
         
-        # Duration select
-        duration_select = discord.ui.Select(
-            placeholder="⏱️ Change Durations",
+        # Time preset select
+        time_preset_select = discord.ui.Select(
+            placeholder="⏱️ Time Presets",
             options=[
-                discord.SelectOption(label="Fast (60/45/30)", value="fast"),
-                discord.SelectOption(label="Standard (180/90/60)", value="standard"),
-                discord.SelectOption(label="Long (300/120/90)", value="long"),
-                discord.SelectOption(label="Custom...", value="custom"),
+                discord.SelectOption(label=f"⚡ Fast (60/30/30s)", value="fast", description="Quick games"),
+                discord.SelectOption(label=f"⏱️ Standard (180/90/60s)", value="standard", description="Default timing"),
+                discord.SelectOption(label=f"🔥 Hardcore (300/120/90s)", value="hardcore", description="Long strategic games"),
+                discord.SelectOption(label=f"🎭 Roleplay (600/180/120s)", value="roleplay", description="RP-heavy games"),
             ]
         )
-        duration_select.callback = self.change_durations
+        time_preset_select.callback = self.apply_time_preset
         
         # Back button
         back_btn = discord.ui.Button(style=discord.ButtonStyle.secondary, emoji="◀️", label="Back to Lobby")
@@ -457,7 +604,7 @@ class MafiaSettingsView(discord.ui.LayoutView):
             discord.ui.ActionRow(lang_en_btn, lang_pl_btn),
             discord.ui.ActionRow(voice_btn),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
-            discord.ui.ActionRow(duration_select),
+            discord.ui.ActionRow(time_preset_select),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(back_btn),
             accent_colour=discord.Colour(color)
@@ -528,34 +675,28 @@ class MafiaSettingsView(discord.ui.LayoutView):
         self._build_ui()
         await interaction.response.edit_message(view=self)
     
-    async def change_durations(self, interaction: discord.Interaction):
-        preset = interaction.data['values'][0]
+    async def apply_time_preset(self, interaction: discord.Interaction):
+        """Apply time preset to lobby"""
         lobby = self.cog.active_lobbies.get(self.lobby_id)
-        
-        if preset == "fast":
-            lobby["day_duration"] = 60
-            lobby["night_duration"] = 45
-            lobby["vote_duration"] = 30
-        elif preset == "standard":
-            lobby["day_duration"] = 180
-            lobby["night_duration"] = 90
-            lobby["vote_duration"] = 60
-        elif preset == "long":
-            lobby["day_duration"] = 300
-            lobby["night_duration"] = 120
-            lobby["vote_duration"] = 90
-        elif preset == "custom":
-            # Show modal for custom input
-            modal = CustomDurationModal(self.cog, self.lobby_id, self)
-            await interaction.response.send_modal(modal)
+        if not lobby or interaction.user.id != lobby["host"]:
+            await interaction.response.send_message("❌ Only host can change settings!", ephemeral=True)
             return
         
-        await self._update_lobby_display()
+        preset_id = interaction.data['values'][0]
+        preset = TIME_PRESETS.get(preset_id)
         
-        # Update settings view
-        self.clear_items()
-        self._build_ui()
-        await interaction.response.edit_message(view=self)
+        if preset:
+            lobby["day_duration"] = preset["day"]
+            lobby["night_duration"] = preset["night"]
+            lobby["vote_duration"] = preset["vote"]
+            
+            await self._update_lobby_display()
+            
+            # Update settings view
+            self.clear_items()
+            self._build_ui()
+            await interaction.response.edit_message(view=self)
+    
     
     async def back_to_lobby(self, interaction: discord.Interaction):
         # Return to lobby view
@@ -694,6 +835,21 @@ class MafiaRolePickerView(discord.ui.LayoutView):
             content += f"\n**{faction_name if lang == 'pl' else faction_name_en}:** {evil_count}"
         
         content += "\n"
+        
+        # Show balance check if roles selected
+        if len(selected_roles) > 0:
+            balance = check_role_balance(theme, mode, selected_roles, player_count, lang)
+            content += f"\n{balance['emoji']} **Balance:** {balance['status'].title()}"
+            
+            if balance['warnings']:
+                warnings_text = "\n".join([f"⚠️ {w}" for w in balance['warnings']])
+                content += f"\n{warnings_text}"
+            
+            if balance['suggestions']:
+                suggestions_text = "\n".join([f"💡 {s}" for s in balance['suggestions']])
+                content += f"\n{suggestions_text}"
+            
+            content += "\n"
         
         if roles_display:
             roles_text = "\n".join([f"• {role}" for role in roles_display])
@@ -1673,8 +1829,810 @@ class MafiaCog(commands.Cog):
         await interaction.response.send_message(view=view)
     
     async def start_mafia_game(self, interaction: discord.Interaction, lobby_id: str):
-        """Start the actual game (placeholder for now)"""
-        await interaction.channel.send("🎮 **Game would start here!** (Full game loop coming next...)")
+        """Start the actual Mafia game with full loop"""
+        lobby = self.active_lobbies.get(lobby_id)
+        if not lobby:
+            return
+        
+        guild = interaction.guild
+        channel = interaction.channel
+        lang = lobby["language"]
+        theme = lobby["theme"]
+        mode = lobby["mode"]
+        player_count = len(lobby["players"])
+        
+        # Create game category and channels
+        category_name = f"🎮 Mafia Game #{channel.id % 10000}"
+        category = await guild.create_category(category_name)
+        
+        # Main channel (everyone can see/talk)
+        main_channel = await guild.create_text_channel(
+            name="🏛️-main" if theme == "mafia" else "🏘️-main",
+            category=category
+        )
+        
+        # Evil faction channel
+        evil_name = "🔫-mafia" if theme == "mafia" else "🐺-werewolves"
+        evil_channel = await guild.create_text_channel(
+            name=evil_name,
+            category=category
+        )
+        
+        # Dead channel
+        dead_channel = await guild.create_text_channel(
+            name="💀-ghosts" if lang == "en" else "💀-duchy",
+            category=category
+        )
+        
+        # Voice mode: create meeting spot voice channels + game center text channel
+        voice_channels = []
+        center_voice_channel = None
+        game_center_text = None
+        
+        if lobby.get("voice_mode", False):
+            # Create game center text channel for votes/interactions
+            game_center_text = await guild.create_text_channel(
+                name="🎯-centrum-gry" if lang == "pl" else "🎯-game-center",
+                category=category
+            )
+            
+            # Theme-specific meeting spots
+            if theme == "mafia":
+                meeting_spots = [
+                    ("🍰", "cukiernia" if lang == "pl" else "cafe"),
+                    ("🏦", "bank" if lang == "pl" else "bank"),
+                    ("🎰", "kasyno" if lang == "pl" else "casino"),
+                    ("🏪", "sklep" if lang == "pl" else "store"),
+                    ("🏭", "fabryka" if lang == "pl" else "factory"),
+                    ("🚔", "posterunek" if lang == "pl" else "police-station"),
+                    ("🏚️", "magazyn" if lang == "pl" else "warehouse"),
+                    ("🌉", "doki" if lang == "pl" else "docks"),
+                ]
+            else:  # werewolf
+                meeting_spots = [
+                    ("🌾", "farma" if lang == "pl" else "farm"),
+                    ("🌲", "las" if lang == "pl" else "forest"),
+                    ("⛏️", "kopalnia" if lang == "pl" else "mine"),
+                    ("🏚️", "opuszczony-dom" if lang == "pl" else "abandoned-house"),
+                    ("🏔️", "góry" if lang == "pl" else "mountains"),
+                    ("🌊", "jezioro" if lang == "pl" else "lake"),
+                    ("⛪", "kościół" if lang == "pl" else "church"),
+                    ("🏰", "zamek" if lang == "pl" else "castle"),
+            ]
+            
+            # Create main center voice channel (where players gather during day/voting)
+            center_name = "🏛️-centrum-miasta" if theme == "mafia" else "🔥-ognisko"
+            if lang == "en":
+                center_name = "🏛️-town-center" if theme == "mafia" else "🔥-campfire"
+            
+            center_voice_channel = await guild.create_voice_channel(
+                name=center_name,
+                category=category
+            )
+            
+            # Create meeting spot channels
+            for emoji, name in meeting_spots:
+                vc = await guild.create_voice_channel(
+                    name=f"{emoji}-{name}",
+                    category=category
+                )
+                voice_channels.append(vc.id)
+                # All players can join initially
+                for member in [await guild.fetch_member(pid) for pid in lobby["players"]]:
+                    await vc.set_permissions(member, connect=True, speak=True)
+            
+            # Set permissions for center voice channel
+            for member in [await guild.fetch_member(pid) for pid in lobby["players"]]:
+                await center_voice_channel.set_permissions(member, connect=True, speak=True)
+            
+            # Set permissions for game center text
+            for member in [await guild.fetch_member(pid) for pid in lobby["players"]]:
+                await game_center_text.set_permissions(member, read_messages=True, send_messages=False)
+        
+        # Set permissions - initially only main is visible to players
+        player_members = [await guild.fetch_member(pid) for pid in lobby["players"]]
+        
+        # Main channel - all players can see
+        for member in player_members:
+            await main_channel.set_permissions(member, read_messages=True, send_messages=True)
+        
+        # Evil channel - hidden initially (or skip in voice mode)
+        if not lobby.get("voice_mode", False):
+            await evil_channel.set_permissions(guild.default_role, read_messages=False)
+        else:
+            # In voice mode, evil channel is hidden - force public meetings
+            await evil_channel.set_permissions(guild.default_role, read_messages=False)
+            await evil_channel.edit(name="❌-disabled-voice-mode")
+        
+        # Dead channel - hidden initially
+        await dead_channel.set_permissions(guild.default_role, read_messages=False)
+        
+        # Assign roles
+        if mode == "custom":
+            roles = lobby["custom_roles"].copy()
+            random_mode = lobby.get("random_roles", False)
+            
+            if random_mode:
+                # Random selection from pool
+                random.shuffle(roles)
+                selected_roles = roles[:player_count]
+            else:
+                selected_roles = roles
+        else:
+            # Use preset
+            preset_key = f"{theme}_{mode}"
+            selected_roles = PRESETS[preset_key][player_count].copy()
+        
+        # Shuffle and assign
+        random.shuffle(selected_roles)
+        players_shuffled = lobby["players"].copy()
+        random.shuffle(players_shuffled)
+        
+        # Create game state
+        game_state = {
+            "lobby_id": lobby_id,
+            "guild_id": guild.id,
+            "category_id": category.id,
+            "main_channel_id": main_channel.id,
+            "evil_channel_id": evil_channel.id,
+            "dead_channel_id": dead_channel.id,
+            "voice_channels": voice_channels,  # Voice mode meeting spots
+            "center_voice_channel_id": center_voice_channel.id if center_voice_channel else None,
+            "game_center_text_id": game_center_text.id if game_center_text else None,
+            "theme": theme,
+            "mode": mode,
+            "language": lang,
+            "day_duration": lobby["day_duration"],
+            "night_duration": lobby["night_duration"],
+            "vote_duration": lobby["vote_duration"],
+            "voice_mode": lobby["voice_mode"],
+            "players": {},  # {player_id: {"role": role_id, "alive": True, "votes": 0}}
+            "alive_players": [],
+            "dead_players": [],
+            "day_number": 0,
+            "phase": "night",  # night, day, vote
+            "night_actions": {},
+            "votes": {},
+        }
+        
+        # Assign roles to players
+        db_key = f"{theme}_advanced" if mode in ["advanced", "custom"] else f"{theme}_normal"
+        role_db = ROLES_DATABASE.get(db_key, {})
+        
+        for player_id, role_id in zip(players_shuffled, selected_roles):
+            # Find role info
+            role_info = None
+            faction = None
+            for f, roles in role_db.items():
+                if role_id in roles:
+                    role_info = roles[role_id]
+                    faction = f
+                    break
+            
+            game_state["players"][player_id] = {
+                "role": role_id,
+                "role_info": role_info,
+                "faction": faction,
+                "alive": True,
+                "protected": False,
+                "votes": 0,
+            }
+            game_state["alive_players"].append(player_id)
+        
+        self.active_games[lobby_id] = game_state
+        
+        # Grant evil faction access to their channel
+        guild = self.bot.get_guild(game_state["guild_id"])
+        evil_channel = guild.get_channel(game_state["evil_channel_id"])
+        evil_faction = "MAFIA" if theme == "mafia" else "WEREWOLVES"
+        
+        for player_id, player_data in game_state["players"].items():
+            if player_data["faction"] == evil_faction:
+                member = await guild.fetch_member(player_id)
+                await evil_channel.set_permissions(member, read_messages=True, send_messages=True)
+        
+        # Send roles via DM
+        await self._send_roles_dm(game_state)
+        
+        # Announce in original channel
+        await channel.send(
+            f"# 🎮 **{'GRA ROZPOCZĘTA!' if lang == 'pl' else 'GAME STARTED!'}**\n"
+            f"{'Gra przeniesiona do' if lang == 'pl' else 'Game moved to'} {main_channel.mention}\n"
+            f"{'Role zostały rozdane. Sprawdźcie DM!' if lang == 'pl' else 'Roles have been assigned. Check your DMs!'}"
+        )
+        
+        # Send welcome message in main channel
+        await main_channel.send(
+            f"# 🎮 **{'WITAMY W GRZE!' if lang == 'pl' else 'WELCOME TO THE GAME!'}**\n"
+            f"{'Gracze' if lang == 'pl' else 'Players'}: {len(game_state['players'])}\n"
+            f"{'Tryb' if lang == 'pl' else 'Mode'}: **{theme.title()} - {mode.title()}**\n"
+            + (f"\n🎙️ **Voice Mode Active!**\n"
+               f"{'Spotykajcie się w kanałach głosowych aby rozmawiać!' if lang == 'pl' else 'Meet in voice channels to talk!'}\n"
+               f"{'Uważajcie - inni gracze mogą was podsłuchać!' if lang == 'pl' else 'Be careful - other players might overhear you!'}\n"
+               if game_state.get('voice_mode', False) else "")
+            + f"\n{'Gra rozpocznie się za chwilę...' if lang == 'pl' else 'Game will start shortly...'}"
+        )
+        
+        await asyncio.sleep(5)
+        
+        # Start first night
+        await self._night_phase(lobby_id)
+    
+    async def _send_roles_dm(self, game_state: dict):
+        """Send role assignments via DM"""
+        lang = game_state["language"]
+        theme = game_state["theme"]
+        
+        for player_id, player_data in game_state["players"].items():
+            try:
+                user = await self.bot.fetch_user(player_id)
+                role_id = player_data["role"]
+                role_info = player_data["role_info"]
+                faction = player_data["faction"]
+                
+                role_name = role_info[f"name_{lang}"]
+                role_emoji = role_info["emoji"]
+                power = role_info.get("power")
+                
+                # Faction names
+                faction_names = {
+                    "pl": {
+                        "TOWN": "🏛️ MIASTO",
+                        "MAFIA": "🔫 MAFIA",
+                        "VILLAGE": "🏘️ WIOSKA",
+                        "WEREWOLVES": "🐺 WILKOŁAKI",
+                        "NEUTRAL": "⚖️ NEUTRALNY",
+                        "CHAOS": "🌀 CHAOS"
+                    },
+                    "en": {
+                        "TOWN": "🏛️ TOWN",
+                        "MAFIA": "🔫 MAFIA",
+                        "VILLAGE": "🏘️ VILLAGE",
+                        "WEREWOLVES": "🐺 WEREWOLVES",
+                        "NEUTRAL": "⚖️ NEUTRAL",
+                        "CHAOS": "🌀 CHAOS"
+                    }
+                }
+                
+                faction_display = faction_names[lang].get(faction, faction)
+                
+                # Get description
+                descriptions = {
+                    "pl": {
+                        None: "Zwykły obywatel bez specjalnych mocy.",
+                        "investigate": "Co noc możesz zbadać gracza i dowiedzieć się czy jest zły.",
+                        "protect": "Co noc możesz ochronić gracza przed śmiercią.",
+                        "kill": "Co noc możesz zabić wybranego gracza (głosowanie z zespołem).",
+                        "kill_leader": "Zabijasz graczy i jesteś odporny na wykrycie.",
+                    },
+                    "en": {
+                        None: "Regular citizen with no special powers.",
+                        "investigate": "Each night you can investigate a player to learn if they are evil.",
+                        "protect": "Each night you can protect a player from death.",
+                        "kill": "Each night you can kill a chosen player (vote with team).",
+                        "kill_leader": "You kill players and are immune to detection.",
+                    }
+                }
+                
+                desc = descriptions[lang].get(power, "Specjalna rola." if lang == "pl" else "Special role.")
+                
+                msg = (
+                    f"# 🎭 {'TWOJA ROLA' if lang == 'pl' else 'YOUR ROLE'}\n\n"
+                    f"**{role_emoji} {role_name}**\n"
+                    f"{faction_display}\n\n"
+                    f"**{'Opis' if lang == 'pl' else 'Description'}:**\n{desc}\n\n"
+                    f"{'Powodzenia!' if lang == 'pl' else 'Good luck!'} 🎮"
+                )
+                
+                await user.send(msg)
+            except Exception as e:
+                print(f"Failed to send DM to {player_id}: {e}")
+    
+    async def _night_phase(self, lobby_id: str):
+        """Execute night phase"""
+        game_state = self.active_games.get(lobby_id)
+        if not game_state:
+            return
+        
+        game_state["day_number"] += 1
+        game_state["phase"] = "night"
+        game_state["night_actions"] = {}
+        
+        main_channel = self.bot.get_channel(game_state["main_channel_id"])
+        evil_channel = self.bot.get_channel(game_state["evil_channel_id"])
+        lang = game_state["language"]
+        theme = game_state["theme"]
+        day_num = game_state["day_number"]
+        
+        # Determine evil faction name
+        evil_faction = "MAFIA" if theme == "mafia" else "WEREWOLVES"
+        evil_name = "Mafia" if theme == "mafia" else ("Wilkołaki" if lang == "pl" else "Werewolves")
+        
+        await main_channel.send(
+            f"# 🌙 {'NOC' if lang == 'pl' else 'NIGHT'} {day_num}\n"
+            f"{'Miasto zasypia... Role specjalne działają w cieniu.' if lang == 'pl' else 'The town sleeps... Special roles act in the shadows.'}\n"
+            f"⏱️ {game_state['night_duration']}s"
+        )
+        
+        # Voice mode: lock meeting spots and move players to center
+        guild = self.bot.get_guild(game_state["guild_id"])
+        if game_state.get("voice_mode", False):
+            # Lock all meeting spot voice channels
+            for vc_id in game_state.get("voice_channels", []):
+                vc = guild.get_channel(vc_id)
+                if vc:
+                    # Block all connections
+                    await vc.set_permissions(guild.default_role, connect=False)
+                    # Move any remaining players to center
+                    for member in vc.members:
+                        center_vc = guild.get_channel(game_state.get("center_voice_channel_id"))
+                        if center_vc:
+                            try:
+                                await member.move_to(center_vc)
+                            except:
+                                pass
+            
+            # Announce in game center text
+            game_center = self.bot.get_channel(game_state.get("game_center_text_id"))
+            if game_center:
+                await game_center.send(
+                    f"🌙 **{'NOC' if lang == 'pl' else 'NIGHT'} {day_num}**\n"
+                    f"🔒 {'Wszystkie lokacje są zamknięte!' if lang == 'pl' else 'All locations are locked!'}\n"
+                    f"{'Wszyscy gracze przebywają w centrum.' if lang == 'pl' else 'All players stay at the center.'}"
+                )
+        
+        # Get evil players
+        evil_players = [pid for pid, pdata in game_state["players"].items() 
+                       if pdata["faction"] == evil_faction and pdata["alive"]]
+        
+        if evil_players and not game_state.get("voice_mode", False):
+            # Text mode: Create night action view for evil faction
+            view = NightActionView(self, lobby_id, evil_faction)
+            msg = await evil_channel.send(
+                f"## 🔫 {evil_name} {'- wybierz ofiarę' if lang == 'pl' else '- choose victim'}",
+                view=view
+            )
+            
+            # Send DMs to evil players
+            for pid in evil_players:
+                try:
+                    user = await self.bot.fetch_user(pid)
+                    await user.send(
+                        f"🌙 {'Noc' if lang == 'pl' else 'Night'} {day_num} - "
+                        f"{'Głosuj na ofiarę w kanale gry' if lang == 'pl' else 'Vote for victim in game channel'}"
+                    )
+                except:
+                    pass
+        elif evil_players and game_state.get("voice_mode", False):
+            # Voice mode: Evil players must meet in voice channels
+            await main_channel.send(
+                f"👥 **Voice Mode:** {evil_name} {'muszą spotkać się w kanałach głosowych aby się zorganizować!' if lang == 'pl' else 'must meet in voice channels to organize!'}\n"
+                f"🔇 {'Bądźcie ostrożni - inni gracze mogą was podsłuchać!' if lang == 'pl' else 'Be careful - other players might overhear you!'}"
+            )
+            
+            # Send DMs to evil players
+            for pid in evil_players:
+                try:
+                    user = await self.bot.fetch_user(pid)
+                    await user.send(
+                        f"🌙 {'Noc' if lang == 'pl' else 'Night'} {day_num} - "
+                        f"{'Tryb głosowy: spotkajcie się i ustalcie ofiarę!' if lang == 'pl' else 'Voice mode: meet up and decide on a victim!'}"
+                    )
+                except:
+                    pass
+        
+        # Wait for night duration
+        await asyncio.sleep(game_state["night_duration"])
+        
+        # Process night actions
+        await self._process_night(lobby_id)
+    
+    async def _process_night(self, lobby_id: str):
+        """Process night actions and move to day"""
+        game_state = self.active_games.get(lobby_id)
+        if not game_state:
+            return
+        
+        main_channel = self.bot.get_channel(game_state["main_channel_id"])
+        dead_channel = self.bot.get_channel(game_state["dead_channel_id"])
+        guild = self.bot.get_guild(game_state["guild_id"])
+        lang = game_state["language"]
+        theme = game_state["theme"]
+        
+        # Determine who was killed
+        evil_faction = "MAFIA" if theme == "mafia" else "WEREWOLVES"
+        target = game_state["night_actions"].get(evil_faction)
+        
+        killed_players = []
+        
+        if target and game_state["players"][target]["alive"]:
+            # Check if protected
+            if not game_state["players"][target].get("protected"):
+                game_state["players"][target]["alive"] = False
+                game_state["alive_players"].remove(target)
+                game_state["dead_players"].append(target)
+                killed_players.append(target)
+                
+                # Give dead player access to ghost channel
+                try:
+                    member = await guild.fetch_member(target)
+                    await dead_channel.set_permissions(member, read_messages=True, send_messages=True)
+                except:
+                    pass
+        
+        # Reset protections
+        for pdata in game_state["players"].values():
+            pdata["protected"] = False
+        
+        # Announce deaths
+        await main_channel.send(f"# ☀️ {'DZIEŃ' if lang == 'pl' else 'DAY'} {game_state['day_number']}")
+        
+        if killed_players:
+            for pid in killed_players:
+                await main_channel.send(f"💀 <@{pid}> {'został zabity w nocy!' if lang == 'pl' else 'was killed during the night!'}")
+        else:
+            await main_channel.send(f"✨ {'Nikt nie zginął tej nocy!' if lang == 'pl' else 'No one died last night!'}")
+        
+        # Check win conditions
+        if await self._check_win_condition(lobby_id):
+            return
+        
+        # Start day phase
+        await self._day_phase(lobby_id)
+    
+    async def _day_phase(self, lobby_id: str):
+        """Execute day phase (discussion)"""
+        game_state = self.active_games.get(lobby_id)
+        if not game_state:
+            return
+        
+        game_state["phase"] = "day"
+        main_channel = self.bot.get_channel(game_state["main_channel_id"])
+        lang = game_state["language"]
+        guild = self.bot.get_guild(game_state["guild_id"])
+        
+        # Voice mode: unlock meeting spots
+        if game_state.get("voice_mode", False):
+            for vc_id in game_state.get("voice_channels", []):
+                vc = guild.get_channel(vc_id)
+                if vc:
+                    # Unlock all connections
+                    await vc.set_permissions(guild.default_role, connect=True)
+            
+            # Announce in game center text
+            game_center = self.bot.get_channel(game_state.get("game_center_text_id"))
+            if game_center:
+                await game_center.send(
+                    f"☀️ **{'DZIEŃ' if lang == 'pl' else 'DAY'} {game_state['day_number']}**\n"
+                    f"🔓 {'Wszystkie lokacje są otwarte!' if lang == 'pl' else 'All locations are open!'}\n"
+                    f"{'Możecie się swobodnie przemieszczać i rozmawiać.' if lang == 'pl' else 'You can freely move and talk.'}"
+                )
+        
+        alive_mentions = " ".join([f"<@{pid}>" for pid in game_state["alive_players"]])
+        
+        await main_channel.send(
+            f"## 💬 {'DYSKUSJA' if lang == 'pl' else 'DISCUSSION'}\n"
+            f"{alive_mentions}\n"
+            f"{'Dyskutujcie i znajdźcie podejrzanych!' if lang == 'pl' else 'Discuss and find the suspects!'}\n"
+            f"⏱️ {game_state['day_duration']}s"
+        )
+        
+        await asyncio.sleep(game_state["day_duration"])
+        
+        # Start voting phase
+        await self._vote_phase(lobby_id)
+    
+    async def _vote_phase(self, lobby_id: str):
+        """Execute voting phase"""
+        game_state = self.active_games.get(lobby_id)
+        if not game_state:
+            return
+        
+        game_state["phase"] = "vote"
+        game_state["votes"] = {}
+        
+        # Use game center text for voice mode, otherwise main channel
+        if game_state.get("voice_mode", False) and game_state.get("game_center_text_id"):
+            channel = self.bot.get_channel(game_state["game_center_text_id"])
+        else:
+            channel = self.bot.get_channel(game_state["main_channel_id"])
+        
+        lang = game_state["language"]
+        guild = self.bot.get_guild(game_state["guild_id"])
+        
+        # Voice mode: teleport all to center and lock meeting spots
+        if game_state.get("voice_mode", False):
+            center_vc = guild.get_channel(game_state.get("center_voice_channel_id"))
+            
+            # Lock meeting spots
+            for vc_id in game_state.get("voice_channels", []):
+                vc = guild.get_channel(vc_id)
+                if vc:
+                    await vc.set_permissions(guild.default_role, connect=False)
+                    # Move players to center
+                    for member in vc.members:
+                        if center_vc:
+                            try:
+                                await member.move_to(center_vc)
+                            except:
+                                pass
+        
+        view = VoteView(self, lobby_id)
+        await channel.send(
+            f"## 🗳️ {'GŁOSOWANIE' if lang == 'pl' else 'VOTING'}\n"
+            f"{'Głosujcie kogo chcecie zlinczować!' if lang == 'pl' else 'Vote who to lynch!'}\n"
+            f"⏱️ {game_state['vote_duration']}s",
+            view=view
+        )
+        
+        await asyncio.sleep(game_state["vote_duration"])
+        
+        # Process votes
+        await self._process_votes(lobby_id)
+    
+    async def _process_votes(self, lobby_id: str):
+        """Process voting results"""
+        game_state = self.active_games.get(lobby_id)
+        if not game_state:
+            return
+        
+        main_channel = self.bot.get_channel(game_state["main_channel_id"])
+        dead_channel = self.bot.get_channel(game_state["dead_channel_id"])
+        guild = self.bot.get_guild(game_state["guild_id"])
+        lang = game_state["language"]
+        
+        # Count votes
+        vote_counts = {}
+        for voter, target in game_state["votes"].items():
+            vote_counts[target] = vote_counts.get(target, 0) + 1
+        
+        if not vote_counts:
+            await main_channel.send(f"❌ {'Nikt nie głosował!' if lang == 'pl' else 'No one voted!'}")
+        else:
+            # Find player with most votes
+            lynched = max(vote_counts, key=vote_counts.get)
+            lynch_votes = vote_counts[lynched]
+            
+            # Show results
+            results = "\n".join([f"<@{pid}>: **{count}** {'głos(ów)' if lang == 'pl' else 'vote(s)'}" 
+                                for pid, count in sorted(vote_counts.items(), key=lambda x: x[1], reverse=True)])
+            
+            await main_channel.send(
+                f"## 📊 {'WYNIKI GŁOSOWANIA' if lang == 'pl' else 'VOTE RESULTS'}\n{results}"
+            )
+            
+            # Lynch player
+            if game_state["players"][lynched]["alive"]:
+                game_state["players"][lynched]["alive"] = False
+                game_state["alive_players"].remove(lynched)
+                game_state["dead_players"].append(lynched)
+                
+                role_id = game_state["players"][lynched]["role"]
+                role_info = game_state["players"][lynched]["role_info"]
+                role_name = role_info[f"name_{lang}"]
+                role_emoji = role_info["emoji"]
+                
+                # Give access to ghost channel
+                try:
+                    member = await guild.fetch_member(lynched)
+                    await dead_channel.set_permissions(member, read_messages=True, send_messages=True)
+                except:
+                    pass
+                
+                await main_channel.send(
+                    f"⚰️ <@{lynched}> {'został zlinczowany!' if lang == 'pl' else 'was lynched!'}\n"
+                    f"{'Był' if lang == 'pl' else 'They were'} **{role_emoji} {role_name}**"
+                )
+        
+        # Check win conditions
+        if await self._check_win_condition(lobby_id):
+            return
+        
+        # Continue to next night
+        await asyncio.sleep(3)
+        await self._night_phase(lobby_id)
+    
+    async def _check_win_condition(self, lobby_id: str) -> bool:
+        """Check if any faction has won"""
+        game_state = self.active_games.get(lobby_id)
+        if not game_state:
+            return True
+        
+        main_channel = self.bot.get_channel(game_state["main_channel_id"])
+        guild = self.bot.get_guild(game_state["guild_id"])
+        lang = game_state["language"]
+        theme = game_state["theme"]
+        
+        # Count alive players by faction
+        alive_by_faction = {}
+        for pid in game_state["alive_players"]:
+            faction = game_state["players"][pid]["faction"]
+            alive_by_faction[faction] = alive_by_faction.get(faction, 0) + 1
+        
+        evil_faction = "MAFIA" if theme == "mafia" else "WEREWOLVES"
+        good_faction = "TOWN" if theme == "mafia" else "VILLAGE"
+        
+        evil_count = alive_by_faction.get(evil_faction, 0)
+        good_count = alive_by_faction.get(good_faction, 0)
+        
+        winner = None
+        
+        # Evil wins if they equal or outnumber good
+        if evil_count >= good_count and evil_count > 0:
+            winner = evil_faction
+        # Good wins if no evil left
+        elif evil_count == 0:
+            winner = good_faction
+        
+        if winner:
+            winner_name = {
+                "MAFIA": "🔫 MAFIA",
+                "WEREWOLVES": "🐺 " + ("WILKOŁAKI" if lang == "pl" else "WEREWOLVES"),
+                "TOWN": "🏛️ " + ("MIASTO" if lang == "pl" else "TOWN"),
+                "VILLAGE": "🏘️ " + ("WIOSKA" if lang == "pl" else "VILLAGE"),
+            }.get(winner, winner)
+            
+            # Show all roles
+            role_list = []
+            for pid, pdata in game_state["players"].items():
+                role_info = pdata["role_info"]
+                role_name = role_info[f"name_{lang}"]
+                role_emoji = role_info["emoji"]
+                status = "✅" if pdata["alive"] else "💀"
+                role_list.append(f"{status} <@{pid}>: {role_emoji} {role_name}")
+            
+            await main_channel.send(
+                f"# 🏆 {'KONIEC GRY!' if lang == 'pl' else 'GAME OVER!'}\n\n"
+                f"## {winner_name} {'WYGRYWA!' if lang == 'pl' else 'WINS!'}\n\n"
+                f"**{'Role' if lang == 'pl' else 'Roles'}:**\n" + "\n".join(role_list) +
+                f"\n\n{'Kategoria zostanie usunięta za 60 sekund...' if lang == 'pl' else 'Category will be deleted in 60 seconds...'}"
+            )
+            
+            # Wait before cleanup
+            await asyncio.sleep(60)
+            
+            # Delete category and all channels
+            try:
+                category = guild.get_channel(game_state["category_id"])
+                if category:
+                    for channel in category.channels:
+                        await channel.delete()
+                    await category.delete()
+            except Exception as e:
+                print(f"Failed to delete category: {e}")
+            
+            # Cleanup
+            del self.active_games[lobby_id]
+            if lobby_id in self.active_lobbies:
+                del self.active_lobbies[lobby_id]
+            
+            return True
+        
+        return False
+
+
+# ========================================
+# GAME PHASE VIEWS
+# ========================================
+
+class NightActionView(discord.ui.View):
+    """View for night actions (evil faction voting)"""
+    
+    def __init__(self, cog, lobby_id: str, faction: str):
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.lobby_id = lobby_id
+        self.faction = faction
+        self._build_ui()
+    
+    def _build_ui(self):
+        game_state = self.cog.active_games.get(self.lobby_id)
+        if not game_state:
+            return
+        
+        # Get alive targets (not in evil faction)
+        targets = [pid for pid, pdata in game_state["players"].items() 
+                  if pdata["alive"] and pdata["faction"] != self.faction]
+        
+        if not targets:
+            return
+        
+        # Create select menu
+        options = []
+        for pid in targets[:25]:  # Max 25 options
+            try:
+                role_info = game_state["players"][pid]["role_info"]
+                options.append(discord.SelectOption(
+                    label=f"Player {pid[:8]}...",
+                    value=str(pid),
+                    emoji="🎯"
+                ))
+            except:
+                pass
+        
+        if options:
+            select = discord.ui.Select(
+                placeholder="Choose target...",
+                options=options
+            )
+            select.callback = self.vote_target
+            self.add_item(select)
+    
+    async def vote_target(self, interaction: discord.Interaction):
+        game_state = self.cog.active_games.get(self.lobby_id)
+        if not game_state:
+            return
+        
+        # Check if voter is in evil faction
+        if interaction.user.id not in game_state["players"]:
+            await interaction.response.send_message("❌ You're not in this game!", ephemeral=True)
+            return
+        
+        if game_state["players"][interaction.user.id]["faction"] != self.faction:
+            await interaction.response.send_message("❌ You can't do that!", ephemeral=True)
+            return
+        
+        target = int(interaction.data['values'][0])
+        game_state["night_actions"][self.faction] = target
+        
+        await interaction.response.send_message(f"✅ Target selected!", ephemeral=True)
+
+
+class VoteView(discord.ui.View):
+    """View for day voting (lynch)"""
+    
+    def __init__(self, cog, lobby_id: str):
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.lobby_id = lobby_id
+        self._build_ui()
+    
+    def _build_ui(self):
+        game_state = self.cog.active_games.get(self.lobby_id)
+        if not game_state:
+            return
+        
+        # Get alive players
+        alive = game_state["alive_players"]
+        
+        if not alive:
+            return
+        
+        # Create select menu
+        options = []
+        for pid in alive[:25]:  # Max 25 options
+            try:
+                options.append(discord.SelectOption(
+                    label=f"Player {pid[:8]}...",
+                    value=str(pid),
+                    emoji="🗳️"
+                ))
+            except:
+                pass
+        
+        if options:
+            select = discord.ui.Select(
+                placeholder="Vote to lynch...",
+                options=options
+            )
+            select.callback = self.cast_vote
+            self.add_item(select)
+    
+    async def cast_vote(self, interaction: discord.Interaction):
+        game_state = self.cog.active_games.get(self.lobby_id)
+        if not game_state:
+            return
+        
+        # Check if voter is alive
+        if interaction.user.id not in game_state["alive_players"]:
+            await interaction.response.send_message("❌ You can't vote!", ephemeral=True)
+            return
+        
+        target = int(interaction.data['values'][0])
+        game_state["votes"][interaction.user.id] = target
+        
+        await interaction.response.send_message(f"✅ Vote cast for <@{target}>!", ephemeral=True)
+
 
 async def setup(bot):
     await bot.add_cog(MafiaCog(bot))
