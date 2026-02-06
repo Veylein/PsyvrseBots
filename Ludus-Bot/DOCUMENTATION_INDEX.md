@@ -1,7 +1,8 @@
 # 🎮 Ludus Bot - Complete Project Documentation
 
 > **COMPLETE ENGLISH DOCUMENTATION** for the entire Ludus Discord Bot project  
-> 50,000+ lines of code | 90+ Python files | 300+ commands | 150+ games
+> 50,000+ lines of code | 90+ Python files | 600+ commands | 450+ games  
+> **Parts 1-7 Complete** ✅ | ~58,500 words documented
 
 ---
 
@@ -199,9 +200,45 @@ Complete analysis of mafia.py, multiplayer_games.py, dueling.py, monopoly.py (4,
   - Monopoly board game (1,000 lines)
 - **~15,000 words of documentation**
 
+#### **[🎮 PART 7: Minigames System](documentation/FULL_DOCUMENTATION_PART7.md)** ⭐ **NEW**
+Complete analysis of minigames.py (1,070 lines):
+- **300+ Interactive Mini-Games:**
+  - 50 base games (coinflip, roll, guess_number, rps, memory, reaction_time, typing_race, hangman, unscramble, quick_math, trivia, etc.)
+  - 250 micro-game variants with difficulty scaling (25 levels)
+  - 10 core game types: Parity, Dice Sum, Quick Math, Reverse Word, Emoji Memory, Color Pick, Fast Type, Unscramble, Trivia, Item Picking
+- **Interactive Help System:**
+  - Paginated embeds with working navigation buttons (Prev/Next/Close)
+  - 10 games per page (~30 pages total)
+  - User-specific interaction checks
+  - Enhanced descriptions with button instructions
+  - Integration with main help.py system (L!help mini)
+- **Economy Integration:**
+  - Automatic PsyCoin rewards (5 coins per win)
+  - User statistics tracking (wins, games played, coins earned)
+  - Non-blocking executor pattern for storage
+  - Safe execution (never crashes game if economy fails)
+- **Command Registration System:**
+  - Programmatic registration of 300+ prefix commands
+  - Anti-collision system with smart name handling
+  - Alias support (micro_1, micro_2, etc.)
+  - Triple-fallback command lookup
+- **PaginatedHelpView Class:**
+  - Reusable pagination component for other cogs
+  - Interaction-based with triple-fallback send strategy
+  - Customizable category names and descriptions
+  - 120-second timeout with auto-cleanup
+- **Recent Part 7 Updates (February 2026):**
+  - Fixed button parameter order (interaction, button)
+  - Fixed command wrapper argument handling (*args)
+  - Removed problematic cog attribution
+  - Enhanced embed descriptions and footers
+  - Optimized per-page count (12 → 10)
+  - help.py integration with button instructions
+- **300+ games × 10-30 seconds = endless entertainment**
+- **~8,500 words of documentation**
+
 ---
 
-- **PART 7: Minigames** (100+ mini-games)
 - **PART 8: RPG Systems** (D&D, Wizard Wars, Quests)
 
 ### Social & Utility Systems
@@ -270,14 +307,15 @@ Ludus-Bot/ (50,000+ lines total)
 │   │       └── no_mercy_plus.py
 │   │
 │   ├── 🕹️ Minigames & Arcade (5 files, ~4,000 lines)
-│   │   ├── minigames.py (2000 lines) - **100+ mini-games**
+│   │   ├── minigames.py (1070 lines) - **300+ mini-games**
 │   │   ├── arcadegames.py (800 lines) - Arcade classics
 │   │   ├── puzzlegames.py (600 lines) - Puzzles
 │   │   ├── game_challenges.py (400 lines) - Challenges
 │   │   └── simulations.py (600 lines) - Life simulations
 │   │
 │   ├── 🎭 Multiplayer & Social Deduction (3 files, ~2,500 lines)
-│   │   ├── multiplayer_games.py (800 lines) - Mafia, Werewolf
+│   │   ├── mafia.py - Warewolf & Mafia
+│   │   ├── multiplayer_games.py (800 lines) - clue, murder mystery
 │   │   ├── monopoly.py (1000 lines) - Monopoly board game
 │   │   └── dueling.py (400 lines) - PvP duels
 │   │
@@ -381,7 +419,7 @@ Data Files:            20+
 ```
 Largest File:   fishing.py (3,472 lines)
 2nd Largest:    mining.py (3,249 lines)
-3rd Largest:    minigames.py (2,000+ lines)
+3rd Largest:    minigames.py (1,070 lines)
 4th Largest:    dnd.py (1,500 lines)
 5th Largest:    monopoly.py (1,000 lines)
 ```
@@ -779,6 +817,23 @@ RENDER_DISK_PATH=/path/to/persistent/disk  # Optional: for cloud hosting
 - `L!trivia` / `/trivia` - Play trivia
 - `L!tictactoe <opponent>` / `/tictactoe` - Play tic-tac-toe
 
+### Minigames Commands (300+ quick games)
+- `L!gamelist` - View all 300+ minigames (paginated)
+- `L!help mini` - View minigames via help system
+- `L!coinflip` - Flip a coin
+- `L!roll` - Roll 1-100
+- `L!guess_number` - Guess a number 1-20
+- `L!rps` - Rock, Paper, Scissors
+- `L!memory` - Remember emoji sequence
+- `L!reaction_time` - Test your reflexes
+- `L!typing_race` - Type sentence quickly
+- `L!hangman` - Play hangman
+- `L!quick_math` - Solve math problem
+- `L!unscramble` - Unscramble a word
+- `L!parity_guess_micro` (or `L!micro_1`) - Even/odd guess
+- `L!dice_sum_micro` (or `L!micro_2`) - Dice sum game
+- ... (290+ more micro-games with difficulty scaling)
+
 ### Social Commands
 - `L!pet` / `/pet` - View your pet
 - `L!marry <user>` / `/marry` - Propose marriage
@@ -829,6 +884,7 @@ This project is proprietary. All rights reserved.
 
 **This documentation is a living document and will be updated as the project evolves.**
 
-Last Updated: 05.02.2026
-Total Documentation Size: 50,000+ words across 15 parts
+Last Updated: 06.02.2026
+Total Documentation Size: 58,500+ words across 7 completed parts (Parts 1-7)
+Documentation Status: ✅ Parts 1-7 Complete | 🚧 Parts 8-15 Planned
 The documentation was written by wilczek80.
