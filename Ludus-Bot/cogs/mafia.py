@@ -2129,6 +2129,519 @@ class MafiaCog(commands.Cog):
             except Exception as e:
                 print(f"Failed to send DM to {player_id}: {e}")
     
+    async def _send_power_role_actions(self, lobby_id: str):
+        """Send action panels to power roles (detective, doctor, etc.)"""
+        game_state = self.active_games.get(lobby_id)
+        if not game_state:
+            return
+        
+        lang = game_state["language"]
+        day_num = game_state["day_number"]
+        
+        # Define all power actions with descriptions (65 total)
+        power_actions = {
+            # Investigation powers
+            "investigate": {"type": "investigate", "text": {"pl": "🔍 **Wybierz gracza do zbadania:**\nDowiesz się czy jest zły czy dobry.", "en": "🔍 **Choose a player to investigate:**\nYou will learn if they are evil or good."}},
+            "stats": {"type": "stats", "text": {"pl": "📊 **Wybierz gracza:**\nZobaczysz statystyki jego działań.", "en": "📊 **Choose a player:**\nYou will see their activity statistics."}},
+            "hints": {"type": "hints", "text": {"pl": "🧠 **Wybierz gracza:**\nOtrzymasz wskazówki o jego roli.", "en": "🧠 **Choose a player:**\nYou will get hints about their role."}},
+            "visits": {"type": "visits", "text": {"pl": "👀 **Wybierz gracza:**\nZobaczysz kto go odwiedził.", "en": "👀 **Choose a player:**\nYou will see who visited them."}},
+            "track": {"type": "track", "text": {"pl": "👁️ **Wybierz gracza do śledzenia:**\nZobaczysz kogo odwiedził tej nocy.", "en": "👁️ **Choose a player to track:**\nYou will see who they visited tonight."}},
+            "death_cause": {"type": "death_cause", "text": {"pl": "🔬 **Wybierz zmarłego gracza:**\nDowiesz się jak zginął.", "en": "🔬 **Choose a dead player:**\nYou will learn how they died."}},
+            "logs": {"type": "logs", "text": {"pl": "💻 **Wybierz gracza:**\nZobaczysz historię jego akcji.", "en": "💻 **Choose a player:**\nYou will see their action history."}},
+            "suspicious": {"type": "suspicious", "text": {"pl": "🗼 **Wybierz gracza:**\nOznaczysz go jako podejrzanego.", "en": "🗼 **Choose a player:**\nYou will mark them as suspicious."}},
+            "old_actions": {"type": "old_actions", "text": {"pl": "📚 **Wybierz gracza:**\nZobaczysz jego dawne działania.", "en": "📚 **Choose a player:**\nYou will see their past actions."}},
+            "future": {"type": "future", "text": {"pl": "✨ **Wybierz gracza:**\nPrzewidzisz jego następną akcję.", "en": "✨ **Choose a player:**\nYou will predict their next action."}},
+            "riddles": {"type": "riddles", "text": {"pl": "🌙 **Wybierz gracza:**\nOtrzymasz zagadkową wizję.", "en": "🌙 **Choose a player:**\nYou will receive a cryptic vision."}},
+            "dreams": {"type": "dreams", "text": {"pl": "💤 **Wybierz gracza:**\nPrzyśnią ci się informacje o nim.", "en": "💤 **Choose a player:**\nYou will dream about them."}},
+            "random_visions": {"type": "random_visions", "text": {"pl": "🔮 **Wybierz gracza:**\nOtrzymasz losową wizję.", "en": "🔮 **Choose a player:**\nYou will receive a random vision."}},
+            "info": {"type": "info", "text": {"pl": "🗂️ **Wybierz gracza:**\nZbierzesz o nim informacje.", "en": "🗂️ **Choose a player:**\nYou will gather info about them."}},
+            
+            # Protection powers
+            "protect": {"type": "protect", "text": {"pl": "🛡️ **Wybierz gracza do ochrony:**\nUratujesz go jeśli zostanie zaatakowany.", "en": "🛡️ **Choose a player to protect:**\nYou will save them if they are attacked tonight."}},
+            "guard": {"type": "guard", "text": {"pl": "🛡️ **Wybierz gracza do ochrony:**\nZabijesz każdego kto spróbuje go zabić.", "en": "🛡️ **Choose a player to guard:**\nYou will kill anyone who attacks them tonight."}},
+            "armor": {"type": "armor", "text": {"pl": "🔨 **Wybierz gracza:**\nDasz mu zbroję na jedną noc.", "en": "🔨 **Choose a player:**\nYou will give them armor for one night."}},
+            "sacrifice": {"type": "sacrifice", "text": {"pl": "🛡️ **Wybierz gracza:**\nMożesz zginąć zamiast niego.", "en": "🛡️ **Choose a player:**\nYou can die instead of them."}},
+            "block_curse": {"type": "block_curse", "text": {"pl": "✝ **Wybierz gracza:**\nZablokujesz na nim klątwy.", "en": "✝ **Choose a player:**\nYou will protect them from curses."}},
+            "remove_curse": {"type": "remove_curse", "text": {"pl": "📿 **Wybierz gracza:**\nUsuniesz z niego klątwę.", "en": "📿 **Choose a player:**\nYou will remove curses from them."}},
+            "secure": {"type": "secure", "text": {"pl": "📋 **Wybierz gracza:**\nZabezpieczysz jego dowody.", "en": "📋 **Choose a player:**\nYou will secure their evidence."}},
+            
+            # Action/Manipulation powers
+            "stealth": {"type": "stealth", "text": {"pl": "👤 **Wybierz gracza do odwiedzenia:**\nBędziesz niewidzialny dla śledczych.", "en": "👤 **Choose a player to visit:**\nYou will be invisible to investigators."}},
+            "revenge_kill": {"type": "revenge_kill", "text": {"pl": "🏹 **Wybierz cel zemsty:**\nZabijesz go gdy ty zginiesz.", "en": "🏹 **Choose revenge target:**\nYou will kill them when you die."}},
+            "potions": {"type": "potions", "text": {"pl": "🧙 **Wybierz akcję:**\nMożesz uratować lub zabić.", "en": "🧙 **Choose action:**\nYou can save or kill."}},
+            "block": {"type": "block", "text": {"pl": "💣 **Wybierz gracza:**\nZablokujesz jego zdolność tej nocy.", "en": "💣 **Choose a player:**\nYou will block their ability tonight."}},
+            "control": {"type": "control", "text": {"pl": "🦁 **Wybierz gracza:**\nPrzejmiesz kontrolę nad jego akcją.", "en": "🦁 **Choose a player:**\nYou will control their action."}},
+            "force": {"type": "force", "text": {"pl": "🎭 **Wybierz gracza:**\nZmuszasz go do działania.", "en": "🎭 **Choose a player:**\nYou will force them to act."}},
+            
+            # Conversion/Recruitment powers
+            "convert": {"type": "convert", "text": {"pl": "🤵 **Wybierz gracza:**\nSpróbujesz go zrekrutować.", "en": "🤵 **Choose a player:**\nYou will try to recruit them."}},
+            "recruit": {"type": "recruit", "text": {"pl": "🕯️ **Wybierz gracza:**\nSpróbujesz nawrócić do kultu.", "en": "🕯️ **Choose a player:**\nYou will try to convert to cult."}},
+            
+            # Disguise/Deception powers
+            "steal": {"type": "steal", "text": {"pl": "🎭 **Wybierz gracza:**\nUkradziesz jego tożsamość.", "en": "🎭 **Choose a player:**\nYou will steal their identity."}},
+            "disguise": {"type": "disguise", "text": {"pl": "🎭 **Wybierz gracza:**\nPrzyj miesz jego wygląd.", "en": "🎭 **Choose a player:**\nYou will take their appearance."}},
+            "copy": {"type": "copy", "text": {"pl": "👥 **Wybierz gracza:**\nSkopiujesz jego zdolność.", "en": "👥 **Choose a player:**\nYou will copy their ability."}},
+            "fake_reports": {"type": "fake_reports", "text": {"pl": "✍️ **Wybierz gracza:**\nSfałszujesz raporty o nim.", "en": "✍️ **Choose a player:**\nYou will forge reports about them."}},
+            "lower_sus": {"type": "lower_sus", "text": {"pl": "📺 **Wybierz gracza:**\nObniżysz jego podejrzliwość.", "en": "📺 **Choose a player:**\nYou will lower their suspicion."}},
+            "fake_town": {"type": "fake_town", "text": {"pl": "🕴️ **Aktywuj:**\nBędziesz wyglądał jak mieszkaniec.", "en": "🕴️ **Activate:**\nYou will appear as town."}},
+            "fake_villager": {"type": "fake_villager", "text": {"pl": "😈 **Aktywuj:**\nPrzyjmiesz wygląd wieśniaka.", "en": "😈 **Activate:**\nYou will appear as villager."}},
+            
+            # Day phase powers (stored for day processing)
+            "reveal": {"type": "reveal", "text": {"pl": "⚖ **Wybierz gracza:**\nUjawnisz jego rolę w dzień.", "en": "⚖ **Choose a player:**\nYou will reveal their role during day."}},
+            "cancel_vote": {"type": "cancel_vote", "text": {"pl": "⚖ **Wybierz gracza:**\nAnulujesz jego głos.", "en": "⚖ **Choose a player:**\nYou will cancel their vote."}},
+            "delay": {"type": "delay", "text": {"pl": "🤝 **Wybierz gracza:**\nOpóźnisz jego egzekucję.", "en": "🤝 **Choose a player:**\nYou will delay their execution."}},
+            "connect": {"type": "connect", "text": {"pl": "🤝 **Wybierz gracza:**\nPołączysz go z innym.", "en": "🤝 **Choose a player:**\nYou will connect them to another."}},
+            "double_vote": {"type": "double_vote", "text": {"pl": "📢 **Aktywuj:**\nTwój głos liczy się podwójnie.", "en": "📢 **Activate:**\nYour vote counts twice."}},
+            "buy_votes": {"type": "buy_votes", "text": {"pl": "💰 **Wybierz gracza:**\nKupujesz dodatkowy głos.", "en": "💰 **Choose a player:**\nYou will buy extra votes."}},
+            "reverse_vote": {"type": "reverse_vote", "text": {"pl": "⚫ **Aktywuj:**\nOdwracasz głosowanie.", "en": "⚫ **Activate:**\nYou will reverse the vote."}},
+            "swap_votes": {"type": "swap_votes", "text": {"pl": "🗳 **Wybierz gracza:**\nZamienisz głosy.", "en": "🗳 **Choose a player:**\nYou will swap votes."}},
+            "vote_influence": {"type": "vote_influence", "text": {"pl": "🌕 **Wybierz gracza:**\nWpłyniesz na jego głos.", "en": "🌕 **Choose a player:**\nYou will influence their vote."}},
+            "anonymous_dm": {"type": "anonymous_dm", "text": {"pl": "👁 **Wybierz gracza:**\nWyślesz anonimową wiadomość.", "en": "👁 **Choose a player:**\nYou will send anonymous message."}},
+            
+            # Communication powers
+            "dead_chat": {"type": "dead_chat", "text": {"pl": "👻 **Aktywuj:**\nPorozmawiasz z umarłymi.", "en": "👻 **Activate:**\nYou will chat with the dead."}},
+            "influence": {"type": "influence", "text": {"pl": "🎵 **Wybierz gracza:**\nWpłyniesz na jego działania.", "en": "🎵 **Choose a player:**\nYou will influence their actions."}},
+            
+            # Chaos/Random powers
+            "chaos": {"type": "chaos", "text": {"pl": "📣 **Aktywuj:**\nStworzysz chaos w grze.", "en": "📣 **Activate:**\nYou will create chaos."}},
+            "random": {"type": "random", "text": {"pl": "🎲 **Aktywuj:**\nLosowy efekt.", "en": "🎲 **Activate:**\nRandom effect."}},
+            "break_night": {"type": "break_night", "text": {"pl": "💥 **Aktywuj:**\nZakłócisz fazę nocy.", "en": "💥 **Activate:**\nYou will disrupt the night."}},
+            "grow": {"type": "grow", "text": {"pl": "⚗ **Aktywuj:**\nRośniesz w siłę.", "en": "⚗ **Activate:**\nYou grow in power."}},
+            "50_lie": {"type": "50_lie", "text": {"pl": "🔮 **Wybierz gracza:**\n50% szans na fałszywy wynik.", "en": "🔮 **Choose a player:**\n50% chance to lie."}},
+            "mix_reports": {"type": "mix_reports", "text": {"pl": "🃏 **Aktywuj:**\nPomieszasz raporty.", "en": "🃏 **Activate:**\nYou will mix reports."}},
+            "random_effects": {"type": "random_effects", "text": {"pl": "⚠️ **Aktywuj:**\nLosowe efekty na grę.", "en": "⚠️ **Activate:**\nRandom game effects."}},
+            "catastrophe": {"type": "catastrophe", "text": {"pl": "☠️ **Aktywuj:**\nSprowadzisz katastrofę.", "en": "☠️ **Activate:**\nYou will cause catastrophe."}},
+            "unpredictable": {"type": "unpredictable", "text": {"pl": "🐾 **Aktywuj:**\nNieprzewidywalne działanie.", "en": "🐾 **Activate:**\nUnpredictable action."}},
+            "event": {"type": "event", "text": {"pl": "🌑 **Aktywuj:**\nWyzwolisz specjalne wydarzenie.", "en": "🌑 **Activate:**\nYou will trigger event."}},
+            "summon": {"type": "summon", "text": {"pl": "🕳️ **Aktywuj:**\nPrzywołujesz coś.", "en": "🕳️ **Activate:**\nYou will summon something."}},
+            "decay": {"type": "decay", "text": {"pl": "💫 **Aktywuj:**\nRozprzestrzeniasz rozkład.", "en": "💫 **Activate:**\nYou spread decay."}},
+            "conflicts": {"type": "conflicts", "text": {"pl": "😰 **Wybierz gracza:**\nStworzysz konflikt.", "en": "😰 **Choose a player:**\nYou will create conflict."}},
+            "manipulate_turns": {"type": "manipulate_turns", "text": {"pl": "⏳ **Aktywuj:**\nManipulujesz czasem.", "en": "⏳ **Activate:**\nYou manipulate time."}},
+            
+            # Utility powers
+            "buff_weak": {"type": "buff_weak", "text": {"pl": "⚖️ **Aktywuj:**\nWzmocnisz słabszą frakcję.", "en": "⚖️ **Activate:**\nYou will buff weak faction."}},
+            "unstoppable": {"type": "unstoppable", "text": {"pl": "⚔️ **Aktywuj:**\nTwój atak nie może być zablokowany.", "en": "⚔️ **Activate:**\nYour attack can't be stopped."}},
+            "reveal_dead": {"type": "reveal", "text": {"pl": "📰 **Wybierz zmarłego gracza:**\nPublicznie ujawnisz jego rolę.", "en": "📰 **Choose a dead player:**\nYou will publicly reveal their true role."}},
+        }
+        
+        # Find all alive power roles
+        for player_id, pdata in game_state["players"].items():
+            if not pdata["alive"]:
+                continue
+            
+            power = pdata["role_info"].get("power")
+            if not power or power in ["kill", "kill_leader", "lynch_win", "contract"]:
+                continue  # Skip evil killers and passive roles
+            
+            # Get action config
+            action_config = power_actions.get(power)
+            if not action_config:
+                continue  # Skip powers without UI implementation yet
+            
+            # Send action view via DM
+            try:
+                user = await self.bot.fetch_user(player_id)
+                view = PowerRoleActionView(self, lobby_id, player_id, action_config["type"])
+                
+                await user.send(
+                    f"🌙 **{'NOC' if lang == 'pl' else 'NIGHT'} {day_num}**\n\n"
+                    f"{action_config['text'][lang]}",
+                    view=view
+                )
+            except Exception as e:
+                print(f"Failed to send power role action to {player_id}: {e}")
+    
+    async def _process_power_role_actions(self, lobby_id: str):
+        """Process power role actions and return investigation/tracking results"""
+        game_state = self.active_games.get(lobby_id)
+        if not game_state:
+            return {}
+        
+        lang = game_state["language"]
+        theme = game_state["theme"]
+        evil_faction = "MAFIA" if theme == "mafia" else "WEREWOLVES"
+        good_faction = "TOWN" if theme == "mafia" else "VILLAGE"
+        
+        results = {}
+        
+        # Process each power role action
+        for player_id, action_data in game_state.get("power_actions", {}).items():
+            action_type = action_data["type"]
+            target_id = action_data["target"]
+            
+            # INVESTIGATE - Learn if target is evil/good
+            if action_type == "investigate":
+                target_faction = game_state["players"][target_id]["faction"]
+                is_evil = target_faction in [evil_faction, "NEUTRAL", "CHAOS"]
+                results[player_id] = {"pl": f"🔍 **Wynik śledztwa:**\n<@{target_id}> jest {'zły' if is_evil else 'dobry'}!", "en": f"🔍 **Investigation result:**\n<@{target_id}> is {'evil' if is_evil else 'good'}!"}[lang]
+            
+            # PROTECT - Save from death
+            elif action_type == "protect":
+                game_state["players"][target_id]["protected"] = True
+                results[player_id] = {"pl": f"🛡️ Chronisz <@{target_id}> tej nocy.", "en": f"🛡️ You are protecting <@{target_id}> tonight."}[lang]
+            
+            # GUARD - Protect AND kill attacker
+            elif action_type == "guard":
+                game_state["players"][target_id]["guarded"] = player_id
+                results[player_id] = {"pl": f"🛡️ Strzeżesz <@{target_id}> tej nocy.", "en": f"🛡️ You are guarding <@{target_id}> tonight."}[lang]
+            
+            # TRACK - See who target visited
+            elif action_type == "track":
+                game_state["pending_tracks"] = game_state.get("pending_tracks", {})
+                game_state["pending_tracks"][player_id] = target_id
+            
+            # REVEAL - Show dead player's role
+            elif action_type == "reveal":
+                if not game_state["players"][target_id]["alive"]:
+                    target_role = game_state["players"][target_id]["role_info"]
+                    role_name = target_role[f"name_{lang}"]
+                    role_emoji = target_role["emoji"]
+                    results[player_id] = {"pl": f"📰 **Publikujesz artykuł!**\n<@{target_id}> był: {role_emoji} **{role_name}**", "en": f"📰 **You publish an article!**\n<@{target_id}> was: {role_emoji} **{role_name}**"}[lang]
+            
+            # STEALTH - Invisible to investigators
+            elif action_type == "stealth":
+                game_state["players"][player_id]["stealthed"] = True
+                results[player_id] = {"pl": f"👤 Odwiedzasz <@{target_id}> w cieniu...", "en": f"👤 You visit <@{target_id}> in the shadows..."}[lang]
+            
+            # VISITS - See who visited target
+            elif action_type == "visits":
+                # This will be resolved after processing all actions
+                game_state["pending_visits"] = game_state.get("pending_visits", {})
+                game_state["pending_visits"][player_id] = target_id
+            
+            # DEATH_CAUSE - Learn how dead player died
+            elif action_type == "death_cause":
+                if not game_state["players"][target_id]["alive"]:
+                    results[player_id] = {"pl": f"🔬 <@{target_id}> zginął od ataku w nocy.", "en": f"🔬 <@{target_id}> died from a night attack."}[lang]
+            
+            # REVENGE_KILL - Kill target when you die
+            elif action_type == "revenge_kill":
+                game_state["players"][player_id]["revenge_target"] = target_id
+                results[player_id] = {"pl": f"🏹 Jeśli zginiesz, zabierzesz <@{target_id}> ze sobą.", "en": f"🏹 If you die, you'll take <@{target_id}> with you."}[lang]
+            
+            # POTIONS - Witch save/kill
+            elif action_type == "potions":
+                game_state["players"][player_id]["potion_target"] = target_id
+                results[player_id] = {"pl": f"🧙 Przygotowujesz miksturę...", "en": f"🧙 You prepare a potion..."}[lang]
+            
+            # ARMOR - Give one-night protection
+            elif action_type == "armor":
+                game_state["players"][target_id]["armored"] = True
+                results[player_id] = {"pl": f"🔨 Dajesz zbroję <@{target_id}>.", "en": f"🔨 You give armor to <@{target_id}>."}[lang]
+            
+            # SACRIFICE - Die instead of target
+            elif action_type == "sacrifice":
+                game_state["players"][player_id]["sacrifice_target"] = target_id
+                results[player_id] = {"pl": f"🛡️ Jesteś gotów umrzeć za <@{target_id}>.", "en": f"🛡️ You are ready to die for <@{target_id}>."}[lang]
+            
+            # BLOCK - Block target's ability
+            elif action_type == "block":
+                game_state["players"][target_id]["blocked"] = True
+                results[player_id] = {"pl": f"💣 Blokujesz <@{target_id}>.", "en": f"💣 You block <@{target_id}>."}[lang]
+            
+            # CONVERT - Recruit to your faction
+            elif action_type == "convert":
+                # 50% success chance
+                if random.random() < 0.5:
+                    old_faction = game_state["players"][target_id]["faction"]
+                    game_state["players"][target_id]["faction"] = game_state["players"][player_id]["faction"]
+                    results[player_id] = {"pl": f"🤵 Zrekrutowałeś <@{target_id}>!", "en": f"🤵 You recruited <@{target_id}>!"}[lang]
+                else:
+                    results[player_id] = {"pl": f"🤵 Rekrutacja <@{target_id}> nie powiodła się.", "en": f"🤵 Failed to recruit <@{target_id}>."}[lang]
+            
+            # STEAL - Steal identity (appear as them)
+            elif action_type == "steal":
+                game_state["players"][player_id]["disguised_as"] = target_id
+                results[player_id] = {"pl": f"🎭 Przejmujesz tożsamość <@{target_id}>.", "en": f"🎭 You steal <@{target_id}>'s identity."}[lang]
+            
+            # DISGUISE - Appear as target to investigators
+            elif action_type == "disguise":
+                game_state["players"][player_id]["disguised_as"] = target_id
+                results[player_id] = {"pl": f"🎭 Przybierasz wygląd <@{target_id}>.", "en": f"🎭 You take <@{target_id}>'s appearance."}[lang]
+            
+            # COPY - Copy target's ability
+            elif action_type == "copy":
+                copied_power = game_state["players"][target_id]["role_info"].get("power")
+                game_state["players"][player_id]["copied_power"] = copied_power
+                results[player_id] = {"pl": f"👥 Kopiujesz zdolność <@{target_id}>.", "en": f"👥 You copy <@{target_id}>'s ability."}[lang]
+            
+            # CONTROL - Control target's action
+            elif action_type == "control":
+                game_state["players"][player_id]["controlling"] = target_id
+                results[player_id] = {"pl": f"🦁 Kontrolujesz <@{target_id}>.", "en": f"🦁 You control <@{target_id}>."}[lang]
+            
+            # RECRUIT (cult) - Convert to cult
+            elif action_type == "recruit":
+                if random.random() < 0.4:
+                    game_state["players"][target_id]["faction"] = "CULT"
+                    results[player_id] = {"pl": f"🕯️ Nawróciłeś <@{target_id}> do kultu!", "en": f"🕯️ You converted <@{target_id}> to the cult!"}[lang]
+                else:
+                    results[player_id] = {"pl": f"🕯️ <@{target_id}> opiera się nawróceniu.", "en": f"🕯️ <@{target_id}> resists conversion."}[lang]
+            
+            # STATS - Show player activity statistics
+            elif action_type == "stats":
+                target_actions = len([a for a in game_state.get("action_log", []) if a.get("player") == target_id])
+                results[player_id] = {"pl": f"📊 <@{target_id}> wykonał {target_actions} akcji.", "en": f"📊 <@{target_id}> has performed {target_actions} actions."}[lang]
+            
+            # HINTS - Give hints about role
+            elif action_type == "hints":
+                target_faction = game_state["players"][target_id]["faction"]
+                hint = "aktywny" if random.random() < 0.5 else "ostrożny"
+                results[player_id] = {"pl": f"🧠 <@{target_id}> wydaje się być {hint}.", "en": f"🧠 <@{target_id}> seems to be {hint}."}[lang]
+            
+            # LOGS - See action history
+            elif action_type == "logs":
+                recent_logs = [a for a in game_state.get("action_log", [])[-5:] if a.get("player") == target_id]
+                log_text = ", ".join([a.get("type", "unknown") for a in recent_logs]) or "brak"
+                results[player_id] = {"pl": f"💻 Logi <@{target_id}>: {log_text}", "en": f"💻 <@{target_id}>'s logs: {log_text}"}[lang]
+            
+            # SUSPICIOUS - Mark as suspicious
+            elif action_type == "suspicious":
+                game_state["players"][target_id]["suspicious"] = True
+                results[player_id] = {"pl": f"🗼 <@{target_id}> jest teraz podejrzany.", "en": f"🗼 <@{target_id}> is now suspicious."}[lang]
+            
+            # OLD_ACTIONS - See historical actions
+            elif action_type == "old_actions":
+                old_actions = game_state.get("action_log", [])[:3]
+                action_text = ", ".join([a.get("type", "unknown") for a in old_actions]) or "brak"
+                results[player_id] = {"pl": f"📚 Dawne akcje <@{target_id}>: {action_text}", "en": f"📚 <@{target_id}>'s past: {action_text}"}[lang]
+            
+            # FUTURE - Predict next action
+            elif action_type == "future":
+                prediction = random.choice(["odwiedzenie", "ochrona", "atak", "głosowanie"])
+                results[player_id] = {"pl": f"✨ <@{target_id}> prawdopodobnie: {prediction}", "en": f"✨ <@{target_id}> will likely: {prediction}"}[lang]
+            
+            # RIDDLES - Cryptic vision
+            elif action_type == "riddles":
+                riddle = random.choice(["w cieniu", "przy świetle", "pośrodku", "na końcu"])
+                results[player_id] = {"pl": f"🌙 Wizja: <@{target_id}> stoi {riddle}.", "en": f"🌙 Vision: <@{target_id}> stands {riddle}."}[lang]
+            
+            # DREAMS - Dream about player
+            elif action_type == "dreams":
+                dream = random.choice(["dobry", "zły", "neutralny", "chaotyczny"])
+                results[player_id] = {"pl": f"💤 Sen: <@{target_id}> jest {dream}.", "en": f"💤 Dream: <@{target_id}> is {dream}."}[lang]
+            
+            # RANDOM_VISIONS - Random vision
+            elif action_type == "random_visions":
+                if random.random() < 0.5:
+                    is_evil = game_state["players"][target_id]["faction"] in [evil_faction, "NEUTRAL"]
+                    results[player_id] = {"pl": f"🔮 Wizja: <@{target_id}> jest {'zły' if is_evil else 'dobry'}.", "en": f"🔮 Vision: <@{target_id}> is {'evil' if is_evil else 'good'}."}[lang]
+                else:
+                    fake_result = random.choice(["zły", "dobry"])
+                    results[player_id] = {"pl": f"🔮 Wizja: <@{target_id}> jest {fake_result}.", "en": f"🔮 Vision: <@{target_id}> is {fake_result}."}[lang]
+            
+            # INFO - Gather information
+            elif action_type == "info":
+                target_role_emoji = game_state["players"][target_id]["role_info"]["emoji"]
+                results[player_id] = {"pl": f"🗂️ <@{target_id}> ma symbol: {target_role_emoji}", "en": f"🗂️ <@{target_id}> has symbol: {target_role_emoji}"}[lang]
+            
+            # BLOCK_CURSE - Protect from curses
+            elif action_type == "block_curse":
+                game_state["players"][target_id]["curse_immune"] = True
+                results[player_id] = {"pl": f"✝ Chronisz <@{target_id}> przed klątwami.", "en": f"✝ You protect <@{target_id}> from curses."}[lang]
+            
+            # REMOVE_CURSE - Remove existing curse
+            elif action_type == "remove_curse":
+                if game_state["players"][target_id].get("cursed"):
+                    game_state["players"][target_id]["cursed"] = False
+                    results[player_id] = {"pl": f"📿 Usunąłeś klątwę z <@{target_id}>!", "en": f"📿 You removed curse from <@{target_id}>!"}[lang]
+                else:
+                    results[player_id] = {"pl": f"📿 <@{target_id}> nie jest przeklęty.", "en": f"📿 <@{target_id}> is not cursed."}[lang]
+            
+            # SECURE - Secure evidence
+            elif action_type == "secure":
+                game_state["players"][target_id]["evidence_secured"] = True
+                results[player_id] = {"pl": f"📋 Zabezpieczasz dowody <@{target_id}>.", "en": f"📋 You secure <@{target_id}>'s evidence."}[lang]
+            
+            # FORCE - Force action
+            elif action_type == "force":
+                game_state["players"][target_id]["forced"] = True
+                results[player_id] = {"pl": f"🎭 Zmuszasz <@{target_id}> do działania.", "en": f"🎭 You force <@{target_id}> to act."}[lang]
+            
+            # FAKE_REPORTS - Forge reports
+            elif action_type == "fake_reports":
+                game_state["players"][target_id]["fake_reports"] = True
+                results[player_id] = {"pl": f"✍️ Fałszujesz raporty o <@{target_id}>.", "en": f"✍️ You forge reports about <@{target_id}>."}[lang]
+            
+            # LOWER_SUS - Lower suspicion
+            elif action_type == "lower_sus":
+                game_state["players"][target_id]["suspicious"] = False
+                results[player_id] = {"pl": f"📺 Obniżasz podejrzliwość <@{target_id}>.", "en": f"📺 You lower <@{target_id}>'s suspicion."}[lang]
+            
+            # FAKE_TOWN - Appear as town (passive, activated)
+            elif action_type == "fake_town":
+                game_state["players"][player_id]["appears_as_town"] = True
+                results[player_id] = {"pl": f"🕴️ Ukrywasz swoją prawdziwą naturę.", "en": f"🕴️ You hide your true nature."}[lang]
+            
+            # FAKE_VILLAGER - Appear as villager
+            elif action_type == "fake_villager":
+                game_state["players"][player_id]["appears_as_villager"] = True
+                results[player_id] = {"pl": f"😈 Przyjmujesz wygląd wieśniaka.", "en": f"😈 You appear as villager."}[lang]
+            
+            # REVEAL (day) - Reveal role during day
+            elif action_type == "reveal":
+                game_state["pending_reveals"] = game_state.get("pending_reveals", {})
+                game_state["pending_reveals"][player_id] = target_id
+                results[player_id] = {"pl": f"⚖ Ujawnisz <@{target_id}> w dniu.", "en": f"⚖ You will reveal <@{target_id}> during day."}[lang]
+            
+            # CANCEL_VOTE - Cancel someone's vote
+            elif action_type == "cancel_vote":
+                game_state["vote_cancelled"] = game_state.get("vote_cancelled", [])
+                game_state["vote_cancelled"].append(target_id)
+                results[player_id] = {"pl": f"⚖ Anulujesz głos <@{target_id}>.", "en": f"⚖ You cancel <@{target_id}>'s vote."}[lang]
+            
+            # DELAY - Delay execution
+            elif action_type == "delay":
+                game_state["execution_delayed"] = target_id
+                results[player_id] = {"pl": f"🤝 Opóźniasz egzekucję <@{target_id}>.", "en": f"🤝 You delay <@{target_id}>'s execution."}[lang]
+            
+            # CONNECT - Connect two players
+            elif action_type == "connect":
+                game_state["connected_players"] = game_state.get("connected_players", [])
+                game_state["connected_players"].append((player_id, target_id))
+                results[player_id] = {"pl": f"🤝 Łączysz się z <@{target_id}>.", "en": f"🤝 You connect with <@{target_id}>."}[lang]
+            
+            # DOUBLE_VOTE - Vote counts twice
+            elif action_type == "double_vote":
+                game_state["double_voters"] = game_state.get("double_voters", [])
+                game_state["double_voters"].append(player_id)
+                results[player_id] = {"pl": f"📢 Twój głos będzie liczył się podwójnie.", "en": f"📢 Your vote will count twice."}[lang]
+            
+            # BUY_VOTES - Buy extra votes
+            elif action_type == "buy_votes":
+                game_state["extra_votes"] = game_state.get("extra_votes", {})
+                game_state["extra_votes"][player_id] = game_state["extra_votes"].get(player_id, 0) + 1
+                results[player_id] = {"pl": f"💰 Kupujesz dodatkowy głos.", "en": f"💰 You buy an extra vote."}[lang]
+            
+            # REVERSE_VOTE - Reverse voting
+            elif action_type == "reverse_vote":
+                game_state["vote_reversed"] = True
+                results[player_id] = {"pl": f"⚫ Odwracasz głosowanie!", "en": f"⚫ You reverse the vote!"}[lang]
+            
+            # SWAP_VOTES - Swap votes
+            elif action_type == "swap_votes":
+                game_state["vote_swaps"] = game_state.get("vote_swaps", [])
+                game_state["vote_swaps"].append(target_id)
+                results[player_id] = {"pl": f"🗳 Zamienisz głosy z <@{target_id}>.", "en": f"🗳 You will swap votes with <@{target_id}>."}[lang]
+            
+            # VOTE_INFLUENCE - Influence votes
+            elif action_type == "vote_influence":
+                game_state["influenced_voters"] = game_state.get("influenced_voters", [])
+                game_state["influenced_voters"].append(target_id)
+                results[player_id] = {"pl": f"🌕 Wpływasz na głos <@{target_id}>.", "en": f"🌕 You influence <@{target_id}>'s vote."}[lang]
+            
+            # ANONYMOUS_DM - Send anonymous message
+            elif action_type == "anonymous_dm":
+                game_state["anonymous_targets"] = game_state.get("anonymous_targets", [])
+                game_state["anonymous_targets"].append(target_id)
+                results[player_id] = {"pl": f"👁 Wyślesz anonimową wiadomość do <@{target_id}>.", "en": f"👁 You will send anonymous message to <@{target_id}>."}[lang]
+            
+            # DEAD_CHAT - Chat with dead
+            elif action_type == "dead_chat":
+                game_state["players"][player_id]["can_see_dead"] = True
+                results[player_id] = {"pl": f"👻 Możesz rozmawiać z umarłymi.", "en": f"👻 You can chat with the dead."}[lang]
+            
+            # INFLUENCE - Influence actions
+            elif action_type == "influence":
+                game_state["players"][target_id]["influenced"] = player_id
+                results[player_id] = {"pl": f"🎵 Wpływasz na <@{target_id}>.", "en": f"🎵 You influence <@{target_id}>."}[lang]
+            
+            # CHAOS - Create chaos
+            elif action_type == "chaos":
+                game_state["chaos_active"] = True
+                results[player_id] = {"pl": f"📣 Stwarzasz chaos!", "en": f"📣 You create chaos!"}[lang]
+            
+            # RANDOM - Random effect
+            elif action_type == "random":
+                random_effects = ["protect", "investigate", "block", "nothing"]
+                effect = random.choice(random_effects)
+                game_state["random_effect"] = effect
+                results[player_id] = {"pl": f"🎲 Losowy efekt: {effect}", "en": f"🎲 Random effect: {effect}"}[lang]
+            
+            # BREAK_NIGHT - Disrupt night phase
+            elif action_type == "break_night":
+                game_state["night_broken"] = True
+                results[player_id] = {"pl": f"💥 Zakłócasz fazę nocy!", "en": f"💥 You disrupt the night!"}[lang]
+            
+            # GROW - Grow in power
+            elif action_type == "grow":
+                game_state["players"][player_id]["power_level"] = game_state["players"][player_id].get("power_level", 1) + 1
+                level = game_state["players"][player_id]["power_level"]
+                results[player_id] = {"pl": f"⚗ Rośniesz w siłę! Poziom: {level}", "en": f"⚗ You grow in power! Level: {level}"}[lang]
+            
+            # 50_LIE - 50% chance to lie
+            elif action_type == "50_lie":
+                if random.random() < 0.5:
+                    is_evil = game_state["players"][target_id]["faction"] in [evil_faction, "NEUTRAL"]
+                    result = "zły" if not is_evil else "dobry"  # Reversed (lie)
+                else:
+                    is_evil = game_state["players"][target_id]["faction"] in [evil_faction, "NEUTRAL"]
+                    result = "zły" if is_evil else "dobry"
+                results[player_id] = {"pl": f"🔮 <@{target_id}> jest {result}.", "en": f"🔮 <@{target_id}> is {result}."}[lang]
+            
+            # MIX_REPORTS - Mix up reports
+            elif action_type == "mix_reports":
+                game_state["reports_mixed"] = True
+                results[player_id] = {"pl": f"🃏 Mieszasz raporty!", "en": f"🃏 You mix reports!"}[lang]
+            
+            # RANDOM_EFFECTS - Random game effects
+            elif action_type == "random_effects":
+                effect = random.choice(["double_night", "skip_day", "double_votes", "random_death"])
+                game_state["special_effect"] = effect
+                results[player_id] = {"pl": f"⚠️ Efekt: {effect}!", "en": f"⚠️ Effect: {effect}!"}[lang]
+            
+            # CATASTROPHE - Major event
+            elif action_type == "catastrophe":
+                game_state["catastrophe"] = True
+                results[player_id] = {"pl": f"☠️ Sprowadzasz katastrofę!", "en": f"☠️ You cause catastrophe!"}[lang]
+            
+            # UNPREDICTABLE - Unpredictable action
+            elif action_type == "unpredictable":
+                actions = ["protect", "attack", "investigate", "nothing"]
+                random_action = random.choice(actions)
+                game_state["unpredictable_action"] = random_action
+                results[player_id] = {"pl": f"🐾 Nieprzewidywalna akcja: {random_action}", "en": f"🐾 Unpredictable: {random_action}"}[lang]
+            
+            # EVENT - Trigger special event
+            elif action_type == "event":
+                events = ["full_moon", "blood_moon", "eclipse", "storm"]
+                event = random.choice(events)
+                game_state["special_event"] = event
+                results[player_id] = {"pl": f"🌑 Wydarzenie: {event}!", "en": f"🌑 Event: {event}!"}[lang]
+            
+            # SUMMON - Summon something
+            elif action_type == "summon":
+                game_state["summoned"] = True
+                results[player_id] = {"pl": f"🕳️ Przywołujesz coś z ciemności...", "en": f"🕳️ You summon from darkness..."}[lang]
+            
+            # DECAY - Spread decay
+            elif action_type == "decay":
+                game_state["players"][target_id]["decaying"] = True
+                results[player_id] = {"pl": f"💫 Rozkład ogarnia <@{target_id}>.", "en": f"💫 Decay spreads to <@{target_id}>."}[lang]
+            
+            # CONFLICTS - Create conflict
+            elif action_type == "conflicts":
+                game_state["conflicts"] = game_state.get("conflicts", [])
+                game_state["conflicts"].append((player_id, target_id))
+                results[player_id] = {"pl": f"😰 Stwarzasz konflikt z <@{target_id}>.", "en": f"😰 You create conflict with <@{target_id}>."}[lang]
+            
+            # MANIPULATE_TURNS - Manipulate time/turns
+            elif action_type == "manipulate_turns":
+                game_state["turn_manipulated"] = True
+                results[player_id] = {"pl": f"⏳ Manipulujesz czasem!", "en": f"⏳ You manipulate time!"}[lang]
+            
+            # BUFF_WEAK - Buff weak faction
+            elif action_type == "buff_weak":
+                game_state["weak_buffed"] = True
+                results[player_id] = {"pl": f"⚖️ Wzmacniasz słabszą frakcję.", "en": f"⚖️ You buff the weak faction."}[lang]
+            
+            # UNSTOPPABLE - Can't be blocked (passive activation)
+            elif action_type == "unstoppable":
+                game_state["players"][player_id]["unstoppable"] = True
+                results[player_id] = {"pl": f"⚔️ Twój atak nie może być zatrzymany.", "en": f"⚔️ Your attack can't be stopped."}[lang]
+        
+        return results
+    
     async def _night_phase(self, lobby_id: str):
         """Execute night phase"""
         game_state = self.active_games.get(lobby_id)
@@ -2138,6 +2651,7 @@ class MafiaCog(commands.Cog):
         game_state["day_number"] += 1
         game_state["phase"] = "night"
         game_state["night_actions"] = {}
+        game_state["power_actions"] = {}  # Reset power role actions
         
         main_channel = self.bot.get_channel(game_state["main_channel_id"])
         evil_channel = self.bot.get_channel(game_state["evil_channel_id"])
@@ -2222,6 +2736,9 @@ class MafiaCog(commands.Cog):
                 except:
                     pass
         
+        # Send power role action panels (detective, doctor, etc.)
+        await self._send_power_role_actions(lobby_id)
+        
         # Wait for night duration
         await asyncio.sleep(game_state["night_duration"])
         
@@ -2240,15 +2757,55 @@ class MafiaCog(commands.Cog):
         lang = game_state["language"]
         theme = game_state["theme"]
         
+        # FIRST: Process power role actions (protections, investigations)
+        power_results = await self._process_power_role_actions(lobby_id)
+        
         # Determine who was killed
         evil_faction = "MAFIA" if theme == "mafia" else "WEREWOLVES"
         target = game_state["night_actions"].get(evil_faction)
         
         killed_players = []
+        bodyguard_kills = []
         
         if target and game_state["players"][target]["alive"]:
-            # Check if protected
-            if not game_state["players"][target].get("protected"):
+            # Check if guarded by bodyguard
+            if game_state["players"][target].get("guarded"):
+                bodyguard_id = game_state["players"][target]["guarded"]
+                # Bodyguard kills ONE attacker (random if multiple)
+                evil_players = [pid for pid, pdata in game_state["players"].items() 
+                               if pdata["faction"] == evil_faction and pdata["alive"]]
+                if evil_players:
+                    import random
+                    attacker = random.choice(evil_players)
+                    game_state["players"][attacker]["alive"] = False
+                    game_state["alive_players"].remove(attacker)
+                    game_state["dead_players"].append(attacker)
+                    bodyguard_kills.append(attacker)
+                    
+                    # Notify bodyguard
+                    try:
+                        bg_user = await self.bot.fetch_user(bodyguard_id)
+                        await bg_user.send(
+                            f"⚔️ {'Zabiłeś atakującego!' if lang == 'pl' else 'You killed an attacker!'}"
+                        )
+                    except:
+                        pass
+                
+                # Target survives
+                protected_text = {
+                    "pl": f"🛡️ <@{target}> został zaatakowany, ale ochroniarz zabił napastnika!",
+                    "en": f"🛡️ <@{target}> was attacked, but the bodyguard killed the attacker!"
+                }
+            
+            # Check if protected by doctor
+            elif game_state["players"][target].get("protected"):
+                # Target survives, no kills
+                protected_text = {
+                    "pl": f"🛡️ <@{target}> został zaatakowany, ale lekarz go uratował!",
+                    "en": f"🛡️ <@{target}> was attacked, but the doctor saved them!"
+                }
+            else:
+                # Target dies
                 game_state["players"][target]["alive"] = False
                 game_state["alive_players"].remove(target)
                 game_state["dead_players"].append(target)
@@ -2261,16 +2818,35 @@ class MafiaCog(commands.Cog):
                 except:
                     pass
         
-        # Reset protections
+        # Reset protections and guards
         for pdata in game_state["players"].values():
             pdata["protected"] = False
+            pdata.pop("guarded", None)
+            pdata.pop("stealthed", None)
+        
+        # Send power role results via DM
+        for player_id, result_msg in power_results.items():
+            try:
+                user = await self.bot.fetch_user(player_id)
+                await user.send(result_msg)
+            except:
+                pass
         
         # Announce deaths
         await main_channel.send(f"# ☀️ {'DZIEŃ' if lang == 'pl' else 'DAY'} {game_state['day_number']}")
         
+        if bodyguard_kills:
+            for pid in bodyguard_kills:
+                await main_channel.send(
+                    f"⚔️ <@{pid}> {'został zabity przez ochroniarza!' if lang == 'pl' else 'was killed by a bodyguard!'}"
+                )
+        
         if killed_players:
             for pid in killed_players:
                 await main_channel.send(f"💀 <@{pid}> {'został zabity w nocy!' if lang == 'pl' else 'was killed during the night!'}")
+        elif target and game_state["players"][target]["alive"]:
+            # Someone was attacked but survived
+            await main_channel.send(protected_text[lang])
         else:
             await main_channel.send(f"✨ {'Nikt nie zginął tej nocy!' if lang == 'pl' else 'No one died last night!'}")
         
@@ -2577,6 +3153,106 @@ class NightActionView(discord.ui.View):
         game_state["night_actions"][self.faction] = target
         
         await interaction.response.send_message(f"✅ Target selected!", ephemeral=True)
+
+
+class PowerRoleActionView(discord.ui.View):
+    """View for power role night actions (detective, doctor, bodyguard, etc.)"""
+    
+    def __init__(self, cog, lobby_id: str, player_id: int, action_type: str):
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.lobby_id = lobby_id
+        self.player_id = player_id
+        self.action_type = action_type
+        self._build_ui()
+    
+    def _build_ui(self):
+        game_state = self.cog.active_games.get(self.lobby_id)
+        if not game_state:
+            return
+        
+        # Get valid targets based on action type
+        targets = []
+        
+        if self.action_type == "reveal":
+            # Reporter can only target dead players
+            targets = [pid for pid, pdata in game_state["players"].items() 
+                      if not pdata["alive"]]
+        else:
+            # Most powers target alive players (except self for some)
+            targets = [pid for pid, pdata in game_state["players"].items() 
+                      if pdata["alive"]]
+            
+            # Remove self for investigation/tracking (can't investigate yourself)
+            if self.action_type in ["investigate", "track", "stealth"]:
+                if self.player_id in targets:
+                    targets.remove(self.player_id)
+        
+        if not targets:
+            return
+        
+        # Create select menu
+        options = []
+        for pid in targets[:25]:  # Max 25 options
+            try:
+                # Try to get username
+                user = self.cog.bot.get_user(pid)
+                label = f"{user.name}" if user else f"Player {str(pid)[:8]}..."
+                
+                options.append(discord.SelectOption(
+                    label=label,
+                    value=str(pid),
+                    emoji="🎯"
+                ))
+            except:
+                pass
+        
+        if options:
+            select = discord.ui.Select(
+                placeholder="Choose target...",
+                options=options
+            )
+            select.callback = self.use_power
+            self.add_item(select)
+    
+    async def use_power(self, interaction: discord.Interaction):
+        game_state = self.cog.active_games.get(self.lobby_id)
+        if not game_state:
+            return
+        
+        # Verify it's the right player
+        if interaction.user.id != self.player_id:
+            await interaction.response.send_message("❌ This isn't your action!", ephemeral=True)
+            return
+        
+        # Verify player is alive
+        if not game_state["players"][self.player_id]["alive"]:
+            await interaction.response.send_message("❌ Dead players can't act!", ephemeral=True)
+            return
+        
+        target = int(interaction.data['values'][0])
+        
+        # Record action
+        game_state["power_actions"][self.player_id] = {
+            "type": self.action_type,
+            "target": target
+        }
+        
+        action_names = {
+            "investigate": "🔍 Investigation",
+            "protect": "🛡️ Protection",
+            "guard": "🛡️ Guard",
+            "track": "👁️ Tracking",
+            "reveal": "📰 Reveal",
+            "stealth": "👤 Stealth visit"
+        }
+        
+        action_name = action_names.get(self.action_type, "Action")
+        
+        await interaction.response.send_message(
+            f"✅ **{action_name} recorded!**\nTarget: <@{target}>",
+            ephemeral=True
+        )
 
 
 class VoteView(discord.ui.View):

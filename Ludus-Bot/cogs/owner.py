@@ -1255,8 +1255,155 @@ class Owner(commands.Cog):
         
         await ctx.send(embed=embed)
 
-    # ==================== HELP COMMAND ====================
-
+    # ==================== CUSTOM ROLE CREATOR ====================
+    
+    @commands.command(name="customrole")
+    async def customrole_command(
+        self,
+        ctx,
+        name_en: str,
+        name_pl: str,
+        faction: str,
+        power: str = None,
+        desc_en: str = "Custom role",
+        *,
+        desc_pl: str = None
+    ):
+        """Create a custom role for Mafia/Werewolf games (bilingual)
+        
+        Usage: L!customrole <name_en> <name_pl> <faction> [power] [desc_en] [desc_pl]
+        
+        Factions: town, mafia, werewolves, village, neutral, chaos
+        Powers: investigate, protect, guard, kill, kill_leader, track, stealth, reveal_dead, lynch_win, contract, 
+                stats, hints, visits, death_cause, logs, suspicious, old_actions, future, riddles, dreams, 
+                random_visions, info, armor, sacrifice, block_curse, remove_curse, secure, revenge_kill, potions, 
+                block, control, force, convert, recruit, steal, disguise, copy, fake_reports, lower_sus, fake_town, 
+                fake_villager, reveal, cancel_vote, delay, connect, double_vote, buy_votes, reverse_vote, swap_votes, 
+                vote_influence, anonymous_dm, dead_chat, influence, chaos, random, break_night, grow, 50_lie, 
+                mix_reports, random_effects, catastrophe, unpredictable, event, summon, decay, conflicts, 
+                manipulate_turns, buff_weak, unstoppable
+        
+        Example: L!customrole Ninja Ninja town stealth "Invisible assassin" "Niewidzialny zabójca"
+        Example: L!customrole Detective Detektyw town investigate "Checks alignment" "Sprawdza czy ktoś jest zły"
+        Example: L!customrole Witch Wiedźma village potions "Can save or kill" "Może uratować lub zabić"
+        """
+        
+        # If desc_pl not provided, use desc_en for both languages
+        if desc_pl is None:
+            desc_pl = desc_en
+        
+        # Import ROLES_DATABASE from mafia cog
+        mafia_cog = self.bot.get_cog("Mafia")
+        if not mafia_cog:
+            return await ctx.send("❌ Mafia cog not loaded!")
+        
+        # Access ROLES_DATABASE from mafia module
+        import sys
+        mafia_module = sys.modules.get('cogs.mafia')
+        if not mafia_module:
+            return await ctx.send("❌ Cannot access mafia module!")
+        
+        ROLES_DATABASE = mafia_module.ROLES_DATABASE
+        
+        # Validate faction
+        valid_factions = ["TOWN", "MAFIA", "WEREWOLVES", "VILLAGE", "NEUTRAL", "CHAOS"]
+        faction = faction.upper()
+        if faction not in valid_factions:
+            return await ctx.send(
+                f"❌ Invalid faction! Use: {', '.join(valid_factions)}"
+            )
+        
+        # Validate power (optional) - all 65 powers
+        valid_powers = [
+            None, "investigate", "protect", "guard", "kill", "kill_leader", "track", "stealth", 
+            "reveal_dead", "lynch_win", "contract", "stats", "hints", "visits", "death_cause", 
+            "logs", "suspicious", "old_actions", "future", "riddles", "dreams", "random_visions", 
+            "info", "armor", "sacrifice", "block_curse", "remove_curse", "secure", "revenge_kill", 
+            "potions", "block", "control", "force", "convert", "recruit", "steal", "disguise", 
+            "copy", "fake_reports", "lower_sus", "fake_town", "fake_villager", "reveal", 
+            "cancel_vote", "delay", "connect", "double_vote", "buy_votes", "reverse_vote", 
+            "swap_votes", "vote_influence", "anonymous_dm", "dead_chat", "influence", "chaos", 
+            "random", "break_night", "grow", "50_lie", "mix_reports", "random_effects", 
+            "catastrophe", "unpredictable", "event", "summon", "decay", "conflicts", 
+            "manipulate_turns", "buff_weak", "unstoppable", "no_vote_strong", "survive", 
+            "survive_x", "top3", "chaos_win", "solo", "revenge"
+        ]
+        if power and power not in valid_powers:
+            return await ctx.send(
+                f"❌ Invalid power! Valid powers: investigate, protect, guard, track, stats, hints, visits, "
+                f"death_cause, logs, old_actions, future, riddles, dreams, info, armor, sacrifice, block, "
+                f"control, convert, recruit, steal, disguise, copy, reveal, cancel_vote, delay, chaos, random, etc. "
+                f"Use L!ownerhelp for full list."
+            )
+        
+        # Generate role ID from English name
+        role_id = name_en.lower().replace(" ", "_")
+        
+        # Check if role already exists
+        for theme_db in ROLES_DATABASE.values():
+            for faction_roles in theme_db.values():
+                if role_id in faction_roles:
+                    return await ctx.send(f"❌ Role `{role_id}` already exists!")
+        
+        # Choose emoji based on faction
+        faction_emojis = {
+            "TOWN": "👤",
+            "MAFIA": "🔫",
+            "WEREWOLVES": "🐺",
+            "VILLAGE": "🏘️",
+            "NEUTRAL": "⚖️",
+            "CHAOS": "🌀"
+        }
+        emoji = faction_emojis.get(faction, "❓")
+        
+        # Create custom role with bilingual support
+        custom_role = {
+            "name_en": name_en,
+            "name_pl": name_pl,
+            "emoji": emoji,
+            "power": power,
+            "description_en": desc_en,
+            "description_pl": desc_pl,
+            "custom": True,
+            "creator": ctx.author.id
+        }
+        
+        # Add to appropriate databases (both mafia and werewolf advanced)
+        if faction in ["TOWN", "VILLAGE"]:
+            ROLES_DATABASE["mafia_advanced"]["TOWN"][role_id] = custom_role.copy()
+            ROLES_DATABASE["werewolf_advanced"]["VILLAGE"][role_id] = custom_role.copy()
+        elif faction == "MAFIA":
+            ROLES_DATABASE["mafia_advanced"]["MAFIA"][role_id] = custom_role.copy()
+        elif faction == "WEREWOLVES":
+            ROLES_DATABASE["werewolf_advanced"]["WEREWOLVES"][role_id] = custom_role.copy()
+        else:
+            # NEUTRAL and CHAOS go to both
+            ROLES_DATABASE["mafia_advanced"][faction][role_id] = custom_role.copy()
+            ROLES_DATABASE["werewolf_advanced"][faction][role_id] = custom_role.copy()
+        
+        # Success message
+        power_text = f"\n**Power:** `{power}`" if power else ""
+        
+        embed = discord.Embed(
+            title="✅ Custom Role Created!",
+            description=f"{emoji} **{name_en}** / **{name_pl}**",
+            color=discord.Color.green()
+        )
+        embed.add_field(name="English Name", value=f"`{name_en}`", inline=True)
+        embed.add_field(name="Polish Name", value=f"`{name_pl}`", inline=True)
+        embed.add_field(name="Faction", value=f"`{faction}`", inline=True)
+        if power:
+            embed.add_field(name="Power", value=f"`{power}`", inline=False)
+        embed.add_field(name="Description (EN)", value=desc_en, inline=False)
+        if desc_en != desc_pl:
+            embed.add_field(name="Description (PL)", value=desc_pl, inline=False)
+        embed.add_field(name="Role ID", value=f"`{role_id}`", inline=False)
+        embed.set_footer(text="You can now select this role in Mafia/Werewolf custom mode!")
+        
+        await ctx.send(embed=embed)
+    
+    # ==================== OWNER HELP ====================
+    
     @commands.command(name="ownerhelp", aliases=["👑", "owner", "helpowner"])
     async def owner_help(self, ctx):
         """Show all secret owner commands"""
@@ -1318,6 +1465,19 @@ class Owner(commands.Cog):
                   "L!unlock_area @user <area_id> - Unlock area\n"
                   "Note: Random tournaments spawn automatically every 2-4h\n"
                   "Use /fish craft to craft kraken_bait from 8 tentacles\n"
+                  "```",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🎭 Mafia/Werewolf Custom Roles",
+            value="```\n"
+                  "L!customrole <name_en> <name_pl> <faction> [power] [desc_en] [desc_pl]\n"
+                  "  Create fully bilingual custom roles\n"
+                  "  Factions: town, mafia, werewolves, village, neutral, chaos\n"
+                  "  Powers: All 65+ powers (investigate, protect, chaos, etc.)\n"
+                  "  Example: L!customrole Ninja Ninja town stealth \"Invisible\" \"Niewidzialny\"\n"
+                  "  Example: L!customrole Witch Wiedźma village potions \"Can save or kill\" \"Może uratować lub zabić\"\n"
                   "```",
             inline=False
         )
