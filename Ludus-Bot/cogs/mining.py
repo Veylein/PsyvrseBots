@@ -8,6 +8,7 @@ import asyncio
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 import io
+from utils import user_storage
 
 class MiningGame:
     """Represents a single mining game session"""
@@ -26,7 +27,7 @@ class MiningGame:
         "redstone": 30, "diamond": 200, "emerald": 300, "deepslate": 10,
         "netherite": 1000, "ancient_debris": 500, "bedrock": 0, "grass": 1,
         "mineshaft_wood": 2, "mineshaft_support": 3, "mineshaft_rail": 5, "mineshaft_entrance": 0,
-        "chest": 0  # Special block with loot
+        "chest": 0
     }
     
     BLOCK_COLORS = {
@@ -38,7 +39,7 @@ class MiningGame:
         "ladder": (139, 90, 0), "portal": (128, 0, 128), "torch": (255, 200, 0),
         "mineshaft_wood": (101, 67, 33), "mineshaft_support": (139, 69, 19),
         "mineshaft_rail": (160, 160, 160), "mineshaft_entrance": (90, 60, 30),
-        "chest": (139, 69, 19)  # Brown chest color
+        "chest": (139, 69, 19)
     }
     
     def __init__(self, user_id: int, seed: int = None, guild_id: int = None, is_shared: bool = False):
@@ -3039,6 +3040,37 @@ class Mining(commands.Cog):
         
         with open(self.data_file, 'w') as f:
             json.dump(data, f, indent=4)
+        
+        # Snapshot per-user game state into user storage
+        try:
+            for user_id, game in self.active_games.items():
+                try:
+                    user_storage.record_game_state(int(user_id), None, "mining", game.to_dict())
+                except Exception:
+                    pass
+            for guild_id, world_info in self.shared_worlds.items():
+                try:
+                    world_state = world_info["world_data"].to_dict()
+                except Exception:
+                    world_state = {}
+                players = world_info.get("players", {})
+                for user_id_str, player_state in players.items():
+                    try:
+                        user_storage.record_game_state(
+                            int(user_id_str),
+                            None,
+                            "mining",
+                            {
+                                "mode": "shared",
+                                "guild_id": guild_id,
+                                "world": world_state,
+                                "player": player_state
+                            }
+                        )
+                    except Exception:
+                        pass
+        except Exception:
+            pass
     
     @app_commands.command(name="mine", description="⛏️ Start a procedurally generated mining adventure!")
     async def mine_slash(self, interaction: discord.Interaction):

@@ -35,6 +35,12 @@
     },
     "recent_plays": []
   },
+  "games": {},
+  "activity": {
+    "counts": {},
+    "by_name": {},
+    "recent": []
+  },
 
   "fishing": {
     "total_fished": 0,
@@ -100,6 +106,7 @@
 
   "meta": {
     "template_version": 1,
-    "updated_at": null
+    "updated_at": null,
+    "last_active": null
   }
 }

@@ -11,6 +11,7 @@ import logging
 import logging.handlers
 from pathlib import Path
 import ludus_logging
+from utils import user_storage
 
 dotenv.load_dotenv()
 # Configure logging to file+console. If Render provides a disk path, use it.
@@ -97,6 +98,21 @@ bot.active_minigames = {}
 bot.pending_rematches = {}
 
 
+def _record_user_activity(user_id: int, username: str | None, activity_type: str, name: str, extra: dict | None = None):
+    """Record user activity without blocking the event loop."""
+    try:
+        loop = bot.loop
+        if loop and loop.is_running():
+            loop.run_in_executor(None, user_storage.record_activity, int(user_id), username, activity_type, name, extra)
+            return
+    except Exception:
+        pass
+    try:
+        user_storage.record_activity(int(user_id), username, activity_type, name, extra)
+    except Exception:
+        pass
+
+
 # Wrap CommandTree.add_command to ignore duplicate registrations gracefully.
 # This prevents CommandAlreadyRegistered exceptions during cog injection
 # when multiple cogs or bridge modules try to register the same slash name.
@@ -158,6 +174,43 @@ async def setup_hook():
     
     # Now load all cogs
     await load_cogs()
+
+
+@bot.event
+async def on_command_completion(ctx):
+    try:
+        cmd_name = ctx.command.qualified_name if ctx.command else "unknown"
+    except Exception:
+        cmd_name = "unknown"
+    _record_user_activity(ctx.author.id, getattr(ctx.author, "name", None), "command", cmd_name)
+
+
+@bot.event
+async def on_app_command_completion(interaction: discord.Interaction, command):
+    try:
+        cmd_name = getattr(command, "qualified_name", None) or getattr(command, "name", None) or "app_command"
+    except Exception:
+        cmd_name = "app_command"
+    _record_user_activity(interaction.user.id, getattr(interaction.user, "name", None), "app_command", cmd_name)
+
+
+@bot.event
+async def on_interaction(interaction: discord.Interaction):
+    try:
+        # Only record component/modal interactions to avoid duplicating app_command tracking
+        itype = interaction.type
+        if itype in (discord.InteractionType.component, discord.InteractionType.modal_submit):
+            name = "component"
+            extra = {}
+            try:
+                if interaction.data:
+                    name = interaction.data.get("custom_id", "component")
+                    extra["component_type"] = interaction.data.get("component_type")
+            except Exception:
+                pass
+            _record_user_activity(interaction.user.id, getattr(interaction.user, "name", None), "interaction", name, extra or None)
+    except Exception:
+        pass
 
 
 async def load_cogs():

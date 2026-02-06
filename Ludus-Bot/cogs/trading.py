@@ -6,6 +6,7 @@ import os
 from typing import Optional
 import asyncio
 from datetime import datetime
+from utils import user_storage
 
 class Trading(commands.Cog):
     """Player-to-player trading system for items and coins"""
@@ -91,6 +92,26 @@ class Trading(commands.Cog):
             'timestamp': datetime.now().isoformat()
         }
         self.save_history()
+
+    def _record_trade_state(self, user_id: int, username: str | None, trade_summary: dict):
+        """Store trade summary in per-user game state."""
+        try:
+            user = user_storage.load_user(user_id, username)
+            games = user.setdefault("games", {})
+            trading = games.setdefault("trading", {})
+            trading["total_trades"] = trading.get("total_trades", 0) + 1
+            trading["last_trade"] = trade_summary
+            recent = trading.setdefault("recent_trades", [])
+            recent.insert(0, trade_summary)
+            if len(recent) > 50:
+                recent[:] = recent[:50]
+            user.setdefault("meta", {})["updated_at"] = datetime.utcnow().isoformat() + "Z"
+            user["meta"]["last_active"] = datetime.utcnow().isoformat() + "Z"
+            if username:
+                user["username"] = username
+            user_storage.save_user(user)
+        except Exception:
+            pass
     
     class TradeSession:
         """Represents an active trade between two users"""
@@ -493,6 +514,23 @@ class Trading(commands.Cog):
                 'server_id': ctx.guild.id,
                 'server_name': ctx.guild.name
             })
+            
+            trade_summary = {
+                "trade_id": trade_id,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "user1_id": trade.user1.id,
+                "user1_name": str(trade.user1),
+                "user1_coins": trade.user1_coins,
+                "user1_items": trade.user1_items,
+                "user2_id": trade.user2.id,
+                "user2_name": str(trade.user2),
+                "user2_coins": trade.user2_coins,
+                "user2_items": trade.user2_items,
+                "server_id": ctx.guild.id,
+                "server_name": ctx.guild.name
+            }
+            self._record_trade_state(trade.user1.id, getattr(trade.user1, "name", None), trade_summary)
+            self._record_trade_state(trade.user2.id, getattr(trade.user2, "name", None), trade_summary)
             
             # Success message
             embed = discord.Embed(
