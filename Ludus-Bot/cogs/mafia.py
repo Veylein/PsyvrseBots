@@ -800,6 +800,7 @@ class MafiaRolePickerView(discord.ui.LayoutView):
         
         # Build role database for name lookup
         theme = lobby["theme"]
+        mode = lobby["mode"]
         db_key = f"{theme}_advanced"
         role_db = ROLES_DATABASE.get(db_key, {})
         
