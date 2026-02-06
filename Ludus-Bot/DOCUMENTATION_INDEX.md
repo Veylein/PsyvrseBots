@@ -165,9 +165,42 @@ Complete analysis of boardgames.py, boardgames_enhanced.py, chess_checkers.py, u
 - **8 board games + 4 UNO variants = 12 total games**
 - **~30,000 words of documentation**
 
+#### **[🎭 PART 6: Multiplayer Games](documentation/FULL_DOCUMENTATION_PART6.md)**
+Complete analysis of mafia.py, multiplayer_games.py, dueling.py, monopoly.py (4,000+ lines total):
+- **Mafia/Werewolf System (2,639 lines - LARGEST MULTIPLAYER FILE):**
+  - 100+ roles across 4 databases (mafia/werewolf × normal/advanced)
+  - 3 game modes (Normal, Advanced, Custom)
+  - Smart presets for 6-16 players (20 balanced configurations)
+  - 8 custom themed presets (Chaos Mode, Detective Heavy, etc.)
+  - Time presets (Fast/Standard/Hardcore/Roleplay)
+  - Auto-balance checker (AI-powered role composition analysis)
+  - Full lobby system with interactive Discord UI
+  - Role picker with preview & balance feedback
+  - **Voice Mode (NEW):**
+    - Theme-specific meeting spots (8 per theme)
+    - Main center voice channel (town center/campfire)
+    - Game center text channel (read-only updates)
+    - Meeting spot locking/unlocking per phase
+    - Player teleportation to center during night/vote
+  - **Full Game Loop:**
+    - Night phase (evil faction votes, voice conspiracy)
+    - Day phase (discussion, unlocked locations)
+    - Vote phase (lynch voting, locked locations)
+    - Win condition checking
+  - Category creation with channels (main/evil/ghost)
+  - Permission system (faction-based access)
+  - DM role cards with descriptions
+  - Auto-cleanup after 60s
+  - Bilingual support (PL/EN)
+  - 26/26 features complete
+- **Other Multiplayer Systems:**
+  - Secret Hitler, Spyfall, Resistance
+  - PvP dueling system
+  - Monopoly board game (1,000 lines)
+- **~15,000 words of documentation**
+
 ---
 
-- **PART 6: Multiplayer Games** (Mafia, Werewolf, Among Us style)
 - **PART 7: Minigames** (100+ mini-games)
 - **PART 8: RPG Systems** (D&D, Wizard Wars, Quests)
 
