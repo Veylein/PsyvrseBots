@@ -5,6 +5,21 @@ from shutil import move
 import os
 import sys
 from datetime import datetime
+import asyncio
+import aiofiles
+import json
+
+async def save_user_async(user_obj: dict):
+    user_id = int(user_obj.get("user_id", 0))
+    p = user_file(user_id)
+    tmp = p.with_suffix('.tmp')
+    try:
+        async with aiofiles.open(tmp, 'w', encoding='utf-8') as f:
+            await f.write(json.dumps(user_obj, ensure_ascii=False, indent=2))
+        os.replace(str(tmp), str(p))
+    except Exception as e:
+        print(f"[user_storage] failed to save user {user_id}: {e}", file=sys.stderr)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 # Always store user data inside the Ludus folder (local data dir),
