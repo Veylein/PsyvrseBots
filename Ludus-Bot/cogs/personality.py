@@ -240,7 +240,7 @@ class LudusPersonality(commands.Cog):
 
                 # Sometimes just react with emoji, sometimes send message
                 if random.random() > 0.7:
-                    await message.add_reaction(emoji)
+                      await message.add_reaction(emoji)
                 else:
                     await message.channel.send(response)
 

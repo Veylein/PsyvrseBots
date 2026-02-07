@@ -456,12 +456,16 @@ class Help(commands.Cog):
 
             def make_embed(page_index: int):
                 page = pages[page_index]
+                desc_text = category_data.get('desc', '')
+                if desc_text:
+                    desc_text += "\n\n"
+                desc_text += "🔘 Use the interactive buttons below to navigate!"
                 embed = discord.Embed(title=f"🎮 Minigames (page {page_index+1}/{len(pages)})",
-                                      description=category_data.get('desc', ''),
+                                      description=desc_text,
                                       color=discord.Color.blue())
                 for name_, brief in page:
                     embed.add_field(name=name_, value=brief, inline=False)
-                embed.set_footer(text="Use the buttons to navigate — Prefix: L! or /")
+                embed.set_footer(text="💡 Buttons are fully functional - click to interact! Prefix: L! or /")
                 return embed
 
             class MiniPaginator(discord.ui.View):
@@ -474,7 +478,7 @@ class Help(commands.Cog):
                     return interaction.user.id == self.author.id
 
                 @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
-                async def prev(self, button: discord.ui.Button, interaction: discord.Interaction):
+                async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
                     if self.page > 0:
                         self.page -= 1
                         await interaction.response.edit_message(embed=make_embed(self.page), view=self)
@@ -482,7 +486,7 @@ class Help(commands.Cog):
                         await interaction.response.defer()
 
                 @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
-                async def next(self, button: discord.ui.Button, interaction: discord.Interaction):
+                async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
                     if self.page < len(pages) - 1:
                         self.page += 1
                         await interaction.response.edit_message(embed=make_embed(self.page), view=self)
@@ -490,7 +494,7 @@ class Help(commands.Cog):
                         await interaction.response.defer()
 
                 @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
-                async def close(self, button: discord.ui.Button, interaction: discord.Interaction):
+                async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
                     try:
                         await interaction.message.delete()
                     except Exception:

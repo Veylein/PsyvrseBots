@@ -2224,8 +2224,3 @@ game['player_coins'] = {player_id: 100 for player_id in game['players']}
 - Global Leaderboards (game performance)
 - TCG system (card rewards for board game wins)
 
-**Next Part:** Part 6 will cover Multiplayer Games (Mafia, Werewolf, Among Us-style games) and remaining minigames.
-
----
-
-*End of Part 5B Documentation - Board Games & UNO System*

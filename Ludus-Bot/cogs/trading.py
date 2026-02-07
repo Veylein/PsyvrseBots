@@ -93,10 +93,10 @@ class Trading(commands.Cog):
         }
         self.save_history()
 
-    def _record_trade_state(self, user_id: int, username: str | None, trade_summary: dict):
+    async def _record_trade_state(self, user_id: int, username: str | None, trade_summary: dict):
         """Store trade summary in per-user game state."""
         try:
-            user = user_storage.load_user(user_id, username)
+            user = await asyncio.to_thread(user_storage.load_user, user_id, username)
             games = user.setdefault("games", {})
             trading = games.setdefault("trading", {})
             trading["total_trades"] = trading.get("total_trades", 0) + 1
@@ -109,7 +109,7 @@ class Trading(commands.Cog):
             user["meta"]["last_active"] = datetime.utcnow().isoformat() + "Z"
             if username:
                 user["username"] = username
-            user_storage.save_user(user)
+            await user_storage.enqueue_user_storage(user_storage.save_user, user)
         except Exception:
             pass
     
@@ -529,8 +529,8 @@ class Trading(commands.Cog):
                 "server_id": ctx.guild.id,
                 "server_name": ctx.guild.name
             }
-            self._record_trade_state(trade.user1.id, getattr(trade.user1, "name", None), trade_summary)
-            self._record_trade_state(trade.user2.id, getattr(trade.user2, "name", None), trade_summary)
+            asyncio.create_task(self._record_trade_state(trade.user1.id, getattr(trade.user1, "name", None), trade_summary))
+            asyncio.create_task(self._record_trade_state(trade.user2.id, getattr(trade.user2, "name", None), trade_summary))
             
             # Success message
             embed = discord.Embed(

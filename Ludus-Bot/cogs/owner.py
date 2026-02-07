@@ -8,6 +8,398 @@ import random
 import asyncio
 from datetime import datetime
 
+# ==================== CUSTOM ROLE MANAGER ====================
+
+CUSTOM_ROLES_FILE = "data/custom_roles.json"
+
+def load_custom_roles():
+    """Load custom roles from JSON file"""
+    if os.path.exists(CUSTOM_ROLES_FILE):
+        with open(CUSTOM_ROLES_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f).get("roles", [])
+    return []
+
+def save_custom_roles(roles):
+    """Save custom roles to JSON file"""
+    os.makedirs("data", exist_ok=True)
+    with open(CUSTOM_ROLES_FILE, 'w', encoding='utf-8') as f:
+        json.dump({"roles": roles}, f, indent=2, ensure_ascii=False)
+
+def apply_custom_roles_to_database(bot):
+    """Apply all custom roles to ROLES_DATABASE"""
+    import sys
+    mafia_module = sys.modules.get('cogs.mafia')
+    if not mafia_module:
+        return False
+    
+    ROLES_DATABASE = mafia_module.ROLES_DATABASE
+    custom_roles = load_custom_roles()
+    
+    for role in custom_roles:
+        role_id = role["role_id"]
+        faction = role["faction"]
+        theme = role.get("theme", "MAFIA")  # Default to MAFIA theme if not specified
+        
+        role_data = {
+            "name_en": role["name_en"],
+            "name_pl": role["name_pl"],
+            "emoji": role["emoji"],
+            "power": role.get("power"),
+            "desc_en": role.get("desc_en", "Custom role"),
+            "desc_pl": role.get("desc_pl", "Niestandardowa rola"),
+            "custom": True,
+            "creator": role.get("creator", 0)
+        }
+        
+        # Add to appropriate database based on theme
+        if theme == "MAFIA":
+            # Add to mafia_advanced
+            if faction in ["TOWN"]:
+                ROLES_DATABASE["mafia_advanced"]["TOWN"][role_id] = role_data.copy()
+            elif faction == "MAFIA":
+                ROLES_DATABASE["mafia_advanced"]["MAFIA"][role_id] = role_data.copy()
+            elif faction == "NEUTRAL":
+                ROLES_DATABASE["mafia_advanced"]["NEUTRAL"][role_id] = role_data.copy()
+            elif faction == "CHAOS":
+                ROLES_DATABASE["mafia_advanced"]["CHAOS"][role_id] = role_data.copy()
+        elif theme == "WEREWOLF":
+            # Add to werewolf_advanced
+            if faction in ["VILLAGE", "TOWN"]:
+                ROLES_DATABASE["werewolf_advanced"]["VILLAGE"][role_id] = role_data.copy()
+            elif faction == "WEREWOLVES":
+                ROLES_DATABASE["werewolf_advanced"]["WEREWOLVES"][role_id] = role_data.copy()
+            elif faction == "NEUTRAL":
+                ROLES_DATABASE["werewolf_advanced"]["NEUTRAL"][role_id] = role_data.copy()
+            elif faction == "CHAOS":
+                ROLES_DATABASE["werewolf_advanced"]["CHAOS"][role_id] = role_data.copy()
+    
+    return True
+
+
+# ==================== HELPER FUNCTION ====================
+async def create_role_with_data(interaction, manager_view, name_en, name_pl, theme, faction, power, emoji=None, desc_en=None, desc_pl=None):
+    """Helper function to create a custom role with given data"""
+    role_id = name_en.lower().replace(" ", "_").strip()
+    
+    # Check if exists
+    for role in manager_view.custom_roles:
+        if role['role_id'] == role_id:
+            await interaction.response.send_message(
+                f"❌ Role `{role_id}` already exists!",
+                ephemeral=True
+            )
+            return False
+    
+    # Default emoji based on faction
+    faction_emojis = {
+        "TOWN": "👤",
+        "MAFIA": "🔫",
+        "WEREWOLVES": "🐺",
+        "VILLAGE": "🏘️",
+        "NEUTRAL": "⚖️",
+        "CHAOS": "🌀"
+    }
+    if not emoji:
+        emoji = faction_emojis.get(faction, "❓")
+    
+    if not desc_en:
+        desc_en = f"Custom {faction.lower()} role"
+    if not desc_pl:
+        desc_pl = f"Niestandardowa rola {faction.lower()}"
+    
+    # Create role
+    new_role = {
+        "role_id": role_id,
+        "name_en": name_en,
+        "name_pl": name_pl,
+        "theme": theme,
+        "faction": faction,
+        "power": power,
+        "emoji": emoji,
+        "desc_en": desc_en,
+        "desc_pl": desc_pl,
+        "creator": interaction.user.id,
+        "created_at": datetime.utcnow().isoformat()
+    }
+    
+    # Save
+    manager_view.custom_roles.append(new_role)
+    save_custom_roles(manager_view.custom_roles)
+    apply_custom_roles_to_database(manager_view.bot)
+    
+    # Update main view
+    embed = manager_view._build_embed()
+    await manager_view.message.edit(embed=embed, view=manager_view)
+    
+    await interaction.response.send_message(
+        f"✅ Created custom role: {emoji} **{name_en}** ({faction}, {theme} theme)",
+        ephemeral=True
+    )
+    return True
+
+
+# ==================== CUSTOM ROLE MANAGER VIEW ====================
+class CustomRoleManagerView(discord.ui.View):
+    """Manager for custom roles with create/delete UI"""
+    
+    def __init__(self, bot, user):
+        super().__init__(timeout=300.0)
+        self.bot = bot
+        self.user = user
+        self.message = None
+        self.custom_roles = load_custom_roles()
+    
+    async def show(self, ctx):
+        """Show the manager interface"""
+        embed = self._build_embed()
+        self.message = await ctx.send(embed=embed, view=self)
+    
+    def _build_embed(self):
+        """Build the main embed"""
+        embed = discord.Embed(
+            title="🎭 Custom Role Manager",
+            description="Create and manage custom Mafia/Werewolf roles",
+            color=discord.Color.blue()
+        )
+        
+        if self.custom_roles:
+            roles_text = ""
+            for i, role in enumerate(self.custom_roles[:10], 1):
+                theme = role.get('theme', 'MAFIA')
+                power_text = f" | {role.get('power', 'None')}" if role.get('power') else ""
+                roles_text += f"{i}. {role['emoji']} **{role['name_en']}** ({role['faction']}, {theme}){power_text}\n"
+            
+            if len(self.custom_roles) > 10:
+                roles_text += f"\n*...and {len(self.custom_roles) - 10} more*"
+            
+            embed.add_field(name=f"Custom Roles ({len(self.custom_roles)})", value=roles_text, inline=False)
+        else:
+            embed.add_field(name="Custom Roles", value="*No custom roles created yet*", inline=False)
+        
+        embed.set_footer(text="Use buttons below to create or delete roles")
+        return embed
+    
+    @discord.ui.button(label="Create Role", style=discord.ButtonStyle.success, emoji="➕")
+    async def create_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ Only the command user can use this!", ephemeral=True)
+            return
+        
+        modal = CreateRoleModal(self)
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(label="Delete Role", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def delete_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ Only the command user can use this!", ephemeral=True)
+            return
+        
+        if not self.custom_roles:
+            await interaction.response.send_message("❌ No custom roles to delete!", ephemeral=True)
+            return
+        
+        # Create select menu with roles
+        options = []
+        for role in self.custom_roles[:25]:  # Discord limit
+            options.append(discord.SelectOption(
+                label=f"{role['name_en']} ({role['faction']})",
+                value=role['role_id'],
+                emoji=role['emoji'],
+                description=f"Power: {role.get('power', 'None')}"
+            ))
+        
+        select = discord.ui.Select(placeholder="Select role to delete", options=options)
+        
+        async def select_callback(select_interaction: discord.Interaction):
+            if select_interaction.user.id != self.user.id:
+                await select_interaction.response.send_message("❌ Only the command user can use this!", ephemeral=True)
+                return
+            
+            role_id = select_interaction.data['values'][0]
+            self.custom_roles = [r for r in self.custom_roles if r['role_id'] != role_id]
+            save_custom_roles(self.custom_roles)
+            apply_custom_roles_to_database(self.bot)
+            
+            embed = self._build_embed()
+            await select_interaction.response.edit_message(embed=embed, view=self)
+            await select_interaction.followup.send(f"✅ Role `{role_id}` deleted!", ephemeral=True)
+        
+        select.callback = select_callback
+        
+        delete_view = discord.ui.View()
+        delete_view.add_item(select)
+        await interaction.response.send_message("Select a role to delete:", view=delete_view, ephemeral=True)
+    
+    @discord.ui.button(label="Refresh", style=discord.ButtonStyle.secondary, emoji="🔄")
+    async def refresh(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ Only the command user can use this!", ephemeral=True)
+            return
+        
+        self.custom_roles = load_custom_roles()
+        embed = self._build_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+
+class CreateRoleModal(discord.ui.Modal, title="Create Custom Role - Step 1/2"):
+    """Modal for creating a new custom role - Step 1: Basic Info"""
+    
+    name_en = discord.ui.TextInput(label="English Name", placeholder="e.g., Ninja", max_length=50, required=True)
+    name_pl = discord.ui.TextInput(label="Polish Name", placeholder="e.g., Ninja", max_length=50, required=True)
+    theme = discord.ui.TextInput(label="Theme", placeholder="MAFIA or WEREWOLF", max_length=20, required=True)
+    faction = discord.ui.TextInput(label="Faction", placeholder="TOWN/MAFIA/WEREWOLVES/VILLAGE/NEUTRAL/CHAOS", max_length=20, required=True)
+    power = discord.ui.TextInput(label="Power (optional)", placeholder="e.g., investigate, protect, stealth", max_length=50, required=False)
+    
+    def __init__(self, manager_view):
+        super().__init__()
+        self.manager_view = manager_view
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        # Validate theme
+        valid_themes = ["MAFIA", "WEREWOLF"]
+        theme = self.theme.value.upper().strip()
+        if theme not in valid_themes:
+            await interaction.response.send_message(
+                f"❌ Invalid theme! Use: {', '.join(valid_themes)}",
+                ephemeral=True
+            )
+            return
+        
+        # Validate faction
+        valid_factions = ["TOWN", "MAFIA", "WEREWOLVES", "VILLAGE", "NEUTRAL", "CHAOS"]
+        faction = self.faction.value.upper().strip()
+        if faction not in valid_factions:
+            await interaction.response.send_message(
+                f"❌ Invalid faction! Use: {', '.join(valid_factions)}",
+                ephemeral=True
+            )
+            return
+        
+        # Validate power
+        valid_powers = [
+            "investigate", "protect", "guard", "kill", "kill_leader", "track", "stealth",
+            "reveal_dead", "lynch_win", "contract", "stats", "hints", "visits", "death_cause",
+            "logs", "suspicious", "old_actions", "future", "riddles", "dreams", "random_visions",
+            "info", "armor", "sacrifice", "block_curse", "remove_curse", "secure", "revenge_kill",
+            "potions", "block", "control", "force", "convert", "recruit", "steal", "disguise",
+            "copy", "fake_reports", "lower_sus", "fake_town", "fake_villager", "reveal",
+            "cancel_vote", "delay", "connect", "double_vote", "buy_votes", "reverse_vote",
+            "swap_votes", "vote_influence", "anonymous_dm", "dead_chat", "influence", "chaos",
+            "random", "break_night", "grow", "50_lie", "mix_reports", "random_effects",
+            "catastrophe", "unpredictable", "event", "summon", "decay", "conflicts",
+            "manipulate_turns", "buff_weak", "unstoppable", "no_vote_strong", "survive",
+            "survive_x", "top3", "chaos_win", "solo", "revenge"
+        ]
+        
+        power_value = self.power.value.strip() if self.power.value else None
+        if power_value and power_value not in valid_powers:
+            await interaction.response.send_message(
+                f"❌ Invalid power! Check L!ownerhelp for valid powers.",
+                ephemeral=True
+            )
+            return
+        
+        # Create a view with button to add descriptions
+        step2_view = discord.ui.View(timeout=180)
+        
+        # Store data temporarily
+        step2_view.role_data = {
+            "name_en": self.name_en.value.strip(),
+            "name_pl": self.name_pl.value.strip(),
+            "theme": theme,
+            "faction": faction,
+            "power": power_value
+        }
+        step2_view.manager_view = self.manager_view
+        
+        # Button to open second modal
+        async def add_descriptions_callback(button_interaction: discord.Interaction):
+            second_modal = CreateRoleModalStep2(
+                step2_view.manager_view,
+                step2_view.role_data["name_en"],
+                step2_view.role_data["name_pl"],
+                step2_view.role_data["theme"],
+                step2_view.role_data["faction"],
+                step2_view.role_data["power"]
+            )
+            await button_interaction.response.send_modal(second_modal)
+        
+        add_desc_button = discord.ui.Button(label="Add Descriptions & Emoji", style=discord.ButtonStyle.primary, emoji="📝")
+        add_desc_button.callback = add_descriptions_callback
+        step2_view.add_item(add_desc_button)
+        
+        # Button to skip and use defaults
+        async def skip_callback(button_interaction: discord.Interaction):
+            # Create role with defaults
+            await create_role_with_data(
+                button_interaction,
+                step2_view.manager_view,
+                step2_view.role_data["name_en"],
+                step2_view.role_data["name_pl"],
+                step2_view.role_data["theme"],
+                step2_view.role_data["faction"],
+                step2_view.role_data["power"]
+            )
+        
+        skip_button = discord.ui.Button(label="Skip (Use Defaults)", style=discord.ButtonStyle.secondary, emoji="⏭️")
+        skip_button.callback = skip_callback
+        step2_view.add_item(skip_button)
+        
+        await interaction.response.send_message(
+            "✅ Basic info saved! Choose an option:",
+            view=step2_view,
+            ephemeral=True
+        )
+
+
+class CreateRoleModalStep2(discord.ui.Modal, title="Create Custom Role - Step 2/2"):
+    
+    emoji = discord.ui.TextInput(label="Emoji (optional)", placeholder="e.g., 🥷", max_length=10, required=False)
+    desc_en = discord.ui.TextInput(
+        label="English Description", 
+        placeholder="Describe the role in English", 
+        style=discord.TextStyle.paragraph,
+        max_length=200, 
+        required=False
+    )
+    desc_pl = discord.ui.TextInput(
+        label="Polish Description", 
+        placeholder="Opisz rolę po polsku", 
+        style=discord.TextStyle.paragraph,
+        max_length=200, 
+        required=False
+    )
+    
+    def __init__(self, manager_view, name_en, name_pl, theme, faction, power):
+        super().__init__()
+        self.manager_view = manager_view
+        self.name_en = name_en
+        self.name_pl = name_pl
+        self.theme = theme
+        self.faction = faction
+        self.power = power
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        # Get custom values
+        emoji = self.emoji.value.strip() if self.emoji.value else None
+        desc_en = self.desc_en.value.strip() if self.desc_en.value else None
+        desc_pl = self.desc_pl.value.strip() if self.desc_pl.value else None
+        
+        # Create role with custom descriptions
+        await create_role_with_data(
+            interaction,
+            self.manager_view,
+            self.name_en,
+            self.name_pl,
+            self.theme,
+            self.faction,
+            self.power,
+            emoji,
+            desc_en,
+            desc_pl
+        )
+
+
 class Owner(commands.Cog):
     """Secret owner-only commands for bot management and fun"""
     
@@ -16,6 +408,13 @@ class Owner(commands.Cog):
         self.owner_ids = bot.owner_ids
         
         print(f"[OWNER COG] Initialized with owner_ids: {self.owner_ids}")
+        
+        # Load custom roles to mafia database
+        try:
+            if apply_custom_roles_to_database(bot):
+                print("[OWNER COG] ✅ Custom roles loaded successfully")
+        except Exception as e:
+            print(f"[OWNER COG] ⚠️ Could not load custom roles yet: {e}")
         
         # Funny responses for secret commands
         self.god_mode_responses = [
@@ -1258,149 +1657,10 @@ class Owner(commands.Cog):
     # ==================== CUSTOM ROLE CREATOR ====================
     
     @commands.command(name="customrole")
-    async def customrole_command(
-        self,
-        ctx,
-        name_en: str,
-        name_pl: str,
-        faction: str,
-        power: str = None,
-        desc_en: str = "Custom role",
-        *,
-        desc_pl: str = None
-    ):
-        """Create a custom role for Mafia/Werewolf games (bilingual)
-        
-        Usage: L!customrole <name_en> <name_pl> <faction> [power] [desc_en] [desc_pl]
-        
-        Factions: town, mafia, werewolves, village, neutral, chaos
-        Powers: investigate, protect, guard, kill, kill_leader, track, stealth, reveal_dead, lynch_win, contract, 
-                stats, hints, visits, death_cause, logs, suspicious, old_actions, future, riddles, dreams, 
-                random_visions, info, armor, sacrifice, block_curse, remove_curse, secure, revenge_kill, potions, 
-                block, control, force, convert, recruit, steal, disguise, copy, fake_reports, lower_sus, fake_town, 
-                fake_villager, reveal, cancel_vote, delay, connect, double_vote, buy_votes, reverse_vote, swap_votes, 
-                vote_influence, anonymous_dm, dead_chat, influence, chaos, random, break_night, grow, 50_lie, 
-                mix_reports, random_effects, catastrophe, unpredictable, event, summon, decay, conflicts, 
-                manipulate_turns, buff_weak, unstoppable
-        
-        Example: L!customrole Ninja Ninja town stealth "Invisible assassin" "Niewidzialny zabójca"
-        Example: L!customrole Detective Detektyw town investigate "Checks alignment" "Sprawdza czy ktoś jest zły"
-        Example: L!customrole Witch Wiedźma village potions "Can save or kill" "Może uratować lub zabić"
-        """
-        
-        # If desc_pl not provided, use desc_en for both languages
-        if desc_pl is None:
-            desc_pl = desc_en
-        
-        # Import ROLES_DATABASE from mafia cog
-        mafia_cog = self.bot.get_cog("Mafia")
-        if not mafia_cog:
-            return await ctx.send("❌ Mafia cog not loaded!")
-        
-        # Access ROLES_DATABASE from mafia module
-        import sys
-        mafia_module = sys.modules.get('cogs.mafia')
-        if not mafia_module:
-            return await ctx.send("❌ Cannot access mafia module!")
-        
-        ROLES_DATABASE = mafia_module.ROLES_DATABASE
-        
-        # Validate faction
-        valid_factions = ["TOWN", "MAFIA", "WEREWOLVES", "VILLAGE", "NEUTRAL", "CHAOS"]
-        faction = faction.upper()
-        if faction not in valid_factions:
-            return await ctx.send(
-                f"❌ Invalid faction! Use: {', '.join(valid_factions)}"
-            )
-        
-        # Validate power (optional) - all 65 powers
-        valid_powers = [
-            None, "investigate", "protect", "guard", "kill", "kill_leader", "track", "stealth", 
-            "reveal_dead", "lynch_win", "contract", "stats", "hints", "visits", "death_cause", 
-            "logs", "suspicious", "old_actions", "future", "riddles", "dreams", "random_visions", 
-            "info", "armor", "sacrifice", "block_curse", "remove_curse", "secure", "revenge_kill", 
-            "potions", "block", "control", "force", "convert", "recruit", "steal", "disguise", 
-            "copy", "fake_reports", "lower_sus", "fake_town", "fake_villager", "reveal", 
-            "cancel_vote", "delay", "connect", "double_vote", "buy_votes", "reverse_vote", 
-            "swap_votes", "vote_influence", "anonymous_dm", "dead_chat", "influence", "chaos", 
-            "random", "break_night", "grow", "50_lie", "mix_reports", "random_effects", 
-            "catastrophe", "unpredictable", "event", "summon", "decay", "conflicts", 
-            "manipulate_turns", "buff_weak", "unstoppable", "no_vote_strong", "survive", 
-            "survive_x", "top3", "chaos_win", "solo", "revenge"
-        ]
-        if power and power not in valid_powers:
-            return await ctx.send(
-                f"❌ Invalid power! Valid powers: investigate, protect, guard, track, stats, hints, visits, "
-                f"death_cause, logs, old_actions, future, riddles, dreams, info, armor, sacrifice, block, "
-                f"control, convert, recruit, steal, disguise, copy, reveal, cancel_vote, delay, chaos, random, etc. "
-                f"Use L!ownerhelp for full list."
-            )
-        
-        # Generate role ID from English name
-        role_id = name_en.lower().replace(" ", "_")
-        
-        # Check if role already exists
-        for theme_db in ROLES_DATABASE.values():
-            for faction_roles in theme_db.values():
-                if role_id in faction_roles:
-                    return await ctx.send(f"❌ Role `{role_id}` already exists!")
-        
-        # Choose emoji based on faction
-        faction_emojis = {
-            "TOWN": "👤",
-            "MAFIA": "🔫",
-            "WEREWOLVES": "🐺",
-            "VILLAGE": "🏘️",
-            "NEUTRAL": "⚖️",
-            "CHAOS": "🌀"
-        }
-        emoji = faction_emojis.get(faction, "❓")
-        
-        # Create custom role with bilingual support
-        custom_role = {
-            "name_en": name_en,
-            "name_pl": name_pl,
-            "emoji": emoji,
-            "power": power,
-            "description_en": desc_en,
-            "description_pl": desc_pl,
-            "custom": True,
-            "creator": ctx.author.id
-        }
-        
-        # Add to appropriate databases (both mafia and werewolf advanced)
-        if faction in ["TOWN", "VILLAGE"]:
-            ROLES_DATABASE["mafia_advanced"]["TOWN"][role_id] = custom_role.copy()
-            ROLES_DATABASE["werewolf_advanced"]["VILLAGE"][role_id] = custom_role.copy()
-        elif faction == "MAFIA":
-            ROLES_DATABASE["mafia_advanced"]["MAFIA"][role_id] = custom_role.copy()
-        elif faction == "WEREWOLVES":
-            ROLES_DATABASE["werewolf_advanced"]["WEREWOLVES"][role_id] = custom_role.copy()
-        else:
-            # NEUTRAL and CHAOS go to both
-            ROLES_DATABASE["mafia_advanced"][faction][role_id] = custom_role.copy()
-            ROLES_DATABASE["werewolf_advanced"][faction][role_id] = custom_role.copy()
-        
-        # Success message
-        power_text = f"\n**Power:** `{power}`" if power else ""
-        
-        embed = discord.Embed(
-            title="✅ Custom Role Created!",
-            description=f"{emoji} **{name_en}** / **{name_pl}**",
-            color=discord.Color.green()
-        )
-        embed.add_field(name="English Name", value=f"`{name_en}`", inline=True)
-        embed.add_field(name="Polish Name", value=f"`{name_pl}`", inline=True)
-        embed.add_field(name="Faction", value=f"`{faction}`", inline=True)
-        if power:
-            embed.add_field(name="Power", value=f"`{power}`", inline=False)
-        embed.add_field(name="Description (EN)", value=desc_en, inline=False)
-        if desc_en != desc_pl:
-            embed.add_field(name="Description (PL)", value=desc_pl, inline=False)
-        embed.add_field(name="Role ID", value=f"`{role_id}`", inline=False)
-        embed.set_footer(text="You can now select this role in Mafia/Werewolf custom mode!")
-        
-        await ctx.send(embed=embed)
+    async def customrole_command(self, ctx):
+        """Open custom role manager interface"""
+        view = CustomRoleManagerView(self.bot, ctx.author)
+        await view.show(ctx)
     
     # ==================== OWNER HELP ====================
     
@@ -1472,12 +1732,13 @@ class Owner(commands.Cog):
         embed.add_field(
             name="🎭 Mafia/Werewolf Custom Roles",
             value="```\n"
-                  "L!customrole <name_en> <name_pl> <faction> [power] [desc_en] [desc_pl]\n"
-                  "  Create fully bilingual custom roles\n"
-                  "  Factions: town, mafia, werewolves, village, neutral, chaos\n"
-                  "  Powers: All 65+ powers (investigate, protect, chaos, etc.)\n"
-                  "  Example: L!customrole Ninja Ninja town stealth \"Invisible\" \"Niewidzialny\"\n"
-                  "  Example: L!customrole Witch Wiedźma village potions \"Can save or kill\" \"Może uratować lub zabić\"\n"
+                  "L!customrole - Open custom role manager (UI)\n"
+                  "  • Create new roles with modal form\n"
+                  "  • Choose custom emoji for each role\n"
+                  "  • Delete existing custom roles\n"
+                  "  • All 65+ powers supported\n"
+                  "  • Persistent (saved to JSON file)\n"
+                  "  • Auto-loads on bot restart\n"
                   "```",
             inline=False
         )

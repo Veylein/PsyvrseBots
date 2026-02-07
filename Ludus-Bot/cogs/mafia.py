@@ -1021,12 +1021,26 @@ class MafiaRolePickerView(discord.ui.LayoutView):
         self.add_item(self.container)
     
     async def prev_page(self, interaction: discord.Interaction):
+        lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         self.page = max(0, self.page - 1)
         self.clear_items()
         self._build_ui()
         await interaction.response.edit_message(view=self)
     
     async def next_page(self, interaction: discord.Interaction):
+        lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         all_roles = self._get_all_roles()
         total_pages = (len(all_roles) + self.roles_per_page - 1) // self.roles_per_page
         self.page = min(total_pages - 1, self.page + 1)
@@ -1085,6 +1099,12 @@ class MafiaRolePickerView(discord.ui.LayoutView):
     async def toggle_random(self, interaction: discord.Interaction):
         """Toggle random role selection"""
         lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         lobby["random_roles"] = not lobby.get("random_roles", False)
         
         self.clear_items()
@@ -1094,6 +1114,12 @@ class MafiaRolePickerView(discord.ui.LayoutView):
     async def set_evil_count(self, interaction: discord.Interaction):
         """Set evil faction count"""
         lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         value = interaction.data['values'][0]
         
         if value == "auto":
@@ -1108,6 +1134,12 @@ class MafiaRolePickerView(discord.ui.LayoutView):
     async def load_preset(self, interaction: discord.Interaction):
         """Load preset role pool"""
         lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         preset_id = interaction.data['values'][0]
         theme = lobby["theme"]
         player_count = len(lobby["players"])
@@ -1151,6 +1183,12 @@ class MafiaRolePickerView(discord.ui.LayoutView):
     async def show_role_preview(self, interaction: discord.Interaction, role_data: dict):
         """Show role description with Add/Cancel buttons"""
         lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         player_count = len(lobby["players"])
         lang = lobby["language"]
         theme = lobby["theme"]
@@ -1215,6 +1253,12 @@ class MafiaRolePickerView(discord.ui.LayoutView):
     async def confirm_add_role(self, interaction: discord.Interaction, role_data: dict):
         """Actually add the role after confirmation"""
         lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         lang = lobby["language"]
         
         if "custom_roles" not in lobby:
@@ -1231,6 +1275,13 @@ class MafiaRolePickerView(discord.ui.LayoutView):
     
     async def cancel_preview(self, interaction: discord.Interaction):
         """Cancel role preview and return to normal view"""
+        lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         # Rebuild UI normally (without preview)
         self.clear_items()
         self._build_ui()
@@ -1240,6 +1291,12 @@ class MafiaRolePickerView(discord.ui.LayoutView):
     async def remove_role(self, interaction: discord.Interaction, role_data: dict):
         """Remove a selected role"""
         lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         role_id = role_data["id"]
         
         if "custom_roles" in lobby and role_id in lobby["custom_roles"]:
@@ -1442,6 +1499,12 @@ class MafiaRolePickerView(discord.ui.LayoutView):
     
     async def clear_roles(self, interaction: discord.Interaction):
         lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         lobby["custom_roles"] = []
         
         self.clear_items()
@@ -1450,6 +1513,12 @@ class MafiaRolePickerView(discord.ui.LayoutView):
     
     async def finish_selection(self, interaction: discord.Interaction):
         lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         player_count = len(lobby["players"])
         role_count = len(lobby.get("custom_roles", []))
         lang = lobby["language"]
@@ -1486,6 +1555,13 @@ class MafiaRolePickerView(discord.ui.LayoutView):
         await interaction.response.edit_message(view=lobby_view)
     
     async def back_to_settings(self, interaction: discord.Interaction):
+        lobby = self.cog.active_lobbies.get(self.lobby_id)
+        lang = lobby.get("language", "en")
+        if not lobby or interaction.user.id != lobby["host"]:
+            msg = "❌ Tylko host może zmieniać ustawienia!" if lang == "pl" else "❌ Only host can change settings!"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        
         # Return to settings view
         settings_view = MafiaSettingsView(self.cog, self.lobby_id, self.lobby_message)
         await interaction.response.edit_message(view=settings_view)

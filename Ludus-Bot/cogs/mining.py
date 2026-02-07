@@ -8,7 +8,6 @@ import asyncio
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 import io
-from utils import user_storage
 
 class MiningGame:
     """Represents a single mining game session"""
@@ -1104,18 +1103,19 @@ class MiningGame:
 class MiningView(discord.ui.LayoutView):
     """Mining game interface using Components v2"""
     
-    def __init__(self, game: MiningGame, user_id: int, bot):
+    def __init__(self, game: MiningGame, user_id: int, bot, mining_cog=None):
         self.game = game
         self.user_id = user_id
         self.bot = bot
+        self.mining_cog = mining_cog
         self.message = None
         self.map_file = None
         super().__init__(timeout=300)
     
     @classmethod
-    async def create(cls, game: MiningGame, user_id: int, bot):
+    async def create(cls, game: MiningGame, user_id: int, bot, mining_cog=None):
         """Async factory method to create view with rendered map"""
-        view = cls(game, user_id, bot)
+        view = cls(game, user_id, bot, mining_cog)
         
         # Regenerate energy before rendering
         view.game.regenerate_energy()
@@ -1765,19 +1765,20 @@ class MiningView(discord.ui.LayoutView):
 class OwnerMiningView(discord.ui.LayoutView):
     """Developer mining interface with additional testing features"""
     
-    def __init__(self, game: MiningGame, user_id: int, bot):
+    def __init__(self, game: MiningGame, user_id: int, bot, mining_cog=None):
         self.game = game
         self.user_id = user_id
         self.bot = bot
+        self.mining_cog = mining_cog
         self.message = None
         self.map_file = None
         self.dev_menu_state = "main"  # Track submenu state: main, teleport, place_blocks, items
         super().__init__(timeout=300)
     
     @classmethod
-    async def create(cls, game: MiningGame, user_id: int, bot):
+    async def create(cls, game: MiningGame, user_id: int, bot, mining_cog=None):
         """Async factory method to create view with rendered map"""
-        view = cls(game, user_id, bot)
+        view = cls(game, user_id, bot, mining_cog)
         
         # Regenerate energy before rendering
         view.game.regenerate_energy()
@@ -2618,6 +2619,10 @@ class OwnerMiningView(discord.ui.LayoutView):
     
     async def on_timeout(self):
         """Handle timeout"""
+        # Remove user from active sessions
+        if self.mining_cog and self.user_id in self.mining_cog.active_sessions:
+            del self.mining_cog.active_sessions[self.user_id]
+        
         if self.message:
             try:
                 await self.message.edit(view=None)
@@ -2985,6 +2990,7 @@ class Mining(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.active_games = {}  # Personal mode: {user_id: MiningGame}
+        self.active_sessions = {}  # Track active mining sessions: {user_id: timestamp}
         self.shared_worlds = {}  # Shared mode: {guild_id: {world_data: MiningGame, players: {user_id: player_data}}}
         self.data_file = "data/mining_data.json"
         self.load_data()
@@ -3041,41 +3047,26 @@ class Mining(commands.Cog):
         with open(self.data_file, 'w') as f:
             json.dump(data, f, indent=4)
         
-        # Snapshot per-user game state into user storage
-        try:
-            for user_id, game in self.active_games.items():
-                try:
-                    user_storage.record_game_state(int(user_id), None, "mining", game.to_dict())
-                except Exception:
-                    pass
-            for guild_id, world_info in self.shared_worlds.items():
-                try:
-                    world_state = world_info["world_data"].to_dict()
-                except Exception:
-                    world_state = {}
-                players = world_info.get("players", {})
-                for user_id_str, player_state in players.items():
-                    try:
-                        user_storage.record_game_state(
-                            int(user_id_str),
-                            None,
-                            "mining",
-                            {
-                                "mode": "shared",
-                                "guild_id": guild_id,
-                                "world": world_state,
-                                "player": player_state
-                            }
-                        )
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        # NOTE: User storage recording removed from save_data() to avoid blocking.
+        # User game states can be saved separately in async context if needed.
     
     @app_commands.command(name="mine", description="⛏️ Start a procedurally generated mining adventure!")
     async def mine_slash(self, interaction: discord.Interaction):
         """Start a mining adventure! (Slash version)"""
         await interaction.response.defer()
+        
+
+        if interaction.user.id in self.active_sessions:
+            await interaction.followup.send(
+                "❌ **You already have an active mining session!**\n"
+                "Please finish or close your current session before starting a new one.\n"
+                "💡 Sessions auto-close after 5 minutes of inactivity.",
+                ephemeral=True
+            )
+            return
+        
+        self.active_sessions[interaction.user.id] = datetime.utcnow()
+        
         await self.start_mining(interaction, interaction.user.id, interaction.guild.id if interaction.guild else None)
     
     @commands.command(name="ownermine")
@@ -3220,9 +3211,9 @@ class Mining(commands.Cog):
         
         # Use OwnerMiningView if in developer mode, otherwise regular MiningView
         if dev_mode:
-            view = await OwnerMiningView.create(game, user_id, self.bot)
+            view = await OwnerMiningView.create(game, user_id, self.bot, mining_cog=self)
         else:
-            view = await MiningView.create(game, user_id, self.bot)
+            view = await MiningView.create(game, user_id, self.bot, mining_cog=self)
         
         if hasattr(ctx, 'response'):  # Slash command
             view.message = await ctx.followup.send(view=view, files=[view.map_file])

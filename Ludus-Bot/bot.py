@@ -12,6 +12,8 @@ import logging.handlers
 from pathlib import Path
 import ludus_logging
 from utils import user_storage
+from datetime import datetime
+import aiofiles
 
 dotenv.load_dotenv()
 # Configure logging to file+console. If Render provides a disk path, use it.
@@ -82,7 +84,11 @@ bot = commands.Bot(
     intents=intents, 
     owner_ids=owner_ids_set,
     help_command=None,  # Disable default help to use custom help cog
-    description="🎮 The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with ❤️ by Psyvrse Development."
+    description="🎮 The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with ❤️ by Psyvrse Development.",
+    # Performance/stability settings for cloud hosting
+    max_messages=1000,  # Limit message cache to reduce memory
+    chunk_guilds_at_startup=False,  # Don't fetch all members on startup
+    heartbeat_timeout=120.0,  # Increase heartbeat timeout for unstable connections (default: 60)
 )
 
 # Initialize Discord log forwarding helper (sends detailed logs to LOG_CHANNEL)
@@ -99,16 +105,12 @@ bot.pending_rematches = {}
 
 
 def _record_user_activity(user_id: int, username: str | None, activity_type: str, name: str, extra: dict | None = None):
-    """Record user activity without blocking the event loop."""
+    """Record user activity in background without blocking."""
     try:
         loop = bot.loop
         if loop and loop.is_running():
-            loop.run_in_executor(None, user_storage.record_activity, int(user_id), username, activity_type, name, extra)
-            return
-    except Exception:
-        pass
-    try:
-        user_storage.record_activity(int(user_id), username, activity_type, name, extra)
+            # Use asyncio.create_task for async function
+            asyncio.create_task(user_storage.record_activity(int(user_id), username, activity_type, name, extra))
     except Exception:
         pass
 
@@ -174,41 +176,92 @@ async def setup_hook():
     
     # Now load all cogs
     await load_cogs()
+    
+    # Initialize user storage batch worker
+    try:
+        from utils import user_storage
+        user_storage.init_user_storage_worker(bot.loop)
+    except Exception as e:
+        print(f"[BOT] Failed to initialize user storage worker: {e}")
+        traceback.print_exc()
+    
+    # Start activity worker
+    try:
+        bot.loop.create_task(activity_worker())
+        print("[BOT] Activity worker started")
+    except Exception as e:
+        print(f"[BOT] Failed to start activity worker: {e}")
+        traceback.print_exc()
 
 
+activity_queue = asyncio.Queue()
+BATCH_SIZE = 50       # how many entries we collect before saving
+BATCH_INTERVAL = 2.0  # save every 2 seconds, even if the batch is not full
+
+async def activity_worker():
+    batch = []
+    while True:
+        try:
+            try:
+                # wait for the first element of the batch with a timeout
+                data = await asyncio.wait_for(activity_queue.get(), timeout=BATCH_INTERVAL)
+                batch.append(data)
+                activity_queue.task_done()
+            except asyncio.TimeoutError:
+                pass  # timeout, save whatever is in the batch
+
+            # fetch additional elements until reaching BATCH_SIZE
+            while len(batch) < BATCH_SIZE:
+                try:
+                    data = activity_queue.get_nowait()
+                    batch.append(data)
+                    activity_queue.task_done()
+                except asyncio.QueueEmpty:
+                    break
+
+            if batch:
+                async with aiofiles.open("user_activity.json", "a") as f:
+                    lines = [json.dumps(entry) + "\n" for entry in batch]
+                    await f.writelines(lines)
+                batch.clear()
+        except Exception as e:
+            print(f"[ACTIVITY WORKER] Error saving activity: {e}")
+            batch.clear()
+
+
+def _record_user_activity(user_id, username, interaction_type, name, extra=None):
+    data = {
+        "user_id": user_id,
+        "username": username,
+        "type": interaction_type,
+        "name": name,
+        "extra": extra or {},
+        "timestamp": str(datetime.utcnow())
+    }
+    activity_queue.put_nowait(data)
+
+
+# Events
 @bot.event
 async def on_command_completion(ctx):
-    try:
-        cmd_name = ctx.command.qualified_name if ctx.command else "unknown"
-    except Exception:
-        cmd_name = "unknown"
+    cmd_name = getattr(ctx.command, "qualified_name", "unknown")
     _record_user_activity(ctx.author.id, getattr(ctx.author, "name", None), "command", cmd_name)
-
 
 @bot.event
 async def on_app_command_completion(interaction: discord.Interaction, command):
-    try:
-        cmd_name = getattr(command, "qualified_name", None) or getattr(command, "name", None) or "app_command"
-    except Exception:
-        cmd_name = "app_command"
+    cmd_name = getattr(command, "qualified_name", None) or getattr(command, "name", None) or "app_command"
     _record_user_activity(interaction.user.id, getattr(interaction.user, "name", None), "app_command", cmd_name)
-
 
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     try:
-        # Only record component/modal interactions to avoid duplicating app_command tracking
-        itype = interaction.type
-        if itype in (discord.InteractionType.component, discord.InteractionType.modal_submit):
+        if interaction.type in (discord.InteractionType.component, discord.InteractionType.modal_submit):
             name = "component"
             extra = {}
-            try:
-                if interaction.data:
-                    name = interaction.data.get("custom_id", "component")
-                    extra["component_type"] = interaction.data.get("component_type")
-            except Exception:
-                pass
-            _record_user_activity(interaction.user.id, getattr(interaction.user, "name", None), "interaction", name, extra or None)
+            if interaction.data:
+                name = interaction.data.get("custom_id", "component")
+                extra["component_type"] = interaction.data.get("component_type")
+            _record_user_activity(interaction.user.id, getattr(interaction.user, "name", None), "interaction", name, extra)
     except Exception:
         pass
 
@@ -284,6 +337,24 @@ async def load_cogs():
             print(f"   • {cog_name}: {error[:80]}")
     
     print("="*50 + "\n")
+
+@bot.event
+async def on_connect():
+    """Called when bot successfully connects to Discord"""
+    print("✅ Connected to Discord!")
+    logger.info("Bot connected to Discord")
+
+@bot.event
+async def on_disconnect():
+    """Called when bot disconnects from Discord"""
+    print("⚠️ Disconnected from Discord - will attempt reconnect")
+    logger.warning("Bot disconnected from Discord")
+
+@bot.event
+async def on_resume():
+    """Called when bot successfully resumes session after disconnect"""
+    print("✅ Successfully resumed Discord session")
+    logger.info("Bot resumed Discord session")
 
 @bot.event
 async def on_ready():
@@ -752,12 +823,29 @@ async def main():
     if not token:
         print("Error: No Discord token found! Please set LUDUS_TOKEN in Secrets or add 'token' to config.json.")
         return
+    
     try:
-        await bot.start(token)
+        async with bot:
+            await bot.start(token)
     except discord.errors.LoginFailure:
         logger.error("Invalid Discord token provided")
+    except KeyboardInterrupt:
+        logger.info("Bot shutdown requested by user")
+        print("\n👋 Bot shutting down gracefully...")
     except Exception as e:
         logger.exception("Bot stopped with exception: %s", e)
+        print(f"\n❌ Bot crashed: {e}")
+        # On error, wait a bit before letting the process restart
+        await asyncio.sleep(5)
+    finally:
+        # Flush user storage queue on shutdown
+        try:
+            from utils import user_storage
+            print("[BOT] Flushing user storage queue...")
+            await user_storage.flush_user_storage_queue()
+            print("[BOT] User storage queue flushed")
+        except Exception as e:
+            print(f"[BOT] Error flushing user storage queue: {e}")
 
 # --- FIXED: Removed duplicate config reload (it served no purpose) ---
 
