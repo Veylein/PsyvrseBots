@@ -184,6 +184,14 @@ async def setup_hook():
     except Exception as e:
         print(f"[BOT] Failed to initialize user storage worker: {e}")
         traceback.print_exc()
+    
+    # Start activity worker
+    try:
+        bot.loop.create_task(activity_worker())
+        print("[BOT] Activity worker started")
+    except Exception as e:
+        print(f"[BOT] Failed to start activity worker: {e}")
+        traceback.print_exc()
 
 
 activity_queue = asyncio.Queue()
@@ -220,9 +228,6 @@ async def activity_worker():
             print(f"[ACTIVITY WORKER] Error saving activity: {e}")
             batch.clear()
 
-
-# start the worker when the bot starts
-bot.loop.create_task(activity_worker())
 
 def _record_user_activity(user_id, username, interaction_type, name, extra=None):
     data = {
