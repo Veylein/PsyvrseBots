@@ -1791,6 +1791,30 @@ async def help_slash(interaction: discord.Interaction):
     await interaction.response.send_message("This is the slash command help! Use !help for the prefix version.")
 
 
+# Owner-only sync helper for application commands
+@bot.tree.command(name="sync", description="Sync slash commands (owner only). Use guild_only=true to sync this guild")
+async def sync_slash(interaction: discord.Interaction, guild_only: bool = False):
+    try:
+        is_owner = await bot.is_owner(interaction.user)
+    except Exception:
+        is_owner = False
+
+    if not is_owner:
+        await interaction.response.send_message("Only the bot owner can sync commands.", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    try:
+        if guild_only and interaction.guild:
+            await bot.tree.sync(guild=interaction.guild)
+            await interaction.followup.send("Synced commands to this guild.", ephemeral=True)
+        else:
+            await bot.tree.sync()
+            await interaction.followup.send("Synced global application commands.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"Failed to sync commands: {e}", ephemeral=True)
+
+
 async def log_event(event_type: str, description: str, guild, color: discord.Color = discord.Color.blue()):
     """Log important bot events to the designated log channel
 
@@ -3567,6 +3591,21 @@ async def on_ready():
 
     print(f"✅ {bot.user} is online!")
     print(f"📊 Monitoring {len(bot.guilds)} guild(s)")
+    # Attempt to synchronize application (slash) commands.
+    try:
+        dev_guild = os.getenv("PAX_DEV_GUILD")
+        if dev_guild:
+            try:
+                dev_guild_obj = discord.Object(id=int(dev_guild))
+                await bot.tree.sync(guild=dev_guild_obj)
+                print(f"✅ Synced application commands to dev guild {dev_guild}")
+            except Exception as e:
+                print(f"⚠️ Failed to sync to dev guild {dev_guild}: {e}")
+        else:
+            await bot.tree.sync()
+            print("✅ Global application commands synced")
+    except Exception as e:
+        print(f"⚠️ Failed to sync application commands: {e}")
 
     # Run migration for garden inventory
     migrate_garden_inventory()
