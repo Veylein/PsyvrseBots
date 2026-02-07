@@ -3055,18 +3055,16 @@ class Mining(commands.Cog):
         """Start a mining adventure! (Slash version)"""
         await interaction.response.defer()
         
-        # TODO: Uncomment to enable one active session per user
-        # Check if user already has an active mining session
-        # if interaction.user.id in self.active_sessions:
-        #     await interaction.followup.send(
-        #         "❌ **You already have an active mining session!**\n"
-        #         "Please finish or close your current session before starting a new one.\n"
-        #         "💡 Sessions auto-close after 5 minutes of inactivity.",
-        #         ephemeral=True
-        #     )
-        #     return
+
+        if interaction.user.id in self.active_sessions:
+            await interaction.followup.send(
+                "❌ **You already have an active mining session!**\n"
+                "Please finish or close your current session before starting a new one.\n"
+                "💡 Sessions auto-close after 5 minutes of inactivity.",
+                ephemeral=True
+            )
+            return
         
-        # Mark session as active
         self.active_sessions[interaction.user.id] = datetime.utcnow()
         
         await self.start_mining(interaction, interaction.user.id, interaction.guild.id if interaction.guild else None)
