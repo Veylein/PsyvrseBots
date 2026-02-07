@@ -201,6 +201,10 @@ class LudusPersonality(commands.Cog):
         # Ignore bots
         if message.author.bot:
             return
+        
+        # Don't try to send messages if bot is disconnected
+        if self.bot.is_closed():
+            return
 
         # Don't react during command processing
         ctx = await self.bot.get_context(message)
@@ -240,9 +244,17 @@ class LudusPersonality(commands.Cog):
 
                 # Sometimes just react with emoji, sometimes send message
                 if random.random() > 0.7:
-                    await message.add_reaction(emoji)
+                    try:
+                        await message.add_reaction(emoji)
+                    except (asyncio.TimeoutError, discord.HTTPException):
+                        # Ignore timeout/connection errors during disconnect
+                        pass
                 else:
-                    await message.channel.send(response)
+                    try:
+                        await message.channel.send(response)
+                    except (asyncio.TimeoutError, discord.HTTPException):
+                        # Ignore timeout/connection errors during disconnect
+                        pass
 
                 break  # Only react to first trigger found
     
