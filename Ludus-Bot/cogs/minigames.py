@@ -57,15 +57,11 @@ class Minigames(commands.Cog):
                     record_fn = None
 
             if record_fn:
-                # run in executor to avoid blocking the event loop
+                # now it's async, so we use create_task to not block
                 try:
-                    self.bot.loop.run_in_executor(None, record_fn, int(ctx.author.id), game_name, 'win', int(amount), str(getattr(ctx.author, 'name', ctx.author)))
+                    asyncio.create_task(record_fn(int(ctx.author.id), game_name, 'win', int(amount), str(getattr(ctx.author, 'name', ctx.author))))
                 except Exception:
-                    # last-resort: call synchronously (best-effort)
-                    try:
-                        record_fn(int(ctx.author.id), game_name, 'win', int(amount), str(getattr(ctx.author, 'name', ctx.author)))
-                    except Exception:
-                        pass
+                    pass
         except Exception:
             pass
 

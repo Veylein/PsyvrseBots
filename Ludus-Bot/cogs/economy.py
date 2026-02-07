@@ -184,27 +184,6 @@ class Economy(commands.Cog):
         self.economy_data[user_key]["balance"] += amount
         self.economy_data[user_key]["total_earned"] += amount
         self.economy_dirty = True
-        
-        # Save to user_storage in background
-        try:
-            loop = asyncio.get_event_loop()
-            loop.run_in_executor(
-                None,
-                user_storage.record_game_state,
-                user_id,
-                None,
-                "economy",
-                {
-                    "balance": self.economy_data[user_key]["balance"],
-                    "total_earned": self.economy_data[user_key]["total_earned"],
-                    "total_spent": self.economy_data[user_key]["total_spent"],
-                    "active_boosts": self.economy_data[user_key].get("active_boosts", {}),
-                    "inventory": self.inventory_data.get(user_key, {})
-                }
-            )
-        except Exception:
-            pass
-        
         return self.economy_data[user_key]["balance"]
 
     def remove_coins(self, user_id: int, amount: int) -> bool:
@@ -216,27 +195,6 @@ class Economy(commands.Cog):
             self.economy_data[user_key]["balance"] -= amount
             self.economy_data[user_key]["total_spent"] += amount
             self.economy_dirty = True
-            
-            # Save to user_storage in background
-            try:
-                loop = asyncio.get_event_loop()
-                loop.run_in_executor(
-                    None,
-                    user_storage.record_game_state,
-                    user_id,
-                    None,
-                    "economy",
-                    {
-                        "balance": self.economy_data[user_key]["balance"],
-                        "total_earned": self.economy_data[user_key]["total_earned"],
-                        "total_spent": self.economy_data[user_key]["total_spent"],
-                        "active_boosts": self.economy_data[user_key].get("active_boosts", {}),
-                        "inventory": self.inventory_data.get(user_key, {})
-                    }
-                )
-            except Exception:
-                pass
-            
             return True
         return False
 
@@ -306,21 +264,7 @@ class Economy(commands.Cog):
             inventory[item_id] = quantity
         
         self.inventory_dirty = True
-        try:
-            user_storage.record_game_state(
-                user_id,
-                None,
-                "economy",
-                {
-                    "balance": self.economy_data.get(str(user_id), {}).get("balance", 0),
-                    "total_earned": self.economy_data.get(str(user_id), {}).get("total_earned", 0),
-                    "total_spent": self.economy_data.get(str(user_id), {}).get("total_spent", 0),
-                    "active_boosts": self.economy_data.get(str(user_id), {}).get("active_boosts", {}),
-                    "inventory": self.inventory_data.get(str(user_id), {})
-                }
-            )
-        except Exception:
-            pass
+
 
     def remove_item(self, user_id: int, item_id: str, quantity: int = 1) -> bool:
         """Remove item from inventory. Returns True if successful."""
@@ -332,21 +276,6 @@ class Economy(commands.Cog):
             if inventory[item_id] == 0:
                 del inventory[item_id]
             self.inventory_dirty = True
-            try:
-                user_storage.record_game_state(
-                    user_id,
-                    None,
-                    "economy",
-                    {
-                        "balance": self.economy_data.get(str(user_id), {}).get("balance", 0),
-                        "total_earned": self.economy_data.get(str(user_id), {}).get("total_earned", 0),
-                        "total_spent": self.economy_data.get(str(user_id), {}).get("total_spent", 0),
-                        "active_boosts": self.economy_data.get(str(user_id), {}).get("active_boosts", {}),
-                        "inventory": self.inventory_data.get(str(user_id), {})
-                    }
-                )
-            except Exception:
-                pass
             return True
         return False
 

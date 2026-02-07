@@ -7,7 +7,114 @@ import sys
 from datetime import datetime
 import asyncio
 import aiofiles
-import json
+
+# ========================================
+# BATCH QUEUE SYSTEM FOR USER STORAGE
+# ========================================
+
+user_storage_queue = None  # Will be initialized by init_user_storage_worker()
+_worker_task = None
+BATCH_INTERVAL = 2.0  # Seconds to wait before flushing batch
+BATCH_SIZE = 50  # Max items to accumulate before forcing a flush
+
+
+async def user_storage_worker():
+    """Background worker that processes user storage operations in batches"""
+    global user_storage_queue
+    batch = []
+    
+    print("[USER STORAGE] Batch worker started")
+    
+    while True:
+        try:
+            # Wait for items with timeout
+            try:
+                item = await asyncio.wait_for(user_storage_queue.get(), timeout=BATCH_INTERVAL)
+                batch.append(item)
+                user_storage_queue.task_done()
+            except asyncio.TimeoutError:
+                pass
+            
+            # Collect more items up to BATCH_SIZE without blocking
+            while len(batch) < BATCH_SIZE:
+                try:
+                    item = user_storage_queue.get_nowait()
+                    batch.append(item)
+                    user_storage_queue.task_done()
+                except asyncio.QueueEmpty:
+                    break
+            
+            # Process batch if we have items
+            if batch:
+                saved_count = 0
+                for func, args, kwargs in batch:
+                    try:
+                        # Run synchronous save functions in thread pool
+                        await asyncio.to_thread(func, *args, **kwargs)
+                        saved_count += 1
+                    except Exception as e:
+                        print(f"[USER STORAGE WORKER] Error saving: {e}", file=sys.stderr)
+                
+                if saved_count > 0:
+                    print(f"[USER STORAGE] Saved batch of {saved_count} operations")
+                batch.clear()
+                
+        except Exception as e:
+            print(f"[USER STORAGE WORKER] Critical error in worker: {e}", file=sys.stderr)
+            batch.clear()
+
+
+def init_user_storage_worker(loop=None):
+    """Initialize the batch worker. Call this once at bot startup."""
+    global user_storage_queue, _worker_task
+    
+    if user_storage_queue is not None:
+        print("[USER STORAGE] Worker already initialized")
+        return
+    
+    user_storage_queue = asyncio.Queue()
+    
+    if loop is None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.get_event_loop()
+    
+    _worker_task = loop.create_task(user_storage_worker())
+    print("[USER STORAGE] Batch worker initialized")
+
+
+async def enqueue_user_storage(func, *args, **kwargs):
+    """Queue a user storage operation for batch processing"""
+    global user_storage_queue
+    
+    if user_storage_queue is None:
+        # Fallback: if queue not initialized, run synchronously
+        print("[USER STORAGE] Queue not initialized, running synchronously", file=sys.stderr)
+        await asyncio.to_thread(func, *args, **kwargs)
+        return
+    
+    await user_storage_queue.put((func, args, kwargs))
+
+
+async def flush_user_storage_queue():
+    """Force immediate flush of all pending operations (for shutdown)"""
+    global user_storage_queue
+    
+    if user_storage_queue is None:
+        return
+    
+    print("[USER STORAGE] Flushing queue...")
+    
+    # Wait for all pending items to be processed
+    await user_storage_queue.join()
+    
+    print("[USER STORAGE] Queue flushed")
+
+
+# ========================================
+# ORIGINAL USER STORAGE CODE
+# ========================================
 
 async def save_user_async(user_obj: dict):
     user_id = int(user_obj.get("user_id", 0))
@@ -128,12 +235,14 @@ def save_user(user_obj: dict):
                 pass
 
 
-def record_minigame_result(user_id: int, game_name: str, result: str, coins: int = 0, username: str | None = None):
+async def record_minigame_result(user_id: int, game_name: str, result: str, coins: int = 0, username: str | None = None):
     """Record a minigame play.
 
     result: 'win' | 'loss' | 'draw'
     """
-    user = load_user(user_id, username)
+    # Load synchronously (still fast - only read operation)
+    user = await asyncio.to_thread(load_user, user_id, username)
+    
     mg = user.setdefault("minigames", {})
     mg["total_played"] = mg.get("total_played", 0) + 1
     if result == 'win':
@@ -167,22 +276,24 @@ def record_minigame_result(user_id: int, game_name: str, result: str, coins: int
         mg["recent_plays"] = recent
 
     user.setdefault("meta", {})["updated_at"] = datetime.utcnow().isoformat() + "Z"
-    save_user(user)
+    
+    # Queue the save operation for batching
+    await enqueue_user_storage(save_user, user)
 
 
-def touch_user(user_id: int, username: str | None = None):
+async def touch_user(user_id: int, username: str | None = None):
     """Ensure user exists and update last_active timestamp."""
-    user = load_user(user_id, username)
+    user = await asyncio.to_thread(load_user, user_id, username)
     user.setdefault("meta", {})["updated_at"] = datetime.utcnow().isoformat() + "Z"
     user["meta"]["last_active"] = datetime.utcnow().isoformat() + "Z"
     if username:
         user["username"] = username
-    save_user(user)
+    await enqueue_user_storage(save_user, user)
 
 
-def record_activity(user_id: int, username: str | None, activity_type: str, name: str, extra: dict | None = None):
+async def record_activity(user_id: int, username: str | None, activity_type: str, name: str, extra: dict | None = None):
     """Record generic activity (commands, interactions, games)."""
-    user = load_user(user_id, username)
+    user = await asyncio.to_thread(load_user, user_id, username)
     activity = user.setdefault("activity", {})
     counters = activity.setdefault("counts", {})
     counters[activity_type] = counters.get(activity_type, 0) + 1
@@ -205,12 +316,12 @@ def record_activity(user_id: int, username: str | None, activity_type: str, name
     user["meta"]["last_active"] = datetime.utcnow().isoformat() + "Z"
     if username:
         user["username"] = username
-    save_user(user)
+    await enqueue_user_storage(save_user, user)
 
 
-def record_game_state(user_id: int, username: str | None, game_name: str, state: dict):
+async def record_game_state(user_id: int, username: str | None, game_name: str, state: dict):
     """Store a snapshot of a game's state for a user."""
-    user = load_user(user_id, username)
+    user = await asyncio.to_thread(load_user, user_id, username)
     games = user.setdefault("games", {})
     games[game_name] = {
         "updated_at": datetime.utcnow().isoformat() + "Z",
@@ -220,4 +331,4 @@ def record_game_state(user_id: int, username: str | None, game_name: str, state:
     user["meta"]["last_active"] = datetime.utcnow().isoformat() + "Z"
     if username:
         user["username"] = username
-    save_user(user)
+    await enqueue_user_storage(save_user, user)
