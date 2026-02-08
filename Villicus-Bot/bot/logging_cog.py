@@ -74,8 +74,7 @@ class LogConfigGroup(app_commands.Group):
         lines = [f'Log channel: {chan_display}']
         for e in LOG_EVENTS:
             lines.append(f'{e}: {"enabled" if evs.get(e) else "disabled"}')
-        await core_ui.send(interaction, embed=core_ui.info_embed("Logging status", "
-".join(lines)), ephemeral=True)
+        await core_ui.send(interaction, embed=core_ui.info_embed("Logging status", "\n".join(lines)), ephemeral=True)
 
 
 class LoggingCog(commands.Cog):
