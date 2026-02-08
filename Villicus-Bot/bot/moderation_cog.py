@@ -11,6 +11,8 @@ from discord import app_commands
 import csv
 import io
 
+from core import ui as core_ui
+
 DB_DIR = os.path.join(os.path.dirname(__file__), '..', 'data')
 DB_PATH = os.path.join(DB_DIR, 'moderation.db')
 
@@ -146,24 +148,32 @@ class ModerationCog(commands.Cog):
     # ---------------- SLASH COMMANDS ----------------
     @app_commands.command(name="warn", description="Warn a member")
     @app_commands.describe(member="Member to warn", reason="Reason for the warning")
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
     async def warn_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
         if not self._is_mod(interaction.user):
-            await interaction.response.send_message("You do not have permission to warn members.", ephemeral=True)
-            return
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Moderate Members permission required."), ephemeral=True)
         inf_id = self._record_infraction(member.id, interaction.user.id, "warn", reason, guild_id=interaction.guild.id)
-        await interaction.response.send_message(f"{member.mention} warned (id: {inf_id}).", ephemeral=True)
+        emb = core_ui.mod_action_embed(
+            "Warn",
+            f"{member} ({member.id})",
+            f"{interaction.user} ({interaction.user.id})",
+            reason=reason,
+            extra_fields=[("Infraction ID", str(inf_id))],
+        )
+        await core_ui.send(interaction, embed=emb, ephemeral=True)
 
     @app_commands.command(name="mute", description="Mute a member")
     @app_commands.describe(member="Member to mute", minutes="Duration in minutes", reason="Reason for mute")
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
     async def mute_slash(self, interaction: discord.Interaction, member: discord.Member, minutes: Optional[int] = None, reason: str = "No reason provided"):
         if not self._is_mod(interaction.user):
-            await interaction.response.send_message("You do not have permission to mute members.", ephemeral=True)
-            return
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Moderate Members permission required."), ephemeral=True)
 
         role = await self._ensure_muted_role(interaction.guild)
         if not role:
-            await interaction.response.send_message("Failed to find or create Muted role.", ephemeral=True)
-            return
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Mute failed", "Could not find or create the Muted role."), ephemeral=True)
 
         await member.add_roles(role, reason=reason)
 
@@ -171,105 +181,114 @@ class ModerationCog(commands.Cog):
             duration = minutes * 60
             inf_id = self._record_infraction(member.id, interaction.user.id, "mute", reason, duration_seconds=duration, guild_id=interaction.guild.id)
             asyncio.create_task(self._apply_timed_unmute(interaction.guild, member, role, inf_id, duration))
-            await interaction.response.send_message(f"{member.mention} muted for {minutes} minute(s). (id: {inf_id})", ephemeral=True)
+            emb = core_ui.mod_action_embed(
+                "Mute",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                reason=reason,
+                duration=f"{minutes} minutes",
+                extra_fields=[("Infraction ID", str(inf_id))],
+            )
+            await core_ui.send(interaction, embed=emb, ephemeral=True)
         else:
             inf_id = self._record_infraction(member.id, interaction.user.id, "mute", reason, guild_id=interaction.guild.id)
-            await interaction.response.send_message(f"{member.mention} muted indefinitely. (id: {inf_id})", ephemeral=True)
+            emb = core_ui.mod_action_embed(
+                "Mute",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                reason=reason,
+                duration="Indefinite",
+                extra_fields=[("Infraction ID", str(inf_id))],
+            )
+            await core_ui.send(interaction, embed=emb, ephemeral=True)
 
     @app_commands.command(name="timeout", description="Apply communication timeout to a member")
     @app_commands.describe(member="Member to timeout", minutes="Duration in minutes", reason="Reason for timeout")
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
     async def timeout_slash(self, interaction: discord.Interaction, member: discord.Member, minutes: Optional[int] = None, reason: str = "Timed out by staff"):
         if not self._is_mod(interaction.user):
-            await interaction.response.send_message("You do not have permission to timeout members.", ephemeral=True)
-            return
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Moderate Members permission required."), ephemeral=True)
         if minutes is None or minutes <= 0:
-            await interaction.response.send_message("Please specify a timeout duration in minutes.", ephemeral=True)
-            return
+            return await core_ui.send(interaction, embed=core_ui.warn_embed("Invalid duration", "Specify a timeout duration in minutes."), ephemeral=True)
         try:
             from datetime import datetime, timedelta
             until = datetime.utcnow() + timedelta(minutes=int(minutes))
             await member.edit(communication_disabled_until=until, reason=reason)
             inf_id = self._record_infraction(member.id, interaction.user.id, 'timeout', reason, duration_seconds=int(minutes) * 60, guild_id=interaction.guild.id)
-            await interaction.response.send_message(f"{member.mention} timed out for {minutes} minute(s). (id: {inf_id})", ephemeral=True)
+            emb = core_ui.mod_action_embed(
+                "Timeout",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                reason=reason,
+                duration=f"{minutes} minutes",
+                extra_fields=[("Infraction ID", str(inf_id))],
+            )
+            await core_ui.send(interaction, embed=emb, ephemeral=True)
         except Exception as e:
-            await interaction.response.send_message(f"Failed to apply timeout: {e}", ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Timeout failed", str(e)), ephemeral=True)
 
     @app_commands.command(name="unmute", description="Unmute a member")
     @app_commands.describe(member="Member to unmute", reason="Reason for unmute")
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
     async def unmute_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = "Unmuted by staff"):
         if not self._is_mod(interaction.user):
-            await interaction.response.send_message("You do not have permission to unmute members.", ephemeral=True)
-            return
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Moderate Members permission required."), ephemeral=True)
 
         role = discord.utils.get(interaction.guild.roles, name="Muted")
         if not role:
-            await interaction.response.send_message("Muted role not found.", ephemeral=True)
-            return
+            return await core_ui.send(interaction, embed=core_ui.warn_embed("Muted role missing", "Muted role was not found in this server."), ephemeral=True)
 
         await member.remove_roles(role, reason=reason)
         for r in self._list_infractions_for(member.id):
             if r[2] == "mute" and r[6] == 1:
                 self._set_infraction_inactive(r[0])
-        await interaction.response.send_message(f"{member.mention} has been unmuted.", ephemeral=True)
+        emb = core_ui.mod_action_embed(
+            "Unmute",
+            f"{member} ({member.id})",
+            f"{interaction.user} ({interaction.user.id})",
+            reason=reason,
+        )
+        await core_ui.send(interaction, embed=emb, ephemeral=True)
 
     @app_commands.command(name="infractions", description="List infractions for a user")
     @app_commands.describe(member="Member to view infractions for (defaults to you)")
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
     async def infractions_slash(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
         await interaction.response.defer(ephemeral=True)
         target = member or interaction.user
         rows = self._list_infractions_for(target.id)
         if not rows:
-            return await interaction.followup.send(f"No infractions found for {target}.", ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Infractions", f"No infractions found for {target}."), ephemeral=True)
         lines = []
-        for r in rows[:20]:
+        for r in rows[:10]:
             ts = datetime.fromtimestamp(r[4]).isoformat()
             active = "active" if r[6] == 1 else "inactive"
-            lines.append(f"#{r[0]} {r[2]} by <@{r[1]}> at {ts} — {r[3] or ''} ({active})")
-        await interaction.followup.send(f"Infractions for {target} (most recent {min(20, len(rows))}):\n" + "\n".join(lines), ephemeral=True)
+            lines.append(f"#{r[0]} {r[2]} by <@{r[1]}> at {ts} - {r[3] or ''} ({active})")
+        emb = core_ui.info_embed(f"Infractions for {target}", "\n".join(lines))
+        await core_ui.send(interaction, embed=emb, ephemeral=True)
 
     @app_commands.command(name='export_infractions', description='Export infractions for a user as CSV')
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.describe(member='Member to export infractions for (defaults to you)')
+    @app_commands.guild_only()
     async def export_infractions_slash(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
         if not self._is_mod(interaction.user):
-            await interaction.response.send_message('You do not have permission to export infractions.', ephemeral=True)
-            return
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Moderate Members permission required."), ephemeral=True)
         target = member or interaction.user
         csv_bytes = self._export_infractions_csv(target.id)
         if not csv_bytes:
-            return await interaction.response.send_message('No infractions found.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Infractions", "No infractions found."), ephemeral=True)
         bio = io.BytesIO(csv_bytes)
         bio.seek(0)
-        await interaction.response.send_message(file=discord.File(fp=bio, filename=f'infractions-{target.id}.csv'), ephemeral=True)
-
+        if interaction.response.is_done():
+            await interaction.followup.send(file=discord.File(fp=bio, filename=f'infractions-{target.id}.csv'), ephemeral=True)
+        else:
+            await interaction.response.send_message(file=discord.File(fp=bio, filename=f'infractions-{target.id}.csv'), ephemeral=True)
 
 # ---------------- SETUP ----------------
 async def setup(bot: commands.Bot):
     cog = ModerationCog(bot)
     await bot.add_cog(cog)
-    # Register app (slash) commands onto the tree but do NOT call `bot.tree.sync()` here;
-    # the main bot (`start_bot`) performs a sync in `on_ready()` when the application_id is available.
-    try:
-        try:
-            bot.tree.add_command(app_commands.Command(name='warn', description='Warn a member', callback=cog.warn_slash, default_member_permissions=discord.Permissions(moderate_members=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='mute', description='Mute a member', callback=cog.mute_slash, default_member_permissions=discord.Permissions(manage_messages=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='unmute', description='Unmute a member', callback=cog.unmute_slash, default_member_permissions=discord.Permissions(manage_messages=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='timeout', description='Timeout a member', callback=cog.timeout_slash, default_member_permissions=discord.Permissions(moderate_members=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='infractions', description='List infractions for a user', callback=cog.infractions_slash))
-        except Exception:
-            pass
-    except Exception:
-        # best-effort registration; continue even if it fails
-        pass

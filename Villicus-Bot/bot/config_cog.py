@@ -8,6 +8,7 @@ from discord.ext import commands
 from discord import app_commands
 
 from core.config import get_guild_settings, save_guild_settings, set_prefix
+from core import ui as core_ui
 
 
 PUNISHMENT_ROLES = {
@@ -86,6 +87,9 @@ class ConfigCog(commands.Cog):
             pass
         await ctx.send('\n'.join(lines))
 
+    @app_commands.command(name="status", description="Show bot status and enabled modules")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
     async def status_slash(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         settings = get_guild_settings(interaction.guild.id)
@@ -101,7 +105,7 @@ class ConfigCog(commands.Cog):
             lines.append(f'Bot latency: {p}ms')
         except Exception:
             pass
-        await interaction.followup.send('\n'.join(lines), ephemeral=True)
+        await core_ui.send(interaction, embed=core_ui.info_embed("Villicus status", "\n".join(lines)), ephemeral=True)
 
     @commands.command(name='config')
     @commands.has_permissions(administrator=True)
@@ -111,19 +115,27 @@ class ConfigCog(commands.Cog):
             await self._config_punishments(ctx)
             return
         await ctx.send('Config sections: `punishments` — try `V!config punishments`')
-
+    @app_commands.command(name="config", description="Open the configuration wizard")
+    @app_commands.describe(section="Config section", selection="Selection for the chosen section")
+    @app_commands.choices(section=[
+        app_commands.Choice(name="Punishments", value="punishments"),
+        app_commands.Choice(name="Tickets", value="tickets"),
+        app_commands.Choice(name="Emoji", value="emoji"),
+        app_commands.Choice(name="Staff", value="staff"),
+        app_commands.Choice(name="Giveaways", value="giveaways"),
+    ])
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
     async def config_slash(self, interaction: discord.Interaction, section: Optional[str] = None, selection: Optional[str] = None):
         """/config [section] [selection]
         If no section provided, shows quick buttons. For `punishments` you may pass a `selection` like `1 3` or `all` or `none`.
         """
         await interaction.response.defer(ephemeral=True)
         perms = interaction.user.guild_permissions
-        # Allow administrators or server managers (manage_guild/manage_roles) to configure
         if not (perms.administrator or perms.manage_guild or perms.manage_roles):
-            return await interaction.followup.send('Administrator or Manage Guild/Manage Roles required.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Administrator or Manage Guild/Manage Roles required."), ephemeral=True)
 
         if section is None:
-            # Show a simple button view to guide to using `/config punishments`
             class _CfgView(discord.ui.View):
                 def __init__(self, bot, guild_id):
                     super().__init__(timeout=120)
@@ -132,18 +144,16 @@ class ConfigCog(commands.Cog):
 
                 @discord.ui.button(label='Punishments', style=discord.ButtonStyle.primary)
                 async def punish(self, interaction2: discord.Interaction, button: discord.ui.Button):
-                    await interaction2.response.send_message('Use `/config punishments <selection>` — e.g. `/config punishments all` or `/config punishments 1 3`.', ephemeral=True)
+                    await interaction2.response.send_message('Use /config punishments <selection> - e.g. /config punishments all or /config punishments 1 3.', ephemeral=True)
 
                 @discord.ui.button(label='Cancel', style=discord.ButtonStyle.secondary)
                 async def cancel(self, interaction2: discord.Interaction, button: discord.ui.Button):
                     await interaction2.response.send_message('Cancelled.', ephemeral=True)
 
-            return await interaction.followup.send('Config sections: `punishments`, `tickets`, `emoji`, `staff`, `giveaways`', view=_CfgView(self.bot, interaction.guild_id), ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Configuration", "Choose a section below."), view=_CfgView(self.bot, interaction.guild_id), ephemeral=True)
 
         if section == 'punishments':
-            # selection may be provided as a string like '1 3' or 'all' or 'none'
             sel = self._parse_selection_text(selection)
-            # create roles and persist
             created = []
             for key in sel:
                 role_name = PUNISHMENT_ROLES.get(key)
@@ -153,7 +163,6 @@ class ConfigCog(commands.Cog):
                         role = await interaction.guild.create_role(name=role_name, reason='Configured by Villicus punishments setup')
                     created.append(role_name)
                     if key == 'shadow_ban':
-                        # best-effort apply overwrites
                         try:
                             if interaction.guild.me and interaction.guild.me.guild_permissions.manage_channels:
                                 for ch in interaction.guild.channels:
@@ -169,20 +178,18 @@ class ConfigCog(commands.Cog):
             settings = get_guild_settings(interaction.guild.id)
             settings['punishments'] = sel
             save_guild_settings(interaction.guild.id, settings)
-            return await interaction.followup.send(f'Configured punishments: {created or "(none)"}', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.success_embed("Punishments configured", f"Configured: {', '.join(created) if created else '(none)'}"), ephemeral=True)
 
         if section == 'tickets':
-            # Provide quick guidance for ticket setup
-            return await interaction.followup.send('Ticket configuration is available via `/ticket settings` — open the command and choose a category and staff role.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Tickets", "Ticket configuration is available via /ticket settings."), ephemeral=True)
 
         if section == 'emoji':
-            return await interaction.followup.send('Lock or unlock emojis using `/emoji_lock <emoji> <role>` and `/emoji_unlock <emoji>`.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Emoji locks", "Use /emoji_lock <emoji> <role> or /emoji_unlock <emoji>."), ephemeral=True)
 
         if section == 'staff':
-            return await interaction.followup.send('Staff roles can be created with `/staff_setup`. Promote/demote with `/staff_promote` and `/staff_demote`.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Staff", "Create staff roles with /staff_setup. Promote/demote with /staff_promote and /staff_demote."), ephemeral=True)
 
         if section == 'giveaways':
-            # allow setting a default giveaway channel via selection like a channel mention or 'channel:<id>'
             sel = (selection or '').strip()
             settings = get_guild_settings(interaction.guild.id)
             if sel.startswith('channel:'):
@@ -190,12 +197,12 @@ class ConfigCog(commands.Cog):
                     cid = int(sel.split(':', 1)[1])
                     settings['giveaway_channel'] = cid
                     save_guild_settings(interaction.guild.id, settings)
-                    return await interaction.followup.send(f'Default giveaway channel set to <#{cid}>', ephemeral=True)
+                    return await core_ui.send(interaction, embed=core_ui.success_embed("Giveaways", f"Default giveaway channel set to <#{cid}>."), ephemeral=True)
                 except Exception:
                     pass
-            return await interaction.followup.send('Set default giveaway channel with `/config giveaways channel:<id>` or use `/giveaway` to create one now.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Giveaways", "Set default with /config giveaways channel:<id> or use /giveaway."), ephemeral=True)
 
-        await interaction.followup.send('Unknown config section.', ephemeral=True)
+        await core_ui.send(interaction, embed=core_ui.warn_embed("Unknown section", "That section is not recognized."), ephemeral=True)
 
     async def _config_punishments(self, ctx: commands.Context):
         # Prompt the admin for which punishments to enable (simple text-based flow)
@@ -459,10 +466,6 @@ async def setup(bot: commands.Bot):
     # Register slash commands (best-effort)
     try:
         try:
-            bot.tree.add_command(app_commands.Command(name='config', description='Configure server settings', callback=cog.config_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
-        except Exception:
-            pass
-        try:
             bot.tree.add_command(app_commands.Command(name='shadowban', description='Apply Shadow Ban role', callback=cog.shadowban_slash, default_member_permissions=discord.Permissions(administrator=True)))
         except Exception:
             pass
@@ -476,10 +479,6 @@ async def setup(bot: commands.Bot):
             pass
         try:
             bot.tree.add_command(app_commands.Command(name='shadowunmute', description='Remove Shadow Mute role', callback=cog.shadowunmute_slash, default_member_permissions=discord.Permissions(manage_messages=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='status', description='Show basic bot health and enabled modules', callback=cog.status_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
         except Exception:
             pass
     except Exception:

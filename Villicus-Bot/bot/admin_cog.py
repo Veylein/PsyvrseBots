@@ -1,6 +1,5 @@
 import asyncio
 import re
-from datetime import datetime, timedelta
 from typing import Optional
 
 import discord
@@ -8,37 +7,26 @@ from discord.ext import commands
 from discord import app_commands
 
 from core.config import get_guild_settings, save_guild_settings
-
+from core import ui as core_ui
 
 RANKS = ['Helper', 'Moderator', 'Senior Moderator', 'Supervisor', 'Administrator']
 
 
 class AdminCog(commands.Cog):
     """Full moderation and admin commands: kick/ban/softban/unban/massban, channel tools,
-    staff management, emoji locking and utility commands."""
+    staff management, emoji locking and utility commands.
+    """
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    def _moderation_cog(self):
-        return self.bot.get_cog('ModerationCog')
-
-    # Prefix admin commands removed — use slash commands only (kick/ban/softban/massban/etc)
-
-    # --- Channel & message controls ---
-    # Channel & message control prefix commands removed in favor of slash equivalents
-
-    # --- Deafen ---
-    # Deafen/undeafen prefix commands removed; use slash wrappers
-
-    # --- Brick & Demoji assignments (roles already created by config) ---
-    # Brick/Demoji prefix commands removed; use slash wrappers
-
-    # --- Emoji lock/unlock ---
-    # Emoji lock/unlock prefix commands removed; use slash wrappers
-
-    # --- Staff system ---
-    # Staff prefix commands removed; use slash wrappers (staff_setup, staff_promote, staff_demote, staff_perms)
+    async def _log(self, guild_id: int, embed: discord.Embed):
+        log = self.bot.get_cog('LoggingCog')
+        if log:
+            try:
+                await log._send_log(guild_id, embed)
+            except Exception:
+                pass
 
     # --- Listeners for emoji locks ---
     @commands.Cog.listener()
@@ -52,7 +40,6 @@ class AdminCog(commands.Cog):
         locks = settings.get('emoji_locks', {})
         if not locks:
             return
-        # Check both custom emoji IDs and unicode emoji strings
         custom_matches = re.findall(r'<a?:[A-Za-z0-9_]+:(\d+)>', message.content)
         member = message.author
         for emoji_key, role_id in locks.items():
@@ -60,24 +47,20 @@ class AdminCog(commands.Cog):
                 role = guild.get_role(role_id)
                 if not role:
                     continue
-                # custom emoji by id
                 if emoji_key.isdigit():
-                    if emoji_key in custom_matches:
-                        if role not in member.roles:
-                            try:
-                                await message.delete()
-                            except Exception:
-                                pass
-                            return
+                    if emoji_key in custom_matches and role not in member.roles:
+                        try:
+                            await message.delete()
+                        except Exception:
+                            pass
+                        return
                 else:
-                    # unicode emoji string check
-                    if emoji_key in message.content:
-                        if role not in member.roles:
-                            try:
-                                await message.delete()
-                            except Exception:
-                                pass
-                            return
+                    if emoji_key in message.content and role not in member.roles:
+                        try:
+                            await message.delete()
+                        except Exception:
+                            pass
+                        return
             except Exception:
                 continue
 
@@ -90,7 +73,6 @@ class AdminCog(commands.Cog):
         locks = settings.get('emoji_locks', {})
         if not locks:
             return
-        # payload.emoji may have id
         eid = getattr(payload.emoji, 'id', None)
         name = getattr(payload.emoji, 'name', None)
         member = guild.get_member(payload.user_id)
@@ -102,57 +84,77 @@ class AdminCog(commands.Cog):
                 if not role:
                     continue
                 if emoji_key.isdigit():
-                    if eid and str(eid) == emoji_key:
-                        if role not in member.roles:
-                            try:
-                                channel = self.bot.get_channel(payload.channel_id)
-                                message = await channel.fetch_message(payload.message_id)
-                                await message.remove_reaction(payload.emoji, member)
-                            except Exception:
-                                pass
+                    if eid and str(eid) == emoji_key and role not in member.roles:
+                        try:
+                            channel = self.bot.get_channel(payload.channel_id)
+                            message = await channel.fetch_message(payload.message_id)
+                            await message.remove_reaction(payload.emoji, member)
+                        except Exception:
+                            pass
                 else:
-                    if name and emoji_key == name:
-                        if role not in member.roles:
-                            try:
-                                channel = self.bot.get_channel(payload.channel_id)
-                                message = await channel.fetch_message(payload.message_id)
-                                await message.remove_reaction(payload.emoji, member)
-                            except Exception:
-                                pass
+                    if name and emoji_key == name and role not in member.roles:
+                        try:
+                            channel = self.bot.get_channel(payload.channel_id)
+                            message = await channel.fetch_message(payload.message_id)
+                            await message.remove_reaction(payload.emoji, member)
+                        except Exception:
+                            pass
             except Exception:
                 pass
 
-    # ---------------- SLASH COMMAND WRAPPERS ----------------
+    # ---------------- SLASH COMMANDS ----------------
+    @app_commands.command(name="kick", description="Kick a member from the server.")
+    @app_commands.describe(member="Member to kick", reason="Reason for the kick")
+    @app_commands.default_permissions(kick_members=True)
+    @app_commands.guild_only()
     async def kick_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = 'No reason provided'):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.kick_members:
-            return await interaction.followup.send('You do not have permission to kick members.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Kick Members permission required."), ephemeral=True)
         try:
             await member.kick(reason=reason)
             mod = self.bot.get_cog('ModerationCog')
             if mod:
                 mod._record_infraction(member.id, interaction.user.id, 'kick', reason, guild_id=interaction.guild.id)
-            await interaction.followup.send(f'Kicked {member}.')
+            await self._log(interaction.guild.id, core_ui.mod_action_embed(
+                "Kick",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                reason=reason,
+            ))
+            await core_ui.send(interaction, embed=core_ui.success_embed("Member kicked", f"{member.mention} was kicked."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to kick: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Kick failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="ban", description="Ban a member from the server.")
+    @app_commands.describe(member="Member to ban", days="Delete messages from the last N days (0-7)", reason="Reason for the ban")
+    @app_commands.default_permissions(ban_members=True)
+    @app_commands.guild_only()
     async def ban_slash(self, interaction: discord.Interaction, member: discord.Member, days: int = 0, reason: str = 'No reason provided'):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.ban_members:
-            return await interaction.followup.send('You do not have permission to ban members.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Ban Members permission required."), ephemeral=True)
         try:
             await member.ban(reason=reason, delete_message_days=days)
             mod = self.bot.get_cog('ModerationCog')
             if mod:
                 mod._record_infraction(member.id, interaction.user.id, 'ban', reason, guild_id=interaction.guild.id)
-            await interaction.followup.send(f'Banned {member}.')
+            await self._log(interaction.guild.id, core_ui.mod_action_embed(
+                "Ban",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                reason=reason,
+                extra_fields=[("Message Delete", f"{days} day(s)")],
+            ))
+            await core_ui.send(interaction, embed=core_ui.success_embed("Member banned", f"{member.mention} was banned."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to ban: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Ban failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="unban", description="Unban a user.")
+    @app_commands.describe(user="User to unban", reason="Reason for the unban")
+    @app_commands.default_permissions(ban_members=True)
+    @app_commands.guild_only()
     async def unban_slash(self, interaction: discord.Interaction, user: discord.User, reason: str = 'Unbanned by staff'):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.ban_members:
-            return await interaction.followup.send('You do not have permission to unban members.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Ban Members permission required."), ephemeral=True)
         try:
             bans = await interaction.guild.bans()
             target = None
@@ -161,109 +163,142 @@ class AdminCog(commands.Cog):
                     target = entry.user
                     break
             if not target:
-                return await interaction.followup.send('User not found in ban list.', ephemeral=True)
+                return await core_ui.send(interaction, embed=core_ui.warn_embed("Not found", "That user is not in the ban list."), ephemeral=True)
             await interaction.guild.unban(target, reason=reason)
             mod = self.bot.get_cog('ModerationCog')
             if mod:
                 mod._record_infraction(target.id, interaction.user.id, 'unban', reason, guild_id=interaction.guild.id)
-            await interaction.followup.send(f'Unbanned {target}.')
+            await self._log(interaction.guild.id, core_ui.mod_action_embed(
+                "Unban",
+                f"{target} ({target.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                reason=reason,
+            ))
+            await core_ui.send(interaction, embed=core_ui.success_embed("User unbanned", f"{target} was unbanned."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to unban: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Unban failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="clear", description="Purge messages from the current channel.")
+    @app_commands.describe(amount="Number of messages to delete (1-200)")
+    @app_commands.default_permissions(manage_messages=True)
+    @app_commands.guild_only()
     async def clear_slash(self, interaction: discord.Interaction, amount: int = 50):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.manage_messages:
-            return await interaction.followup.send('You do not have permission to manage messages.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Manage Messages permission required."), ephemeral=True)
         try:
             deleted = await interaction.channel.purge(limit=amount)
-            await interaction.followup.send(f'Deleted {len(deleted)} messages.', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.success_embed("Messages deleted", f"Deleted {len(deleted)} message(s)."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to clear messages: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Purge failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="lock", description="Lock a channel for @everyone.")
+    @app_commands.describe(channel="Channel to lock (defaults to current)")
+    @app_commands.default_permissions(manage_channels=True)
+    @app_commands.guild_only()
     async def lock_slash(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
-        await interaction.response.defer()
         ch = channel or interaction.channel
         if not interaction.user.guild_permissions.manage_channels:
-            return await interaction.followup.send('You do not have permission to manage channels.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Manage Channels permission required."), ephemeral=True)
         try:
             await ch.set_permissions(interaction.guild.default_role, send_messages=False)
-            await interaction.followup.send(f'Locked {ch.mention}')
+            await core_ui.send(interaction, embed=core_ui.success_embed("Channel locked", f"{ch.mention} locked for @everyone."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to lock: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Lock failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="unlock", description="Unlock a channel for @everyone.")
+    @app_commands.describe(channel="Channel to unlock (defaults to current)")
+    @app_commands.default_permissions(manage_channels=True)
+    @app_commands.guild_only()
     async def unlock_slash(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
-        await interaction.response.defer()
         ch = channel or interaction.channel
         if not interaction.user.guild_permissions.manage_channels:
-            return await interaction.followup.send('You do not have permission to manage channels.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Manage Channels permission required."), ephemeral=True)
         try:
             await ch.set_permissions(interaction.guild.default_role, send_messages=True)
-            await interaction.followup.send(f'Unlocked {ch.mention}')
+            await core_ui.send(interaction, embed=core_ui.success_embed("Channel unlocked", f"{ch.mention} unlocked for @everyone."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to unlock: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Unlock failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="brick", description="Apply the Brick role to a member.")
+    @app_commands.describe(member="Member to brick", reason="Reason for the punishment")
+    @app_commands.default_permissions(manage_roles=True)
+    @app_commands.guild_only()
     async def brick_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = ''):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.manage_roles:
-            return await interaction.followup.send('You do not have permission to manage roles.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Manage Roles permission required."), ephemeral=True)
         role = discord.utils.get(interaction.guild.roles, name='Brick')
         if role is None:
-            return await interaction.followup.send('Brick role not configured. Run `V!config punishments` first.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.warn_embed("Brick not configured", "Run /config punishments to create the Brick role."), ephemeral=True)
         try:
             await member.add_roles(role, reason=reason or f'Bricked by {interaction.user}')
             mod = self.bot.get_cog('ModerationCog')
             if mod:
                 mod._record_infraction(member.id, interaction.user.id, 'brick', reason or f'Bricked by {interaction.user}', guild_id=interaction.guild.id)
-            await interaction.followup.send(f'{member.mention} bricked.')
+            await self._log(interaction.guild.id, core_ui.mod_action_embed(
+                "Brick",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                reason=reason or "Bricked by staff",
+            ))
+            await core_ui.send(interaction, embed=core_ui.success_embed("Brick applied", f"{member.mention} has been bricked."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to brick: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Brick failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="demoji", description="Apply the Demoji role to a member.")
+    @app_commands.describe(member="Member to apply Demoji to")
+    @app_commands.default_permissions(manage_roles=True)
+    @app_commands.guild_only()
     async def demoji_slash(self, interaction: discord.Interaction, member: discord.Member):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.manage_roles:
-            return await interaction.followup.send('You do not have permission to manage roles.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Manage Roles permission required."), ephemeral=True)
         role = discord.utils.get(interaction.guild.roles, name='Demoji')
         if role is None:
-            return await interaction.followup.send('Demoji role not configured. Run `V!config punishments` first.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.warn_embed("Demoji not configured", "Run /config punishments to create the Demoji role."), ephemeral=True)
         try:
             await member.add_roles(role, reason=f'Demoji by {interaction.user}')
             mod = self.bot.get_cog('ModerationCog')
             if mod:
                 mod._record_infraction(member.id, interaction.user.id, 'demoji', f'Demoji by {interaction.user}', guild_id=interaction.guild.id)
-            await interaction.followup.send(f'{member.mention} demoji applied.')
+            await self._log(interaction.guild.id, core_ui.mod_action_embed(
+                "Demoji",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                reason="Demoji by staff",
+            ))
+            await core_ui.send(interaction, embed=core_ui.success_embed("Demoji applied", f"{member.mention} now has Demoji."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to apply demoji: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Demoji failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="emoji_lock", description="Lock an emoji to a specific role.")
+    @app_commands.describe(emoji="Emoji or emoji ID", role="Role allowed to use the emoji")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
     async def emoji_lock_slash(self, interaction: discord.Interaction, emoji: str, role: discord.Role):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.manage_guild:
-            return await interaction.followup.send('You do not have permission to manage the guild.', ephemeral=True)
-        # Normalize emoji input: accept <:name:id>, <a:name:id>, raw id, or unicode emoji
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Manage Guild permission required."), ephemeral=True)
         key = emoji
         m = re.match(r'<a?:[A-Za-z0-9_]+:(\d+)>', emoji)
         if m:
             key = m.group(1)
+        elif emoji.isdigit():
+            key = emoji
         else:
-            # if purely digits, treat as id
-            if emoji.isdigit():
-                key = emoji
-            else:
-                # keep unicode emoji as-is
-                key = emoji
+            key = emoji
         settings = get_guild_settings(interaction.guild.id)
         locks = settings.get('emoji_locks', {})
         locks[str(key)] = role.id
         settings['emoji_locks'] = locks
         save_guild_settings(interaction.guild.id, settings)
-        await interaction.followup.send(f'Locked emoji {emoji} to role {role.name}.', ephemeral=True)
+        await core_ui.send(interaction, embed=core_ui.success_embed("Emoji locked", f"{emoji} is now locked to {role.mention}."), ephemeral=True)
 
+    @app_commands.command(name="emoji_unlock", description="Unlock a locked emoji.")
+    @app_commands.describe(emoji="Emoji or emoji ID")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
     async def emoji_unlock_slash(self, interaction: discord.Interaction, emoji: str):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.manage_guild:
-            return await interaction.followup.send('You do not have permission to manage the guild.', ephemeral=True)
-        # Normalize input like emoji_lock
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Manage Guild permission required."), ephemeral=True)
         m = re.match(r'<a?:[A-Za-z0-9_]+:(\d+)>', emoji)
-        key = None
         if m:
             key = m.group(1)
         elif emoji.isdigit():
@@ -276,9 +311,8 @@ class AdminCog(commands.Cog):
             locks.pop(str(key), None)
             settings['emoji_locks'] = locks
             save_guild_settings(interaction.guild.id, settings)
-            await interaction.followup.send(f'Unlocked emoji {emoji}.', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.success_embed("Emoji unlocked", f"{emoji} is now unlocked."), ephemeral=True)
             return
-        # Try to find by matching unicode strings
         found = None
         for k in list(locks.keys()):
             if k == emoji:
@@ -288,43 +322,56 @@ class AdminCog(commands.Cog):
             locks.pop(found, None)
             settings['emoji_locks'] = locks
             save_guild_settings(interaction.guild.id, settings)
-            await interaction.followup.send(f'Unlocked emoji {emoji}.', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.success_embed("Emoji unlocked", f"{emoji} is now unlocked."), ephemeral=True)
             return
-        await interaction.followup.send('Emoji not locked.', ephemeral=True)
+        await core_ui.send(interaction, embed=core_ui.warn_embed("Not locked", "That emoji is not locked."), ephemeral=True)
 
+    @app_commands.command(name="emoji_list", description="List all locked emojis.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
     async def emoji_list_slash(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
         if not interaction.user.guild_permissions.manage_guild:
-            return await interaction.followup.send('Manage Guild required.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Manage Guild permission required."), ephemeral=True)
         settings = get_guild_settings(interaction.guild.id)
         locks = settings.get('emoji_locks', {})
         if not locks:
-            return await interaction.followup.send('No emoji locks configured.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Emoji locks", "No emoji locks configured."), ephemeral=True)
         lines = []
         for k, rid in locks.items():
             role = interaction.guild.get_role(rid)
             lines.append(f'{k} -> {role.name if role else rid}')
-        await interaction.followup.send('Emoji locks:\n' + '\n'.join(lines), ephemeral=True)
+        await core_ui.send(interaction, embed=core_ui.info_embed("Emoji locks", "\n".join(lines)), ephemeral=True)
 
-    # --- Additional admin slash wrappers ---
+    @app_commands.command(name="softban", description="Softban a member (ban and immediate unban).")
+    @app_commands.describe(member="Member to softban", reason="Reason for the softban")
+    @app_commands.default_permissions(ban_members=True)
+    @app_commands.guild_only()
     async def softban_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = 'Softban by staff'):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.ban_members:
-            return await interaction.followup.send('You do not have permission to softban members.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Ban Members permission required."), ephemeral=True)
         try:
             await member.ban(reason=reason, delete_message_days=1)
             await interaction.guild.unban(member, reason='Softban unban')
             mod = self.bot.get_cog('ModerationCog')
             if mod:
                 mod._record_infraction(member.id, interaction.user.id, 'softban', reason, guild_id=interaction.guild.id)
-            await interaction.followup.send(f'Softbanned {member}.')
+            await self._log(interaction.guild.id, core_ui.mod_action_embed(
+                "Softban",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                reason=reason,
+            ))
+            await core_ui.send(interaction, embed=core_ui.success_embed("Member softbanned", f"{member.mention} was softbanned."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to softban: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Softban failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="massban", description="Massban members by criteria.")
+    @app_commands.describe(criteria="Use role:<name> or account_age<days>")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.guild_only()
     async def massban_slash(self, interaction: discord.Interaction, criteria: str):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.administrator:
-            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Administrator permission required."), ephemeral=True)
         try:
             parts = criteria.split(':', 1)
             members = []
@@ -332,19 +379,18 @@ class AdminCog(commands.Cog):
                 role_name = parts[1].strip()
                 role = discord.utils.get(interaction.guild.roles, name=role_name)
                 if not role:
-                    return await interaction.followup.send('Role not found.', ephemeral=True)
+                    return await core_ui.send(interaction, embed=core_ui.warn_embed("Role not found", "That role name does not exist."), ephemeral=True)
                 members = [m for m in interaction.guild.members if role in m.roles and not m.bot]
             elif parts[0].startswith('account_age'):
-                import re
                 m = re.search(r'account_age<(?P<days>\d+)', criteria)
                 if not m:
-                    return await interaction.followup.send('Invalid account_age filter, use account_age<days', ephemeral=True)
+                    return await core_ui.send(interaction, embed=core_ui.warn_embed("Invalid filter", "Use account_age<days>."), ephemeral=True)
                 days = int(m.group('days'))
                 from datetime import datetime, timedelta
                 cutoff = datetime.utcnow() - timedelta(days=days)
                 members = [m for m in interaction.guild.members if m.joined_at and m.joined_at < cutoff and not m.bot]
             else:
-                return await interaction.followup.send('Unsupported criteria. Use role:rolename or account_age<days', ephemeral=True)
+                return await core_ui.send(interaction, embed=core_ui.warn_embed("Unsupported criteria", "Use role:<name> or account_age<days>."), ephemeral=True)
             count = 0
             for m in members:
                 try:
@@ -352,38 +398,60 @@ class AdminCog(commands.Cog):
                     count += 1
                 except Exception:
                     continue
-            await interaction.followup.send(f'Attempted massban for {len(members)} members; banned {count}.')
+            await self._log(interaction.guild.id, core_ui.mod_action_embed(
+                "Massban",
+                f"{count} members",
+                f"{interaction.user} ({interaction.user.id})",
+                reason=f"Criteria: {criteria}",
+                extra_fields=[("Matched", str(len(members)))],
+            ))
+            await core_ui.send(interaction, embed=core_ui.warn_embed("Massban complete", f"Matched {len(members)} members, banned {count}."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Massban failed: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Massban failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="slowmode", description="Set slowmode for the current channel.")
+    @app_commands.describe(seconds="Delay between messages (0-21600)")
+    @app_commands.default_permissions(manage_channels=True)
+    @app_commands.guild_only()
     async def slowmode_slash(self, interaction: discord.Interaction, seconds: int = 0):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.manage_channels:
-            return await interaction.followup.send('You do not have permission to manage channels.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Manage Channels permission required."), ephemeral=True)
         try:
             await interaction.channel.edit(slowmode_delay=seconds)
-            await interaction.followup.send(f'Set slowmode to {seconds} seconds.', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.success_embed("Slowmode updated", f"Slowmode set to {seconds} seconds."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to set slowmode: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Slowmode failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="clone", description="Clone a channel.")
+    @app_commands.describe(channel="Channel to clone (defaults to current)")
+    @app_commands.default_permissions(manage_channels=True)
+    @app_commands.guild_only()
     async def clone_slash(self, interaction: discord.Interaction, channel: Optional[discord.abc.GuildChannel] = None):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.administrator:
-            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Administrator permission required."), ephemeral=True)
         ch = channel or interaction.channel
         try:
             new = await ch.clone(reason=f'Cloned by {interaction.user}')
-            await interaction.followup.send(f'Cloned {ch.mention} to {new.mention}')
+            await core_ui.send(interaction, embed=core_ui.success_embed("Channel cloned", f"{ch.mention} cloned to {new.mention}."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to clone: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Clone failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="deafen", description="Server deafen a member.")
+    @app_commands.describe(member="Member to deafen", duration_minutes="Optional duration in minutes")
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
     async def deafen_slash(self, interaction: discord.Interaction, member: discord.Member, duration_minutes: Optional[int] = None):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.moderate_members:
-            return await interaction.followup.send('You do not have permission to deafen members.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Moderate Members permission required."), ephemeral=True)
         try:
             await member.edit(deafen=True, reason=f'Deafened by {interaction.user}')
-            await interaction.followup.send(f'{member.mention} deafened.')
+            await self._log(interaction.guild.id, core_ui.mod_action_embed(
+                "Deafen",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+                duration=f"{duration_minutes} minutes" if duration_minutes else None,
+            ))
+            await core_ui.send(interaction, embed=core_ui.success_embed("Member deafened", f"{member.mention} is now deafened."), ephemeral=True)
             if duration_minutes:
                 await asyncio.sleep(int(duration_minutes) * 60)
                 try:
@@ -391,22 +459,32 @@ class AdminCog(commands.Cog):
                 except Exception:
                     pass
         except Exception as e:
-            await interaction.followup.send(f'Failed to deafen: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Deafen failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="undeafen", description="Remove server deafen from a member.")
+    @app_commands.describe(member="Member to undeafen")
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.guild_only()
     async def undeafen_slash(self, interaction: discord.Interaction, member: discord.Member):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.moderate_members:
-            return await interaction.followup.send('You do not have permission to undeafen members.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Moderate Members permission required."), ephemeral=True)
         try:
             await member.edit(deafen=False, reason=f'Undeafen by {interaction.user}')
-            await interaction.followup.send(f'{member.mention} undeafened.')
+            await self._log(interaction.guild.id, core_ui.mod_action_embed(
+                "Undeafen",
+                f"{member} ({member.id})",
+                f"{interaction.user} ({interaction.user.id})",
+            ))
+            await core_ui.send(interaction, embed=core_ui.success_embed("Member undeafened", f"{member.mention} is now undeafened."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to undeafen: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Undeafen failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="staff_setup", description="Create or restore core staff roles.")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.guild_only()
     async def staff_setup_slash(self, interaction: discord.Interaction):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.administrator:
-            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Administrator permission required."), ephemeral=True)
         created = {}
         for r in RANKS:
             role = discord.utils.get(interaction.guild.roles, name=r)
@@ -420,148 +498,71 @@ class AdminCog(commands.Cog):
         settings = get_guild_settings(interaction.guild.id)
         settings['staff_roles'] = created
         save_guild_settings(interaction.guild.id, settings)
-        await interaction.followup.send(f'Staff roles ensured: {list(created.keys())}')
+        await core_ui.send(interaction, embed=core_ui.success_embed("Staff roles ready", f"Ensured: {', '.join(created.keys())}"), ephemeral=True)
 
+    @app_commands.command(name="staff_promote", description="Promote a member to a staff rank.")
+    @app_commands.describe(member="Member to promote", rank="Staff rank")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.guild_only()
+    @app_commands.choices(rank=[app_commands.Choice(name=r, value=r) for r in RANKS])
     async def staff_promote_slash(self, interaction: discord.Interaction, member: discord.Member, rank: str):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.administrator:
-            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Administrator permission required."), ephemeral=True)
         settings = get_guild_settings(interaction.guild.id)
         staff = settings.get('staff_roles', {})
         if rank not in staff:
-            return await interaction.followup.send('Unknown rank. Run staff_setup first.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.warn_embed("Unknown rank", "Run /staff_setup first."), ephemeral=True)
         role = interaction.guild.get_role(staff[rank])
         if not role:
-            return await interaction.followup.send('Role not found on server.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.warn_embed("Role missing", "That role no longer exists on the server."), ephemeral=True)
         try:
             await member.add_roles(role, reason=f'Promoted to {rank} by {interaction.user}')
-            await interaction.followup.send(f'{member.mention} promoted to {rank}.')
+            await core_ui.send(interaction, embed=core_ui.success_embed("Promotion complete", f"{member.mention} promoted to {rank}."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to promote: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Promotion failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="staff_demote", description="Demote a member from a staff rank.")
+    @app_commands.describe(member="Member to demote", rank="Staff rank")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.guild_only()
+    @app_commands.choices(rank=[app_commands.Choice(name=r, value=r) for r in RANKS])
     async def staff_demote_slash(self, interaction: discord.Interaction, member: discord.Member, rank: str):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.administrator:
-            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Administrator permission required."), ephemeral=True)
         settings = get_guild_settings(interaction.guild.id)
         staff = settings.get('staff_roles', {})
         if rank not in staff:
-            return await interaction.followup.send('Unknown rank.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.warn_embed("Unknown rank", "Run /staff_setup first."), ephemeral=True)
         role = interaction.guild.get_role(staff[rank])
         if not role:
-            return await interaction.followup.send('Role not found on server.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.warn_embed("Role missing", "That role no longer exists on the server."), ephemeral=True)
         try:
             await member.remove_roles(role, reason=f'Demoted from {rank} by {interaction.user}')
-            await interaction.followup.send(f'{member.mention} demoted from {rank}.')
+            await core_ui.send(interaction, embed=core_ui.success_embed("Demotion complete", f"{member.mention} demoted from {rank}."), ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f'Failed to demote: {e}', ephemeral=True)
+            await core_ui.send(interaction, embed=core_ui.error_embed("Demotion failed", str(e)), ephemeral=True)
 
+    @app_commands.command(name="staff_perms", description="Show staff rank role mappings.")
+    @app_commands.describe(rank="Optional rank to inspect")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.guild_only()
+    @app_commands.choices(rank=[app_commands.Choice(name=r, value=r) for r in RANKS])
     async def staff_perms_slash(self, interaction: discord.Interaction, rank: Optional[str] = None):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.administrator:
-            return await interaction.followup.send('Administrator permission required.', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.error_embed("Permission denied", "Administrator permission required."), ephemeral=True)
         settings = get_guild_settings(interaction.guild.id)
         staff = settings.get('staff_roles', {})
         if rank:
             if rank not in staff:
-                return await interaction.followup.send('Unknown rank.', ephemeral=True)
+                return await core_ui.send(interaction, embed=core_ui.warn_embed("Unknown rank", "Run /staff_setup first."), ephemeral=True)
             role = interaction.guild.get_role(staff[rank])
-            return await interaction.followup.send(f'Role {rank}: {role.mention if role else "(missing)"}', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Staff role", f"{rank}: {role.mention if role else '(missing)'}"), ephemeral=True)
         if not staff:
-            return await interaction.followup.send('No staff roles configured. Run staff_setup', ephemeral=True)
+            return await core_ui.send(interaction, embed=core_ui.info_embed("Staff roles", "No staff roles configured. Run /staff_setup."), ephemeral=True)
         lines = [f'{k}: <@&{v}>' for k, v in staff.items()]
-        await interaction.followup.send('Staff roles:\n' + '\n'.join(lines), ephemeral=True)
+        await core_ui.send(interaction, embed=core_ui.info_embed("Staff roles", "\n".join(lines)), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
     cog = AdminCog(bot)
     await bot.add_cog(cog)
-    # Best-effort: register important admin slash commands onto the tree — actual sync happens in on_ready()
-    try:
-        try:
-            bot.tree.add_command(app_commands.Command(name='kick', description='Kick a member', callback=cog.kick_slash, default_member_permissions=discord.Permissions(kick_members=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='ban', description='Ban a member', callback=cog.ban_slash, default_member_permissions=discord.Permissions(ban_members=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='unban', description='Unban a member', callback=cog.unban_slash, default_member_permissions=discord.Permissions(ban_members=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='clear', description='Purge messages', callback=cog.clear_slash, default_member_permissions=discord.Permissions(manage_messages=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='lock', description='Lock a channel', callback=cog.lock_slash, default_member_permissions=discord.Permissions(manage_channels=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='unlock', description='Unlock a channel', callback=cog.unlock_slash, default_member_permissions=discord.Permissions(manage_channels=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='brick', description='Apply Brick role', callback=cog.brick_slash, default_member_permissions=discord.Permissions(manage_roles=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='demoji', description='Apply Demoji role', callback=cog.demoji_slash, default_member_permissions=discord.Permissions(manage_roles=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='emoji_lock', description='Lock an emoji to a role', callback=cog.emoji_lock_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='emoji_unlock', description='Unlock an emoji', callback=cog.emoji_unlock_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='emoji_list', description='List locked emojis and roles', callback=cog.emoji_list_slash, default_member_permissions=discord.Permissions(manage_guild=True)))
-        except Exception:
-            pass
-        # Additional admin slash commands
-        try:
-            bot.tree.add_command(app_commands.Command(name='softban', description='Softban a member', callback=cog.softban_slash, default_member_permissions=discord.Permissions(ban_members=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='massban', description='Massban members by criteria', callback=cog.massban_slash, default_member_permissions=discord.Permissions(administrator=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='slowmode', description='Set channel slowmode', callback=cog.slowmode_slash, default_member_permissions=discord.Permissions(manage_channels=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='clone', description='Clone a channel', callback=cog.clone_slash, default_member_permissions=discord.Permissions(manage_channels=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='deafen', description='Deafen a member', callback=cog.deafen_slash, default_member_permissions=discord.Permissions(moderate_members=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='undeafen', description='Undeafen a member', callback=cog.undeafen_slash, default_member_permissions=discord.Permissions(moderate_members=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='staff_setup', description='Ensure staff roles', callback=cog.staff_setup_slash, default_member_permissions=discord.Permissions(administrator=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='staff_promote', description='Promote a member to staff rank', callback=cog.staff_promote_slash, default_member_permissions=discord.Permissions(administrator=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='staff_demote', description='Demote a member from staff rank', callback=cog.staff_demote_slash, default_member_permissions=discord.Permissions(administrator=True)))
-        except Exception:
-            pass
-        try:
-            bot.tree.add_command(app_commands.Command(name='staff_perms', description='Show staff role mappings', callback=cog.staff_perms_slash, default_member_permissions=discord.Permissions(administrator=True)))
-        except Exception:
-            pass
-    except Exception:
-        pass
