@@ -2,6 +2,18 @@
 
 A Discord bot that tracks user "chi" (positive energy) based on their language usage in your server, plus a monthly quest system!
 
+## About Pax — How to use the bot in Discord
+
+Pax is a friendly community bot built to run quietly in your server and surface community health and small events. This section explains how to interact with Pax as a regular user (not how to develop it).
+
+- **Speak naturally**: Pax watches chat for positive and negative words and adjusts chi automatically — you don't need special commands for this.
+- **Check your score**: Use `P!chi` to see your personal chi and `P!leaderboard` to view the server leaderboard.
+- **Claim tokens**: Mystery Panda Tokens drop automatically during active chat. When one appears, use `P!claim` to grab it — tokens give small rewards and mini-quests.
+- **Track rewards**: Use `P!tokens` to see your token stats and progress on any short mini-quests.
+- **Slash commands**: Pax supports slash commands (type `/` in Discord). Slash commands are discoverable in the UI — try `/help` or `/ping`.
+- **Quests**: Server events and monthly quests are available for community play — `Q!` prefix commands are used by admins to manage quests and by players to view progress.
+- **Automatic daily checks**: Every day Pax evaluates chi and can assign configured roles (positive/negative) and post a daily summary to a configured channel.
+
 ## Features
 
 ### Chi System
@@ -9,7 +21,7 @@ A Discord bot that tracks user "chi" (positive energy) based on their language u
   - Positive words: +1 chi (react with 🐼💖)
   - Negative words: -2 chi (react with 🐼😡)
   - 30-second cooldown prevents chi spam
-  
+
 - **Chi Commands** (use `P!` prefix):
   - `P!chi` - Check your current chi score
   - `P!leaderboard` - View top 10 users by chi score
