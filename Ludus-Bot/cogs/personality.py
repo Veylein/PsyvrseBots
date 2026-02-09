@@ -437,8 +437,8 @@ class LudusPersonality(commands.Cog):
         self.last_reaction_time[user_id] = now
         return True
 
-    @app_commands.command(name="personality", description="Configure Ludus's personality and channels")
-    @app_commands.describe(personality="Choose Ludus's personality", channels="Optional channels to restrict personality messages to")
+    @app_commands.command(name="personality", description="Configure Ludus's personality, get help, or set channels")
+    @app_commands.describe(personality="Choose Ludus's personality, or type 'help' for a list", channels="Optional channels to restrict personality messages to")
     async def personality_slash(self, interaction: discord.Interaction, personality: Optional[str] = None, channels: Optional[str] = None):
         # Only allow server admins to change settings
         if not interaction.guild:
@@ -450,10 +450,20 @@ class LudusPersonality(commands.Cog):
             return
 
         server_config = self._load_server_config(interaction.guild.id)
+        # Show help if requested or no args
+        if personality is None or (isinstance(personality, str) and personality.lower() == "help"):
+            desc = "**Available Ludus Personalities:**\n\n"
+            for key, val in self.personalities.items():
+                desc += f"`{key}` — {val['name']}: {val['description']}\n"
+            desc += "\nUse `/personality personality:<type>` to set."
+            await interaction.response.send_message(desc, ephemeral=True)
+            return
+
         # Set personality if provided
         if personality:
             if personality not in self.personalities:
-                await interaction.response.send_message(f"Unknown personality. Available: {', '.join(self.personalities.keys())}", ephemeral=True)
+                desc = "Unknown personality. Available: " + ", ".join(f"`{k}`" for k in self.personalities.keys())
+                await interaction.response.send_message(desc, ephemeral=True)
                 return
             server_config["personality_type"] = personality
             self.server_personality[interaction.guild.id] = personality
@@ -477,7 +487,9 @@ class LudusPersonality(commands.Cog):
                         continue
             server_config["personality_channels"] = ids
         self._save_server_config(interaction.guild.id, server_config)
-        msg = f"Ludus personality set to: {server_config.get('personality_type', 'default')}\n"
+        # Always update in-memory cache
+        self.server_personality[interaction.guild.id] = server_config.get("personality_type", "default")
+        msg = f"Ludus personality set to: **{server_config.get('personality_type', 'default')}**\n"
         if server_config.get("personality_channels"):
             ch_mentions = ", ".join(f"<#{c}>" for c in server_config["personality_channels"])
             msg += f"Personality messages enabled in: {ch_mentions}"
