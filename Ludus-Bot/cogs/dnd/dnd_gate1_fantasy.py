@@ -40,6 +40,30 @@ class Gate1WorldState:
         self.demon_invasion_started = False
         self.dragon_awakening_triggered = False
         
+        # Quest Progress Flags (unlock system)
+        self.quest_flags = {
+            "kingdom_quest_started": False,
+            "kingdom_quest_complete": False,
+            "dragon_discovered": False,
+            "dragon_pact_offered": False,
+            "dragon_hostile": False,
+            "rebellion_contacted": False,
+            "rebellion_allied": False,
+            "rebellion_destroyed": False,
+            "artifact_sword_obtained": False,
+            "artifact_shield_obtained": False,
+            "artifact_crown_obtained": False,
+            "artifact_book_obtained": False,
+            "artifact_heart_obtained": False,
+            "dark_pact_accepted": False,
+            "ghost_army_obtained": False,
+            "lightbringer_obtained": False,
+            "varathul_defeated": False,
+            "zariel_defeated": False,
+            "villages_saved": 0,  # counter
+            "moral_alignment": "neutral",  # "good", "neutral", "evil"
+        }
+        
     def to_dict(self):
         return {
             "king_alive": self.king_alive,
@@ -202,7 +226,56 @@ def get_gate1_scene(scene_id: str, lang: str, world_state: Gate1WorldState, play
     elif scene_id == "g1_main_015":
         return get_scene_015_coronation(lang, world_state, player_data)
     
-    # TODO: Implement 35+ main scenes (dragon, rebellion, artifacts, dark path)
+    # WĄTEK B: SMOK (016-025)
+    elif scene_id == "g1_main_016":
+        return get_scene_016_dragon_legend(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_017":
+        return get_scene_017_mountain_journey(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_018":
+        return get_scene_018_dragon_negotiation(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_019":
+        return get_scene_019_dragon_trial(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_020":
+        return get_scene_020_dragon_pact(lang, world_state, player_data)
+    
+    # WĄTEK C: REBELIA (026-035)
+    elif scene_id == "g1_main_026":
+        return get_scene_026_forest_rebels(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_027":
+        return get_scene_027_rebellion_truth(lang, world_state, player_data)
+    
+    # WĄTEK D: ARTEFAKTY (036-045)
+    elif scene_id == "g1_main_036":
+        return get_scene_036_artifact_map(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_037":
+        return get_scene_037_sword_artifact(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_038":
+        return get_scene_038_shield_artifact(lang, world_state, player_data)
+    
+    # WĄTEK E: MROCZNA ŚCIEŻKA (046-050)
+    elif scene_id == "g1_main_046":
+        return get_scene_046_dark_rebellion(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_047":
+        return get_scene_047_assassination_spree(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_048":
+        return get_scene_048_rift_control(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_049":
+        return get_scene_049_demon_lord_power(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_050":
+        return get_scene_050_ultimate_power(lang, world_state, player_data)
+    
+    # TODO: Implement remaining scenes and branches
     
     # ==================== BRANCH SCENES ====================
     
@@ -222,6 +295,27 @@ def get_gate1_scene(scene_id: str, lang: str, world_state: Gate1WorldState, play
     
     elif scene_id == "g1_end_dragon_pact":
         return get_ending_dragon_pact(lang, world_state, player_data)
+    
+    elif scene_id == "g1_end_stalemate":
+        return get_ending_stalemate(lang, world_state, player_data)
+    
+    elif scene_id == "g1_end_sacrifice":
+        return get_ending_sacrifice(lang, world_state, player_data)
+    
+    elif scene_id == "g1_end_reshape_reality":
+        return get_ending_reshape_reality(lang, world_state, player_data)
+    
+    elif scene_id == "g1_end_eternal_throne":
+        return get_ending_eternal_throne(lang, world_state, player_data)
+    
+    elif scene_id == "g1_end_dragon_merge":
+        return get_ending_dragon_merge(lang, world_state, player_data)
+    
+    elif scene_id == "g1_end_exile":
+        return get_ending_exile(lang, world_state, player_data)
+    
+    elif scene_id == "g1_end_timeloop":
+        return get_ending_timeloop(lang, world_state, player_data)
     
     return None
 
@@ -1788,9 +1882,928 @@ But you know... **this was only FIRST GATE.**
     state.capital_status = "safe"
     state.rift_activity = "sealed"
     state.quest_completed = True
+    state.quest_flags["kingdom_quest_complete"] = True
     
     return {"title": title, "text": text, "choices": choices, "location": "throne_room", "ending": True}
 
+
+# ==================== WĄTEK B: SMOK (016-025) ====================
+
+def get_scene_016_dragon_legend(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 016: Legenda o śpiącym smoku - REQUIRES: heard rumors"""
+    if lang == "pl":
+        title = "🐉 Opowieści Strażników"
+        text = """W tawernie po bitwie słyszysz rozmowę starych strażników.
+
+**"...słyszałeś legendę o Drakonie z Gór Ognia? Mówią że śpi tam od tysiąca lat..."**
+
+**"To głupoty! Smokiew wyginęły!"**
+
+**"A może właśnie smok STWORZYŁ Rozłam? Pomyśl - fioletowa magia to NIE magia ludzi..."**
+
+Podchodzisz do nich."""
+        
+        choices = [
+            {"text": "🗣️ 'Opowiedzcie mi o smoku'", "next": "g1_main_017"},
+            {"text": "🍺 'Postaw im rundy, wyciągnij info'", "next": "g1_main_017", 
+             "req": {"type": "resource_check", "resource": "gold", "amount": 50}},
+            {"text": "⚔️ 'Gdzie te góry?! Zabijęgo!'", "next": "g1_main_017",
+             "effects": {"dragon_hostile": True}},
+            {"text": "❌ Ignoruj - wróć do głównego questu", "next": "g1_main_002"}
+        ]
+    else:
+        title = "🐉 Guardsmen Tales"
+        text = """In tavern after battle you hear old guardsmen talking.
+
+**"...heard the legend of Dragon from Fire Mountains? They say it sleeps there for thousand years..."**
+
+**"That's nonsense! Dragons are extinct!"**
+
+**"Or maybe dragon CREATED the Rift? Think - purple magic is NOT human magic..."**
+
+You approach them."""
+        
+        choices = [
+            {"text": "🗣️ 'Tell me about the dragon'", "next": "g1_main_017"},
+            {"text": "🍺 'Buy them rounds, extract info'", "next": "g1_main_017",
+             "req": {"type": "resource_check", "resource": "gold", "amount": 50}},
+            {"text": "⚔️ 'Where are those mountains?! I'll kill it!'", "next": "g1_main_017",
+             "effects": {"dragon_hostile": True}},
+            {"text": "❌ Ignore - return to main quest", "next": "g1_main_002"}
+        ]
+    
+    state.quest_flags["dragon_discovered"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "tavern"}
+
+
+def get_scene_017_mountain_journey(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 017: Wyprawa do gór"""
+    if lang == "pl":
+        title = "⛰️ Góry Ognia"
+        text = """Podróż trwa tydzień. Góry rosną przed tobą - szczyty dymiące, lawowe rzeki.
+
+**To wulkaniczny region.**
+
+Docierasz do ogromnej jaskini. Wejście szerokość 100 stóp. **Ślady pazurów na skale.**
+
+Powietrze gorące. Słyszysz... **oddech.**
+
+Głęboki. Powolny. Coś OGROMNEGO śpi w środku.
+
+{'Światłoklinga drży w twojej ręce. Ostrzega.' if state.quest_flags.get("lightbringer_obtained") else 'Instynkt krzyczy: NIEBEZPIECZEŃSTWO.'}"""
+        
+        choices = [
+            {"text": "👣 Wejdź CICHO - spróbuj nie obudzić", "next": "g1_main_018",
+             "req": {"type": "stat_check", "stat": "agility", "dc": 14}},
+            {"text": "📢 ZAWOŁAJ - 'Smoku! Chcę rozmawiać!'", "next": "g1_main_018"},
+            {"text": "⚔️ Zakradnij się i ZAATAKUJ śpiącego", "next": "g1_branch_ambush_dragon",
+             "effects": {"dragon_hostile": True, "alignment_shift": "evil"}},
+            {"text": "🔙 Wróć - to zbyt ryzykowne", "next": "g1_main_002"}
+        ]
+    else:
+        title = "⛰️ Fire Mountains"
+        text = """Journey takes a week. Mountains grow before you - smoking peaks, lava rivers.
+
+**This is volcanic region.**
+
+You reach huge cavern. Entrance 100 feet wide. **Claw marks on stone.**
+
+Air is hot. You hear... **breathing.**
+
+Deep. Slow. Something ENORMOUS sleeps inside.
+
+{'Lightbringer trembles in your hand. Warning.' if state.quest_flags.get("lightbringer_obtained") else 'Instinct screams: DANGER.'}"""
+        
+        choices = [
+            {"text": "👣 Enter QUIETLY - try not to wake", "next": "g1_main_018",
+             "req": {"type": "stat_check", "stat": "agility", "dc": 14}},
+            {"text": "📢 CALL OUT - 'Dragon! I want to talk!'", "next": "g1_main_018"},
+            {"text": "⚔️ Sneak and ATTACK sleeping dragon", "next": "g1_branch_ambush_dragon",
+             "effects": {"dragon_hostile": True, "alignment_shift": "evil"}},
+            {"text": "🔙 Return - too risky", "next": "g1_main_002"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "dragon_lair_entrance"}
+
+
+def get_scene_018_dragon_negotiation(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 018: Negocjacje ze smokiem"""
+    dragon_hostile = state.quest_flags.get("dragon_hostile", False)
+    
+    if lang == "pl":
+        title = "🐲 Żywa Legenda" if not dragon_hostile else "🐲 Gniew Smoka"
+        text = """{'SMOK BUDZI SIĘ!!' if not dragon_hostile else 'SMOK JUŻ CZEKA!!'}
+
+**PYRAXIS PŁOMIENIOSERCE** - długość 200 stóp. Łuski czerwone jak lawa. Oczy złote. Dym wydobywa się z nozdrzy.
+
+{'Głos rozbrzmiewa w twojej głowie - nie porusza paszczą:' if not dragon_hostile else 'Ryczy z furią:'}
+
+{'**"Śmiertelny odważył się wejść do mojej siedziby. Ciekawe. Czuję zapach... Rozłamu na tobie. Więc TO już się zaczęło."**' if not dragon_hostile else '**"TCHÓRZU! Chciałeś mnie zabić przez sen?! PŁAĆ ŻYCIEM!"**'}
+
+{'Smok siada, patrzy na ciebie z góry.' if not dragon_hostile else 'Smok przygotowuje ogień w gardle!'}
+
+{'**"Mów szybko, śmiertelny. Czego chcesz? I dlaczego nie powinienem cię ZJEŚĆ?"**' if not dragon_hostile else '**DC 20 Charisma żeby go uspokoić - albo WALKA!**'}"""
+        
+        if not dragon_hostile:
+            choices = [
+                {"text": "🤝 'Potrzebuję pomocy zamknąć Rozłam'", "next": "g1_main_019"},
+                {"text": "❓ 'Czy to TY otworzyłeś Rozłam?'", "next": "g1_main_019",
+                 "effects": {"dragon_offended": True}},
+                {"text": "💎 'Zaoferuję skarbcy za pomoc'", "next": "g1_main_019",
+                 "req": {"type": "resource_check", "resource": "gold", "amount": 5000}},
+                {"text": "⚔️ 'Walczę zamiast gadać!' - ATAK", "next": "g1_branch_fight_dragon",
+                 "effects": {"dragon_hostile": True}}
+            ]
+        else:
+            choices = [
+                {"text": "🗣️ PRÓBA USPOKOJENIA (DC 20)", "next": "g1_main_019",
+                 "req": {"type": "stat_check", "stat": "charisma", "dc": 20}},
+                {"text": "⚔️ WALCZ - nie masz wyboru!", "next": "g1_branch_fight_dragon"},
+                {"text": "🏃 UCIECZKA - biegnij z jaskini!", "next": "g1_main_002",
+                 "effects": {"reputation": -50}}
+            ]
+    else:
+        title = "🐲 Living Legend" if not dragon_hostile else "🐲 Dragon's Wrath"
+        text = """{'DRAGON AWAKENS!!' if not dragon_hostile else 'DRAGON ALREADY WAITING!!'}
+
+**PYRAXIS FLAMEHEART** - 200 feet long. Scales red as lava. Eyes golden. Smoke from nostrils.
+
+{'Voice echoes in your mind - doesn't move jaws:' if not dragon_hostile else 'Roars with fury:'}
+
+{'**"Mortal dared enter my domain. Interesting. I smell... Rift on you. So IT has begun."**' if not dragon_hostile else '**"COWARD! You wanted to kill me in sleep?! PAY WITH LIFE!"**'}
+
+{'Dragon sits, looks down at you.' if not dragon_hostile else 'Dragon prepares fire in throat!'}
+
+{'**"Speak quickly, mortal. What do you want? And why shouldn't I EAT you?"**' if not dragon_hostile else '**DC 20 Charisma to calm - or FIGHT!**'}"""
+        
+        if not dragon_hostile:
+            choices = [
+                {"text": "🤝 'I need help sealing the Rift'", "next": "g1_main_019"},
+                {"text": "❓ 'Did YOU open the Rift?'", "next": "g1_main_019",
+                 "effects": {"dragon_offended": True}},
+                {"text": "💎 'I'll offer treasure for help'", "next": "g1_main_019",
+                 "req": {"type": "resource_check", "resource": "gold", "amount": 5000}},
+                {"text": "⚔️ 'Fight instead of talk!' - ATTACK", "next": "g1_branch_fight_dragon",
+                 "effects": {"dragon_hostile": True}}
+            ]
+        else:
+            choices = [
+                {"text": "🗣️ TRY CALM (DC 20)", "next": "g1_main_019",
+                 "req": {"type": "stat_check", "stat": "charisma", "dc": 20}},
+                {"text": "⚔️ FIGHT - no choice!", "next": "g1_branch_fight_dragon"},
+                {"text": "🏃 FLEE - run from cavern!", "next": "g1_main_002",
+                 "effects": {"reputation": -50}}
+            ]
+    
+    state.ancient_dragon_awakened = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "dragon_lair", "epic": True}
+
+
+def get_scene_019_dragon_trial(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 019: Próba smoka - honorowy pojedynek"""
+    if lang == "pl":
+        title = "⚔️ Próba Ognia"
+        text = """Smok słucha twojej prośby. Milczy długo.
+
+**"Ciekawe. Śmiałość masz... ale CZY wartość?"**
+
+**"Smokii nie pomagają słabym. Jesteśmy dumni. Musisz przejść PRÓBĘ."**
+
+Smok się zmniejsza - teraz ma "tylko" 30 stóp.
+
+**"Walcz ze mną. Pokroć 3 rundy. JEŚLI przeżyjesz - pomogę. Jeśli nie... zostaniesz prochem."**
+
+**"Zaczynam TERAZ."**
+
+**BOSS FIGHT - Pyraxis (Trial Mode)**
+**HP: 300 | Atak: +10 | Obrona: 18**
+**Specjalne:**
+- **Przedmuch Ognia** - 50 dmg cone (DC 17 Agility half)
+- **Atak Ogonem** - 40 dmg + knockdown
+- **Lot** - unika fizycznych ataków 2 rundy
+
+**WARUNEK ZWYCIĘSTWA:** Przeżyj 3 rundy LUB zadaj 150+ dmg"""
+        
+        choices = [
+            {"text": "⚔️ ATAK BEZPOŚREDNI", "next": "g1_main_020_combat",
+             "req": {"type": "combat_action"}},
+            {"text": "🛡️ OBRONA - przetrwaj", "next": "g1_main_020_combat"},
+            {"text": "🏹 DYSTANS - atakuj z daleka", "next": "g1_main_020_combat",
+             "req": {"type": "stat_check", "stat": "agility", "dc": 15}},
+            {"text": "🗣️ 'Jest inny sposób próby?'", "next": "g1_branch_alternative_trial"}
+        ]
+    else:
+        title = "⚔️ Trial of Fire"
+        text = """Dragon listens to your request. Silent for long.
+
+**"Interesting. You have boldness... but DO you have worth?"**
+
+**"Dragons don't help the weak. We are proud. You must pass TRIAL."**
+
+Dragon shrinks - now "only" 30 feet.
+
+**"Fight me. Survive 3 rounds. IF you live - I help. If not... become ash."**
+
+**"I begin NOW."**
+
+**BOSS FIGHT - Pyraxis (Trial Mode)**
+**HP: 300 | Attack: +10 | Defense: 18**
+**Special:**
+- **Fire Breath** - 50 dmg cone (DC 17 Agility half)
+- **Tail Attack** - 40 dmg + knockdown
+- **Flight** - avoids physical attacks 2 rounds
+
+**WIN CONDITION:** Survive 3 rounds OR deal 150+ dmg"""
+        
+        choices = [
+            {"text": "⚔️ DIRECT ATTACK", "next": "g1_main_020_combat",
+             "req": {"type": "combat_action"}},
+            {"text": "🛡️ DEFENSE - survive", "next": "g1_main_020_combat"},
+            {"text": "🏹 RANGE - attack from distance", "next": "g1_main_020_combat",
+             "req": {"type": "stat_check", "stat": "agility", "dc": 15}},
+            {"text": "🗣️ 'Is there another way for trial?'", "next": "g1_branch_alternative_trial"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "dragon_lair", "combat": True, "boss": "pyraxis_trial"}
+
+
+def get_scene_020_dragon_pact(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 020: Pakt ze smokiem lub wojna"""
+    survived_trial = True  # TODO: check combat result
+    
+    if lang == "pl":
+        title = "🔥 Smocze Słowo"
+        if survived_trial:
+            text = """Upadasz na kolana. Wyczerpany. Ale ŻYJESZ.
+
+Smok ląduje, wraca do pełnego rozmiaru.
+
+**"Imponujące. Mało śmiertelnych przeszło próbę. Masz mój RESPEKT."**
+
+**"Zatem pakt. Pomogę ci zamknąć Rozłam. ALE pod warunkami:**
+
+**1) Po zamknięciu - królestwo płaci mi TRYBUT. 1000 złota rocznie."**
+**2) Góry Ognia pozostają MOIM terytorium. Zakaz dla ludzi."**
+**3) **Jeden dzień w roku** - przysłużysz się MNE jak ZAŻĄDAM."**
+
+**"Zgadzasz się?"**"""
+            
+            choices = [
+                {"text": "🤝 PRZYJMIJ PAKT - zgadzam się", "next": "g1_main_022",
+                 "effects": {"dragon_pact": True, "dragon_ally": True}},
+                {"text": "⚖️ NEGOCJUJ - 'Zmniejszmy trybut'", "next": "g1_main_021",
+                 "req": {"type": "stat_check", "stat": "charisma", "dc": 18}},
+                {"text": "❌ ODMÓW - 'Zbyt wysoką cenę'", "next": "g1_main_021"},
+                {"text": "⚔️ 'Pomożesz NA MOICH warunkach!' - atak", "next": "g1_branch_fight_dragon_full"}
+            ]
+        else:
+            text = """Nie przetrwałeś próby. Smok cię pokonał.
+
+**"Słaby. Nie wartościowy. IDŹ."**
+
+Wyrzuca cię z jaskini. Bez pomocy smoka."""
+            
+            choices = [
+                {"text": "😔 Wracaj - przegrałeś", "next": "g1_main_002"}
+            ]
+    else:
+        title = "🔥 Dragon's Word"
+        if survived_trial:
+            text = """You fall to knees. Exhausted. But ALIVE.
+
+Dragon lands, returns to full size.
+
+**"Impressive. Few mortals passed trial. You have my RESPECT."**
+
+**"So, pact. I'll help seal Rift. BUT with conditions:**
+
+**1) After sealing - kingdom pays me TRIBUTE. 1000 gold yearly."**
+**2) Fire Mountains remain MY territory. Ban for humans."**
+**3) **One day per year** - you'll serve ME as I DEMAND."**
+
+**"Do you agree?"**"""
+            
+            choices = [
+                {"text": "🤝 ACCEPT PACT - I agree", "next": "g1_main_022",
+                 "effects": {"dragon_pact": True, "dragon_ally": True}},
+                {"text": "⚖️ NEGOTIATE - 'Lower the tribute'", "next": "g1_main_021",
+                 "req": {"type": "stat_check", "stat": "charisma", "dc": 18}},
+                {"text": "❌ REFUSE - 'Too high price'", "next": "g1_main_021"},
+                {"text": "⚔️ 'You'll help on MY terms!' - attack", "next": "g1_branch_fight_dragon_full"}
+            ]
+        else:
+            text = """You didn't survive trial. Dragon defeated you.
+
+**"Weak. Not worthy. LEAVE."**
+
+He throws you from cavern. Without dragon's help."""
+            
+            choices = [
+                {"text": "😔 Return - you lost", "next": "g1_main_002"}
+            ]
+    
+    if survived_trial:
+        state.quest_flags["dragon_pact_offered"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "dragon_lair"}
+
+
+# ==================== WĄTEK C: REBELIA (026-035) ====================
+
+def get_scene_026_forest_rebels(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 026: Spotkanie z rebeliantami"""
+    if lang == "pl":
+        title = "🏹 Cienie Lasu"
+        text = """W drodze powrotnej nagle - **STRZAŁY!**
+
+Otaczają cię zamaskowani łucznicy. 
+
+**Kobieta w zielonej pelerynie** wychodzi z cienia.
+
+**"Nie ruszaj się, Wędrowiec. Słyszeliśmy o tobie. Zabijasz demony... ALE służysz TYRANOWI."**
+
+Ściąga maskę. Jest młoda, oczy płoną determinacją.
+
+**"Jestem LYRA WOLNA - liderka Rebelii. Król Aldric był MORDERCĄ. Zabijał niewinnych. Wprowadził niewolnictwo."**
+
+{'**"A teraz JEGO córka siada na tronie. Kontynuuje terror."**' if state.king_alive == False else '**"Zamordowaliśmy go. Bo musiał UMRZEĆ."**'}
+
+**"Dołącz do nas. Razem obalimy tron. Stwwórzymy RZECZPOSPOLITĄ."**"""
+        
+        choices = [
+            {"text": "🤝 'Opowiedz mi więcej...'", "next": "g1_main_027"},
+            {"text": "⚔️ 'Jesteście zdrajcami!' - ATAK", "next": "g1_branch_fight_rebels",
+             "effects": {"rebellion_hostile": True}},
+            {"text": "🤔 'Udowodnij że król był tyranem'", "next": "g1_main_027"},
+            {"text": "🏃 'Puszczajcie mnie' - odejdź", "next": "g1_main_002"}
+        ]
+    else:
+        title = "🏹 Forest Shadows"
+        text = """On way back suddenly - **ARROWS!**
+
+Masked archers surround you.
+
+**Woman in green cloak** emerges from shadow.
+
+**"Don't move, Wanderer. We heard of you. You kill demons... BUT serve TYRANT."**
+
+She removes mask. Young, eyes burning with determination.
+
+**"I am LYRA FREE - Rebellion leader. King Aldric was MURDERER. Killed innocents. Introduced slavery."**
+
+{'**"And now HIS daughter sits on throne. Continues terror."**' if state.king_alive == False else '**"We murdered him. Because he HAD to DIE."**'}
+
+**"Join us. Together we'll overthrow throne. Create REPUBLIC."**"""
+        
+        choices = [
+            {"text": "🤝 'Tell me more...'", "next": "g1_main_027"},
+            {"text": "⚔️ 'You are traitors!' - ATTACK", "next": "g1_branch_fight_rebels",
+             "effects": {"rebellion_hostile": True}},
+            {"text": "🤔 'Prove king was tyrant'", "next": "g1_main_027"},
+            {"text": "🏃 'Let me go' - leave", "next": "g1_main_002"}
+        ]
+    
+    state.rebellion_leader_known = True
+    state.quest_flags["rebellion_contacted"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "forest_rebel_camp"}
+
+
+def get_scene_027_rebellion_truth(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 027: Prawda o królu"""
+    if lang == "pl":
+        title = "📜 Mroczna Przeszłość"
+        text = """Lyra pokazuje ci dokumenty. Świadectwa. **Listy królewskie.**
+
+**"Patrz. Rozkaz spalenia wioski Riverdale - za odmowę podatku. 200 osób. DZIECI."**
+
+**"Tu - lista więźniów politycznych. Tortury. Za krytykę króla."**
+
+Jeden dokument cię uderza - **DEMON PAKT.**
+
+**"Król WIEDZIAŁ o Rozłamie. SAM go otworzył! Chciał mocy demon dla siebie!"**
+
+**"Ale gdy stracił kontrolę... obwinił innych. Kościół skorumpował by ukryć prawdę."**
+
+{'Jeśli to prawda... twoja walka była kłamstwem...' if state.quest_flags.get("lightbringer_obtained") else 'To brzmi niewiarygodnie...'}"""
+        
+        choices = [
+            {"text": "😨 'To PRAWDA?! Król był zły?!'", "next": "g1_main_028",
+             "effects": {"moral_crisis": True}},
+            {"text": "❌ 'To FAŁSZYWKI! Propaganda!'", "next": "g1_branch_fight_rebels"},
+            {"text": "🤝 DOŁĄCZ DO REBELII", "next": "g1_main_029",
+             "effects": {"rebellion_allied": True, "reputation": -50}},
+            {"text": "⚖️ 'Muszę to zweryfikować...'", "next": "g1_main_028"}
+        ]
+    else:
+        title = "📜 Dark Past"
+        text = """Lyra shows you documents. Testimonies. **Royal letters.**
+
+**"Look. Order to burn Riverdale village - for tax refusal. 200 people. CHILDREN."**
+
+**"Here - list of political prisoners. Torture. For criticizing king."**
+
+One document strikes you - **DEMON PACT.**
+
+**"King KNEW about Rift. HE opened it! Wanted demon power for himself!"**
+
+**"But when he lost control... blamed others. Corrupted church to hide truth."**
+
+{'If this is true... your fight was a lie...' if state.quest_flags.get("lightbringer_obtained") else 'This sounds unbelievable...'}"""
+        
+        choices = [
+            {"text": "😨 'This is TRUE?! King was evil?!'", "next": "g1_main_028",
+             "effects": {"moral_crisis": True}},
+            {"text": "❌ 'These are FAKES! Propaganda!'", "next": "g1_branch_fight_rebels"},
+            {"text": "🤝 JOIN REBELLION", "next": "g1_main_029",
+             "effects": {"rebellion_allied": True, "reputation": -50}},
+            {"text": "⚖️ 'I must verify this...'", "next": "g1_main_028"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "rebel_command"}
+
+
+# ==================== WĄTEK D: ARTEFAKTY (036-045) ====================
+
+def get_scene_036_artifact_map(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 036: Odkrycie mapy do artefaktów"""
+    if lang == "pl":
+        title = "🗺️ Mapa Zagłady"
+        text = """W ruinach starożytnej biblioteki znajdujesz **MAPOWPERGAMINU.**
+
+Zaznaczonych 5 lokacji. Przy każdej - symbol:
+
+🗡️ **MIECZ ŚWIATŁA** - Krypta Wampirów (Północ)
+🛡️ **TARCZA WIEKÓW** - Twierdza Olbrzymów (Wschód)
+👑 **KORONA UMYSŁU** - Labirynt Szaleństwa (Południe)
+📚 **KSIĘGA ZAKAZANA** - Nekromanckie Katakumby (Zachód)
+❤️ **SERCE FENIX** - Wulkan Wiecznego Ognia (Centrum)
+
+Pod mapą napis:
+
+**"Kto zbierze WSZYSTKIE PIĘĆ - może zniszczyć bogów... lub ZOSTAĆ bogiem."**
+
+{'Światłoklinga wibruje. Ostrzega - to niebezpieczne artefakty.' if state.quest_flags.get("lightbringer_obtained") else 'Czujesz moc emanującą z mapy.'}"""
+        
+        choices = [
+            {"text": "🗡️ IDŹ PO MIECZ - Krypta Wampirów", "next": "g1_main_037"},
+            {"text": "🛡️ IDŹ PO TARCZĘ - Twierdza Olbrzymów", "next": "g1_main_038"},
+            {"text": "👑 IDŹ PO KORONĘ - Labirynt", "next": "g1_main_039"},
+            {"text": "❌ ZOSTAW - to zbyt groźne", "next": "g1_main_002"}
+        ]
+    else:
+        title = "🗺️ Map of Doom"
+        text = """In ruins of ancient library you find **PARCHMENT MAP.**
+
+5 locations marked. By each - symbol:
+
+🗡️ **SWORD OF LIGHT** - Vampire Crypt (North)
+🛡️ **SHIELD OF AGES** - Giants' Fortress (East)
+👑 **CROWN OF MIND** - Labyrinth of Madness (South)
+📚 **FORBIDDEN BOOK** - Necromantic Catacombs (West)
+❤️ **PHOENIX HEART** - Eternal Fire Volcano (Center)
+
+Under map, inscription:
+
+**"Who gathers ALL FIVE - can destroy gods... or BECOME god."**
+
+{'Lightbringer vibrates. Warns - these are dangerous artifacts.' if state.quest_flags.get("lightbringer_obtained") else 'You feel power emanating from map.'}"""
+        
+        choices = [
+            {"text": "🗡️ GET SWORD - Vampire Crypt", "next": "g1_main_037"},
+            {"text": "🛡️ GET SHIELD - Giants' Fortress", "next": "g1_main_038"},
+            {"text": "👑 GET CROWN - Labyrinth", "next": "g1_main_039"},
+            {"text": "❌ LEAVE - too dangerous", "next": "g1_main_002"}
+        ]
+    
+    state.quest_flags["artifact_map_found"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "ancient_library"}
+
+
+def get_scene_037_sword_artifact(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 037: Miecz Światła w krypcie wampirów"""
+    if lang == "pl":
+        title = "🗡️ Krypta Krwiopijców"
+        text = """Krypta jest CIEMNA. Zapach rozkładu.
+
+**Trumny wszędzie.** Setki.
+
+W centrum - **MIECZ NA PIEDESTALE.** Ostrze emituje białe światło.
+
+Podchodzisz. Nagle - **TRUMNY OTWIERAJĄ SIĘ!**
+
+**5 WAMPIRÓW** wyłania się z cieni. Oczy czerwone. Kły wyszczerzone.
+
+**WAMPIR-LORD**: *"Śmiertelny odważył się tu przyjść? MIECZ jest NASZYM strażnikiem. Weź go... i UMRZYJ."*
+
+**BOSS FIGHT - 5 Wampirów (każdy 80 HP, regeneracja 10 HP/rundę)**
+
+LUB możesz:"""
+        
+        choices = [
+            {"text": "⚔️ WALCZ z wampirami!", "next": "g1_main_037_combat",
+             "req": {"type": "combat_check"}},
+            {"text": "💡 UŻYJ ŚWIATŁA - wypędź wampiry (DC 16)", "next": "g1_main_037_success",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 16}},
+            {"text": "🗣️ NEGOCJUJ - zaoferuj krew (20 HP)", "next": "g1_main_037_success",
+             "effects": {"hp_cost": 20}},
+            {"text": "🏃 CHWYĆ i UCIEKAJ!", "next": "g1_main_037_escape"}
+        ]
+    else:
+        title = "🗡️ Bloodsucker Crypt"
+        text = """Crypt is DARK. Smell of decay.
+
+**Coffins everywhere.** Hundreds.
+
+In center - **SWORD ON PEDESTAL.** Blade emits white light.
+
+You approach. Suddenly - **COFFINS OPEN!**
+
+**5 VAMPIRES** emerge from shadows. Red eyes. Fangs bared.
+
+**VAMPIRE-LORD**: *"Mortal dared come? SWORD is OUR guardian. Take it... and DIE."*
+
+**BOSS FIGHT - 5 Vampires (each 80 HP, regeneration 10 HP/round)**
+
+OR you can:"""
+        
+        choices = [
+            {"text": "⚔️ FIGHT vampires!", "next": "g1_main_037_combat",
+             "req": {"type": "combat_check"}},
+            {"text": "💡 USE LIGHT - repel vampires (DC 16)", "next": "g1_main_037_success",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 16}},
+            {"text": "🗣️ NEGOTIATE - offer blood (20 HP)", "next": "g1_main_037_success",
+             "effects": {"hp_cost": 20}},
+            {"text": "🏃 GRAB and FLEE!", "next": "g1_main_037_escape"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "vampire_crypt", "combat": True}
+
+
+def get_scene_038_shield_artifact(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 038: Tarcza Wieków w twierdzy olbrzymów"""
+    if lang == "pl":
+        title = "🛡️ Twierdza Tytanów"
+        text = """Twierdza GIGANTYCZNA. Bramy 50 stóp wysokoś ci.
+
+Wszystko jest OLBRZYMIE - stoły, krzesła, miecze.
+
+W sali tronowej - **OLBRZYM** 40 stóp wysokości.
+
+**"Maluch! Przyszedłeś po TARCZĘ? To MOJA tarcza! Dawno temu ukradzona przez magów!"**
+
+**"Walcz ze mną o nią! LUB... rozwiąż moją zagadkę."**
+
+Olbrzym uśmiecha się.
+
+**ZAGADKA:**
+**"Nie żyje, a rośnie. Nie je, a pożera. Nie pije, a ginie od wody. Co to?"**"""
+        
+        choices = [
+            {"text": "💭 'OGIEŃ!' - odpowiedź", "next": "g1_main_038_success",
+             "correct": True},
+            {"text": "💭 'CIEŃ!' - odpowiedź", "next": "g1_main_038_fail"},
+            {"text": "💭 'CZAS!' - odpowiedź", "next": "g1_main_038_fail"},
+            {"text": "⚔️ WALCZ zamiast zagadek!", "next": "g1_main_038_combat",
+             "req": {"type": "combat_check"}}
+        ]
+    else:
+        title = "🛡️ Titans' Fortress"
+        text = """Fortress GIGANTIC. Gates 50 feet high.
+
+Everything is GIANT - tables, chairs, swords.
+
+In throne room - **GIANT** 40 feet tall.
+
+**"Tiny! You came for SHIELD? This is MY shield! Stolen long ago by mages!"**
+
+**"Fight me for it! OR... solve my riddle."**
+
+Giant smiles.
+
+**RIDDLE:**
+**"Not alive, yet grows. Doesn't eat, yet devours. Doesn't drink, yet killed by water. What is it?"**"""
+        
+        choices = [
+            {"text": "💭 'FIRE!' - answer", "next": "g1_main_038_success",
+             "correct": True},
+            {"text": "💭 'SHADOW!' - answer", "next": "g1_main_038_fail"},
+            {"text": "💭 'TIME!' - answer", "next": "g1_main_038_fail"},
+            {"text": "⚔️ FIGHT instead of riddles!", "next": "g1_main_038_combat",
+             "req": {"type": "combat_check"}}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "giant_fortress"}
+
+
+# ==================== WĄTEK E: MROCZNA ŚCIEŻKA (046-050) ====================
+
+def get_scene_046_dark_rebellion(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 046: Rebelia mroczna - sojusz z demonami"""
+    requires_dark_alignment = state.quest_flags.get("moral_alignment") == "evil"
+    
+    if lang == "pl":
+        title = "💀 Mroczny Pakt"
+        text = """{'Twoje czyny doprowadziły cię tu...' if requires_dark_alignment else 'Podążasz mroczną ścieżką...'}
+
+**Głos z Rozłamu** rozbrzmiewa w twojej głowie:
+
+**"Widzę cię, Wędrowiec. Widzę twoją AMBIJĘ. Twoją SIŁĘ."**
+
+**"Nie zamykaj mnie. UŻYJ mnie. Dołącz do nas."**
+
+**"Możesz zostać PANEM tego świata. Nie sługą króla. WŁADCĄ."**
+
+Fioletowa energia wyciąga się do ciebie.
+
+**"Wystarczy jeden dotyk. Jedna decyzja. A MOC będzie twoja."**
+
+{'Światłoklinga KRZCZY w twojej ręce - ostrzega!' if state.quest_flags.get("lightbringer_obtained") else 'Kuszące...'}"""
+        
+        choices = [
+            {"text": "💜 DOTKNIJ - przyjmij moc demon", "next": "g1_main_047",
+             "effects": {"dark_pact": True, "alignment": "evil"}},
+            {"text": "⚔️ 'Nigdy!' - odrzuć i atakuj", "next": "g1_main_013"},
+            {"text": "🤔 'Jaką DOKŁADNIE moc?'", "next": "g1_branch_demon_details"}
+        ]
+    else:
+        title = "💀 Dark Pact"
+        text = """{'Your deeds led you here...' if requires_dark_alignment else 'You follow dark path...'}
+
+**Voice from Rift** echoes in your mind:
+
+**"I see you, Wanderer. I see your AMBITION. Your STRENGTH."**
+
+**"Don't seal me. USE me. Join us."**
+
+**"You can become LORD of this world. Not king's servant. RULER."**
+
+Purple energy reaches toward you.
+
+**"Just one touch. One decision. And POWER is yours."**
+
+{'Lightbringer SCREAMS in your hand - warning!' if state.quest_flags.get("lightbringer_obtained") else 'Tempting...'}"""
+        
+        choices = [
+            {"text": "💜 TOUCH - accept demon power", "next": "g1_main_047",
+             "effects": {"dark_pact": True, "alignment": "evil"}},
+            {"text": "⚔️ 'Never!' - reject and attack", "next": "g1_main_013"},
+            {"text": "🤔 'What EXACTLY power?'", "next": "g1_branch_demon_details"}
+        ]
+    
+    state.quest_flags["dark_pact_offered"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "rift_heart", "critical": True}
+
+
+def get_scene_047_assassination_spree(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 047: Zabójstwo wszystkich przywódców"""
+    if lang == "pl":
+        title = "🗡️ Noc Długich Noży"
+        text = """Moc demon przepływa przez ciebie. **Czujesz się NIEPOKONANY.**
+
+Twoje oczy świecą FIOLETOWO.
+
+Otrzymujesz WIZJĘ - lokacje wszystkich przywódców:
+
+✓ Dowódca Rycerzy - w koszarach
+✓ Lider Rebelii - w lesie  
+✓ {'Duch Króla - w Krainie Umarłych' if state.quest_flags.get("ghost_army_obtained") else 'Rada Królewska - w pałacu'}
+✓ Smok Pyraxis - w jaskini
+✓ Przywódca Kościoła - w katedrze
+
+**"Zabij ich WSZYSTKICH. Zostaw królestwo bez przywódców. A ty PANUJ z chaosu."**
+
+Czujesz... pragnienie mordu."""
+        
+        choices = [
+            {"text": "💀 ROZPOCZNIJ MASAKRĘ", "next": "g1_main_048"},
+            {"text": "😨 'Co ja robię?!' - OPIERAJ SIĘ!", "next": "g1_branch_resist_darkness",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 22}},
+            {"text": "🔥 WZMOCNIJ moc - zabij WSZYSTKICH", "next": "g1_main_048",
+             "effects": {"full_corruption": True}}
+        ]
+    else:
+        title = "🗡️ Night of Long Knives"
+        text = """Demon power flows through you. **You feel INVINCIBLE.**
+
+Your eyes glow PURPLE.
+
+You receive VISION - locations of all leaders:
+
+✓ Knight Commander - in barracks
+✓ Rebellion Leader - in forest
+✓ {'Ghost King - in Land of Dead' if state.quest_flags.get("ghost_army_obtained") else 'Royal Council - in palace'}
+✓ Dragon Pyraxis - in cavern
+✓ Church Leader - in cathedral
+
+**"Kill them ALL. Leave kingdom without leaders. And you RULE from chaos."**
+
+You feel... lust for murder."""
+        
+        choices = [
+            {"text": "💀 BEGIN MASSACRE", "next": "g1_main_048"},
+            {"text": "😨 'What am I doing?!' - RESIST!", "next": "g1_branch_resist_darkness",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 22}},
+            {"text": "🔥 AMPLIFY power - kill EVERYONE", "next": "g1_main_048",
+             "effects": {"full_corruption": True}}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "various", "dark": True}
+
+
+def get_scene_048_rift_control(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 048: Przejęcie kontroli nad Rozłamem"""
+    if lang == "pl":
+        title = "💜 Władca Otchłani"
+        text = """Wszyscy przywódcy... martwi. Przez twoją rękę.
+
+**Królestwo tonie w chaosie.**
+
+Wracasz do Rozłamu. Teraz czujesz... POŁĄCZENIE.
+
+**"Dobra robota, nasz nowy PANIE."**
+
+Głos demon nie jest już zewnętrzny. Jest W TOBIE.
+
+**"Teraz ostatni krok. Wejdź DO Rozłamu. Przejmij tron Pana Demonów."**
+
+**"Zostań DEMON-KRÓLEM. Władcą obydwu światów."**
+
+Widzisz portal. Prowadzi w głąb Rozłamu - do SERCA demon."""
+        
+        choices = [
+            {"text": "👿 WEJDŹ - przejmij tron demon", "next": "g1_main_049"},
+            {"text": "⚔️ 'Nie! Zniszczę Rozłam od ŚRODKA!'", "next": "g1_branch_sacrifice_ending"},
+            {"text": "💀 WCHŁOŃ Rozłam w SIEBIE", "next": "g1_main_050"}
+        ]
+    else:
+        title = "💜 Lord of Abyss"
+        text = """All leaders... dead. By your hand.
+
+**Kingdom drowns in chaos.**
+
+You return to Rift. Now you feel... CONNECTION.
+
+**"Good work, our new LORD."**
+
+Demon voice is no longer external. It's IN YOU.
+
+**"Now final step. Enter INTO Rift. Seize Demon Lord's throne."**
+
+**"Become DEMON-KING. Ruler of both worlds."**
+
+You see portal. Leads into Rift depths - to demon HEART."""
+        
+        choices = [
+            {"text": "👿 ENTER - seize demon throne", "next": "g1_main_049"},
+            {"text": "⚔️ 'No! I'll destroy Rift from INSIDE!'", "next": "g1_branch_sacrifice_ending"},
+            {"text": "💀 ABSORB Rift into YOURSELF", "next": "g1_main_050"}
+        ]
+    
+    state.rift_activity = "controlled"
+    
+    return {"title": title, "text": text, "choices": choices, "location": "rift_heart", "dark": True}
+
+
+def get_scene_049_demon_lord_power(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 049: Wchłonięcie mocy Pana Demonów"""
+    if lang == "pl":
+        title = "👑 Tron Ognia"
+        text = """Wchodzisz przez portal.
+
+**PIEKŁO.**
+
+Świat fioletu i ognia. Miliony demon wokół.
+
+Na tronie z czaszek siedzi **AZATHUL - PAN DEMONÓW.**
+
+**"ŚMIERTELNY? Tutaj?! NIEMOŻLI-"**
+
+Nie kończy. **ATAKUJESZ.**
+
+Twoja moc demon vs jego moc. Starcie Tytanów.
+
+**WYGRYWASZ.**
+
+Wchłaniasz jego esencję. **Jego MOC.**
+
+**Zasiadasz na tronie.**
+
+Wszystkie demony klękają.
+
+**"NOWY PAN! NOWY PAN! NOWY PAN!"**
+
+Jesteś teraz... BOGIEM DEMON."""
+        
+        choices = [
+            {"text": "👿 ZAAKCEPTUJ - zostań Panem", "next": "g1_end_demon_lord"},
+            {"text": "💥 ZNISZCZ TRON - zakończ to", "next": "g1_end_sacrifice"}
+        ]
+    else:
+        title = "👑 Throne of Fire"
+        text = """You enter through portal.
+
+**HELL.**
+
+World of violet and fire. Millions of demons around.
+
+On throne of skulls sits **AZATHUL - DEMON LORD.**
+
+**"MORTAL? Here?! IMPOSSI-"**
+
+He doesn't finish. **YOU ATTACK.**
+
+Your demon power vs his. Clash of Titans.
+
+**YOU WIN.**
+
+You absorb his essence. **His POWER.**
+
+**You sit on throne.**
+
+All demons kneel.
+
+**"NEW LORD! NEW LORD! NEW LORD!"**
+
+You are now... DEMON GOD."""
+        
+        choices = [
+            {"text": "👿 ACCEPT - become Lord", "next": "g1_end_demon_lord"},
+            {"text": "💥 DESTROY THRONE - end this", "next": "g1_end_sacrifice"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "demon_throne_room", "epic": True}
+
+
+def get_scene_050_ultimate_power(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 050: Finał - pełna fuzja z mocą"""
+    if lang == "pl":
+        title = "💫 Bóstwo"
+        text = """Wchłaniasz WSZYSTKO.
+
+Rozłam. Demony. Moc. Królestwo. WSZYSTKO.
+
+**Stajesz się CZYMŚ WIĘCEJ.**
+
+Nie jesteś już śmiertelnikiem.
+Nie jesteś demonem.
+Nie jesteś bogiem.
+
+Jesteś... **TRANSCENDENCJĄ.**
+
+**Przestrzeń-czas zgina się wokół ciebie.**
+
+Widzisz WSZYSTKIE wymiary jednocześnie. 9 Bram. Wszystkie możliwości.
+
+**Możesz:**
+- Przerobić Gate 1 według swojej woli
+- Przeskoczyć do innego wymiaru
+- Zostać tu na zawsze jako bóg"""
+        
+        choices = [
+            {"text": "🔮 PRZEBUDUJ GATE 1", "next": "g1_end_reshape_reality"},
+            {"text": "🌌 PRZEJDŹ DO GATE 2", "next": "return_to_precipice"},
+            {"text": "👑 ZOSTAŃ BOGIEM TU", "next": "g1_end_eternal_throne"}
+        ]
+    else:
+        title = "💫 Godhood"
+        text = """You absorb EVERYTHING.
+
+Rift. Demons. Power. Kingdom. EVERYTHING.
+
+**You become SOMETHING MORE.**
+
+You're no longer mortal.
+You're not demon.
+You're not god.
+
+You are... **TRANSCENDENCE.**
+
+**Space-time bends around you.**
+
+You see ALL dimensions simultaneously. 9 Gates. All possibilities.
+
+**You can:**
+- Reshape Gate 1 according to your will
+- Jump to another dimension
+- Stay here forever as god"""
+        
+        choices = [
+            {"text": "🔮 RESHAPE GATE 1", "next": "g1_end_reshape_reality"},
+            {"text": "🌌 GO TO GATE 2", "next": "return_to_precipice"},
+            {"text": "👑 BECOME GOD HERE", "next": "g1_end_eternal_throne"}
+        ]
+    
+    state.quest_flags["transcendence_achieved"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "beyond_reality", "ending": True, "ultimate": True}
+
+
+# Kontynuacja w następnym replace - dodaję kolejne sceny
 
 # ==================== BRANCH SCENES ====================
 
@@ -1861,16 +2874,1490 @@ def get_branch_help_villagers(lang: str, state: Gate1WorldState, player) -> Dict
 # ==================== ENDINGS ====================
 
 def get_ending_kingdom_saved(lang: str, state: Gate1WorldState, player) -> Dict:
-    """Zakończenie: Królestwo uratowane"""
-    # TODO: Implement endings
-    pass
+    """Zakończenie: Królestwo uratowane - heroic ending"""
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  🏆 KRÓLESTWO URATOWANE - KONIEC  🏆  ║
+╚═══════════════════════════════════════╝
+
+Rozłam **ZAMYKA SIĘ** w eksplozji światła.
+
+Ostatnia fala demonicznej energii rozrywa niebo, ale **TY** stoisz mocno, {player.character.name}.
+Fragment **ŚWIATŁONOŚCICELA** w twoich rękach rozbłyska **OŚLEPIAJĄCYM BLASKIEM**.
+
+```asciidoc
+ROZŁAM ▂▃▅▇█▓▒░ ZAMYKA SIĘ ░▒▓█▇▅▃▂
+```
+
+**TŁUM KRZYCZY** z ulgi i radości.
+
+**📜 EPILOG:**
+
+• **KRÓLESTWO** odbudowuje się z ruin - {state.villages_saved if hasattr(state, 'villages_saved') else 0} wiosek ocalonych
+• **PRINCESSKA ELARA** koronowana jako nowa królowa, mądra i sprawiedliwa
+• **ZAKON RYCERZY** składa ci przysięgę wierności
+• **SER MARKUS** nazywa cię **"Zbawcą Królestwa"**
+
+{f"• **PYRAXIS FLAMEHEART** powraca do lazurowych gór, pakt mocno trwa" if state.quest_flags.get("dragon_pact_offered") else ""}
+{f"• **REBELIA** integruje się z królestwem, Lyra Free zostaje Wielką Marszałkini" if state.quest_flags.get("rebellion_allied") else ""}
+
+**TWOJE IMIĘ** zapisane zostaje w legendach.
+
+Jednak... głęboko w sercu **CZUJESZ**:
+
+> *To dopiero początek. Pozostało jeszcze **8 BRAM**.*
+
+**NAGRODY FINAŁOWE:**
+├─ 🪙 +10,000 Gold
+├─ 💎 +500 Experience
+├─ 🏅 Tytuł: "Zbawca Królestwa"
+├─ ✨ Unlock: Gate 2 Access
+└─ 🎖️ Achievement: "Hero of Gate 1"
+
+**STATYSTYKI ZAKOŃCZENIA:**
+```
+Rozłam:         ZAMKNIĘTY ✓
+Straty:         {state.villages_destroyed if hasattr(state, 'villages_destroyed') else 0} wiosek zniszczonych
+Uratowanych:    {state.villages_saved if hasattr(state, 'villages_saved') else 0} wiosek ocalonych
+Moralność:      {state.quest_flags.get('moral_alignment', 'neutral').upper()}
+Sojusznicy:     {', '.join([k.replace('_', ' ').title() for k, v in state.quest_flags.items() if 'allied' in k and v]) or 'Brak'}
+```
+
+_(Możesz teraz przejść do Gate 2 lub eksplorować Gate 1 w trybie post-game)_
+"""
+    else:  # EN
+        text = f"""╔════════════════════════════════════╗
+║  🏆 KINGDOM SAVED - THE END  🏆   ║
+╚════════════════════════════════════╝
+
+The Rift **CLOSES** in an explosion of light.
+
+The final wave of demonic energy tears the sky, but **YOU** stand firm, {player.character.name}.
+The **LIGHTBRINGER** fragment in your hands blazes with **BLINDING BRILLIANCE**.
+
+```asciidoc
+RIFT ▂▃▅▇█▓▒░ CLOSING ░▒▓█▇▅▃▂
+```
+
+**THE CROWD ROARS** with relief and joy.
+
+**📜 EPILOGUE:**
+
+• **KINGDOM** rebuilds from ruins - {state.villages_saved if hasattr(state, 'villages_saved') else 0} villages saved
+• **PRINCESS ELARA** crowned as new queen, wise and just
+• **KNIGHT ORDER** swears fealty to you
+• **SER MARKUS** names you **"Savior of the Kingdom"**
+
+{f"• **PYRAXIS FLAMEHEART** returns to azure mountains, pact holds strong" if state.quest_flags.get("dragon_pact_offered") else ""}
+{f"• **REBELLION** integrates with kingdom, Lyra Free becomes Grand Marshal" if state.quest_flags.get("rebellion_allied") else ""}
+
+**YOUR NAME** is written in legends.
+
+Yet... deep in your heart **YOU FEEL**:
+
+> *This is only the beginning. **8 GATES** remain.*
+
+**FINAL REWARDS:**
+├─ 🪙 +10,000 Gold
+├─ 💎 +500 Experience
+├─ 🏅 Title: "Kingdom Savior"
+├─ ✨ Unlock: Gate 2 Access
+└─ 🎖️ Achievement: "Hero of Gate 1"
+
+**ENDING STATISTICS:**
+```
+Rift:           SEALED ✓
+Losses:         {state.villages_destroyed if hasattr(state, 'villages_destroyed') else 0} villages destroyed
+Saved:          {state.villages_saved if hasattr(state, 'villages_saved') else 0} villages protected
+Morality:       {state.quest_flags.get('moral_alignment', 'neutral').upper()}
+Allies:         {', '.join([k.replace('_', ' ').title() for k, v in state.quest_flags.items() if 'allied' in k and v]) or 'None'}
+```
+
+_(You can now proceed to Gate 2 or explore Gate 1 in post-game mode)_
+"""
+    
+    choices = [
+        {"text": "🚪 Przejdź do Gate 2" if lang == "pl" else "🚪 Proceed to Gate 2",
+         "next": "gate_2_transition",
+         "effects": {"gate": 2}},
+        {"text": "🔄 Eksploruj Gate 1" if lang == "pl" else "🔄 Explore Gate 1",
+         "next": "g1_postgame_hub"}
+    ]
+    
+    # Apply rewards
+    player.currency += 10000
+    player.experience += 500
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "heroic",
+        "outcome": "kingdom_saved"
+    }
 
 
 def get_ending_demon_lord(lang: str, state: Gate1WorldState, player) -> Dict:
     """Zakończenie: Zostałeś władcą demonów"""
-    pass
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  👿 WŁADCA DEMONÓW - KONIEC  👿      ║
+╚═══════════════════════════════════════╝
+
+**ROZŁAM** nie zamyka się. **TY** go kontrolujesz.
+
+{player.character.name}, twoje oczy płoną **FIOLETOWYM OGNIEM**.
+Moc **AZATHULA** została wchłonięta. Jesteś **PANEM OTCHŁANI**.
+
+```asciidoc
+🔥 DEMONY KLĘKAJĄ PRZED TOBĄ 🔥
+```
+
+**📜 EPILOG - KRÓLOWANIE PRZEZ PRZERAŻENIE:**
+
+• **KRÓLESTWO** upada w chaos i ruinę
+• **REBELIA** zmiażdżona twoją mocą
+• **SMOK PYRAXIS** {'pokonany w bitwie' if state.quest_flags.get('dragon_hostile') else 'unika konfrontacji'}
+• **ELARA** {'zginęła w walce' if state.quest_flags.get('princess_dead') else 'uwięziona w wieży'}
+
+**TWOJE PANOWANIE:**
+
+Rządzisz z **TRONU Z CZASZEK** w centrum Rozłamu.
+Królestwo przekształciło się w **DEMONICZNĄ KRAINĄ**.
+
+Każdego dnia tysiące dusz przepływa przez portal, zasilając twoją moc.
+
+**OSIĄGNIĘCIA WŁADCY:**
+├─ 💀 Kontrola nad 10,000+ demonami
+├─ 🔥 Przekształcono 50+ wiosek w warownie demoniczne
+├─ 👿 Złożono 1,000,000+ ofiar
+├─ 💜 Moc Rozłamu: ABSOLUTNA
+└─ ⚫ Status: NIEŚMIERTELNY TYRAN
+
+Ale...
+
+**GŁOS AZATHULA** wciąż szepcze w twojej głowie:
+
+> *"Jesteś **MOIM** narzędziem. Zawsze byłeś. Zawsze będziesz."*
+
+Czy naprawdę **WYGRAŁEŚ**?
+Czy tylko **ZMIENIŁEŚ PANA**?
+
+**ZAKOŃCZENIE: ZŁE - "Król Demonów"**
+
+_(To zakończenie uniemożliwia przejście do Gate 2. Możesz zresetować lub kontynuować panowanie w Gate 1)_
+"""
+    else:  # EN
+        text = f"""╔═══════════════════════════════════╗
+║  👿 DEMON LORD - THE END  👿     ║
+╚═══════════════════════════════════╝
+
+**THE RIFT** does not close. **YOU** control it.
+
+{player.character.name}, your eyes burn with **VIOLET FIRE**.
+**AZATHUL'S** power has been absorbed. You are **LORD OF THE ABYSS**.
+
+```asciidoc
+🔥 DEMONS KNEEL BEFORE YOU 🔥
+```
+
+**📜 EPILOGUE - REIGN THROUGH TERROR:**
+
+• **KINGDOM** falls into chaos and ruin
+• **REBELLION** crushed by your might
+• **DRAGON PYRAXIS** {'defeated in battle' if state.quest_flags.get('dragon_hostile') else 'avoids confrontation'}
+• **ELARA** {'died in combat' if state.quest_flags.get('princess_dead') else 'imprisoned in tower'}
+
+**YOUR REIGN:**
+
+You rule from the **THRONE OF SKULLS** at the center of the Rift.
+The kingdom has transformed into a **DEMONIC WASTELAND**.
+
+Every day thousands of souls flow through the portal, feeding your power.
+
+**LORD'S ACHIEVEMENTS:**
+├─ 💀 Control over 10,000+ demons
+├─ 🔥 Transformed 50+ villages into demon fortresses
+├─ 👿 1,000,000+ sacrifices made
+├─ 💜 Rift Power: ABSOLUTE
+└─ ⚫ Status: IMMORTAL TYRANT
+
+But...
+
+**AZATHUL'S VOICE** still whispers in your mind:
+
+> *"You are **MY** tool. Always were. Always will be."*
+
+Did you truly **WIN**?
+Or did you just **CHANGE MASTERS**?
+
+**ENDING: EVIL - "Demon King"**
+
+_(This ending blocks Gate 2 access. You can reset or continue ruling Gate 1)_
+"""
+    
+    choices = [
+        {"text": "👿 Kontynuuj panowanie" if lang == "pl" else "👿 Continue reign",
+         "next": "g1_demon_lord_hub"},
+        {"text": "🔄 Zresetuj kampanię" if lang == "pl" else "🔄 Reset campaign",
+         "next": "reset_gate1"}
+    ]
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "evil",
+        "outcome": "demon_lord_reign"
+    }
 
 
 def get_ending_dragon_pact(lang: str, state: Gate1WorldState, player) -> Dict:
     """Zakończenie: Pakt ze smokiem"""
-    pass
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  🐉 PAKT SMOKA - KONIEC  🐉          ║
+╚═══════════════════════════════════════╝
+
+**PYRAXIS FLAMEHEART** i {player.character.name} stoją razem przed Rozłamem.
+
+Starożytny smok wybucha **SMUGĄ ŚWIATŁA DRAGONIEGO** wprost w serce portalu.
+Ty zaś wznosisz **FRAGMENT ŚWIATŁONOŚCICELA** - energie łączą się.
+
+```asciidoc
+╔══════════════════════════╗
+║ 🔥🐉  FUZJA MOCY  🐉🔥  ║
+╚══════════════════════════╝
+```
+
+Rozłam **IMPLODUJE** w kaskadzie dźwięku i światła.
+
+**📜 EPILOG - NOWA ERA:**
+
+• **KRÓLESTWO** odbudowane pod przywództwem Elary i Pyraxisa
+• **PAKT DRAGONÓW** - pierwsza taka umowa od 1000 lat
+• **TY** zostałeś **SMOCZY RYCERZ** - jedyny w historii nieSmok z tym tytułem
+
+**TWOJA NOWA ROLA:**
+
+Co roku spędzasz **1 MIESIĄC** w Lazurowych Górach, ucząc się starożytnej magii od Pyraxisa.
+Płacisz **TRYBUT** (1000 złota rocznie), ale w zamian:
+
+├─ 🐉 Możesz przywołać Pyraxisa raz na rok
+├─ 🔥 Otrzymałeś **DAR SMOCZEGO ODDECHU** (minor)
+├─ 📚 Dostęp do Biblioteki Smoków
+├─ ⚔️ Miecz wykuty w smoczym ogniu
+└─ 🛡️ Immunitet na ogień
+
+**PYRAXIS** mówi, stojąc na szczycie góry:
+
+> *"Rzadko znajduję śmiertelnika **GODNEGO SZACUNKU**. Twoja odwaga zmieniła historię, młody przyjacielu."*
+
+**KRÓLESTWO** świętuje **PIERWSZEGO SMOCZY RYCERZA**.
+
+**ZAKOŃCZENIE: SOJUSZ - "Smocze Braterstwo"**
+
+✨ **ODBLOKOWANE**: Gate 2 + Smocza Siła
+"""
+    else:  # EN
+        text = f"""╔════════════════════════════════════╗
+║  🐉 DRAGON PACT - THE END  🐉     ║
+╚════════════════════════════════════╝
+
+**PYRAXIS FLAMEHEART** and {player.character.name} stand together before the Rift.
+
+The ancient dragon releases a **BEAM OF DRAGONFIRE** straight into the portal's heart.
+You raise the **LIGHTBRINGER FRAGMENT** - the energies merge.
+
+```asciidoc
+╔══════════════════════════╗
+║ 🔥🐉  POWER FUSION  🐉🔥 ║
+╚══════════════════════════╝
+```
+
+The Rift **IMPLODES** in a cascade of sound and light.
+
+**📜 EPILOGUE - NEW ERA:**
+
+• **KINGDOM** rebuilt under Elara and Pyraxis's leadership
+• **DRAGON PACT** - first such accord in 1000 years
+• **YOU** became **DRAGON KNIGHT** - only non-Dragon in history with this title
+
+**YOUR NEW ROLE:**
+
+Each year you spend **1 MONTH** in Azure Mountains, learning ancient magic from Pyraxis.
+You pay **TRIBUTE** (1000 gold yearly), but in return:
+
+├─ 🐉 Can summon Pyraxis once per year
+├─ 🔥 Received **GIFT OF DRAGONBREATH** (minor)
+├─ 📚 Access to Dragon Library
+├─ ⚔️ Sword forged in dragonfire
+└─ 🛡️ Fire immunity
+
+**PYRAXIS** says, standing atop the mountain:
+
+> *"Rarely do I find a mortal **WORTHY OF RESPECT**. Your courage changed history, young friend."*
+
+The **KINGDOM** celebrates its **FIRST DRAGON KNIGHT**.
+
+**ENDING: ALLIANCE - "Dragon Brotherhood"**
+
+✨ **UNLOCKED**: Gate 2 + Dragon Power
+"""
+    
+    choices = [
+        {"text": "🚪 Przejdź do Gate 2" if lang == "pl" else "🚪 Proceed to Gate 2",
+         "next": "gate_2_transition",
+         "effects": {"gate": 2, "dragon_ally": True}},
+        {"text": "🐉 Wizyta u Pyraxisa" if lang == "pl" else "🐉 Visit Pyraxis",
+         "next": "g1_dragon_keep"}
+    ]
+    
+    # Rewards
+    player.currency += 5000
+    player.experience += 400
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "alliance",
+        "outcome": "dragon_pact"
+    }
+
+
+def get_ending_stalemate(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Zakończenie: Pat - Rozłam pozostaje otwarty w kontrolowanym stanie"""
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  ⚖️ PAT - KONIEC NIEPEWNY  ⚖️        ║
+╚═══════════════════════════════════════╝
+
+Rozłam **NIE ZAMYKA SIĘ**.
+
+Ale też **NIE ROZRASTA SIĘ** dalej.
+
+{player.character.name}, użyłeś fragmentu Światłonościcela do **USTABILIZOWANIA** portalu, nie zamknięcia go.
+
+```asciidoc
+⚠️  ROZŁAM: STATUS ZAWIESZONY  ⚠️
+```
+
+**📜 EPILOG - RÓWNOWAGA STRACHU:**
+
+• **KRÓLESTWO** stoi w gotowości bojowej 24/7
+• **ROZŁAM** monitorowany przez straże co 6 minut
+• **ELARA** rządzi z kamienną twarzą, wiedząc że niebezpieczeństwo nigdy nie minęło
+
+**TWOJA DECYZJA MIAŁA KONSEKWENCJE:**
+
+Uratowałeś księżniczkę (lub kogoś innego), ale **CENĄ** była niemożność pełnego zamknięcia portalu.
+
+**ŻYCIE W CIENIU ROZŁAMU:**
+
+├─ Demony **NIE ATAKUJĄ** (na razie)
+├─ Ale ludzie **ŻYJĄ W STRACHU**
+├─ Co noc pojawia się pytanie: *"Czy dziś wybuchnie?"*
+├─ Królestwo nie może się rozwijać - cała energia idzie na obronę
+└─ Każde pokolenie **CZEKA NA WYBUCH**
+
+**SER MARKUS** mówi, patrząc na portal:
+
+> *"Zrobiłeś, co musiałeś. Ale **HISTORIA CIĘ OSĄDZI** - czy uratowałeś królestwo, czy tylko *przedłużyłeś agonię*?"*
+
+**ZAKOŃCZENIE: NIEJEDNOZNACZNE - "Wieczny Miecz Damoklesa"**
+
+_(Możesz wrócić i spróbować inaczej, lub żyć z konsekwencjami)_
+"""
+    else:  # EN
+        text = f"""╔════════════════════════════════════╗
+║  ⚖️ STALEMATE - UNCERTAIN END  ⚖️  ║
+╚════════════════════════════════════╝
+
+The Rift **DOES NOT CLOSE**.
+
+But it **DOESN'T EXPAND** either.
+
+{player.character.name}, you used the Lightbringer fragment to **STABILIZE** the portal, not seal it.
+
+```asciidoc
+⚠️  RIFT: STATUS SUSPENDED  ⚠️
+```
+
+**📜 EPILOGUE - BALANCE OF FEAR:**
+
+• **KINGDOM** stands in combat readiness 24/7
+• **RIFT** monitored by guards every 6 minutes
+• **ELARA** rules with stone face, knowing danger never passed
+
+**YOUR DECISION HAD CONSEQUENCES:**
+
+You saved the princess (or someone else), but the **PRICE** was inability to fully close the portal.
+
+**LIFE IN RIFT'S SHADOW:**
+
+├─ Demons **DON'T ATTACK** (for now)
+├─ But people **LIVE IN FEAR**
+├─ Every night asks: *"Will it explode today?"*
+├─ Kingdom cannot develop - all energy goes to defense
+└─ Every generation **WAITS FOR ERUPTION**
+
+**SER MARKUS** says, looking at the portal:
+
+> *"You did what you had to. But **HISTORY WILL JUDGE** - did you save the kingdom, or only *prolong its agony*?"*
+
+**ENDING: AMBIGUOUS - "Eternal Sword of Damocles"**
+
+_(You can return and try differently, or live with consequences)_
+"""
+    
+    choices = [
+        {"text": "🔄 Spróbuj ponownie" if lang == "pl" else "🔄 Try again",
+         "next": "g1_main_014",
+         "effects": {"reset_to_choice": True}},
+        {"text": "✅ Zaakceptuj los" if lang == "pl" else "✅ Accept fate",
+         "next": "g1_postgame_stalemate"}
+    ]
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "ambiguous",
+        "outcome": "stalemate"
+    }
+
+
+def get_ending_sacrifice(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Zakończenie: Ofiara - zniszczenie tronu demonów kosztem własnego życia"""
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  ⚡ OSTATECZNA OFIARA - KONIEC  ⚡   ║
+╚═══════════════════════════════════════╝
+
+{player.character.name} kładzie dłonie na **TRONIE Z CZASZEK**.
+
+Twoja moc, dusza, wszystko co jesteś - **PRZEPŁYWA** do kamienia.
+
+```asciidoc
+💥 EKSPLOZJA ŚWIETLNA 💥
+```
+
+**AZATHUL KRZYCZY** w agonii, rozpadając się na miliony cząstek.
+
+**TRON PĘKA** z dźwiękiem łamiącego się świata.
+
+**ROZŁAM IMPLODUJE** - zasysając wszystkie demony z powrotem.
+
+Ostatnią rzeczą, którą widzisz, jest **TWARZ ELARY** w portalu, krzyczącej twoje imię...
+
+**📜 EPILOG - 100 LAT PÓŹNIEJ:**
+
+Królestwo **ODBUDOWAŁO SIĘ** w czasach pokoju.
+
+W centrum stolicy stoi **200-METROWY POMNIK**:
+
+```
+╔══════════════════════════════════╗
+║  {player.character.name.upper()}           ║
+║  ZBAWCA KRÓLESTWA               ║
+║  "Oddał życie, byśmy żyli"      ║
+╚══════════════════════════════════╝
+```
+
+**ELARA**, teraz stara królowa, każdego roku składa kwiaty u pomnika.
+
+Jej pra-wnuki słuchają **LEGENDY o BOHATERZE**, który pokonał Pana Demonów ceną własnej duszy.
+
+**PIEŚŃ BARDÓW:**
+
+> *"W ciemności najgłębszej, gdy zło tryumfowało*
+> *Jedno serce biło, co dobro wybierało*
+> *{player.character.name} imieniem, {player.character.char_class} klasą*
+> *Oddał życie swoje, by zamknąć Przepaść własną."*
+
+**TWOJA DUSZA:**
+
+Ale ty... czujesz dziwny spokój.
+
+Twoja dusza unosi się teraz w **LIMBO MIĘDZY ŚWIATAMI**.
+
+**GŁOS** przemawia:
+
+> *"NIEWIELU wybiera **ABSOLUTNĄ OFIARĘ**. Zasługujesz na nagrodę."*
+
+**OPCJE REINKARNACJI:**
+
+**ZAKOŃCZENIE: HEROICZNE - "Wieczna Ofiara"**
+
+✨ **SPECJALNA NAGRODA**: Postać {player.character.name} otrzymuje status LEGENDARY w bazie danych.
+Przy następnej kampanii możesz ją wskrzesić jako mentora/ducha.
+"""
+    else:  # EN
+        text = f"""╔════════════════════════════════════╗
+║  ⚡ ULTIMATE SACRIFICE - END  ⚡   ║
+╚════════════════════════════════════╝
+
+{player.character.name} places hands on the **THRONE OF SKULLS**.
+
+Your power, soul, everything you are - **FLOWS** into the stone.
+
+```asciidoc
+💥 LIGHT EXPLOSION 💥
+```
+
+**AZATHUL SCREAMS** in agony, dissolving into millions of particles.
+
+**THRONE CRACKS** with the sound of a breaking world.
+
+**RIFT IMPLODES** - sucking all demons back.
+
+The last thing you see is **ELARA'S FACE** in the portal, screaming your name...
+
+**📜 EPILOGUE - 100 YEARS LATER:**
+
+The kingdom **REBUILT** in times of peace.
+
+In the capital's center stands a **200-METER MONUMENT**:
+
+```
+╔══════════════════════════════════╗
+║  {player.character.name.upper()}           ║
+║  KINGDOM SAVIOR                 ║
+║  "Gave life, that we may live"  ║
+╚══════════════════════════════════╝
+```
+
+**ELARA**, now an old queen, lays flowers at the monument every year.
+
+Her great-grandchildren listen to the **LEGEND of the HERO** who defeated the Demon Lord at the cost of his own soul.
+
+**BARD'S SONG:**
+
+> *"In deepest darkness, when evil triumphed*
+> *One heart beat, choosing good*
+> *{player.character.name} by name, {player.character.char_class} by class*
+> *Gave their life, to close the Abyss themselves."*
+
+**YOUR SOUL:**
+
+But you... feel a strange peace.
+
+Your soul now floats in **LIMBO BETWEEN WORLDS**.
+
+A **VOICE** speaks:
+
+> *"FEW choose **ABSOLUTE SACRIFICE**. You deserve reward."*
+
+**REINCARNATION OPTIONS:**
+
+**ENDING: HEROIC - "Eternal Sacrifice"**
+
+✨ **SPECIAL REWARD**: Character {player.character.name} receives LEGENDARY status in database.
+In next campaign you can resurrect them as mentor/spirit.
+"""
+    
+    choices = [
+        {"text": "👻 Zostań duchem-mentorem" if lang == "pl" else "👻 Become spirit-mentor",
+         "next": "reincarnation_spirit"},
+        {"text": "🔄 Reinkarnacja (nowa postać)" if lang == "pl" else "🔄 Reincarnation (new character)",
+         "next": "reincarnation_new"}
+    ]
+    
+    # Special legendary status
+    player.experience += 1000
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "heroic_sacrifice",
+        "outcome": "ultimate_sacrifice",
+        "legendary": True
+    }
+
+
+def get_ending_reshape_reality(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Zakończenie: Przebudowa rzeczywistości Gate 1"""
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  🔮 NOWA RZECZYWISTOŚĆ - KONIEC  🔮  ║
+╚═══════════════════════════════════════╝
+
+{player.character.name}, teraz **ISTOTA TRANSCENDENTNA**, unosi dłoń.
+
+Rzeczywistość **ZMIENIA SIĘ** na twoje skinienie.
+
+```asciidoc
+✨ GATE 1: REWRITING... █████████ 100% ✨
+```
+
+**TWOJE ZMIANY:**
+
+**1. ROZŁAM:**
+   - Przekształcony w **PORTAL HANDLOWY** między wymiarami
+   - Demony? Teraz są **SPRZEDAWCAMI MAGICZNYCH TOWARÓW**
+   - Azathul? Zarządza biurem celnym
+
+**2. KRÓLESTWO:**
+   - Elara nadal królową, ale teraz z **MAGICZNYMI MOCAMI**
+   - Wszyscy mieszkańcy otrzymali **+50 lat życia**
+   - Choroby? **WYELIMINOWANE**
+
+**3. SMOK PYRAXIS:**
+   - Teraz współrządzi jako **MINISTER MAGII**
+   - Doradzajacy sposób, nie tyran
+
+**4. REBELIA:**
+   - Już nie potrzebna - sprawiedliwość **AUTOMATYCZNA**
+   - Lyra Free? Teraz dyrektor ds. edukacji
+
+**REAKCJE:**
+
+**ELARA** (zaszokowana): *"To... to niemożliwe. Zmieniłeś **SAMĄ ISTOTĘ ŚWIATA**."*
+
+**PYRAXIS**: *"Nawet ja, który żył 10,000 lat, nie widziałem takiej mocy. Jesteś **PONAD** bogami."*
+
+**AZATHUL** (teraz przyjacielski sprzedawca): *"Witam! Potrzebujesz magicznego artefaktu? Mamy promocję!"* (😄)
+
+**LUDZIE** początkowo są przerażeni, ale stopniowo **AKCEPTUJĄ** nową rzeczywistość.
+
+```asciidoc
+GATE 1: STATUS - PARADISE MODE ✓
+```
+
+**ALE OSTRZEŻENIE:**
+
+Głos z Gate 9 (najwyższa Brama):
+
+> *"Przekroczyłeś próg **BOSKOŚCI**. Pozostałych 8 Bram obserwuje. Niektórzy cię **PODZIWIAJĄ**. Inni cię **BOJĄ SIĘ**. Jeszcze inni... cię **NENADERWIDZĄ**."*
+
+**ZAKOŃCZENIE: TRANSCENDENTNE - "Boski Architekt"**
+
+✨ **EFEKTY:**
+- Gate 2-9: Wiedza o tobie się rozprzestrzenia
+- Status: GOD-TIER
+- Możesz teraz przemieszczać się między Bramami **NATYCHMIAST**
+- Osiągnięcie: "Reality Bender"
+"""
+    else:  # EN
+        text = f"""╔════════════════════════════════════╗
+║  🔮 NEW REALITY - THE END  🔮     ║
+╚════════════════════════════════════╝
+
+{player.character.name}, now a **TRANSCENDENT BEING**, raises a hand.
+
+Reality **CHANGES** at your command.
+
+```asciidoc
+✨ GATE 1: REWRITING... █████████ 100% ✨
+```
+
+**YOUR CHANGES:**
+
+**1. RIFT:**
+   - Transformed into **TRADE PORTAL** between dimensions
+   - Demons? Now **MAGICAL GOODS MERCHANTS**
+   - Azathul? Manages customs office
+
+**2. KINGDOM:**
+   - Elara still queen, but now with **MAGICAL POWERS**
+   - All citizens received **+50 years lifespan**
+   - Diseases? **ELIMINATED**
+
+**3. DRAGON PYRAXIS:**
+   - Now co-rules as **MINISTER OF MAGIC**
+   - Advisor, not tyrant
+
+**4. REBELLION:**
+   - No longer needed - justice **AUTOMATIC**
+   - Lyra Free? Now education director
+
+**REACTIONS:**
+
+**ELARA** (shocked): *"This... this is impossible. You changed the **VERY ESSENCE OF THE WORLD**."*
+
+**PYRAXIS**: *"Even I, who lived 10,000 years, haven't seen such power. You are **ABOVE** gods."*
+
+**AZATHUL** (now friendly merchant): *"Welcome! Need a magical artifact? We have a sale!"* (😄)
+
+**PEOPLE** are initially terrified, but gradually **ACCEPT** the new reality.
+
+```asciidoc
+GATE 1: STATUS - PARADISE MODE ✓
+```
+
+**BUT WARNING:**
+
+Voice from Gate 9 (highest Gate):
+
+> *"You crossed the threshold of **DIVINITY**. The remaining 8 Gates watch. Some **ADMIRE** you. Others **FEAR** you. Still others... **HATE** you."*
+
+**ENDING: TRANSCENDENT - "Divine Architect"**
+
+✨ **EFFECTS:**
+- Gates 2-9: Knowledge of you spreads
+- Status: GOD-TIER
+- You can now move between Gates **INSTANTLY**
+- Achievement: "Reality Bender"
+"""
+    
+    choices = [
+        {"text": "🚪 Skocz do Gate 5 (środek)" if lang == "pl" else "🚪 Jump to Gate 5 (middle)",
+         "next": "gate_5_transition"},
+        {"text": "🕰️ Zostań w Gate 1" if lang == "pl" else "🕰️ Stay in Gate 1",
+         "next": "g1_paradise_hub"}
+    ]
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "transcendent_reshape",
+        "outcome": "reality_rewrite"
+    }
+
+
+def get_ending_eternal_throne(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Zakończenie: Wieczny tron - zostań bogiem Gate 1"""
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  👑 WIECZNY TRON - KONIEC  👑        ║
+╚═══════════════════════════════════════╝
+
+{player.character.name} zasiada na **TRONIE TRANSCENDENCJI**.
+
+Nie zmieniasz świata. **STAJESZ SIĘ ŚWIATEM**.
+
+```asciidoc
+╔══════════════════════════════════╗
+║  BOG GATE 1 - {player.character.name.upper()[:20]}  ║
+╚══════════════════════════════════╝
+```
+
+**TWOJA TRANSFORMACJA:**
+
+• Twoje ciało **ROZPUSZCZA SIĘ** w energię
+• Stajesz się **NIEWIDZIALNYM STRAŻNIKIEM** Gate 1
+• Czujesz każdą myśl, każde słowo, każdy oddech w tym wymiarze
+• **JESTEŚ BOGIEM**, ale więźniem własnej domeny
+
+**📜 WIECZNE PANOWANIE:**
+
+**ROK 1:**
+Ludzie cię czczą. Budują świątynie. Modlą się.
+
+**ROK 100:**
+Religia oparta na tobie **DOMINUJE** Gate 1.
+
+**ROK 1,000:**
+Twoje imię stało się **LEGENDĄ**. Nikt nie pamięta, że byłeś śmiertelnikiem.
+
+**ROK 10,000:**
+Jesteś **SAM**. Tak bardzo sam.
+Widzisz wszystko, ale **NIE MOŻESZ DOTKNĄĆ**.
+Słyszysz wszystko, ale **NIE MOŻESZ ODPOWIEDZIEĆ** (chyba że przez znaki).
+
+**ELARA** dawno umarła. Jej pra-pra-pra wnuki teraz rządzą.
+
+**PYRAXIS** odwiedza ci co 100 lat, jedyny który cię pamięta:
+
+> *"Stary przyjacielu... czy to naprawdę tego chciałeś? **NIEŚMIERTELNOŚĆ** kosztem **ŻYCIA**?"*
+
+**TWOJE MYŚLI:**
+
+Sam na tronie energii, obserwujesz lata, dekady, wieki...
+
+```asciidoc
+CZAS: ∞
+SAMOTNOŚĆ: ∞
+ŻAŁOBA: ▓▓▓▓▓▓▓▓▓▓ 100%
+```
+
+**ALE:**
+
+Masz moc. Masz wieczność. Masz... wszystko, czego chciałeś.
+
+*Prawda?*
+
+**ZAKOŃCZENIE: GORZKO-SŁODKIE - "Samotny Bóg"**
+
+✨ **EFEKTY:**
+- Nieśmiertelny w Gate 1
+- Możesz błogosławić/przeklinać mieszkańców
+- **NIE MOŻESZ** opuścić Gate 1 (uwięziony swoim wyborem)
+- Osiągnięcie: "Eternal Watcher"
+
+_(Czy to naprawdę wygrana?)_
+"""
+    else:  # EN
+        text = f"""╔════════════════════════════════════╗
+║  👑 ETERNAL THRONE - THE END  👑  ║
+╚════════════════════════════════════╝
+
+{player.character.name} sits on the **THRONE OF TRANSCENDENCE**.
+
+You don't change the world. **YOU BECOME THE WORLD**.
+
+```asciidoc
+╔══════════════════════════════════╗
+║  GOD OF GATE 1 - {player.character.name.upper()[:20]}  ║
+╚══════════════════════════════════╝
+```
+
+**YOUR TRANSFORMATION:**
+
+• Your body **DISSOLVES** into energy
+• You become the **INVISIBLE GUARDIAN** of Gate 1
+• You feel every thought, every word, every breath in this dimension
+• **YOU ARE GOD**, but prisoner of your own domain
+
+**📜 ETERNAL REIGN:**
+
+**YEAR 1:**
+People worship you. Build temples. Pray.
+
+**YEAR 100:**
+Religion based on you **DOMINATES** Gate 1.
+
+**YEAR 1,000:**
+Your name became **LEGEND**. No one remembers you were mortal.
+
+**YEAR 10,000:**
+You are **ALONE**. So very alone.
+You see everything, but **CANNOT TOUCH**.
+You hear everything, but **CANNOT RESPOND** (except through signs).
+
+**ELARA** died long ago. Her great-great-great grandchildren now rule.
+
+**PYRAXIS** visits every 100 years, the only one who remembers you:
+
+> *"Old friend... is this really what you wanted? **IMMORTALITY** at the cost of **LIFE**?"*
+
+**YOUR THOUGHTS:**
+
+Alone on the throne of energy, you watch years, decades, centuries...
+
+```asciidoc
+TIME: ∞
+LONELINESS: ∞
+REGRET: ▓▓▓▓▓▓▓▓▓▓ 100%
+```
+
+**BUT:**
+
+You have power. You have eternity. You have... everything you wanted.
+
+*Right?*
+
+**ENDING: BITTERSWEET - "Lonely God"**
+
+✨ **EFFECTS:**
+- Immortal in Gate 1
+- Can bless/curse inhabitants
+- **CANNOT** leave Gate 1 (trapped by your choice)
+- Achievement: "Eternal Watcher"
+
+_(Was this really a victory?)_
+"""
+    
+    choices = [
+        {"text": "😢 Akceptuj los" if lang == "pl" else "😢 Accept fate",
+         "next": "g1_god_eternal"},
+        {"text": "🔄 Cofnij decyzję (jeśli możliwe)" if lang == "pl" else "🔄 Undo decision (if possible)",
+         "next": "g1_main_050",
+         "effects": {"rewind": True}}
+    ]
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "bittersweet_god",
+        "outcome": "eternal_throne"
+    }
+
+
+def get_ending_dragon_merge(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Zakończenie: Fuzja ze smokiem - stajesz się pół-smokiem"""
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  🐉 FUZJA DRAGONA - KONIEC  🐉       ║
+╚═══════════════════════════════════════╝
+
+Rozłam **EKSPLODUJE** w ostatnim ataku.
+
+{player.character.name} i **PYRAXIS FLAMEHEART** - obydwoje śmiertelnie ranni.
+
+**PYRAXIS** (umierając): *"Jest... jeden sposób... starodawna magia... FUZJA DUSZ..."*
+
+Twoja dłoń dotyka łuski smoka.
+
+```asciidoc
+🔥🐉 POŁĄCZENIE... AKTYWNE 🐉🔥
+```
+
+**BOL** - twoje ciało **PRZEKSZTAŁCA SIĘ**.
+
+**📜 TRANSFORMACJA:**
+
+• Skóra staje się **ŁUSKOWATA** (lazurowo-złota)
+• Z pleców wyrastają **SKRZYDŁA** (15-metrowa rozpiętość)
+• Oczy płoną **ZŁOTYM OGNIEM**
+• Wzrost: **3 METRY**
+• Pazury, kły, ogon
+
+**JESTEŚ TERAZ:**
+
+**DRAKOŃSKIM WOJOWNIKIEM** - hybryda człowieka i starożytnego smoka.
+
+**MOCE:**
+├─ 🔥 Smocze Tchnienie (120 dmg, AOE)
+├─ 🪽 Lot (500 km/h)
+├─ 🛡️ Łuski (Defense +15)
+├─ 💎 Żywotność x5 (500 HP total)
+├─ 📚 Pamięć Pyraxisa (10,000 lat wiedzy)
+└─ 👁️ Darkvision 500 metrów
+
+**PYRAXIS GŁOS** (w twojej głowie):
+
+> *"Żyjemy... razem. Moja dusza, twoje serce. **JESTEM TY**. **TY JESTEŚ MNĄ**."*
+
+**REAKCJE:**
+
+**ELARA** (przerażona, ale zafascynowana): *"Ty... ty wciąż jesteś sobą?"*
+
+**TY** (podwójny głos - twój + dragon): *"Tak. I nie. Jestem **CZYMŚ WIĘCEJ**."*
+
+**KRÓLESTWO** początkowo się boi, ale stopniowo akceptuje.
+
+Zostajesz **PIERWSZYM DRAKOŃSKIM RYCERZEM** - legenda żywa.
+
+```asciidoc
+RASA: HUMAN-DRAGON HYBRID
+STATUS: LEGENDARY
+LATA ŻYCIA: ~2000
+```
+
+**ZAKOŃCZENIE: FUZJA - "Drakoński Wojownik"**
+
+✨ **EFEKTY:**
+- Unlock: Draconic Knight class (unikalna)
+- Możesz przejść do Gate 2 jako hybryd
+- +1000 do wszystkich statystyk
+- Osiągnięcie: "Dragon Merger"
+
+**ALE:**
+
+Każdej nocy **ŚNISZ SNY PYRAXISA** - 10,000 lat wspomnień.
+
+Czasami nie wiesz, gdzie kończy się {player.character.name}, a zaczyna Pyraxis...
+"""
+    else:  # EN
+        text = f"""╔════════════════════════════════════╗
+║  🐉 DRAGON FUSION - THE END  🐉   ║
+╚════════════════════════════════════╝
+
+The Rift **EXPLODES** in final attack.
+
+{player.character.name} and **PYRAXIS FLAMEHEART** - both mortally wounded.
+
+**PYRAXIS** (dying): *"There is... one way... ancient magic... SOUL FUSION..."*
+
+Your hand touches dragon's scales.
+
+```asciidoc
+🔥🐉 MERGING... ACTIVE 🐉🔥
+```
+
+**PAIN** - your body **TRANSFORMS**.
+
+**📜 TRANSFORMATION:**
+
+• Skin becomes **SCALED** (azure-gold)
+• **WINGS** grow from back (15-meter wingspan)
+• Eyes burn with **GOLDEN FIRE**
+• Height: **3 METERS**
+• Claws, fangs, tail
+
+**YOU ARE NOW:**
+
+**DRACONIC WARRIOR** - hybrid of human and ancient dragon.
+
+**POWERS:**
+├─ 🔥 Dragon Breath (120 dmg, AOE)
+├─ 🪽 Flight (500 km/h)
+├─ 🛡️ Scales (Defense +15)
+├─ 💎 Vitality x5 (500 HP total)
+├─ 📚 Pyraxis's Memory (10,000 years knowledge)
+└─ 👁️ Darkvision 500 meters
+
+**PYRAXIS VOICE** (in your head):
+
+> *"We live... together. My soul, your heart. **I AM YOU**. **YOU ARE ME**."*
+
+**REACTIONS:**
+
+**ELARA** (terrified but fascinated): *"You... are you still yourself?"*
+
+**YOU** (dual voice - yours + dragon): *"Yes. And no. I am **SOMETHING MORE**."*
+
+**KINGDOM** is initially afraid, but gradually accepts.
+
+You become the **FIRST DRACONIC KNIGHT** - a living legend.
+
+```asciidoc
+RACE: HUMAN-DRAGON HYBRID
+STATUS: LEGENDARY
+LIFESPAN: ~2000 years
+```
+
+**ENDING: FUSION - "Draconic Warrior"**
+
+✨ **EFFECTS:**
+- Unlock: Draconic Knight class (unique)
+- Can proceed to Gate 2 as hybrid
+- +1000 to all stats
+- Achievement: "Dragon Merger"
+
+**BUT:**
+
+Every night you **DREAM PYRAXIS'S DREAMS** - 10,000 years of memories.
+
+Sometimes you don't know where {player.character.name} ends and Pyraxis begins...
+"""
+    
+    choices = [
+        {"text": "🚪 Przejdź do Gate 2 (jako hybryd)" if lang == "pl" else "🚪 Proceed to Gate 2 (as hybrid)",
+         "next": "gate_2_transition",
+         "effects": {"gate": 2, "race": "draconic_hybrid"}},
+        {"text": "🏔️ Zamieszkaj w górach" if lang == "pl" else "🏔️ Live in mountains",
+         "next": "g1_dragon_mountain_home"}
+    ]
+    
+    # Massive stat boosts
+    player.hp += 400
+    player.experience += 700
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "transformation_fusion",
+        "outcome": "dragon_merge"
+    }
+
+
+def get_ending_exile(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Zakończenie: Wygnanie - zbyt wiele strasznych wyborów"""
+    
+    # Count evil actions
+    evil_score = 0
+    if state.quest_flags.get("villages_destroyed", 0) > 3:
+        evil_score += 3
+    if state.quest_flags.get("rebellion_destroyed"):
+        evil_score += 2
+    if state.quest_flags.get("dragon_hostile"):
+        evil_score += 2
+    if state.quest_flags.get("moral_alignment") == "evil":
+        evil_score += 3
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  ⚖️ WYGNANIE - KONIEC GORZKI  ⚖️     ║
+╚═══════════════════════════════════════╝
+
+Rozłam **ZAMYKA SIĘ**.
+
+Królestwo **URATOWANE**.
+
+Ale... **CY JEST BOHATEREM**?
+
+**SER MARKUS** podchodzi, twarz jak kamień:
+
+> *"{player.character.name}. W imieniu Korony i Ludu... **JESTEŚ WYGNANY**."*
+
+**TWOJE ZBRODNIE:**
+
+{f"• Zniszczono {state.villages_destroyed} wiosek (setki cywilów martwych) 💀" if hasattr(state, 'villages_destroyed') and state.villages_destroyed > 0 else ""}
+{f"• Rebelia zmasakrowana (300+ egzekucji) ⚔️" if state.quest_flags.get("rebellion_destroyed") else ""}
+{f"• Smok Pyraxis zabity (gatunkobójstwo) 🐉" if state.quest_flags.get("dragon_hostile") and state.quest_flags.get("varathul_defeated") else ""}
+{f"• Księża zamordowani (świętokradztwo) ⛪" if state.quest_flags.get("priests_killed") else ""}
+{f"• Demon pakt inicjowany (zdrada) 👿" if state.quest_flags.get("dark_pact_offered") else ""}
+
+**OCENA MORALNA:**
+```
+Dobro:  {"▓" * max(0, 10 - evil_score)}{"░" * evil_score}
+Zło:    {"▓" * evil_score}{"░" * max(0, 10 - evil_score)}
+Wynik:  {evil_score}/10 (ZŁE CZYNY)
+```
+
+**ELARA** odwraca wzrok, płacze:
+
+> *"Uratowałeś królestwo... ale **JAKĄKOLWIEK CENĘ**. Zbyt wiele niewinnych umarło przez twoje wybory. Nie mogę cię nagrodzić."*
+
+**WYROK:**
+
+• **DOŻYWOTNIE WYGNANIE** z królestwa
+• Zakaz wstępu do wszystkich miast
+• Twoje imię **WYMAZANE** z kronik
+• Nagroda: **0 złota**
+• Tytuł: *"Morderczy Zbawca"*
+
+**LUDZIE** rzucają kamieniami gdy opuszczasz bramę.
+
+```asciidoc
+═══════════════════════════════════
+  WYPROWADZENIE - GODZINA 13:00
+       (NIECH NIGDY NIE WRÓCI)
+═══════════════════════════════════
+```
+
+**1 ROK PÓŹNIEJ:**
+
+Wędrierzeszz samotnie przez dzikie ziemie.
+
+Każdej nocy **DUCHY ZABITYCH** nawiedzają twoje sny.
+
+Wioski zamykają drzwi na twój widok. Twoja twarz na plakatach "WANTED - NIE ZABIJAĆ, TYLKO WYGNAĆ".
+
+**PYRAXIS GŁOS** (jeśli żyje): *"Widzisz, śmiertelniku? **CZYNY MAJĄ KONSEKWENCJE**. Moc bez mądrości = zniszczenie."*
+
+**ZAKOŃCZENIE: TRAGICZNE - "Samotny Wygnańc"**
+
+❌ **KONSEKWENCJE:**
+- Brak dostępu do Gate 2
+- Wszystkie reputacje: -100
+- Tytuł: "Exiled Savior"
+- Osiągnięcie: "Fall from Grace"
+
+**MOŻLIWOŚĆ ODKUPIENIA:**
+_(Dodatkowa kampania side-quest: "Droga Odkupienia" - 20 misji dobra)_
+"""
+    else:  # EN
+        text = f"""╔════════════════════════════════════╗
+║  ⚖️ EXILE - BITTER END  ⚖️         ║
+╚════════════════════════════════════╝
+
+The Rift **CLOSES**.
+
+Kingdom **SAVED**.
+
+But... **ARE YOU A HERO**?
+
+**SER MARKUS** approaches, face like stone:
+
+> *"{player.character.name}. In the name of Crown and People... **YOU ARE EXILED**."*
+
+**YOUR CRIMES:**
+
+{f"• Destroyed {state.villages_destroyed} villages (hundreds of civilians dead) 💀" if hasattr(state, 'villages_destroyed') and state.villages_destroyed > 0 else ""}
+{f"• Rebellion massacred (300+ executions) ⚔️" if state.quest_flags.get("rebellion_destroyed") else ""}
+{f"• Dragon Pyraxis killed (genocide) 🐉" if state.quest_flags.get("dragon_hostile") and state.quest_flags.get("varathul_defeated") else ""}
+{f"• Priests murdered (sacrilege) ⛪" if state.quest_flags.get("priests_killed") else ""}
+{f"• Demon pact initiated (treason) 👿" if state.quest_flags.get("dark_pact_offered") else ""}
+
+**MORAL ASSESSMENT:**
+```
+Good:   {"▓" * max(0, 10 - evil_score)}{"░" * evil_score}
+Evil:   {"▓" * evil_score}{"░" * max(0, 10 - evil_score)}
+Score:  {evil_score}/10 (EVIL DEEDS)
+```
+
+**ELARA** turns away, crying:
+
+> *"You saved the kingdom... but **AT ANY COST**. Too many innocents died by your choices. I cannot reward you."*
+
+**SENTENCE:**
+
+• **LIFETIME EXILE** from kingdom
+• Banned from all cities
+• Your name **ERASED** from chronicles
+• Reward: **0 gold**
+• Title: *"Murderous Savior"*
+
+**PEOPLE** throw stones as you leave the gate.
+
+```asciidoc
+═══════════════════════════════════
+  EXPULSION - HOUR 13:00
+       (MAY NEVER RETURN)
+═══════════════════════════════════
+```
+
+**1 YEAR LATER:**
+
+You wander alone through wild lands.
+
+Every night **GHOSTS OF THE SLAIN** haunt your dreams.
+
+Villages close doors at your sight. Your face on posters "WANTED - DON'T KILL, JUST EXILE".
+
+**PYRAXIS VOICE** (if alive): *"See, mortal? **ACTIONS HAVE CONSEQUENCES**. Power without wisdom = destruction."*
+
+**ENDING: TRAGIC - "Lonely Exile"**
+
+❌ **CONSEQUENCES:**
+- No Gate 2 access
+- All reputations: -100
+- Title: "Exiled Savior"
+- Achievement: "Fall from Grace"
+
+**REDEMPTION POSSIBILITY:**
+_(Additional side-quest campaign: "Road to Redemption" - 20 good missions)_
+"""
+    
+    choices = [
+        {"text": "💔 Zaakceptuj wygnanie" if lang == "pl" else "💔 Accept exile",
+         "next": "g1_exile_life"},
+        {"text": "🔥 Rozpocznij Drogę Odkupienia" if lang == "pl" else "🔥 Start Redemption Path",
+         "next": "g1_redemption_quest_001"}
+    ]
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "tragic_exile",
+        "outcome": "exiled"
+    }
+
+
+def get_ending_timeloop(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Zakończenie: Pętla czasu - utknięcie w nieskończonym cyklu"""
+    
+    if lang == "pl":
+        text = f"""╔═══════════════════════════════════════╗
+║  ⏰ PĘTLA CZASU - KONIEC...?  ⏰     ║
+╚═══════════════════════════════════════╝
+
+Rozłam **NIE ZAMYKA SIĘ**.
+
+Ale też **NIE OTWIERA SIĘ** bardziej.
+
+Coś poszło **STRASZNIE ŹLE**.
+
+**CZAS ZATRZYMUJE SIĘ**.
+
+Wszystko **ZAMRAŻA** w miejscu - ludzie, ptaki, chmury.
+
+Tylko **TY** możesz się poruszać.
+
+```asciidoc
+⏰ ANOMALIA CZASOWA WYKRYTA ⏰
+   LOADING... ERROR... RESET...
+```
+
+**GŁOS Z ROZŁAMU** (mechaniczny, nie-ludzki):
+
+> *"BŁĄD PARADOKSU WYKRYTY. PRZYWRACANIE PUNKTU ZAPISU. 3... 2... 1..."*
+
+**BŁYSK ŚWIATŁA.**
+
+---
+
+Budzisz się przed **BRAMĄ GATE 1**.
+
+To samo intro. Ta sama data.
+
+**DÉJÀ VU.**
+
+Wszystko dokładnie tak samo jak **PIERWSZY RAZ**.
+
+**PRÓBUJESZ INACZEJ:**
+
+• Mówisz inaczej - Ser Markus odpowiada **DOKŁADNIE TAK SAMO**
+• Idziesz inną drogą - **WYNIK IDENTYCZNY**
+• Atakujesz wcześniej - **CZAS RESETUJE ZNOWU**
+
+```asciidoc
+═══════════════════════════════
+  PĘTLA #1    ✓ UKOŃCZONA
+  PĘTLA #2    ✓ UKOŃCZONA  
+  PĘTLA #3    ✓ UKOŃCZONA
+  PĘTLA #4    ✓ UKOŃCZONA
+  ...
+  PĘTLA #477  ◄ AKTYWNA
+═══════════════════════════════
+```
+
+**PĘTLA #477:**
+
+{player.character.name}, wiesz już **KAŻDE SŁOWO** każdej osoby.
+
+Przewidujesz każdy atak. Znasz każdą pułapkę.
+
+Ale **NIE MOŻESZ UCIEC**.
+
+**SER MARKUS** (po raz 477.): *"Witaj wędrowcze. Kim jesteś?"*
+
+**TY** (szalony śmiech): *"Nazywam się {player.character.name}. Jestem **UWIĘZIONY W PĘTLI CZASU**. Czy to pyta się już **477. RAZ**?"*
+
+**SER MARKUS**: *"Witaj wędrowcze. Kim jesteś?"* [identyczna intonacja]
+
+```asciidoc
+🔄 SYSTEM STUCK IN LOOP 🔄
+>> CANNOT BREAK CYCLE
+>> REASON: PARADOX UNRESOLVED
+>> SOLUTION: UNKNOWN
+```
+
+**PRAWDA:**
+
+Pewnego wyboru **POPEŁNIŁEŚ PARADOKS CZASOWY**.
+
+Może zapisałeś kogoś, kto powinien zginąć?
+Może zabiłeś kogoś, kto musiał żyć?
+
+**ROZŁAM** nie może się domknąć, bo **PRZYCZYNOWOŚĆ JEST ZŁAMANA**.
+
+**ZAKOŃCZENIE: HORROR - "Wieczna Pętla"**
+
+⏰ **STAN:**
+- Uwięziony w pętli czasowej Gate 1
+- Loop count: ∞
+- Świadomość: ZACHOWANA (najgorsze)
+- Możliwość ucieczki: 0.001%
+
+**OPCJE:**
+
+1. **ZAAKCEPTUJ PĘTLĘ** - żyj w nieskończonej repetycji
+2. **SZUKAJ ROZWIĄZANIA** - eksperymentuj z każdym wyborem (może po 10,000 pętlach znajdziesz wyjście?)
+3. **ZATRAC ŚWIADOMOŚĆ** - pozwól umysłowi upaść, zapomnij, zresetuj pamięć
+
+*Najbardziej przerażające zakończenie - gorsz niż śmierć.*
+"""
+    else:  # EN
+        text = f"""╔════════════════════════════════════╗
+║  ⏰ TIME LOOP - THE END...?  ⏰   ║
+╚════════════════════════════════════╝
+
+The Rift **DOESN'T CLOSE**.
+
+But it **DOESN'T EXPAND** further either.
+
+Something went **TERRIBLY WRONG**.
+
+**TIME STOPS**.
+
+Everything **FREEZES** in place - people, birds, clouds.
+
+Only **YOU** can move.
+
+```asciidoc
+⏰ TIME ANOMALY DETECTED ⏰
+   LOADING... ERROR... RESET...
+```
+
+**VOICE FROM RIFT** (mechanical, inhuman):
+
+> *"PARADOX ERROR DETECTED. RESTORING SAVE POINT. 3... 2... 1..."*
+
+**FLASH OF LIGHT.**
+
+---
+
+You wake up at **GATE 1 ENTRANCE**.
+
+Same intro. Same date.
+
+**DÉJÀ VU.**
+
+Everything exactly like the **FIRST TIME**.
+
+**YOU TRY DIFFERENTLY:**
+
+• Speak differently - Ser Markus responds **EXACTLY THE SAME**
+• Take different path - **IDENTICAL RESULT**
+• Attack earlier - **TIME RESETS AGAIN**
+
+```asciidoc
+═══════════════════════════════
+  LOOP #1    ✓ COMPLETED
+  LOOP #2    ✓ COMPLETED  
+  LOOP #3    ✓ COMPLETED
+  LOOP #4    ✓ COMPLETED
+  ...
+  LOOP #477  ◄ ACTIVE
+═══════════════════════════════
+```
+
+**LOOP #477:**
+
+{player.character.name}, you know **EVERY WORD** of every person.
+
+You predict every attack. Know every trap.
+
+But **YOU CANNOT ESCAPE**.
+
+**SER MARKUS** (477th time): *"Greetings traveler. Who are you?"*
+
+**YOU** (mad laughter): *"My name is {player.character.name}. I am **TRAPPED IN TIME LOOP**. Is this the **477TH TIME** you ask?"*
+
+**SER MARKUS**: *"Greetings traveler. Who are you?"* [identical intonation]
+
+```asciidoc
+🔄 SYSTEM STUCK IN LOOP 🔄
+>> CANNOT BREAK CYCLE
+>> REASON: PARADOX UNRESOLVED
+>> SOLUTION: UNKNOWN
+```
+
+**TRUTH:**
+
+At some choice you **CREATED TIME PARADOX**.
+
+Maybe saved someone who should have died?
+Maybe killed someone who had to live?
+
+**RIFT** cannot close because **CAUSALITY IS BROKEN**.
+
+**ENDING: HORROR - "Eternal Loop"**
+
+⏰ **STATUS:**
+- Trapped in Gate 1 time loop
+- Loop count: ∞
+- Consciousness: PRESERVED (worst part)
+- Escape chance: 0.001%
+
+**OPTIONS:**
+
+1. **ACCEPT LOOP** - live in infinite repetition
+2. **SEARCH SOLUTION** - experiment with every choice (maybe after 10,000 loops find exit?)
+3. **LOSE CONSCIOUSNESS** - let mind fall, forget, reset memory
+
+*Most terrifying ending - worse than death.*
+"""
+    
+    choices = [
+        {"text": "😱 KONTYNUUJ SZUKANIE" if lang == "pl" else "😱 KEEP SEARCHING",
+         "next": "g1_main_001",
+         "effects": {"loop_count": (state.quest_flags.get("loop_count", 0) + 1)}},
+        {"text": "🧠 ZATRAĆ PAMIĘĆ" if lang == "pl" else "🧠 LOSE MEMORY",
+         "next": "g1_mindwipe"},
+        {"text": "🔄 ZRESETUJ KAMPANIĘ" if lang == "pl" else "🔄 RESET CAMPAIGN",
+         "next": "reset_gate1"}
+    ]
+    
+    # Track loop count
+    if "loop_count" not in state.quest_flags:
+        state.quest_flags["loop_count"] = 1
+    else:
+        state.quest_flags["loop_count"] += 1
+    
+    return {
+        "text": text,
+        "choices": choices,
+        "is_ending": True,
+        "ending_type": "horror_timeloop",
+        "outcome": "infinite_loop"
+    }
+
