@@ -477,7 +477,7 @@ async def on_ready():
     
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
-    DEV_ONLY_COMMANDS = []  # Add command names here for dev guild testing
+    DEV_ONLY_COMMANDS = ['dnd']  # Add command names here for dev guild testing
     
     try:
         import os
