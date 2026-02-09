@@ -40,6 +40,9 @@ class Gate1WorldState:
         self.demon_invasion_started = False
         self.dragon_awakening_triggered = False
         
+        # Navigation tracking
+        self.last_scene_id = "g1_main_001"  # Track last valid scene for back button
+        
         # Quest Progress Flags (unlock system)
         self.quest_flags = {
             "kingdom_quest_started": False,
@@ -61,6 +64,9 @@ class Gate1WorldState:
             "varathul_defeated": False,
             "zariel_defeated": False,
             "villages_saved": 0,  # counter
+            "villages_destroyed": 0,  # counter
+            "princess_dead": False,
+            "priests_killed": False,
             "moral_alignment": "neutral",  # "good", "neutral", "evil"
         }
         
@@ -84,6 +90,8 @@ class Gate1WorldState:
             "king_assassination_happened": self.king_assassination_happened,
             "demon_invasion_started": self.demon_invasion_started,
             "dragon_awakening_triggered": self.dragon_awakening_triggered,
+            "last_scene_id": self.last_scene_id,
+            "quest_flags": self.quest_flags,
         }
     
     @classmethod
@@ -161,6 +169,10 @@ def get_gate1_scene(scene_id: str, lang: str, world_state: Gate1WorldState, play
     g1_branch_X_Y - rozgałęzienia
     g1_end_X - zakończenia
     """
+    
+    # Track last valid scene for navigation
+    if not scene_id.startswith(("save_and_exit", "reset_gate1", "gate_2_transition")):
+        world_state.last_scene_id = scene_id
     
     # ==================== INTRO SCENES ====================
     
@@ -242,12 +254,51 @@ def get_gate1_scene(scene_id: str, lang: str, world_state: Gate1WorldState, play
     elif scene_id == "g1_main_020":
         return get_scene_020_dragon_pact(lang, world_state, player_data)
     
+    elif scene_id == "g1_main_021":
+        return get_scene_021_dragon_alliance(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_022":
+        return get_scene_022_dragon_rift_assault(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_023":
+        return get_scene_023_dragon_sacrifice_demand(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_024":
+        return get_scene_024_dragon_truth_revealed(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_025":
+        return get_scene_025_dragon_final_choice(lang, world_state, player_data)
+    
     # WĄTEK C: REBELIA (026-035)
     elif scene_id == "g1_main_026":
         return get_scene_026_forest_rebels(lang, world_state, player_data)
     
     elif scene_id == "g1_main_027":
         return get_scene_027_rebellion_truth(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_028":
+        return get_scene_028_moral_crisis(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_029":
+        return get_scene_029_rebellion_war(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_030":
+        return get_scene_030_capital_battle(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_031":
+        return get_scene_031_rebellion_leader_fate(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_032":
+        return get_scene_032_demon_funding_reveal(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_033":
+        return get_scene_033_faction_unification(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_034":
+        return get_scene_034_blood_bridge_battle(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_035":
+        return get_scene_035_new_order(lang, world_state, player_data)
     
     # WĄTEK D: ARTEFAKTY (036-045)
     elif scene_id == "g1_main_036":
@@ -258,6 +309,27 @@ def get_gate1_scene(scene_id: str, lang: str, world_state: Gate1WorldState, play
     
     elif scene_id == "g1_main_038":
         return get_scene_038_shield_artifact(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_039":
+        return get_scene_039_crown_artifact(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_040":
+        return get_scene_040_book_artifact(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_041":
+        return get_scene_041_heart_artifact(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_042":
+        return get_scene_042_artifact_fusion(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_043":
+        return get_scene_043_artifact_corruption(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_044":
+        return get_scene_044_mind_battle(lang, world_state, player_data)
+    
+    elif scene_id == "g1_main_045":
+        return get_scene_045_ultimate_weapon(lang, world_state, player_data)
     
     # WĄTEK E: MROCZNA ŚCIEŻKA (046-050)
     elif scene_id == "g1_main_046":
@@ -284,6 +356,60 @@ def get_gate1_scene(scene_id: str, lang: str, world_state: Gate1WorldState, play
     
     elif scene_id == "g1_branch_help_villagers":
         return get_branch_help_villagers(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_forest_escape":
+        return get_branch_forest_escape(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_join_bandits":
+        return get_branch_join_bandits(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_werewolf_encounter":
+        return get_branch_werewolf_encounter(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_werewolf_pact":
+        return get_branch_werewolf_pact(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_bandit_camp":
+        return get_branch_bandit_camp(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_bandit_negotiation":
+        return get_branch_bandit_negotiation(lang, world_state, player_data)
+    
+    # Combat branches
+    elif scene_id == "g1_branch_fight_guards":
+        return get_branch_fight_guards(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_escape_fortress":
+        return get_branch_escape_fortress(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_grovel":
+        return get_branch_grovel(lang, world_state, player_data)
+    
+    # Dragon branches
+    elif scene_id == "g1_branch_dragon_sacrifice":
+        return get_branch_dragon_sacrifice(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_village_sacrifice":
+        return get_branch_village_sacrifice(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_dragon_betrayal":
+        return get_branch_dragon_betrayal(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_kill_dragon":
+        return get_branch_kill_dragon(lang, world_state, player_data)
+    
+    # Rebellion branches
+    elif scene_id == "g1_branch_demon_negotiation":
+        return get_branch_demon_negotiation(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_palace_defense":
+        return get_branch_palace_defense(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_fight_rebels":
+        return get_branch_fight_rebels(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_rear_guard":
+        return get_branch_rear_guard(lang, world_state, player_data)
     
     # ==================== ENDINGS ====================
     
@@ -317,7 +443,62 @@ def get_gate1_scene(scene_id: str, lang: str, world_state: Gate1WorldState, play
     elif scene_id == "g1_end_timeloop":
         return get_ending_timeloop(lang, world_state, player_data)
     
-    return None
+    # ==================== FALLBACK - UNIMPLEMENTED SCENES ====================
+    else:
+        # Scena nie jest jeszcze zaimplementowana
+        if lang == "pl":
+            text = f"""⚠️ **SCENA W BUDOWIE** ⚠️
+
+Przepraszamy! Ta ścieżka fabularną (`{scene_id}`) **nie jest jeszcze gotowa**.
+
+System jest nadal w rozwoju - ta scena zostanie dodana wkrótce.
+
+**Co możesz zrobić:**
+• Wróć do poprzedniej sceny i wybierz inną opcję
+• Zapisz grę i wróć później
+• Zgłoś ten błąd jeśli pojawił się nieoczekiwanie
+
+**Informacja dla gracza:**
+To jest wersja BETA systemu Infinity Adventure.
+Obecnie dostępne są główne wątki Kingdom, Dragon, Rebellion, Artifacts i Dark Path.
+
+_Dziękujemy za cierpliwość!_
+"""
+        else:
+            text = f"""⚠️ **SCENE UNDER CONSTRUCTION** ⚠️
+
+Sorry! This story path (`{scene_id}`) **is not ready yet**.
+
+The system is still in development - this scene will be added soon.
+
+**What you can do:**
+• Go back to previous scene and choose another option
+• Save your game and return later
+• Report this bug if it appeared unexpectedly
+
+**Player Info:**
+This is BETA version of Infinity Adventure system.
+Currently available are main threads: Kingdom, Dragon, Rebellion, Artifacts and Dark Path.
+
+_Thank you for your patience!_
+"""
+        
+        choices = [
+            {"text": "⬅️ Wróć" if lang == "pl" else "⬅️ Go Back",
+             "next_scene": world_state.last_scene_id or "g1_main_001",
+             "effects": {}},
+            {"text": "💾 Zapisz i wyjdź" if lang == "pl" else "💾 Save & Exit",
+             "next_scene": None,
+             "end_session": True}
+        ]
+        
+        return {
+            "title": "⚠️ Scena w budowie" if lang == "pl" else "⚠️ Scene Under Construction",
+            "text": text,
+            "choices": choices,
+            "is_placeholder": True
+        }
+
 
 
 # ==================== INTRO SCENES (5) ====================
@@ -2210,6 +2391,416 @@ He throws you from cavern. Without dragon's help."""
     return {"title": title, "text": text, "choices": choices, "location": "dragon_lair"}
 
 
+def get_scene_021_dragon_alliance(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 021: Sojusz ze smokiem - przygotowania"""
+    if lang == "pl":
+        title = "🤝 Pakt Zawarty"
+        text = f"""Pyraxis kładzie łapę na twoją głowę. **Czujesz MOC ognia i żelaza przepływającą przez ciebie.**
+
+**"Pakt ZAWARTY. Odczuwamy teraz siebie nawzajem. Wezwij mnie, a przyjdę."**
+
+Daje ci **ROGOWY RÓG SMOCZY**:
+
+📯 **Kły Pyraxisa** (artifact)
+→ Dmuchnij 3x by wezwać smoka
+→ Działa raz na tydzień
+→ Smok przybędzie w 10 minut
+
+**"Teraz czas na WAR. Prowadź mnie do Rozłamu. Spalę każdego demona."**
+
+Pyraxis rozpina skrzydła. Gotów do lotu.
+
+Wsiadasz na jego grzbiet. **CZUJESZ MROĆ W SERCU.**"""
+        
+        choices = [
+            {"text": "🚀 'Lecimy do Rozłamu!' - natychmiastowy atak", "next_scene": "g1_main_022"},
+            {"text": "⏸️ 'Najpierw plan' - wróć do stolicy", "next_scene": "g1_main_013"},
+            {"text": "📜 'Potrzebuję więcej mocy' - zbieraj artefakty", "next_scene": "g1_main_036"}
+        ]
+    else:
+        title = "🤝 Pact Sealed"
+        text = f"""Pyraxis places claw on your head. **You feel POWER of fire and iron flowing through you.**
+
+**"Pact SEALED. We now sense each other. Call me, and I'll come."**
+
+Gives you **DRAGON HORN**:
+
+📯 **Pyraxis's Fangs** (artifact)
+→ Blow 3x to summon dragon
+→ Works once per week
+→ Dragon arrives in 10 minutes
+
+**"Now time for WAR. Lead me to Rift. I'll burn every demon."**
+
+Pyraxis spreads wings. Ready to fly.
+
+You mount his back. **FEEL POWER IN HEART.**"""
+        
+        choices = [
+            {"text": "🚀 'Let's fly to Rift!' - immediate attack", "next_scene": "g1_main_022"},
+            {"text": "⏸️ 'First plan' - return to capital", "next_scene": "g1_main_013"},
+            {"text": "📜 'I need more power' - collect artifacts", "next_scene": "g1_main_036"}
+        ]
+    
+    state.quest_flags["dragon_ally_confirmed"] = True
+    player.currency -= 1000  # First tribute payment
+    
+    return {"title": title, "text": text, "choices": choices, "location": "dragon_back", "epic": True}
+
+
+def get_scene_022_dragon_rift_assault(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 022: Atak smoka na Rozłam"""
+    if lang == "pl":
+        title = "🔥 Furia Smoka"
+        text = """**LOT** trwa godzinę. Góry, lasy, jeziora przelatują pod tobą.
+
+Wreszcie - **ROZŁAM.**
+
+Portal 100 metrów średnicy. **FIOLETOWA ENERGIA** wybucha jak gejzer.
+
+Demony wylewają się jak mrówki - setki, tysiące.
+
+Pyraxis ***RY***:
+
+**"POPATRZ NA TO. Oni SKALALI mój świat."**
+
+Nurkuje w dół. **Otwiera paszczę:**
+
+```asciidoc
+🔥🔥🔥 SMOCZE TCHNIENIE 🔥🔥🔥
+```
+
+**CAŁA RÓWNINA WYBUCHA W PŁOMIENIACH.**
+
+50+ demonów spłonęło w sekundę!!
+
+Ale... **Z ROZŁAMU WYŁANIA SIĘ COŚCIĘ WIĘKSZEGO.**
+
+**ARCHIDEMON** - 30 stóp wysokości. Rogi jak lance. Skóra z magmy.
+
+**"SMOKU... TY ZDRADZIŁEŚ NASZĄ SPRAWĘ..."**
+
+Pyraxis zawisa, zaskoczony:
+
+**"Naszą sprawę? O czym mówisz?!"**
+
+**ARCHIDEMON:** *"Ty otworzyłeś Rozłam 1000 lat temu. BYLIŚMY SOJUSZNIKAMI. A teraz nas ATAKUJESZ?!"*
+
+❓ **CZY TO PRAWDA?**"""
+        
+        choices = [
+            {"text": "😨 'Pyraxis... czy to prawda?!'", "next_scene": "g1_main_024"},
+            {"text": "⚔️ 'KŁAMIE! Atakuj go!' - zignoruj", "next_scene": "g1_main_023"},
+            {"text": "🤝 'Negocjuj - może da się to rozwiązać'", "next_scene": "g1_branch_demon_negotiation"},
+            {"text": "🏃 'Uciekajmy - to pułapka!'", "next_scene": "g1_main_013"}
+        ]
+    else:
+        title = "🔥 Dragon's Fury"
+        text = """**FLIGHT** takes an hour. Mountains, forests, lakes fly beneath you.
+
+Finally - **THE RIFT.**
+
+Portal 100 meters diameter. **VIOLET ENERGY** erupts like geyser.
+
+Demons pour out like ants - hundreds, thousands.
+
+Pyraxis **ROARS**:
+
+**"LOOK AT THIS. They DEFILED my world."**
+
+Dives down. **Opens maw:**
+
+```asciidoc
+🔥🔥🔥 DRAGON BREATH 🔥🔥🔥
+```
+
+**ENTIRE PLAIN EXPLODES IN FLAMES.**
+
+50+ demons burned in a second!!
+
+But... **SOMETHING BIGGER EMERGES FROM RIFT.**
+
+**ARCHDEMON** - 30 feet tall. Horns like lances. Skin of magma.
+
+**"DRAGON... YOU BETRAYED OUR CAUSE..."**
+
+Pyraxis hovers, surprised:
+
+**"Our cause? What are you talking about?!"**
+
+**ARCHDEMON:** *"YOU opened Rift 1000 years ago. WE WERE ALLIES. And now you ATTACK us?!"*
+
+❓ **IS THIS TRUE?**"""
+        
+        choices = [
+            {"text": "😨 'Pyraxis... is this true?!'", "next_scene": "g1_main_024"},
+            {"text": "⚔️ 'HE LIES! Attack him!' - ignore", "next_scene": "g1_main_023"},
+            {"text": "🤝 'Negotiate - maybe we can solve this'", "next_scene": "g1_branch_demon_negotiation"},
+            {"text": "🏃 'Let's escape - this is trap!'", "next_scene": "g1_main_013"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "rift_battlefield", "combat": True}
+
+
+def get_scene_023_dragon_sacrifice_demand(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 023: Pyraxis żąda ofiary"""
+    if lang == "pl":
+        title = "💀 Cena Mocy"
+        text = """Pyraxis ignoruje archdemona i **SPALA GO TRCHNIENIEM**.
+
+Archidemon krzyczy i rozpada się w popiół.
+
+Ale Rozłam **NIE ZAMYKA SIĘ**. Wręcz przeciwnie - **PULSUJE MOCNIEJ**.
+
+Pyraxis ląduje. Patrzy na portal.
+
+**"Rozumiem teraz. Zamknąć Rozłam... wymaga ŻYCIA."**
+
+Patrzy na ciebie.
+
+**"Ktoś musi wejść do Rozłamu i ZATOPIĆ się w jego sercu. Życie za życie. Energia za energię."**
+
+**"Ja mogę to zrobić. Ale... są inne opcje."**
+
+Wskazuje na wioskę w oddali.
+
+**"100 śmiertelnych. Ich życia wystarczą."**
+
+Albo wskazuje na ciebie.
+
+**"Albo TY. Jeden wybraniec. Twoja moc jest silna - może wystarczyć."**
+
+**"Wybierz. Kto umiera?"**"""
+        
+        choices = [
+            {"text": "🐉 'Ty powinieneś się poświęcić'", "next_scene": "g1_branch_dragon_sacrifice"},
+            {"text": "😭 'Zabierz wioskę' - poświęć cywilów", "next_scene": "g1_branch_village_sacrifice",
+             "effects": {"alignment": "evil", "villages_destroyed": 1}},
+            {"text": "💔 'Ja pójdę' - poświęć siebie", "next_scene": "g1_end_sacrifice"},
+            {"text": "⚡ 'NIE! Musi być inny sposób!'", "next_scene": "g1_main_024"}
+        ]
+    else:
+        title = "💀 Price of Power"
+        text = """Pyraxis ignores archdemon and **BURNS HIM WITH BREATH**.
+
+Archdemon screams and crumbles to ash.
+
+But Rift **DOESN'T CLOSE**. On contrary - **PULSES STRONGER**.
+
+Pyraxis lands. Looks at portal.
+
+**"I understand now. To close Rift... requires LIFE."**
+
+Looks at you.
+
+**"Someone must enter Rift and DROWN in its heart. Life for life. Energy for energy."**
+
+**"I can do it. But... there are other options."**
+
+Points at village in distance.
+
+**"100 mortals. Their lives will suffice."**
+
+Or points at you.
+
+**"Or YOU. One chosen one. Your power is strong - might be enough."**
+
+**"Choose. Who dies?"**"""
+        
+        choices = [
+            {"text": "🐉 'You should sacrifice yourself'", "next_scene": "g1_branch_dragon_sacrifice"},
+            {"text": "😭 'Take the village' - sacrifice civilians", "next_scene": "g1_branch_village_sacrifice",
+             "effects": {"alignment": "evil", "villages_destroyed": 1}},
+            {"text": "💔 'I'll go' - sacrifice yourself", "next_scene": "g1_end_sacrifice"},
+            {"text": "⚡ 'NO! There must be another way!'", "next_scene": "g1_main_024"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "rift_edge", "critical": True}
+
+
+def get_scene_024_dragon_truth_revealed(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 024: Prawda o smokach i Rozłamie"""
+    if lang == "pl":
+        title = "📜 Grzech Smoków"
+        text = """Pyraxis opuszcza głowę. Milczy długo.
+
+Wreszcie mówi:
+
+**"Prawda jest... skomplikowana."**
+
+**"1000 lat temu... moja rasa - SMOKI - była POTĘŻNA. Władaliśmy tym światem."**
+
+**"Ale byliśmy... ZNUDZENI. Chcieliśmy więcej. Więcej mocy. Więcej wyzwań."**
+
+**"Więc... otworzyliśmy portal do OTCHŁANI. Chcieliśmy walczyć z demonami. Udowodnić naszą siłę."**
+
+Patrzy na ciebie. Oczy pełne żalu.
+
+**"To BYŁ BŁĄD. Demony były zbyt silne. Za dużo ich. Zabiły większość moich braci."**
+
+**"Ja... ZAPIECZĘTOWAŁEM Rozłam wtedy. Zapłaciłem ceną - 900 lat snu."**
+
+**"A teraz... ktoś go OTWORZYŁ ponownie. I oskarżają MNIE."**
+
+**"Może mają rację. To MOJA wina od początku."**
+
+Łzy spływają po jego łuskach.
+
+**"Przepraszam, śmiertelniku. Wciągnąłem cię w mój grzech."**"""
+        
+        choices = [
+            {"text": "🤝 'Razem to naprawimy' - przebacz", "next_scene": "g1_main_025"},
+            {"text": "😠 'ZDRADZIŁŚ MNIE!' - zerwij pakt", "next_scene": "g1_branch_dragon_betrayal"},
+            {"text": "⚖️ 'Musisz ponieść konsekwencje'", "next_scene": "g1_main_025"},
+            {"text": "🗡️ 'Zabije cię za to!' - atak", "next_scene": "g1_branch_kill_dragon"}
+        ]
+    else:
+        title = "📜 Dragons' Sin"
+        text = """Pyraxis lowers head. Silent for long time.
+
+Finally speaks:
+
+**"Truth is... complicated."**
+
+**"1000 years ago... my race - DRAGONS - was POWERFUL. We ruled this world."**
+
+**"But we were... BORED. Wanted more. More power. More challenges."**
+
+**"So... we opened portal to ABYSS. Wanted to fight demons. Prove our strength."**
+
+Looks at you. Eyes full of regret.
+
+**"It WAS MISTAKE. Demons were too strong. Too many. Killed most of my siblings."**
+
+**"I... SEALED the Rift then. Paid price - 900 years sleep."**
+
+**"And now... someone OPENED it again. And they blame ME."**
+
+**"Maybe they're right. It's MY fault from beginning."**
+
+Tears flow down his scales.
+
+**"I'm sorry, mortal. I dragged you into my sin."**"""
+        
+        choices = [
+            {"text": "🤝 'We'll fix this together' - forgive", "next_scene": "g1_main_025"},
+            {"text": "😠 'YOU BETRAYED ME!' - break pact", "next_scene": "g1_branch_dragon_betrayal"},
+            {"text": "⚖️ 'You must face consequences'", "next_scene": "g1_main_025"},
+            {"text": "🗡️ 'I'll kill you for this!' - attack", "next_scene": "g1_branch_kill_dragon"}
+        ]
+    
+    state.dragon_awakening_triggered = True
+    state.quest_flags["dragon_truth_known"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "rift_edge", "emotional": True}
+
+
+def get_scene_025_dragon_final_choice(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 025: Finałowy wybór ze smokiem"""
+    dragon_forgiven = not state.quest_flags.get("dragon_betrayed", False)
+    
+    if lang == "pl":
+        title = "⚔️ Ostatnia Decyzja" if dragon_forgiven else "💔 Punkt Zwrotny"
+        
+        if dragon_forgiven:
+            text = """Pyraxis unosi głowę. Determinacja w oczach.
+
+**"Dziękuję. Za zaufanie. Za... przebaczenie."**
+
+**"Wiem co muszę zrobić."**
+
+Rozpina skrzydła szeroko.
+
+**"Jest sposób zamknąć Rozłam bez ofiary. Ale wymaga... FUZJI."**
+
+**"Moja moc + twoja dusza = JEDNO."**
+
+**"Stajesz się pół-smokiem. Pół-człowiekiem."**
+
+**"Razem mamy dość mocy by zapieczętować Rozłam NA ZAWSZE."**
+
+**"Ale... nie wrócisz już do normalności. Na zawsze zmieniony."**
+
+**"Zgadzasz się?"**"""
+            
+            choices = [
+                {"text": "🐉🤝 'TAK' - fuzja ze smokiem", "next_scene": "g1_end_dragon_merge"},
+                {"text": "💪 'Sam to zrobię' - użyj mocy bez fuzji", "next_scene": "g1_main_014"},
+                {"text": "👥 'Znajdźmy armię' - wróć po wsparcie", "next_scene": "g1_main_013"},
+                {"text": "💀 'Użyjmy ofiary' - wróć do planu B", "next_scene": "g1_main_023"}
+            ]
+        else:
+            text = """Pyraxis cofa się. Smutny ale akceptujący.
+
+**"Rozumiem. Zaufanie złamane... nie da sę odbudować łatwo."**
+
+**"Idź. Zamknij Rozłam po swojemu."**
+
+**"Jeśli kiedykolwiek... potrzebujesz pomocy... wiesz gdzie mnie znaleźć."**
+
+Odlatuje w góry. Sam.
+
+Ty zostałeś z Rozłamem. SAM."""
+            
+            choices = [
+                {"text": "💪 'Zrobię to sam' - finałowa misja", "next_scene": "g1_main_014"},
+                {"text": "🤝 'CZEKAJ! Wybaczam!' - zawołaj go z powrotem", "next_scene": "g1_main_025",
+                 "effects": {"dragon_forgiven": True}},
+                {"text": "⚔️ 'Lepiej bez ciebie' - kontynuuj solo", "next_scene": "g1_main_013"}
+            ]
+    else:
+        title = "⚔️ Final Choice" if dragon_forgiven else "💔 Turning Point"
+        
+        if dragon_forgiven:
+            text = """Pyraxis raises head. Determination in eyes.
+
+**"Thank you. For trust. For... forgiveness."**
+
+**"I know what I must do."**
+
+Spreads wings wide.
+
+**"There's way to close Rift without sacrifice. But requires... FUSION."**
+
+**"My power + your soul = ONE."**
+
+**"You become half-dragon. Half-human."**
+
+**"Together we have enough power to seal Rift FOREVER."**
+
+**"But... you won't return to normal. Forever changed."**
+
+**"Do you agree?"**"""
+            
+            choices = [
+                {"text": "🐉🤝 'YES' - fusion with dragon", "next_scene": "g1_end_dragon_merge"},
+                {"text": "💪 'I'll do it myself' - use power without fusion", "next_scene": "g1_main_014"},
+                {"text": "👥 'Let's find army' - return for support", "next_scene": "g1_main_013"},
+                {"text": "💀 'Use sacrifice' - return to plan B", "next_scene": "g1_main_023"}
+            ]
+        else:
+            text = """Pyraxis backs away. Sad but accepting.
+
+**"I understand. Broken trust... cannot be rebuilt easily."**
+
+**"Go. Close Rift your way."**
+
+**"If you ever... need help... you know where to find me."**
+
+Flies away to mountains. Alone.
+
+You're left with Rift. ALONE."""
+            
+            choices = [
+                {"text": "💪 'I'll do it myself' - final mission", "next_scene": "g1_main_014"},
+                {"text": "🤝 'WAIT! I forgive!' - call him back", "next_scene": "g1_main_025",
+                 "effects": {"dragon_forgiven": True}},
+                {"text": "⚔️ 'Better without you' - continue solo", "next_scene": "g1_main_013"}
+            ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "rift_battlefield", "finale": True}
+
+
 # ==================== WĄTEK C: REBELIA (026-035) ====================
 
 def get_scene_026_forest_rebels(lang: str, state: Gate1WorldState, player) -> Dict:
@@ -2233,11 +2824,11 @@ Otaczają cię zamaskowani łucznicy.
 **"Dołącz do nas. Razem obalimy tron. Stwwórzymy RZECZPOSPOLITĄ."**"""
         
         choices = [
-            {"text": "🤝 'Opowiedz mi więcej...'", "next": "g1_main_027"},
-            {"text": "⚔️ 'Jesteście zdrajcami!' - ATAK", "next": "g1_branch_fight_rebels",
+            {"text": "🤝 'Opowiedz mi więcej...'", "next_scene": "g1_main_027"},
+            {"text": "⚔️ 'Jesteście zdrajcami!' - ATAK", "next_scene": "g1_branch_fight_rebels",
              "effects": {"rebellion_hostile": True}},
-            {"text": "🤔 'Udowodnij że król był tyranem'", "next": "g1_main_027"},
-            {"text": "🏃 'Puszczajcie mnie' - odejdź", "next": "g1_main_002"}
+            {"text": "🤔 'Udowodnij że król był tyranem'", "next_scene": "g1_main_027"},
+            {"text": "🏃 'Puszczajcie mnie' - odejdź", "next_scene": "g1_main_002"}
         ]
     else:
         title = "🏹 Forest Shadows"
@@ -2258,11 +2849,11 @@ She removes mask. Young, eyes burning with determination.
 **"Join us. Together we'll overthrow throne. Create REPUBLIC."**"""
         
         choices = [
-            {"text": "🤝 'Tell me more...'", "next": "g1_main_027"},
-            {"text": "⚔️ 'You are traitors!' - ATTACK", "next": "g1_branch_fight_rebels",
+            {"text": "🤝 'Tell me more...'", "next_scene": "g1_main_027"},
+            {"text": "⚔️ 'You are traitors!' - ATTACK", "next_scene": "g1_branch_fight_rebels",
              "effects": {"rebellion_hostile": True}},
-            {"text": "🤔 'Prove king was tyrant'", "next": "g1_main_027"},
-            {"text": "🏃 'Let me go' - leave", "next": "g1_main_002"}
+            {"text": "🤔 'Prove king was tyrant'", "next_scene": "g1_main_027"},
+            {"text": "🏃 'Let me go' - leave", "next_scene": "g1_main_002"}
         ]
     
     state.rebellion_leader_known = True
@@ -2290,12 +2881,12 @@ Jeden dokument cię uderza - **DEMON PAKT.**
 {'Jeśli to prawda... twoja walka była kłamstwem...' if state.quest_flags.get("lightbringer_obtained") else 'To brzmi niewiarygodnie...'}"""
         
         choices = [
-            {"text": "😨 'To PRAWDA?! Król był zły?!'", "next": "g1_main_028",
+            {"text": "😨 'To PRAWDA?! Król był zły?!'", "next_scene": "g1_main_028",
              "effects": {"moral_crisis": True}},
-            {"text": "❌ 'To FAŁSZYWKI! Propaganda!'", "next": "g1_branch_fight_rebels"},
-            {"text": "🤝 DOŁĄCZ DO REBELII", "next": "g1_main_029",
+            {"text": "❌ 'To FAŁSZYWKI! Propaganda!'", "next_scene": "g1_branch_fight_rebels"},
+            {"text": "🤝 DOŁĄCZ DO REBELII", "next_scene": "g1_main_029",
              "effects": {"rebellion_allied": True, "reputation": -50}},
-            {"text": "⚖️ 'Muszę to zweryfikować...'", "next": "g1_main_028"}
+            {"text": "⚖️ 'Muszę to zweryfikować...'", "next_scene": "g1_main_028"}
         ]
     else:
         title = "📜 Dark Past"
@@ -2314,15 +2905,569 @@ One document strikes you - **DEMON PACT.**
 {'If this is true... your fight was a lie...' if state.quest_flags.get("lightbringer_obtained") else 'This sounds unbelievable...'}"""
         
         choices = [
-            {"text": "😨 'This is TRUE?! King was evil?!'", "next": "g1_main_028",
+            {"text": "😨 'This is TRUE?! King was evil?!'", "next_scene": "g1_main_028",
              "effects": {"moral_crisis": True}},
-            {"text": "❌ 'These are FAKES! Propaganda!'", "next": "g1_branch_fight_rebels"},
-            {"text": "🤝 JOIN REBELLION", "next": "g1_main_029",
+            {"text": "❌ 'These are FAKES! Propaganda!'", "next_scene": "g1_branch_fight_rebels"},
+            {"text": "🤝 JOIN REBELLION", "next_scene": "g1_main_029",
              "effects": {"rebellion_allied": True, "reputation": -50}},
-            {"text": "⚖️ 'I must verify this...'", "next": "g1_main_028"}
+            {"text": "⚖️ 'I must verify this...'", "next_scene": "g1_main_028"}
         ]
     
     return {"title": title, "text": text, "choices": choices, "location": "rebel_command"}
+
+
+def get_scene_028_moral_crisis(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 028: Kryzys moralny - kogo wspierać?"""
+    if lang == "pl":
+        title = "⚖️ Rozbita Lojalność"
+        text = """Wrócasz do stolicy sam. **SERCE ROZDZARTE.**
+
+Z jednej strony - **PAŁAC.** Księżniczka Elara. Służyłeś jej lojalnie.
+
+Z drugiej - **LYRA.** Dokumenty. Może mówią prawdę?
+
+W tawernie spotykasz **STARSZEGO DOWÓDCĘ** - weterana królewskiego.
+
+**"Wiem co myślisz, młody. Prawda jest... skomplikowana. Król NIE BYŁ święty. Zabił wielu. ALE... rebelia też zabija. Może nawet więcej."**
+
+**"Wojna nigdy nie jest czarno-biała. Pytanie - kto PO WAR zbuduje lepszy świat?"**
+
+**"Pałac = Porządek, ale tyrania."**
+**"Rebelia = Wolność, ale chaos."**
+
+**"WYBIERZ STRONĘ. Jutro zaczyna się WOJNA."**"""
+        
+        choices = [
+            {"text": "👑 WYBIERAJ PAŁAC - Wsparcie Elary", "next_scene": "g1_main_013",
+             "effects": {"side_chosen": "crown", "rebellion_hostile": True}},
+            {"text": "🏹 WYBIERZ REBELIĘ - Dołącz do Lyry", "next_scene": "g1_main_029",
+             "effects": {"side_chosen": "rebellion", "palace_hostile": True}},
+            {"text": "⚖️ 'NEUTRALNOŚĆ' - Spróbuj pogodzić", "next_scene": "g1_main_033"},
+            {"text": "🚪 'Idę swoją drogą' - Opusć konflikt", "next_scene": "g1_main_014"}
+        ]
+    else:
+        title = "⚖️ Shattered Loyalty"
+        text = """You return to capital alone. **HEART TORN.**
+
+On one side - **PALACE.** Princess Elara. You served her loyally.
+
+On other - **LYRA.** Documents. Maybe they speak truth?
+
+In tavern you meet **SENIOR COMMANDER** - royal veteran.
+
+**"I know what you think, young one. Truth is... complicated. King WAS NOT saint. Killed many. BUT... rebellion kills too. Maybe even more."**
+
+**"War is never black and white. Question - who AFTER WAR will build better world?"**
+
+**"Palace = Order, but tyranny."**
+**"Rebellion = Freedom, but chaos."**
+
+**"CHOOSE SIDE. Tomorrow WAR begins."**"""
+        
+        choices = [
+            {"text": "👑 CHOOSE PALACE - Support Elara", "next_scene": "g1_main_013",
+             "effects": {"side_chosen": "crown", "rebellion_hostile": True}},
+            {"text": "🏹 CHOOSE REBELLION - Join Lyra", "next_scene": "g1_main_029",
+             "effects": {"side_chosen": "rebellion", "palace_hostile": True}},
+            {"text": "⚖️ 'NEUTRALITY' - Try reconcile", "next_scene": "g1_main_033"},
+            {"text": "🚪 'I go my own way' - Leave conflict", "next_scene": "g1_main_014"}
+        ]
+    
+    state.quest_flags["moral_crisis_resolved"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "tavern", "critical": True}
+
+
+def get_scene_029_rebellion_war(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 029: Wojna rebelii - pierwsze starcie"""
+    if lang == "pl":
+        title = "⚔️ Pierwsze Starcie"
+        text = """**REBELIA ATAKUJE STORMHOLD.**
+
+Lyra prowadzi wojsko 500 rebeliantów. Ty u jej boku.
+
+**TARAN rozbija bramę miejską.**
+
+Strażnicy królewscy sypią strzałami z murów.
+
+**Lyra:** *"Naprzód! Za WOLNOŚĆ! Za PRZYSZŁOŚĆ bez TYRANÓW!"*
+
+Wbiągasz do miasta. **CHAOS.**
+
+Uliczna walka. Żołnierze kontra rebelianci. Cywile uciekają.
+
+Nagle - widzisz **STARUSZKA z dzieckiem** pod gruzami. Płacz.
+
+Ale Lyra krzyczy: **"DALEJ! Do pałacu! NIE zatrzymujemy się!"**
+
+**Żołnierze królewscy** zbliżają się z tyłu - 20 ludzi."""
+        
+        choices = [
+            {"text": "💪 RATUJ cywilów - ignoruj rozkaz", "next_scene": "g1_main_030",
+             "effects": {"civilians_saved": 1, "reputation": 10}},
+            {"text": "⚔️ IDŹ Z LYRĄ - Atak na pałac", "next_scene": "g1_main_030"},
+            {"text": "🛡️ OBROŃ TYŁ - Walcz z 20 żołnierzami", "next_scene": "g1_branch_rear_guard"},
+            {"text": "💥 UŻYJ MAGII - Obal mur (DC 18)", "next_scene": "g1_main_030",
+             "req": {"type": "stat_check", "stat": "intelligence", "dc": 18}}
+        ]
+    else:
+        title = "⚔️ First Clash"
+        text = """**REBELLION ATTACKS STORMHOLD.**
+
+Lyra leads army of 500 rebels. You at her side.
+
+**BATTERING RAM breaks city gate.**
+
+Royal guards rain arrows from walls.
+
+**Lyra:** *"Forward! For FREEDOM! For FUTURE without TYRANTS!"*
+
+You charge into city. **CHAOS.**
+
+Street combat. Soldiers vs rebels. Civilians flee.
+
+Suddenly - you see **OLD MAN with child** under rubble. Crying.
+
+But Lyra shouts: **"ONWARD! To palace! DON'T stop!"**
+
+**Royal soldiers** approaching from behind - 20 men."""
+        
+        choices = [
+            {"text": "💪 SAVE civilians - ignore order", "next_scene": "g1_main_030",
+             "effects": {"civilians_saved": 1, "reputation": 10}},
+            {"text": "⚔️ GO WITH LYRA - Attack palace", "next_scene": "g1_main_030"},
+            {"text": "🛡️ DEFEND REAR - Fight 20 soldiers", "next_scene": "g1_branch_rear_guard"},
+            {"text": "💥 USE MAGIC - Topple wall (DC 18)", "next_scene": "g1_main_030",
+             "req": {"type": "stat_check", "stat": "intelligence", "dc": 18}}
+        ]
+    
+    state.quest_flags["rebellion_war_started"] = True
+    return {"title": title, "text": text, "choices": choices, "location": "city_battle", "combat": True}
+
+
+def get_scene_030_capital_battle(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 030: Ulice stolicy - epickie starcie"""
+    if lang == "pl":
+        title = "🏛️ Bitwa o Pałac"
+        text = """Docierasz do **PLACU KORONACYJNEGO.**
+
+Armia królewska zbudowała BARYKADY. **300 żołnierzy.**
+
+Z drugiej strony - **REBELIA.** 400 walczących.
+
+**Lyra:** *"To tutaj decyduje się przyszłość! SZARŻA!"*
+
+KRWAWA bitwa. Stal brzęczy. Krzyki umierających.
+
+Widzisz księżniczkę **ELARA** na balkonie. **Trzyma BERŁO KRÓLÓW.**
+
+Nagle - **magiczne uderzenie!** Z berła wystrzeliwuje fala światła - zabija 50 rebeliantów!
+
+**Elara:** *"ZDRAJCY! Zniszczyłam demony! URATOWAŁAM was! A wy się BUNTUJECIE?!"*
+
+**Lyra:** *"KŁAMIESZ! Król SAM sprowadził demony! A ty kontynuujesz jego TYRANIĘ!"*
+
+Stojesz między nimi. **Obie patrzą na ciebie.**
+
+**"Kogo wspierasż?!"** - krzyczą jednocześnie."""
+        
+        choices = [
+            {"text": "👑 WSPIERAJ ELARĘ - Broń pałacu", "next_scene": "g1_branch_palace_defense",
+             "effects": {"side_final": "crown"}},
+            {"text": "🏹 WSPIERAJ LYRĘ - Zabij Elarę", "next_scene": "g1_main_031",
+             "effects": {"side_final": "rebellion", "princess_dead": True}},
+            {"text": "⚡ ZATRZYMAJ OBE - Użyj mocy (DC 20)", "next_scene": "g1_main_033",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 20}},
+            {"text": "🏃 'TO SZALEŃSTWO!' - Uciekaj", "next_scene": "g1_main_014"}
+        ]
+    else:
+        title = "🏛️ Battle for Palace"
+        text = """You reach **CORONATION SQUARE.**
+
+Royal army built BARRICADES. **300 soldiers.**
+
+Other side - **REBELLION.** 400 fighters.
+
+**Lyra:** *"This is where future is decided! CHARGE!"*
+
+BLOODY battle. Steel clangs. Screams of dying.
+
+You see princess **ELARA** on balcony. **Holds ROYAL SCEPTER.**
+
+Suddenly - **magic strike!** From scepter shoots wave of light - kills 50 rebels!
+
+**Elara:** *"TRAITORS! I destroyed demons! SAVED you! And you REBEL?!"*
+
+**Lyra:** *"YOU LIE! King HIMSELF brought demons! And you continue his TYRANNY!"*
+
+You stand between them. **Both look at you.**
+
+**"Who do you support?!"** - they shout simultaneously."""
+        
+        choices = [
+            {"text": "👑 SUPPORT ELARA - Defend palace", "next_scene": "g1_branch_palace_defense",
+             "effects": {"side_final": "crown"}},
+            {"text": "🏹 SUPPORT LYRA - Kill Elara", "next_scene": "g1_main_031",
+             "effects": {"side_final": "rebellion", "princess_dead": True}},
+            {"text": "⚡ STOP BOTH - Use power (DC 20)", "next_scene": "g1_main_033",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 20}},
+            {"text": "🏃 'THIS IS MADNESS!' - Flee", "next_scene": "g1_main_014"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "palace_square", "finale": True}
+
+
+def get_scene_031_rebellion_leader_fate(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 031: Los Lyry - zabić czy oszczędzić?"""
+    if lang == "pl":
+        title = "⚔️ Sąd Zwycięzcy"
+        text = """Elara leży martwa. **Berło rozbite.**
+
+Rebelia **WYGRYWA.** Pałac zdobyty.
+
+**Lyra związana.** Klęczy przed tobą. Żołnierze chcą jej śmierci.
+
+**REBELIANT:** *"Ona zaczęła to! ZABIŁA setki! Musi UMRZEĆ!"*
+
+Ale Lyra patrzy ci w oczy:
+
+**"Zrobiłam to dla ludu. By odsunąć tyranię. Jeśli mnie zabijesz... stajesz się TYM SAMYM co król."**
+
+**"Ale... rozumiem. Jeśli sądzisz że zasługuję na śmierć... zrób to."**
+
+Oddaje ci swój miecz.
+
+**DRUGA OPCJA:** Kapłan obok mówi: **"Mogę zapieczętować ją w KRYSZTAŁOWEJ WIĘZI. Będzie spać 100 lat. Żywa, ale nieszkodliwa."**"""
+        
+        choices = [
+            {"text": "⚔️ ZABIJ Lyrę - Kończ cykl przemocy", "next_scene": "g1_main_032",
+             "effects": {"lyra_dead": True, "reputation": -30}},
+            {"text": "💎 ZAPIECZĘTUJ - Kryształowa więź", "next_scene": "g1_main_032",
+             "effects": {"lyra_sealed": True}},
+            {"text": "🤝 DARUJ ŻYCIE - Niech żyje wolna", "next_scene": "g1_main_035",
+             "effects": {"lyra_alive": True, "reputation": 20}},
+            {"text": "👑 'Niech lud zdecyduje' - Referendum", "next_scene": "g1_main_035"}
+        ]
+    else:
+        title = "⚔️ Victor's Judgment"
+        text = """Elara lies dead. **Scepter shattered.**
+
+Rebellion **WINS.** Palace captured.
+
+**Lyra bound.** Kneels before you. Soldiers want her death.
+
+**REBEL:** *"She started this! KILLED hundreds! Must DIE!"*
+
+But Lyra looks in your eyes:
+
+**"I did this for people. To remove tyranny. If you kill me... you become SAME as king."**
+
+**"But... I understand. If you judge I deserve death... do it."**
+
+Gives you her sword.
+
+**SECOND OPTION:** Priest nearby says: **"I can seal her in CRYSTAL PRISON. She'll sleep 100 years. Alive but harmless."**"""
+        
+        choices = [
+            {"text": "⚔️ KILL Lyra - End cycle of violence", "next_scene": "g1_main_032",
+             "effects": {"lyra_dead": True, "reputation": -30}},
+            {"text": "💎 SEAL - Crystal prison", "next_scene": "g1_main_032",
+             "effects": {"lyra_sealed": True}},
+            {"text": "🤝 SPARE - Let her live free", "next_scene": "g1_main_035",
+             "effects": {"lyra_alive": True, "reputation": 20}},
+            {"text": "👑 'Let people decide' - Referendum", "next_scene": "g1_main_035"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "throne_room", "critical": True}
+
+
+def get_scene_032_demon_funding_reveal(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 032: Odkrycie - demony finansowały rebelię"""
+    if lang == "pl":
+        title = "💀 Mroczne Odkrycie"
+        text = """W archiwach pałacu znajdujesz **LISTY.**
+
+**Od ARCHDEMON MALGORATHA** do... **LYRY.**
+
+```
+"Droga Lyro,
+
+Przelew 50,000 złotych na zakup broni.
+Kontynuuj działania destabilizujące.
+Chaos w królestwie to NASZ cel.
+
+- Malgorath"
+```
+
+**REBELIA BYŁA FINANSOWANA PRZEZ DEMONY.**
+
+Twój żołądek się ściska. Walczyłeś po... **złej stronie?**
+
+Albo może... **obie strony były złe?**
+
+Nagle - **PORTAL DEMONICZNY** otwiera się w sali tronu!
+
+**Malgorath wyłania się:**
+
+**"GRATUUŁACJE, śmiertelniku. Zabiłeś króla oraz księżniczkę. Królestwo w RUINIE. Łatwy cel."**
+
+**"Teraz ZDOBĘDZIEMY ten świat. A ty... byłeś naszym NARZĘDZIEM."**"""
+        
+        choices = [
+            {"text": "😨 'NIE... ja... ja ich pomogłem...'", "next_scene": "g1_main_033"},
+            {"text": "⚔️ 'WALCZĘ Z TOBĄ!' - Boss fight", "next_scene": "g1_main_034",
+             "effects": {"combat_start": True}},
+            {"text": "🤝 'Może... może sojusz?' - Join demons", "next_scene": "g1_end_demon_lord",
+             "effects": {"alignment": "evil"}},
+            {"text": "🏃 'Muszę ostrzec innych!' - Uciekaj", "next_scene": "g1_main_033"}
+        ]
+    else:
+        title = "💀 Dark Discovery"
+        text = """In palace archives you find **LETTERS.**
+
+**From ARCHDEMON MALGORATH** to... **LYRA.**
+
+```
+"Dear Lyra,
+
+Transfer of 50,000 gold for weapons purchase.
+Continue destabilizing actions.
+Chaos in kingdom is OUR goal.
+
+- Malgorath"
+```
+
+**REBELLION WAS FUNDED BY DEMONS.**
+
+Your stomach tightens. You fought on... **wrong side?**
+
+Or maybe... **both sides were wrong?**
+
+Suddenly - **DEMON PORTAL** opens in throne room!
+
+**Malgorath emerges:**
+
+**"CONGRATULATIONS, mortal. You killed king and princess. Kingdom in RUINS. Easy target."**
+
+**"Now we'll CONQUER this world. And you... were our TOOL."**"""
+        
+        choices = [
+            {"text": "😨 'NO... I... I helped them...'", "next_scene": "g1_main_033"},
+            {"text": "⚔️ 'I FIGHT YOU!' - Boss fight", "next_scene": "g1_main_034",
+             "effects": {"combat_start": True}},
+            {"text": "🤝 'Maybe... maybe alliance?' - Join demons", "next_scene": "g1_end_demon_lord",
+             "effects": {"alignment": "evil"}},
+            {"text": "🏃 'I must warn others!' - Flee", "next_scene": "g1_main_033"}
+        ]
+    
+    state.quest_flags["demon_conspiracy_revealed"] = True
+    return {"title": title, "text": text, "choices": choices, "location": "throne_room", "plot_twist": True}
+
+
+def get_scene_033_faction_unification(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 033: Zjednoczenie frakcji przeciw demonom"""
+    if lang == "pl":
+        title = "🤝 Sojusz Konieczności"
+        text = """**WYSYŁASZ WEZWANIE.**
+
+Jeśli Elara żyje - przybywa z resztkami armii królewskiej.
+Jeśli Lyra żyje - przybywa z rebelią.
+
+**Zbierasz WSZYSTKICH przy stole.**
+
+**"Demony nas OSZUKAŁY. Finansowały OBIE strony. Chciały WOJNY. Chaosu. By nas podbić."**
+
+Pokazujesz listy. Dokumenty.
+
+Elara (jeśli żyje): **"Ojciec... był częścią tego?"**
+
+Lyra (jeśli żyje): **"Wykorzystali moją wiarę... by zabijać niewinnych..."**
+
+**Cisza.**
+
+Wreszcie - dowódcą armii mówi:
+
+**"Jeśli zjednoczymy się... mamy 1000 żołnierzy + rebeliantów. Możemy zamknąć Rozłam."**
+
+**Kapłan:** *"Potrzebujemy JEDNOŚCI. Albo wszyscy zginiemy."*"""
+        
+        choices = [
+            {"text": "👑 'Elara prowadzi' - Monarchia zjednoczona", "next_scene": "g1_main_034",
+             "effects": {"leader": "elara"}},
+            {"text": "🏹 'Lyra prowadzi' - Republika wojenna", "next_scene": "g1_main_034",
+             "effects": {"leader": "lyra"}},
+            {"text": "⚖️ 'RADA WOJENNA' - Współrządy", "next_scene": "g1_main_034",
+             "effects": {"leader": "council"}},
+            {"text": "💪 'JA prowadzę' - Dyktatura konieczności", "next_scene": "g1_main_034",
+             "effects": {"leader": "player"}}
+        ]
+    else:
+        title = "🤝 Alliance of Necessity"
+        text = """**YOU SEND SUMMONS.**
+
+If Elara lives - arrives with remnants of royal army.
+If Lyra lives - arrives with rebellion.
+
+**You gather EVERYONE at table.**
+
+**"Demons DECEIVED us. Funded BOTH sides. Wanted WAR. Chaos. To conquer us."**
+
+You show letters. Documents.
+
+Elara (if alive): **"Father... was part of this?"**
+
+Lyra (if alive): **"They used my faith... to kill innocents..."**
+
+**Silence.**
+
+Finally - army commander says:
+
+**"If we unite... we have 1000 soldiers + rebels. We can close Rift."**
+
+**Priest:** *"We need UNITY. Or we all perish."*"""
+        
+        choices = [
+            {"text": "👑 'Elara leads' - United monarchy", "next_scene": "g1_main_034",
+             "effects": {"leader": "elara"}},
+            {"text": "🏹 'Lyra leads' - War republic", "next_scene": "g1_main_034",
+             "effects": {"leader": "lyra"}},
+            {"text": "⚖️ 'WAR COUNCIL' - Co-rule", "next_scene": "g1_main_034",
+             "effects": {"leader": "council"}},
+            {"text": "💪 'I lead' - Necessary dictatorship", "next_scene": "g1_main_034",
+             "effects": {"leader": "player"}}
+        ]
+    
+    state.quest_flags["factions_united"] = True
+    return {"title": title, "text": text, "choices": choices, "location": "war_room", "alliance": True}
+
+
+def get_scene_034_blood_bridge_battle(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 034: Bitwa na Moście Krwi - epickie starcie finałowe"""
+    if lang == "pl":
+        title = "🔥 Most Krwi"
+        text = """**WSZYSTKIE SIŁY** maszerują do ROZŁAMU.
+
+1000 żołnierzy. 500 rebeliantów. 200 magów. **TY na czele.**
+
+Most prowadzący do Rozłamu jest **JEDYNĄ DROGĄ.**
+
+Szerokość: 50 metrów. Długość: 1 km. Pod spodem - **OTCHŁAŃ.**
+
+A na moście - **ARMIA DEMONÓW.**
+
+```asciidoc
+🔥 5000 DEMONÓW 🔥
+👿 50 ARCHDEMONÓW 👿  
+💀 1 DEMON LORD 💀
+```
+
+**Malgorath stoi na końcu mostu. Uśmiecha się.**
+
+**"Przyszliście umrzeć RAZEM zamiast OSOBNO. Jak... romantyczne."**
+
+**OSTATNIA BITWA ZACZYNA SIĘ.**"""
+        
+        choices = [
+            {"text": "⚔️ SZARŻA! - Bezpośredni atak", "next_scene": "g1_main_035",
+             "req": {"type": "army_morale"}},
+            {"text": "🎯 TAKTYKA - Łucznicy + flanki", "next_scene": "g1_main_035",
+             "req": {"type": "stat_check", "stat": "intelligence", "dc": 18}},
+            {"text": "💥 MAGIA MASOWA - Zniszcz most", "next_scene": "g1_branch_bridge_destruction",
+             "effects": {"bridge_destroyed": True}},
+            {"text": "🐉 WEZWIJ PYRAXISA - Smocza pomoc (jeśli sojusz)", "next_scene": "g1_main_035",
+             "req": {"flag": "dragon_ally_confirmed"}}
+        ]
+    else:
+        title = "🔥 Blood Bridge"
+        text = """**ALL FORCES** march to RIFT.
+
+1000 soldiers. 500 rebels. 200 mages. **YOU leading.**
+
+Bridge leading to Rift is **ONLY PATH.**
+
+Width: 50 meters. Length: 1 km. Below - **ABYSS.**
+
+And on bridge - **DEMON ARMY.**
+
+```asciidoc
+🔥 5000 DEMONS 🔥
+👿 50 ARCHDEMONS 👿
+💀 1 DEMON LORD 💀
+```
+
+**Malgorath stands at bridge end. Smiles.**
+
+**"You came to die TOGETHER instead of SEPARATE. How... romantic."**
+
+**FINAL BATTLE BEGINS.**"""
+        
+        choices = [
+            {"text": "⚔️ CHARGE! - Direct attack", "next_scene": "g1_main_035",
+             "req": {"type": "army_morale"}},
+            {"text": "🎯 TACTICS - Archers + flanks", "next_scene": "g1_main_035",
+             "req": {"type": "stat_check", "stat": "intelligence", "dc": 18}},
+            {"text": "💥 MASS MAGIC - Destroy bridge", "next_scene": "g1_branch_bridge_destruction",
+             "effects": {"bridge_destroyed": True}},
+            {"text": "🐉 SUMMON PYRAXIS - Dragon help (if allied)", "next_scene": "g1_main_035",
+             "req": {"flag": "dragon_ally_confirmed"}}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "blood_bridge", "epic_battle": True}
+
+
+def get_scene_035_new_order(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 035: Nowy ład - wybór rządu"""
+    if lang == "pl":
+        title = "🏛️ Nowa Era"
+        text = """**DEMONY POKONANE.** Rozłam zapieczętowany. Malgorath martwy.
+
+Armia wraca do stolicy. **ZWYCIĘSTWO.**
+
+Lud zbiera się na placu. **CZEKAJĄ NA DECYZJĘ.**
+
+Jeśli Elara żyje - klęczy przed tobą: **"Jakikolwiek wybrłasz rząd... poprę cię."**
+
+Jeśli Lyra żyje - mówi: **"Zbudujmy świat lepszy niż ten, który zniszczyliśmy."**
+
+**Księża, dowódcy, lud** - wszyscy patrzą na ciebie.
+
+**"KTO BĘDZIE RZĄDZIŁ?"**"""
+        
+        choices = [
+            {"text": "👑 PRZYWRÓĆ MONARCHIĘ - Elara królową", "next_scene": "g1_end_kingdom_saved",
+             "req": {"flag": "elara_alive"}},
+            {"text": "🏹 USTANÓW REPUBLIKĘ - Lyra prezydent", "next_scene": "g1_end_republic",
+             "req": {"flag": "lyra_alive"}},
+            {"text": "⚖️ RADA STARSZYCH - Demokracja", "next_scene": "g1_end_democracy"},
+            {"text": "👑 'JA będę władcą' - Cesarstwo", "next_scene": "g1_end_emperor"}
+        ]
+    else:
+        title = "🏛️ New Era"
+        text = """**DEMONS DEFEATED.** Rift sealed. Malgorath dead.
+
+Army returns to capital. **VICTORY.**
+
+People gather in square. **AWAITING DECISION.**
+
+If Elara lives - kneels before you: **"Whatever government you choose... I'll support you."**
+
+If Lyra lives - says: **"Let's build world better than one we destroyed."**
+
+**Priests, commanders, people** - all look at you.
+
+**"WHO WILL RULE?"**"""
+        
+        choices = [
+            {"text": "👑 RESTORE MONARCHY - Elara queen", "next_scene": "g1_end_kingdom_saved",
+             "req": {"flag": "elara_alive"}},
+            {"text": "🏹 ESTABLISH REPUBLIC - Lyra president", "next_scene": "g1_end_republic",
+             "req": {"flag": "lyra_alive"}},
+            {"text": "⚖️ COUNCIL OF ELDERS - Democracy", "next_scene": "g1_end_democracy"},
+            {"text": "👑 'I will be ruler' - Empire", "next_scene": "g1_end_emperor"}
+        ]
+    
+    state.quest_flags["war_ended"] = True
+    return {"title": title, "text": text, "choices": choices, "location": "victory_square", "finale": True}
 
 
 # ==================== WĄTEK D: ARTEFAKTY (036-045) ====================
@@ -2497,6 +3642,535 @@ Giant smiles.
         ]
     
     return {"title": title, "text": text, "choices": choices, "location": "giant_fortress"}
+
+
+def get_scene_039_crown_artifact(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 039: Korona Umysłu w labiryncie szaleństwa"""
+    if lang == "pl":
+        title = "👑 Labirynt Szaleństwa"
+        text = """**LABIRYNT WIECZNY.** Ściany z czystoego kryształu. Wszystko się odbija.
+
+**Setki swojch odbić** patrzy na ciebie.
+
+Nagle - jedno z nich **OŻYWA.**
+
+**TWOJE ODBICIE:** *"Witaj. Jestem TOBĄ. Twoimi lękami. Twoimi wątpliwościami."*
+
+Wyciąga miecz (identyczny jak twój).
+
+**"By zdobyć KORONĘ UMYSŁU - musisz pokonać SIEBIE."**
+
+**"Znam wszystkie twoje ruchy. Twoje słabości. Twoje myśli."**
+
+**"Jesteś gotów walczyć ze SOBĄ?"**
+
+**BOSS FIGHT: Twoje Odbicie - twoje HP, twoje umiejętności, twoja broń**"""
+        
+        choices = [
+            {"text": "⚔️ WALCZ z odbiciem!", "next_scene": "g1_main_039_combat",
+             "req": {"type": "combat_check"}},
+            {"text": "🧠 'Jesteś mną - więc NIE WALCZĘ' - odmów (DC 19)", "next_scene": "g1_main_039_success",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 19}},
+            {"text": "💭 'Połączmy się zamiast walczyć'", "next_scene": "g1_main_039_success",
+             "effects": {"self_unity": True}},
+            {"text": "🏃 UCIEKAJ z labiryntu!", "next_scene": "g1_main_036"}
+        ]
+    else:
+        title = "👑 Labyrinth of Madness"
+        text = """**ETERNAL LABYRINTH.** Walls of pure crystal. Everything reflects.
+
+**Hundreds of your reflections** stare at you.
+
+Suddenly - one of them **COMES ALIVE.**
+
+**YOUR REFLECTION:** *"Welcome. I am YOU. Your fears. Your doubts."*
+
+Draws sword (identical to yours).
+
+**"To claim CROWN OF MIND - you must defeat YOURSELF."**
+
+**"I know all your moves. Your weaknesses. Your thoughts."**
+
+**"Are you ready to fight YOURSELF?"**
+
+**BOSS FIGHT: Your Reflection - your HP, your skills, your weapon**"""
+        
+        choices = [
+            {"text": "⚔️ FIGHT reflection!", "next_scene": "g1_main_039_combat",
+             "req": {"type": "combat_check"}},
+            {"text": "🧠 'You are me - so I DON'T FIGHT' - refuse (DC 19)", "next_scene": "g1_main_039_success",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 19}},
+            {"text": "💭 'Let's unite instead of fighting'", "next_scene": "g1_main_039_success",
+             "effects": {"self_unity": True}},
+            {"text": "🏃 FLEE from labyrinth!", "next_scene": "g1_main_036"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "crystal_labyrinth", "psychological": True}
+
+
+def get_scene_040_book_artifact(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 040: Księga Zakazana w katakumbach nekromanty"""
+    if lang == "pl":
+        title = "📚 Biblioteka Umarłych"
+        text = """Katakumby NEKROMANTY. Zapach zgnilizny.
+
+**KSIĘGA** leży na ołtarzu. Okładka z ludzkiej skóry. Strony krwią pisane.
+
+Przy ołtarzu - **SZKIELET w szacie mnicha.** 
+
+Nagle - szkielet **OŻYWA.**
+
+**NEKROMANTA-LICZ:** *"Żywy... w mojej domenie... Chcesz KSIĘGI?"*
+
+**"Ta księga zawiera wszystkie zaklęcia nekromancji. Kontrola nad śmiercią. Zmartwychwstanie."**
+
+**"Ale... cena jest wysoka. By ją przeczytać, musisz UMRZEĆ. A potem WRÓCIĆ."**
+
+Wyciąga kościstą dłoń.
+
+**"Daj mi swoje życie. Zabiję cię. A potem zmartwychwstam. I będziesz NIEŚMIERTELNYM LICHE."**
+
+**"Albo... zabij mnie, weź księgę siłą. Ale nie będziesz umiał jej czytać bez KLUCZA."**"""
+        
+        choices = [
+            {"text": "💀 'Zgadzam się' - zostań liche", "next_scene": "g1_branch_become_lich",
+             "effects": {"lich_transformation": True}},
+            {"text": "⚔️ ZABIJ liche - weź księgę siłą", "next_scene": "g1_main_040_combat",
+             "req": {"type": "combat_check"}},
+            {"text": "🗣️ 'Naucz mnie zamiast zabijać' - negocjuj", "next_scene": "g1_main_040_success",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 17}},
+            {"text": "❌ 'To zbyt niebezpieczne' - odejdź", "next_scene": "g1_main_036"}
+        ]
+    else:
+        title = "📚 Library of the Dead"
+        text = """NECROMANCER's catacombs. Smell of decay.
+
+**BOOK** lies on altar. Cover of human skin. Pages written in blood.
+
+By altar - **SKELETON in monk's robe.**
+
+Suddenly - skeleton **AWAKENS.**
+
+**NECROMANCER-LICH:** *"Living... in my domain... Want BOOK?"*
+
+**"This book contains all necromancy spells. Control over death. Resurrection."**
+
+**"But... price is high. To read it, you must DIE. And then RETURN."**
+
+Extends bony hand.
+
+**"Give me your life. I'll kill you. Then resurrect. And you'll be IMMORTAL LICH."**
+
+**"Or... kill me, take book by force. But you won't be able to read it without KEY."**"""
+        
+        choices = [
+            {"text": "💀 'I agree' - become lich", "next_scene": "g1_branch_become_lich",
+             "effects": {"lich_transformation": True}},
+            {"text": "⚔️ KILL lich - take book by force", "next_scene": "g1_main_040_combat",
+             "req": {"type": "combat_check"}},
+            {"text": "🗣️ 'Teach me instead of killing' - negotiate", "next_scene": "g1_main_040_success",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 17}},
+            {"text": "❌ 'This is too dangerous' - leave", "next_scene": "g1_main_036"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "necro_catacombs", "dark": True}
+
+
+def get_scene_041_heart_artifact(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 041: Serce Feniksa w wulkanie"""
+    if lang == "pl":
+        title = "❤️ Serce Wiecznego Ognia"
+        text = """**WULKAN AKTYWNY.** Lawa spływa jak rzeka.
+
+W sercu krateru - **GNIAZDO FENIKSA.**
+
+Ptak GIGANTYCZNY. Skrzydła z płomieni. Oczy jak słońca.
+
+**FENIKS:** *"Śmiertelny odważył się tu przyjść. Chcesz MOJEGO serca..."*
+
+**"Serce Feniksa - nieskończoone odrodzenie. Nieśmiertelność."**
+
+**"Ale... by je zdobyć, musisz SPALIĆ się w moich płomieniach. I ODRODZIĆ się z własnych popiołów."**
+
+Feniks rozpina skrzydła - **CAŁA GÓRA ZAPADA SIĘ W OGNIU.**
+
+**"Jeśli nie jesteś GODNy - popioły pozostaną popiołami."**
+
+**"Wejdź w ogień. Udowodnij swoją wartość."**"""
+        
+        choices = [
+            {"text": "🔥 WEJDŹ W OGIEŃ - test oczyszczenia (DC 20)", "next_scene": "g1_main_041_success",
+             "req": {"type": "stat_check", "stat": "constitution", "dc": 20}},
+            {"text": "⚔️ WALCZ z feniksem zamiast testu", "next_scene": "g1_main_041_combat"},
+            {"text": "🛡️ UŻYJ TARCZY WIEKÓW - ochrona od ognia", "next_scene": "g1_main_041_success",
+             "req": {"flag": "shield_obtained"}},
+            {"text": "🏃 'Nie jestem gotowy' - wycofaj się", "next_scene": "g1_main_036"}
+        ]
+    else:
+        title = "❤️ Heart of Eternal Fire"
+        text = """**ACTIVE VOLCANO.** Lava flows like river.
+
+In crater's heart - **PHOENIX NEST.**
+
+Bird GIGANTIC. Wings of flames. Eyes like suns.
+
+**PHOENIX:** *"Mortal dared come here. You want MY heart..."*
+
+**"Phoenix Heart - infinite rebirth. Immortality."**
+
+**"But... to claim it, you must BURN in my flames. And REBORN from your own ashes."**
+
+Phoenix spreads wings - **ENTIRE MOUNTAIN COLLAPSES IN FIRE.**
+
+**"If you are not WORTHY - ashes will remain ashes."**
+
+**"Enter the fire. Prove your worth."**"""
+        
+        choices = [
+            {"text": "🔥 ENTER FIRE - purification test (DC 20)", "next_scene": "g1_main_041_success",
+             "req": {"type": "stat_check", "stat": "constitution", "dc": 20}},
+            {"text": "⚔️ FIGHT phoenix instead of test", "next_scene": "g1_main_041_combat"},
+            {"text": "🛡️ USE SHIELD OF AGES - fire protection", "next_scene": "g1_main_041_success",
+             "req": {"flag": "shield_obtained"}},
+            {"text": "🏃 'I'm not ready' - retreat", "next_scene": "g1_main_036"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "volcano_peak", "epic": True}
+
+
+def get_scene_042_artifact_fusion(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 042: Złączenie 5 artefaktów w ostateczną broń"""
+    artifacts_count = sum([
+        state.quest_flags.get("sword_obtained", False),
+        state.quest_flags.get("shield_obtained", False),
+        state.quest_flags.get("crown_obtained", False),
+        state.quest_flags.get("book_obtained", False),
+        state.quest_flags.get("heart_obtained", False)
+    ])
+    
+    if lang == "pl":
+        title = "⚡ Fuzja Artefaktów"
+        text = f"""Posiadasz **{artifacts_count}/5** artefaktów.
+
+{'**MASZ WSZYSTKIE PIĘĆ!**' if artifacts_count == 5 else f'**Brakuje {5 - artifacts_count} artefaktów.**'}
+
+Gdy zbierasz je razem - **ZACZYNAJĄ REZONOWAĆ.**
+
+```asciidoc
+🗡️ Miecz Światła
+🛡️ Tarcza Wieków  
+👑 Korona Umysłu
+📚 Księga Zakazana
+❤️ Serce Feniksa
+```
+
+**ENERGIA WYBUCHA!** Artefakty **ŁĄCZĄ SIĘ** w jedną całość!
+
+**POWSTAJE:**
+
+✨ **OMNIBRON** - Broń Bogów ✨
+
+- Niezniszczalność
+- Kontrola czasu
+- Nekromancja
+- Nieśmiertelność  
+- Absolutna moc
+
+**"Z tą bronią możesz ZNISZCZYĆ Rozłam... albo ZNISZCZYĆ ŚWIAT."**
+
+Głos w głowie: **"Omnibron wybiera swojego władcę. Czy jesteś GODNy?"**"""
+        
+        choices = [
+            {"text": "✨ ZAAKCEPTUJ MOC - zostań bogiem", "next_scene": "g1_main_043"},
+            {"text": "⚔️ UŻYJ przeciw Rozłamowi - zamknij go", "next_scene": "g1_main_045"},
+            {"text": "💔 ZNISZCZ artefakty - zbyt groźne", "next_scene": "g1_branch_destroy_artifacts"},
+            {"text": "🤝 PODZIEL MOC - daj innym", "next_scene": "g1_main_044"}
+        ] if artifacts_count == 5 else [
+            {"text": "🗡️ Zbierz MIECZ - Krypta Wampirów" if not state.quest_flags.get("sword_obtained") else None,
+             "next_scene": "g1_main_037"},
+            {"text": "🛡️ Zbierz TARCZĘ - Twierdza Olbrzymów" if not state.quest_flags.get("shield_obtained") else None,
+             "next_scene": "g1_main_038"},
+            {"text": "👑 Zbierz KORONĘ - Labirynt" if not state.quest_flags.get("crown_obtained") else None,
+             "next_scene": "g1_main_039"},
+            {"text": "📚 Zbierz KSIĘGĘ - Katakumby" if not state.quest_flags.get("book_obtained") else None,
+             "next_scene": "g1_main_040"},
+            {"text": "❤️ Zbierz SERCE - Wulkan" if not state.quest_flags.get("heart_obtained") else None,
+             "next_scene": "g1_main_041"}
+        ]
+        
+        choices = [c for c in choices if c is not None]
+    else:
+        title = "⚡ Artifact Fusion"
+        text = f"""You possess **{artifacts_count}/5** artifacts.
+
+{'**YOU HAVE ALL FIVE!**' if artifacts_count == 5 else f'**Missing {5 - artifacts_count} artifacts.**'}
+
+When you gather them together - **THEY START RESONATING.**
+
+```asciidoc
+🗡️ Sword of Light
+🛡️ Shield of Ages
+👑 Crown of Mind
+📚 Forbidden Book
+❤️ Phoenix Heart
+```
+
+**ENERGY EXPLODES!** Artifacts **MERGE** into one!
+
+**CREATED:**
+
+✨ **OMNIWEAPON** - Weapon of Gods ✨
+
+- Indestructibility
+- Time control
+- Necromancy
+- Immortality
+- Absolute power
+
+**"With this weapon you can DESTROY Rift... or DESTROY WORLD."**
+
+Voice in head: **"Omniweapon chooses its master. Are you WORTHY?"**"""
+        
+        choices = [
+            {"text": "✨ ACCEPT POWER - become god", "next_scene": "g1_main_043"},
+            {"text": "⚔️ USE against Rift - seal it", "next_scene": "g1_main_045"},
+            {"text": "💔 DESTROY artifacts - too dangerous", "next_scene": "g1_branch_destroy_artifacts"},
+            {"text": "🤝 SHARE POWER - give to others", "next_scene": "g1_main_044"}
+        ] if artifacts_count == 5 else [
+            {"text": "🗡️ Collect SWORD - Vampire Crypt" if not state.quest_flags.get("sword_obtained") else None,
+             "next_scene": "g1_main_037"},
+            {"text": "🛡️ Collect SHIELD - Giants' Fortress" if not state.quest_flags.get("shield_obtained") else None,
+             "next_scene": "g1_main_038"},
+            {"text": "👑 Collect CROWN - Labyrinth" if not state.quest_flags.get("crown_obtained") else None,
+             "next_scene": "g1_main_039"},
+            {"text": "📚 Collect BOOK - Catacombs" if not state.quest_flags.get("book_obtained") else None,
+             "next_scene": "g1_main_040"},
+            {"text": "❤️ Collect HEART - Volcano" if not state.quest_flags.get("heart_obtained") else None,
+             "next_scene": "g1_main_041"}
+        ]
+        
+        choices = [c for c in choices if c is not None]
+    
+    if artifacts_count == 5:
+        state.quest_flags["omnibron_created"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "fusion_chamber", "epic": artifacts_count == 5}
+
+
+def get_scene_043_artifact_corruption(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 043: Korupcja przez artefakty - walka o umysł"""
+    if lang == "pl":
+        title = "🌀 Upadek w Moc"
+        text = """Omnibron **PŁONIE** w twoich rękach.
+
+**MOC przepływa przez ciebie. NIEZWYKŁA MOC.**
+
+Ale... coś jest nie tak.
+
+Słyszysz **GŁOSY:**
+
+**Miecz:** *"Zabij wszystkich wrogów."*
+**Tarcza:** *"Nikomu nie ufaj."*
+**Korona:** *"Chcą cię zdetronizować."*
+**Księga:** *"Życie jest bez wartości."*
+**Serce:** *"Spalll ten świat i ODRÓDŹ lepszy."*
+
+**ARTEFAKTY WALCZĄ O KONTROLĘ NAD TOBĄ.**
+
+Twoje oczy płoną. Skóra lśni energią.
+
+Księżniczka Elara (jeśli żyje) krzyczy: **"PRZESTAŃ! To cię NISZCZY!"**
+
+Lyra (jeśli żyje): **"Rzuć to! STRACISZ SIEBIE!"**
+
+Ale MOC jest... kuszącą..."""
+        
+        choices = [
+            {"text": "💪 'JA KONTROLUJĘ MOC!' - opanuj artefakty (DC 22)", "next_scene": "g1_main_045",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 22}},
+            {"text": "💔 RZUĆ Omnibron - zachowaj człowieczeństwo", "next_scene": "g1_main_044"},
+            {"text": "😈 PODDAJ SIĘ - niech moc pokieruje tobą", "next_scene": "g1_end_artifact_god",
+             "effects": {"corrupted": True}},
+            {"text": "🐉 WEZWIJ PYRAXISA - pomoc smoka", "next_scene": "g1_main_044",
+             "req": {"flag": "dragon_ally_confirmed"}}
+        ]
+    else:
+        title = "🌀 Fall into Power"
+        text = """Omniweapon **BLAZES** in your hands.
+
+**POWER flows through you. EXTRAORDINARY POWER.**
+
+But... something is wrong.
+
+You hear **VOICES:**
+
+**Sword:** *"Kill all enemies."*
+**Shield:** *"Trust no one."*
+**Crown:** *"They want to dethrone you."*
+**Book:** *"Life is worthless."*
+**Heart:** *"Burn this world and REBIRTH better one."*
+
+**ARTIFACTS FIGHT FOR CONTROL OVER YOU.**
+
+Your eyes blaze. Skin shines with energy.
+
+Princess Elara (if alive) screams: **"STOP! It's DESTROYING you!"**
+
+Lyra (if alive): **"Drop it! You'll LOSE YOURSELF!"**
+
+But POWER is... tempting..."""
+        
+        choices = [
+            {"text": "💪 'I CONTROL POWER!' - master artifacts (DC 22)", "next_scene": "g1_main_045",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 22}},
+            {"text": "💔 DROP Omniweapon - keep humanity", "next_scene": "g1_main_044"},
+            {"text": "😈 SURRENDER - let power guide you", "next_scene": "g1_end_artifact_god",
+             "effects": {"corrupted": True}},
+            {"text": "🐉 SUMMON PYRAXIS - dragon's help", "next_scene": "g1_main_044",
+             "req": {"flag": "dragon_ally_confirmed"}}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "power_vortex", "critical": True}
+
+
+def get_scene_044_mind_battle(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 044: Walka o umysł - finałowa próba woli"""
+    if lang == "pl":
+        title = "🧠 Bitwa Umysłów"
+        text = """**WCHODZISZ W SWÓJ WŁASNY UMYSŁ.**
+
+Widzisz WSPOMNIENIA:
+
+📸 Twoja rodzina - zabita przez demony
+📸 Król - dawał rozkaz spalenia wiosek
+📸 Lyra - prowadziła rebelię finansowaną przez demony
+📸 Elara - bezradna wobec korupcji
+📸 Pyraxis - otwierał Rozłam 1000 lat temu
+
+**Wszystko było KŁAMSTWEM. Wszyscy cię WYKORZYSTALI.**
+
+Głos Omnibrona: **"Widzisz? Nie możesz nikomu ufać. Tylko MOC jest wierna."**
+
+Ale... głębiej w umyśle... widzisz ŚWIATŁO.
+
+Głos twojego nauczyciela: **"Moc korumpuje. Ale WYBÓR pozostaje wolny."**
+
+**"Nie kłamstwa definiują cię. TWOJE CZYNY."**
+
+**OSTATECZNY TEST WOLI:**"""
+        
+        choices = [
+            {"text": "💡 'Wybieram LUDZKOŚĆ' - odrzuć moc", "next_scene": "g1_main_045",
+             "effects": {"humanity_preserved": True}},
+            {"text": "⚡ 'Wybieram MOC' - zaakceptuj korupcję", "next_scene": "g1_end_artifact_god"},
+            {"text": "⚖️ 'Wybieram BALANS' - kontroluj ale nie poddaj się", "next_scene": "g1_main_045",
+             "effects": {"balanced_power": True}},
+            {"text": "💔 'Niszczę WSZYSTKO' - Reset", "next_scene": "g1_end_time_loop"}
+        ]
+    else:
+        title = "🧠 Battle of Minds"
+        text = """**YOU ENTER YOUR OWN MIND.**
+
+You see MEMORIES:
+
+📸 Your family - killed by demons
+📸 King - gave order to burn villages
+📸 Lyra - led rebellion funded by demons
+📸 Elara - helpless against corruption
+📸 Pyraxis - opened Rift 1000 years ago
+
+**Everything was LIE. Everyone USED you.**
+
+Omniweapon's voice: **"See? You can't trust anyone. Only POWER is faithful."**
+
+But... deeper in mind... you see LIGHT.
+
+Your teacher's voice: **"Power corrupts. But CHOICE remains free."**
+
+**"Not lies define you. YOUR ACTIONS."**
+
+**ULTIMATE WILL TEST:**"""
+        
+        choices = [
+            {"text": "💡 'I choose HUMANITY' - reject power", "next_scene": "g1_main_045",
+             "effects": {"humanity_preserved": True}},
+            {"text": "⚡ 'I choose POWER' - accept corruption", "next_scene": "g1_end_artifact_god"},
+            {"text": "⚖️ 'I choose BALANCE' - control but don't surrender", "next_scene": "g1_main_045",
+             "effects": {"balanced_power": True}},
+            {"text": "💔 'I destroy EVERYTHING' - Reset", "next_scene": "g1_end_time_loop"}
+        ]
+    
+    return {"title": title, "text": text, "choices": choices, "location": "mindscape", "psychological": True}
+
+
+def get_scene_045_ultimate_weapon(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Scena 045: Użycie ostatecznej broni - zniszcz lub zbaw świat"""
+    controlled = state.quest_flags.get("balanced_power") or state.quest_flags.get("humanity_preserved")
+    
+    if lang == "pl":
+        title = "⚡ Dzień Sądu"
+        text = f"""{'OPANOWAŁEŚ Omnibron. Moc słucha CIEBIE.' if controlled else 'Omnibron w twoich rękach. Płonie energią.'}
+
+Stoisz przed **ROZŁAMEM.**
+
+Portal 200 metrów średnicy. **DEMONY WYLEWAJĄ SIĘ tysiącami.**
+
+W tle - armia królestwa (jeśli przeżyła).
+
+Pyraxis obok ciebie (jeśli sojusz).
+
+**To OSTATECZNA BITWA.**
+
+Podnosisz Omnibron. **ENERGIA WYBUCHA!**
+
+**3 OPCJE:**
+
+1️⃣ **ZAPIECZĘTUJ Rozłam** - Zamknij portal na zawsze
+2️⃣ **ZNISZCZ Rozłam + Otchłań** - Eliminuj źródło demonów
+3️⃣ **PRZEJMIJ Rozłam** - Kontroluj demoniczną moc"""
+        
+        choices = [
+            {"text": "🔒 ZAPIECZĘTUJ - trwały pokój", "next_scene": "g1_end_kingdom_saved"},
+            {"text": "💥 ZNISZCZ - eliminuj zagrożenie", "next_scene": "g1_end_reshape_reality",
+             "effects": {"rift_destroyed": True}},
+            {"text": "👑 PRZEJMIJ - władaj demonami", "next_scene": "g1_end_artifact_god",
+             "effects": {"demon_control": True}},
+            {"text": "🔮 RESET ŚWIATA - pętla czasu", "next_scene": "g1_end_time_loop"}
+        ]
+    else:
+        title = "⚡ Judgment Day"
+        text = f"""{'You MASTERED Omniweapon. Power obeys YOU.' if controlled else 'Omniweapon in your hands. Blazes with energy.'}
+
+You stand before **RIFT.**
+
+Portal 200 meters diameter. **DEMONS POUR OUT by thousands.**
+
+Background - kingdom's army (if survived).
+
+Pyraxis beside you (if allied).
+
+**This is FINAL BATTLE.**
+
+You raise Omniweapon. **ENERGY EXPLODES!**
+
+**3 OPTIONS:**
+
+1️⃣ **SEAL Rift** - Close portal forever
+2️⃣ **DESTROY Rift + Abyss** - Eliminate demon source
+3️⃣ **CONTROL Rift** - Command demonic power"""
+        
+        choices = [
+            {"text": "🔒 SEAL - lasting peace", "next_scene": "g1_end_kingdom_saved"},
+            {"text": "💥 DESTROY - eliminate threat", "next_scene": "g1_end_reshape_reality",
+             "effects": {"rift_destroyed": True}},
+            {"text": "👑 CONTROL - rule demons", "next_scene": "g1_end_artifact_god",
+             "effects": {"demon_control": True}},
+            {"text": "🔮 RESET WORLD - time loop", "next_scene": "g1_end_time_loop"}
+        ]
+    
+    state.quest_flags["omnibron_used"] = True
+    
+    return {"title": title, "text": text, "choices": choices, "location": "rift_gates", "finale": True, "epic": True}
 
 
 # ==================== WĄTEK E: MROCZNA ŚCIEŻKA (046-050) ====================
@@ -2871,6 +4545,1895 @@ def get_branch_help_villagers(lang: str, state: Gate1WorldState, player) -> Dict
     }
 
 
+def get_branch_forest_escape(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Ucieczka w głąb lasu - spotkanie z wilkołakami"""
+    
+    if lang == "pl":
+        title = "🌲 Ucieczka w Głąb Lasu"
+        text = f"""**BIEGNIESZ** w głąb ciemnego lasu!
+
+Bandyci krzyczą za tobą: **"Wracaj, tchórzu! W tym lesie są gorsze rzeczy niż my!"**
+
+Ale już ich nie słyszysz. Drzewa stają się gęstsze, mroczniejsze.
+
+**MGŁA** unosi się z ziemi. Zimna, gęsta.
+
+Nagle - **SŁYSZYSZ WYCIE.**
+
+```asciidoc
+🐺 AWOOOOOOO! 🐺
+```
+
+Z cieni wyłaniają się **TRZY SYLWETKI** - większe niż zwykłe wilki.
+
+**WILKOŁAKI.**
+
+Oczy żółte jak księżyc. Kły jak sztylety. Warczenie rozbrzmiewa w kościach.
+
+Największy z nich **PRZEMAWIA** (to niemożliwe... ale przemawia):
+
+**"INTRUZ... w naszym lesie... Część KLANU LUNARA... Co chcesz... człowieku?"**
+
+Otaczają cię powoli."""
+        
+        choices = [
+            {"text": "⚔️ 'Walczę!' - Atak wilkołaków (DC 17)", "next_scene": "g1_branch_werewolf_encounter",
+             "req": {"type": "combat_check"}},
+            {"text": "💬 'Jestem wędrowcem. Szukam schronienia.'", "next_scene": "g1_branch_werewolf_encounter",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 15}},
+            {"text": "🌙 'Usłyszałem wezwanie. Księżyc mnie prowadzi.'", "next_scene": "g1_branch_werewolf_pact",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 16}},
+            {"text": "🏃 UCIEKAJ dalej w las!", "next_scene": "g1_main_005",
+             "effects": {"hp_cost": 15}}
+        ]
+    else:
+        title = "🌲 Escape into Deep Forest"
+        text = f"""**YOU RUN** deep into dark forest!
+
+Bandits shout behind you: **"Come back, coward! There are worse things in this forest than us!"**
+
+But you no longer hear them. Trees become denser, darker.
+
+**FOG** rises from ground. Cold, thick.
+
+Suddenly - **YOU HEAR HOWLING.**
+
+```asciidoc
+🐺 AWOOOOOOO! 🐺
+```
+
+From shadows emerge **THREE FIGURES** - larger than normal wolves.
+
+**WEREWOLVES.**
+
+Eyes yellow like moon. Fangs like daggers. Growling resonates in bones.
+
+The largest one **SPEAKS** (impossible... but speaks):
+
+**"INTRUDER... in our forest... Part of LUNAR CLAN... What do you want... human?"**
+
+They slowly surround you."""
+        
+        choices = [
+            {"text": "⚔️ 'I fight!' - Attack werewolves (DC 17)", "next_scene": "g1_branch_werewolf_encounter",
+             "req": {"type": "combat_check"}},
+            {"text": "💬 'I am traveler. I seek shelter.'", "next_scene": "g1_branch_werewolf_encounter",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 15}},
+            {"text": "🌙 'I heard calling. Moon guides me.'", "next_scene": "g1_branch_werewolf_pact",
+             "req": {"type": "stat_check", "stat": "wisdom", "dc": 16}},
+            {"text": "🏃 FLEE deeper into forest!", "next_scene": "g1_main_005",
+             "effects": {"hp_cost": 15}}
+        ]
+    
+    state.quest_flags["werewolves_encountered"] = True
+    
+    return {
+        "title": title,
+        "text": text,
+        "choices": choices,
+        "location": "deep_forest",
+        "npc_present": ["werewolf_alpha", "werewolf_pack"]
+    }
+
+
+def get_branch_join_bandits(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Dołączenie do bandytów - dark path"""
+    
+    if lang == "pl":
+        title = "💰 Nowy Rekrut"
+        text = f"""Opuszczasz broń. **Uśmiechasz się.**
+
+**"Mam lepszy pomysł. Dołączę do was."**
+
+Bandyci patrzą na siebie zaskoczeni. Lider podchodzi bliżej, mierzy cię wzrokiem.
+
+**"Ho ho! Odważny jesteś! Albo głupi..."**
+
+Sięga do pasa i **RZUCA CI WORKIEM ZŁOTA**.
+
+**"To twoja PIERWSZA ŁUPNA. 50 złotych. Podzieliliśmy uczciwie z tych głupców."**
+
+Wskazuje na ciała strażników.
+
+**"Ale jeśli chcesz do NASZEJ BANDY - musisz się WYKAZAĆ."**
+
+**"Widzisz ten wóz? Tam jest **DZIEWCZYNKA** ukryta. Rodzina kupiecka."**
+
+**"ZABIJ JĄ. Pokaż że jesteś z nami. Że potrafisz robić to co TRZEBA, nie to co UCZUCIOWE."**
+
+Podaje ci nóż.
+
+Dziewczynka patrzy na ciebie przez szparę w wozie. **Ma może 8 lat. Płacze cicho.**"""
+        
+        choices = [
+            {"text": "😈 ZABIJ dziewczynkę - wejdź do bandy", "next_scene": "g1_branch_bandit_camp",
+             "effects": {"alignment": "evil", "reputation": -100, "bandit_allied": True}},
+            {"text": "⚔️ 'NIGDY!' - Zabij bandytę i ratuj dziewczynkę", "next_scene": "g1_main_004",
+             "effects": {"bandits_hostile": True}},
+            {"text": "💬 'Zabijanie dzieci to nie biznes. Znajdźmy lepszy cel.'", "next_scene": "g1_branch_bandit_negotiation",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 16}},
+            {"text": "🏃 'Zmieniłem zdanie' - Ucieknij!", "next_scene": "g1_branch_forest_escape",
+             "effects": {"bandits_hostile": True}}
+        ]
+    else:
+        title = "💰 New Recruit"
+        text = f"""You lower weapon. **Smile.**
+
+**"I have better idea. I'll join you."**
+
+Bandits look at each other surprised. Leader approaches closer, measures you with gaze.
+
+**"Ho ho! You're brave! Or stupid..."**
+
+Reaches to belt and **THROWS YOU BAG OF GOLD**.
+
+**"This is your FIRST LOOT. 50 gold. We shared fairly from these fools."**
+
+Points to guard corpses.
+
+**"But if you want in OUR GANG - you must PROVE yourself."**
+
+**"See that wagon? There's **LITTLE GIRL** hidden. Merchant family."**
+
+**"KILL HER. Show you're with us. That you can do what's NEEDED, not what's EMOTIONAL."**
+
+Hands you knife.
+
+Girl looks at you through crack in wagon. **Maybe 8 years old. Crying quietly.**"""
+        
+        choices = [
+            {"text": "😈 KILL girl - join gang", "next_scene": "g1_branch_bandit_camp",
+             "effects": {"alignment": "evil", "reputation": -100, "bandit_allied": True}},
+            {"text": "⚔️ 'NEVER!' - Kill bandit and save girl", "next_scene": "g1_main_004",
+             "effects": {"bandits_hostile": True}},
+            {"text": "💬 'Killing children is not business. Find better target.'", "next_scene": "g1_branch_bandit_negotiation",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 16}},
+            {"text": "🏃 'I changed mind' - Flee!", "next_scene": "g1_branch_forest_escape",
+             "effects": {"bandits_hostile": True}}
+        ]
+    
+    player.currency += 50  # Pierwsza łupna
+    state.quest_flags["bandit_offer_received"] = True
+    
+    return {
+        "title": title,
+        "text": text,
+        "choices": choices,
+        "location": "forest_road",
+        "npc_present": ["bandit_leader", "bandits"],
+        "moral_choice": True,
+        "critical": True
+    }
+
+
+def get_branch_werewolf_encounter(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Walka lub negocjacje z wilkołakami"""
+    
+    if lang == "pl":
+        title = "🐺 Próba Wilkołaków"
+        text = f"""Alfa wilkołaków **RYCZY.**
+
+**"DOBRZE. Pokażesz swą wartość..."**
+
+Nagle - **ZIEMIA DRŻY.**
+
+Z lasu wyłania się **OGROMNY DEMON** - 15 stóp wysokości. Skóra jak magma.
+
+**"WILKOŁAKI... dajcie mi CZŁOWIEKA... albo was WSZYSTKICH spalę..."**
+
+Alfa warczy: **"Ten las jest NASZ, demonie! ONI pierwszy raz naruszyli pakt!"**
+
+Demon **ATAKUJE!** Wystrzeliwuje kulę ognia!
+
+Wilkołaki skaczą w bok. **TY zostałeś w środku!**
+
+**BOSS FIGHT: MNIEJSZY DEMON (80 HP)**
+
+Możesz walczyć SAM lub z pomocą wilkołaków (ale musisz im zaufać)."""
+        
+        choices = [
+            {"text": "⚔️ WALCZ z demonem sam! (DC 16)", "next_scene": "g1_main_005",
+             "req": {"type": "combat_check"}},
+            {"text": "🐺 'WILKOŁAKI! Razem go zabijemy!' - Sojusz", "next_scene": "g1_branch_werewolf_pact",
+             "effects": {"werewolf_allied": True}},
+            {"text": "🔥 UŻYJ MAGII - spalające uderzenie (DC 15)", "next_scene": "g1_main_005",
+             "req": {"type": "stat_check", "stat": "intelligence", "dc": 15}},
+            {"text": "🏃 UCIEKAJ podczas walki!", "next_scene": "g1_main_002",
+             "effects": {"hp_cost": 25}}
+        ]
+    else:
+        title = "🐺 Werewolves' Trial"
+        text = f"""Alpha werewolf **ROARS.**
+
+**"GOOD. You'll show your worth..."**
+
+Suddenly - **EARTH SHAKES.**
+
+From forest emerges **HUGE DEMON** - 15 feet tall. Skin like magma.
+
+**"WEREWOLVES... give me HUMAN... or I'll burn you ALL..."**
+
+Alpha growls: **"This forest is OURS, demon! THEY first violated pact!"**
+
+Demon **ATTACKS!** Shoots fireball!
+
+Werewolves jump aside. **YOU remained in middle!**
+
+**BOSS FIGHT: LESSER DEMON (80 HP)**
+
+You can fight ALONE or with werewolves' help (but must trust them)."""
+        
+        choices = [
+            {"text": "⚔️ FIGHT demon alone! (DC 16)", "next_scene": "g1_main_005",
+             "req": {"type": "combat_check"}},
+            {"text": "🐺 'WEREWOLVES! Together we'll kill him!' - Alliance", "next_scene": "g1_branch_werewolf_pact",
+             "effects": {"werewolf_allied": True}},
+            {"text": "🔥 USE MAGIC - burning strike (DC 15)", "next_scene": "g1_main_005",
+             "req": {"type": "stat_check", "stat": "intelligence", "dc": 15}},
+            {"text": "🏃 FLEE during fight!", "next_scene": "g1_main_002",
+             "effects": {"hp_cost": 25}}
+        ]
+    
+    return {
+        "title": title,
+        "text": text,
+        "choices": choices,
+        "location": "deep_forest",
+        "combat": True,
+        "boss_fight": True
+    }
+
+
+def get_branch_werewolf_pact(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Pakt z wilkołakami - dostęp do mocy likantropii"""
+    
+    if lang == "pl":
+        title = "🌙 Pakt Księżyca"
+        text = f"""Razem z wilkołakami **ZABIJASZ DEMONA!**
+
+Alfa podchodzi do ciebie. Krew demona dymi na ziemi.
+
+**"Dobrze walczyłeś... CZŁOWIEKU."**
+
+**"Widzę w tobie... coś więcej. Nie jesteś zwykłym śmiertelnikiem."**
+
+Unosi łapę - **NA PAZURACH ŚWIECI KSIĘŻYCOWA MOC.**
+
+**"Dajemy ci WYBÓR."**
+
+**"Możesz odejść jako przyjaciel wilkołaków. Zawsze będziesz bezpieczny w naszym lesie."**
+
+**"LUB... możesz przyjąć **POCAŁUNEK KSIĘŻYCA**. Stać się jednym z nas. Wilkołakiem."**
+
+**"POTĘGA, SZYBKOŚĆ, REGENERACJA... ale też PRZEKLEŃSTWO. Każda pełnia księżyca zmieni cię w bestię."**
+
+**"Co wybierasz?"**"""
+        
+        choices = [
+            {"text": "🐺 AKCEPTUJ - zostań wilkołakiem", "next_scene": "g1_main_002",
+             "effects": {"lycanthropy": True, "werewolf_allied": True, "reputation": -30}},
+            {"text": "🤝 'Dziękuję, ale pozostanę człowiekiem. Będę waszym sojusznikiem.'", "next_scene": "g1_main_002",
+             "effects": {"werewolf_allied": True, "reputation": 20}},
+            {"text": "⚔️ 'To KLĄTWA! Zabije was wszystkich!'", "next_scene": "g1_main_004",
+             "effects": {"werewolves_hostile": True}},
+            {"text": "🤔 'Muszę przemyśleć. Wrócę.'", "next_scene": "g1_main_002",
+             "effects": {"werewolf_offer_pending": True}}
+        ]
+    else:
+        title = "🌙 Moon Pact"
+        text = f"""Together with werewolves you **KILL THE DEMON!**
+
+Alpha approaches you. Demon blood smokes on ground.
+
+**"You fought well... HUMAN."**
+
+**"I see in you... something more. You're not ordinary mortal."**
+
+Raises paw - **ON CLAWS SHINES LUNAR POWER.**
+
+**"We give you CHOICE."**
+
+**"You can leave as friend of werewolves. You'll always be safe in our forest."**
+
+**"OR... you can accept **MOON'S KISS**. Become one of us. Werewolf."**
+
+**"POWER, SPEED, REGENERATION... but also CURSE. Every full moon will change you to beast."**
+
+**"What do you choose?"**"""
+        
+        choices = [
+            {"text": "🐺 ACCEPT - become werewolf", "next_scene": "g1_main_002",
+             "effects": {"lycanthropy": True, "werewolf_allied": True, "reputation": -30}},
+            {"text": "🤝 'Thank you, but I'll remain human. I'll be your ally.'", "next_scene": "g1_main_002",
+             "effects": {"werewolf_allied": True, "reputation": 20}},
+            {"text": "⚔️ 'This is CURSE! I'll kill you all!'", "next_scene": "g1_main_004",
+             "effects": {"werewolves_hostile": True}},
+            {"text": "🤔 'I must think. I'll return.'", "next_scene": "g1_main_002",
+             "effects": {"werewolf_offer_pending": True}}
+        ]
+    
+    state.quest_flags["werewolf_pact_offered"] = True
+    player.currency += 100  # Wilkołaki dają łup z demona
+    
+    return {
+        "title": title,
+        "text": text,
+        "choices": choices,
+        "location": "lunar_clearing",
+        "critical": True,
+        "transformation_available": True
+    }
+
+
+def get_branch_bandit_camp(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Obóz bandytów - dark path kontynuacja"""
+    
+    if lang == "pl":
+        title = "💀 Obóz Bandytów"
+        text = f"""{'**ZABIŁEŚ DZIEWCZYNKĘ.**' if state.quest_flags.get('alignment') == 'evil' else '**OSZUKAŁEŚ ich. Udałeś zabójstwo.**'}
+
+Bandyci prowadzą cię do OBOZU w głębi lasu.
+
+**50+ BANDYTÓW** - namioty, ogniska, stosy łupów.
+
+Lider wskazuje na wielki namiot:
+
+**"Witaj w CZARNYCH KLESZCZACH. Najlepszej bandzie w królestwie."**
+
+**"Nasz szef, VARGOSS NOŻOWNIK, chce cię poznać."**
+
+Wchodzisz do namiotu. **Olbrzym** - 7 stóp wysokości, blizny po całym ciele.
+
+**VARGOSS:** *"Słyszałem że jesteś BEZWZGLĘDNY. Doskonale. Mam dla ciebie robotę."*
+
+**"WIDZIAŁEŚ ten Rozłam nad królestwem? Demony atakują. Chaos. Doskonała pora na PRAWDZIWĄ kradzież."**
+
+**"Idziemy ZŁUPIĆ PAŁAC KRÓLEWSKI. Skarbiec. Zatrudniam cię jako skrytobójcę."**
+
+**"Zabij księżniczkę Elara. Stwórz chaos. My zabierzemy złoto."**
+
+**"Co ty na to?"**"""
+        
+        choices = [
+            {"text": "😈 'Jestem! Kiedy ruszamy?'", "next_scene": "g1_main_013",
+             "effects": {"assassination_mission": True, "bandits_allied": True}},
+            {"text": "💰 'Za jaką cenę? 5000 złota minimum.'", "next_scene": "g1_main_002",
+             "effects": {"negotiation_bandits": True}},
+            {"text": "⚔️ 'NIE! To zdrada królestwa!' - Zabij Vargossa", "next_scene": "g1_main_004",
+             "effects": {"bandits_hostile": True, "reputation": 50}},
+            {"text": "🤔 'Potrzebuję czasu przemyśleć...'", "next_scene": "g1_main_002",
+             "effects": {"assassination_pending": True}}
+        ]
+    else:
+        title = "💀 Bandit Camp"
+        text = f"""{'**YOU KILLED THE GIRL.**' if state.quest_flags.get('alignment') == 'evil' else '**YOU TRICKED them. Faked murder.**'}
+
+Bandits lead you to CAMP deep in forest.
+
+**50+ BANDITS** - tents, campfires, piles of loot.
+
+Leader points to large tent:
+
+**"Welcome to BLACK TICKS. Best gang in kingdom."**
+
+**"Our boss, VARGOSS KNIFER, wants to meet you."**
+
+You enter tent. **Giant** - 7 feet tall, scars all over body.
+
+**VARGOSS:** *"Heard you're RUTHLESS. Perfect. I have job for you."*
+
+**"SAW that Rift over kingdom? Demons attacking. Chaos. Perfect time for REAL theft."**
+
+**"We're going to ROB ROYAL PALACE. Treasury. I'm hiring you as assassin."**
+
+**"Kill princess Elara. Create chaos. We take gold."**
+
+**"What say you?"**"""
+        
+        choices = [
+            {"text": "😈 'I'm in! When do we move?'", "next_scene": "g1_main_013",
+             "effects": {"assassination_mission": True, "bandits_allied": True}},
+            {"text": "💰 'For what price? 5000 gold minimum.'", "next_scene": "g1_main_002",
+             "effects": {"negotiation_bandits": True}},
+            {"text": "⚔️ 'NO! This is treason!' - Kill Vargoss", "next_scene": "g1_main_004",
+             "effects": {"bandits_hostile": True, "reputation": 50}},
+            {"text": "🤔 'I need time to think...'", "next_scene": "g1_main_002",
+             "effects": {"assassination_pending": True}}
+        ]
+    
+    state.quest_flags["bandit_camp_visited"] = True
+    player.currency += 200  # Początkowa zapłata
+    
+    return {
+        "title": title,
+        "text": text,
+        "choices": choices,
+        "location": "bandit_camp",
+        "npc_present": ["vargoss_knifer", "bandit_gang"],
+        "dark_path": True
+    }
+
+
+def get_branch_bandit_negotiation(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Negocjacje z bandytami - uniknięcie zabicia dziecka"""
+    
+    if lang == "pl":
+        title = "💬 Przekonywanie Bandytów"
+        text = f"""Lider bandytów **PATRZY** na ciebie podejrzliwie.
+
+**"Hmm... masz rację. Dzieciak nie jest wart ryzyka."**
+
+**"Może inny test..."**
+
+Rozgląda się. **Wskazuje na KUPCA ukrytego za wozem.**
+
+**"Widzisz tego grubasa? Bogaty kupiec. Ma pierścień ZŁOTY na palcu."**
+
+**"Przynieś mi ten pierścień. Żywy czy martwy - nie obchodzi mnie."**
+
+**"Ale BEZ pierścienia - nie jesteś w bandzie."**
+
+Kupiec drży ze strachu. **Trzyma córkę.** Patrzy na ciebie błągalnie."""
+        
+        choices = [
+            {"text": "⚔️ Zabij kupca - weź pierścień", "next_scene": "g1_branch_bandit_camp",
+             "effects": {"alignment": "evil", "merchant_dead": True}},
+            {"text": "💬 'Oddaj pierścień dobrowolnie. Ocalę ci życie.'", "next_scene": "g1_branch_bandit_camp",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 14}},
+            {"text": "🤝 ZAPŁAĆ za pierścień z własnych pieniędzy (150 gold)", "next_scene": "g1_branch_bandit_camp",
+             "req": {"currency": 150}},
+            {"text": "⚔️ 'DOSYĆ TEJ KOMEDII!' - Zabij bandytów", "next_scene": "g1_main_004",
+             "effects": {"bandits_hostile": True}}
+        ]
+    else:
+        title = "💬 Convincing Bandits"
+        text = f"""Bandit leader **STARES** at you suspiciously.
+
+**"Hmm... you're right. Kid isn't worth risk."**
+
+**"Maybe different test..."**
+
+Looks around. **Points to MERCHANT hidden behind wagon.**
+
+**"See that fatso? Rich merchant. Has GOLDEN ring on finger."**
+
+**"Bring me that ring. Alive or dead - don't care."**
+
+**"But WITHOUT ring - you're not in gang."**
+
+Merchant trembles in fear. **Holds daughter.** Looks at you pleadingly."""
+        
+        choices = [
+            {"text": "⚔️ Kill merchant - take ring", "next_scene": "g1_branch_bandit_camp",
+             "effects": {"alignment": "evil", "merchant_dead": True}},
+            {"text": "💬 'Give ring willingly. I'll spare your life.'", "next_scene": "g1_branch_bandit_camp",
+             "req": {"type": "stat_check", "stat": "charisma", "dc": 14}},
+            {"text": "🤝 PAY for ring from own money (150 gold)", "next_scene": "g1_branch_bandit_camp",
+             "req": {"currency": 150}},
+            {"text": "⚔️ 'ENOUGH OF THIS!' - Kill bandits", "next_scene": "g1_main_004",
+             "effects": {"bandits_hostile": True}}
+        ]
+    
+    return {
+        "title": title,
+        "text": text,
+        "choices": choices,
+        "location": "forest_road",
+        "npc_present": ["bandit_leader", "merchant", "girl"],
+        "moral_choice": True
+    }
+
+
+# ==================== COMBAT BRANCHES ====================
+
+def get_branch_fight_guards(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Walka ze strażnikami do końca - TPK risk"""
+    
+    if lang == "pl":
+        text = f"""**⚔️ WALCZYSZ DO KOŃCA! ⚔️**
+
+5 strażników **OTACZA** cię ze wszystkich stron!
+
+**Sir Theron Ironclad** - weteran, dowódca
+**⚔️** 3 x Ciężkie Ostrza - strażnicy elitarni
+**🏹** 1 x Łucznik - z wieży
+
+{player.character.name}, to **SAMOBÓJSTWO**!
+
+**Sir Theron**: *"Myślałeś, że poradzisz sobie z moim oddziałem? NAIWNY IMBECYLU!"*
+
+```asciidoc
+╔═══════════════════════╗
+║   COMBAT: 5 vs 1      ║
+║   TPK RISK: BARDZO    ║
+║   WYSOKIE             ║
+╚═══════════════════════╝
+```
+
+**ATAK #1:** Sir Theron - ciężki chwyt po głowie!
+**-25 HP** - Widzisz gwiazdki
+
+**ATAK #2:** Strażnik atakuje z lewej!
+**-15 HP** - Głębokie cięcie w ramię
+
+**ATAK #3:** Łucznik zza pleców!
+**-10 HP** - Strzała w udo
+
+**Twój HP:** {max(0, player.stats.hp - 50)}/{player.stats.hp}
+
+**Sir Theron:** *"To KONIEC dla ciebie, zdrajco!"*
+
+Podnosi miecz na **OSTATECZNY CIOS**..."""
+        
+        choices = [
+            {"text": "🤺 DESPERACKA AKROBACJA! (DC 20 DEX)", "next_scene": "g1_main_013", "requires_roll": True, "stat": "dexterity", "dc": 20, "effect": {"hp": -50}},
+            {"text": "💀 PRZYJMIJ CIOS - umierasz", "next_scene": "g1_end_death_guards", "effect": {"hp": -999}},
+            {"text": "😭 'BŁAGAM O LITOŚĆ!'", "next_scene": "g1_branch_grovel", "effect": {"reputation": -75}},
+        ]
+    else:
+        text = f"""**⚔️ YOU FIGHT TO THE END! ⚔️**
+
+5 guards **SURROUND** you from all sides!
+
+**Sir Theron Ironclad** - veteran, commander
+**⚔️** 3 x Heavy Blades - elite guards
+**🏹** 1 x Archer - from tower
+
+{player.character.name}, this is **SUICIDE**!
+
+**Sir Theron**: *"You thought you could handle my unit? NAIVE FOOL!"*
+
+```asciidoc
+╔═══════════════════════╗
+║   COMBAT: 5 vs 1      ║
+║   TPK RISK: VERY      ║
+║   HIGH                ║
+╚═══════════════════════╝
+```
+
+**ATTACK #1:** Sir Theron - heavy strike to head!
+**-25 HP** - You see stars
+
+**ATTACK #2:** Guard attacks from left!
+**-15 HP** - Deep cut in arm
+
+**ATTACK #3:** Archer from behind!
+**-10 HP** - Arrow in thigh
+
+**Your HP:** {max(0, player.stats.hp - 50)}/{player.stats.hp}
+
+**Sir Theron:** *"This is the END for you, traitor!"*
+
+He raises sword for **FINAL BLOW**..."""
+        
+        choices = [
+            {"text": "🤺 DESPERATE ACROBATICS! (DC 20 DEX)", "next_scene": "g1_main_013", "requires_roll": True, "stat": "dexterity", "dc": 20, "effect": {"hp": -50}},
+            {"text": "💀 ACCEPT STRIKE - you die", "next_scene": "g1_end_death_guards", "effect": {"hp": -999}},
+            {"text": "😭 'BEG FOR MERCY!'", "next_scene": "g1_branch_grovel", "effect": {"reputation": -75}},
+        ]
+    
+    return {
+        "title": "Walka do końca" if lang == "pl" else "Fight to the End",
+        "text": text,
+        "choices": choices,
+        "location": "stormhold_keep",
+        "combat": True,
+        "boss_fight": True,
+        "npc_present": ["sir_theron", "guards_x4"]
+    }
+
+
+def get_branch_escape_fortress(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Ucieczka - skok z muru twierdzy"""
+    
+    if lang == "pl":
+        text = f"""**🏃 UCIEKASZ! 🏃**
+
+Wybiegasz w stronę muru!
+
+**Sir Theron:** *"ZŁAPAĆ GO!"*
+
+Strażnicy ruszają w pogoń, ale jesteś **SZYBSZY**!
+
+Dobiegasz do krawędzi muru. **30 STÓP** w dół do fosy!
+
+**Żadnych opcji!** Musisz **SKOCZYĆ**!
+
+```asciidoc
+╔════════════════════════╗
+║  MUR TWIERDZY: 30 FT   ║
+║  W DÓL: FOSA Z WODĄ    ║
+╚════════════════════════╝
+```
+
+**SKACZESZ!**
+
+**SPLASH!** Wpadasz do fosy!
+
+💧 Zimna woda. Twoje zbroja ciągnie cię w dół.
+💧 Odpychasz się od kamieni.
+💧 Wypływasz na powierzchnię!
+
+**-20 HP** - Upadek zranił cię (stłuczenia, sińce)
+
+**Twoje HP:** {max(0, player.stats.hp - 20)}/{player.stats.hp}
+
+**STRAŻNICY Z GÓRY:** *"UCIEKŁ! Powiadomić lord Garricka!"*
+
+**🏹 STRZAŁY** spadają wokół ciebie!
+
+Płyniesz w stronę lasu. Musisz **SZYBKO** zniknąć z pola widzenia!
+
+{player.character.name}, udało się... ale **CENA** była wysoka.
+Teraz jesteś **ZBIEGIEM** w oczach całej twierdzy."""
+        
+        choices = [
+            {"text": "🌲 Uciekaj do lasu!", "next_scene": "g1_main_011", "effect": {"hp": -20, "reputation": -30}},
+            {"text": "📜 [ROGUE] Ukryj się w bagnie (DC 15)", "next_scene": "g1_main_013", "requires_roll": True, "stat": "dexterity", "dc": 15, "effect": {"hp": -20}},
+        ]
+    else:
+        text = f"""**🏃 YOU FLEE! 🏃**
+
+You sprint toward the wall!
+
+**Sir Theron:** *"CATCH HIM!"*
+
+Guards give chase, but you're **FASTER**!
+
+You reach the wall's edge. **30 FEET** down to moat!
+
+**No options!** You must **JUMP**!
+
+```asciidoc
+╔════════════════════════╗
+║  FORTRESS WALL: 30 FT  ║
+║  DOWN: WATER MOAT      ║
+╚════════════════════════╝
+```
+
+**YOU JUMP!**
+
+**SPLASH!** You hit the moat!
+
+💧 Cold water. Your armor drags you down.
+💧 You push off rocks.
+💧 You surface!
+
+**-20 HP** - Fall injured you (bruises, contusions)
+
+**Your HP:** {max(0, player.stats.hp - 20)}/{player.stats.hp}
+
+**GUARDS FROM ABOVE:** *"HE ESCAPED! Inform lord Garrick!"*
+
+**🏹 ARROWS** rain around you!
+
+You swim toward forest. Must **QUICKLY** vanish from sight!
+
+{player.character.name}, you made it... but **PRICE** was high.
+Now you're a **FUGITIVE** in eyes of entire fortress."""
+        
+        choices = [
+            {"text": "🌲 Flee to forest!", "next_scene": "g1_main_011", "effect": {"hp": -20, "reputation": -30}},
+            {"text": "📜 [ROGUE] Hide in swamp (DC 15)", "next_scene": "g1_main_013", "requires_roll": True, "stat": "dexterity", "dc": 15, "effect": {"hp": -20}},
+        ]
+    
+    return {
+        "title": "Ucieczka z twierdzy" if lang == "pl" else "Fortress Escape",
+        "text": text,
+        "choices": choices,
+        "location": "stormhold_moat",
+        "danger": True
+    }
+
+
+def get_branch_grovel(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Przeprosiny - błaganie o litość"""
+    
+    if lang == "pl":
+        text = f"""**🙏 BŁAGASZ O LITOŚĆ! 🙏**
+
+Upuszczasz broń i klęczysz!
+
+**{player.character.name}:** *"PRZEPRASZAM! To był impuls! Nie chciałem tego zrobić!"*
+
+Strażnicy zatrzymują się. **Sir Theron** patrzy na ciebie z **POGARDĄ**.
+
+**Sir Theron:** *"Impuls? IMPULS?! Zaatakowałeś RYCERZA KRÓLESTWA!"*
+
+Kopnięciem przewraca cię na ziemię.
+
+**-10 HP** - Ból w żebrach
+
+**Sir Theron:** *"Jesteś TCHÓRZEM, nie wojownikiem!"*
+
+```asciidoc
+╔══════════════════════════╗
+║  REPUTACJA: -50          ║
+║  STATUS: "TCHÓRZ"        ║
+╚══════════════════════════╝
+```
+
+**Sir Theron** stoi nad tobą z mieczem przy gardle.
+
+**"Dam ci JEDNĄ szansę: Opuść tę twierdzę NATYCHMIAST i nigdy nie wracaj. Jeśli zobaczę cię ponownie... ZABIJE CIĘ NA MIEJSCU."**
+
+Strażnicy podnoszą cię brutalnie i **WYRZUCAJĄ** za bramę twierdzy.
+
+Lądasz w błocie. **PONIŻONY**.
+
+Ludzie patrzą na ciebie z **POGARDĄ**. Słowo rozejdzie się szybko:
+*"{player.character.name} to TCHÓRZ - zaatakowat rycerza i ZARAZ SIĘ POŁOŻYŁ!"*
+
+Twoja **REPUTACJA** jest zniszczona."""
+        
+        choices = [
+            {"text": "😞 Odejdź w hańbie", "next_scene": "g1_main_011", "effect": {"hp": -10, "reputation": -100}},
+            {"text": "😠 'Jeszcze wrócę!' - zapamiętaj to", "next_scene": "g1_main_011", "effect": {"hp": -10, "reputation": -100}, "sets_flag": "revenge_on_theron"},
+        ]
+    else:
+        text = f"""**🙏 YOU BEG FOR MERCY! 🙏**
+
+You drop weapon and kneel!
+
+**{player.character.name}:** *"I'M SORRY! It was impulse! I didn't mean it!"*
+
+Guards stop. **Sir Theron** looks at you with **CONTEMPT**.
+
+**Sir Theron:** *"Impulse? IMPULSE?! You attacked a KNIGHT OF THE REALM!"*
+
+He kicks you to ground.
+
+**-10 HP** - Pain in ribs
+
+**Sir Theron:** *"You're a COWARD, not a warrior!"*
+
+```asciidoc
+╔══════════════════════════╗
+║  REPUTATION: -50         ║
+║  STATUS: "COWARD"        ║
+╚══════════════════════════╝
+```
+
+**Sir Theron** stands over you with sword at throat.
+
+**"I'll give you ONE chance: Leave this fortress IMMEDIATELY and never return. If I see you again... I'LL KILL YOU ON SPOT."**
+
+Guards lift you brutally and **THROW** you outside fortress gate.
+
+You land in mud. **HUMILIATED**.
+
+People look at you with **CONTEMPT**. Word will spread fast:
+*"{player.character.name} is a COWARD - attacked knight and INSTANTLY GROVELED!"*
+
+Your **REPUTATION** is destroyed."""
+        
+        choices = [
+            {"text": "😞 Leave in shame", "next_scene": "g1_main_011", "effect": {"hp": -10, "reputation": -100}},
+            {"text": "😠 'I'll be back!' - remember this", "next_scene": "g1_main_011", "effect": {"hp": -10, "reputation": -100}, "sets_flag": "revenge_on_theron"},
+        ]
+    
+    # Set coward status
+    state.quest_flags["coward_status"] = True
+    state.quest_flags["sir_theron_enemy"] = True
+    
+    return {
+        "title": "Tchórz" if lang == "pl" else "Coward",
+        "text": text,
+        "choices": choices,
+        "location": "stormhold_gates",
+        "reputation_loss": True
+    }
+
+
+# ==================== DRAGON BRANCHES ====================
+
+def get_branch_dragon_sacrifice(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Smok się poświęca - heroiczne zakończenie"""
+    
+    if lang == "pl":
+        text = f"""**🐉 PYRAXIS PODEJMUJE DECYZJĘ 🐉**
+
+Rozłam **PULSUJE** potworną energią.
+
+**Pyraxis** rozłożył swoje ogromne skrzydła. Jego złote oczy patrzą na ciebie z **DETERMINACJĄ**.
+
+**Pyraxis:** *"{player.character.name}... byłeś lojalnym sojusznikiem. Pokazałeś mi, że ludzie potrafią być szlachetni."*
+
+```asciidoc
+  🐉
+▀▄▀▄▀▄▀▄▀
+SMOK PODEJMUJE
+OSTATECZNĄ 
+DECYZJĘ
+▀▄▀▄▀▄▀▄▀
+```
+
+**Pyraxis:** *"ROZŁAM wymaga ogromnej mocy żywotnej, aby się zamknąć. Moja magia smoka... moja ESENCJA może go uszczelnić."*
+
+**Ty:** *"NIE! Pyraxis! Znajdziemy inny sposób!"*
+
+**Pyraxis uśmiecha się smutno.**
+
+**Pyraxis:** *"Nie ma innego sposobu, młody wojowniku. Ale TO... to jest WŁAŚCIWY wybór."*
+
+**PYRAXIS LECI W STRONĘ ROZŁAMU!**
+
+Jego złote ciało **ROZBŁYSKA** oślepiającym światłem!
+
+**⚡ ROZŁAM POCHŁANIA ENERGIĘ SMOKA! ⚡**
+
+```asciidoc
+████ PYRAXIS ████
+░▒▓█ WCHODZI █▓▒░
+███ DO OTCHŁANI ███
+```
+
+**WYBUCH MAGII!**
+
+Rozłam **KURCZY SIĘ**... 
+Pomniejsza się...
+Zamyka...
+
+**ZABLIŹNIA SIĘ.**
+
+**💫 ROZŁAM ZAMKNIĘTY 💫**
+
+Pyraxis znikł. Jego ofiara **URATOWAŁA** królestwo.
+
+Ludzie patrzą w niebo z **ŁZAMI**.
+
+**Wioska ocalona.** 100 cywilów żyje dzięki smokom.
+
+{player.character.name}, Pyraxis odszedł... ale jego **DZIEDZICTWO** pozostanie NA WIEKI."""
+        
+        choices = [
+            {"text": "😭 Opłakuj smoka", "next_scene": "g1_end_dragon_hero", "effect": {"reputation": 200}},
+            {"text": "🙏 'Dziękuję, stary przyjacielu...'", "next_scene": "g1_end_dragon_hero", "effect": {"reputation": 200}},
+        ]
+    else:
+        text = f"""**🐉 PYRAXIS MAKES HIS DECISION 🐉**
+
+The Rift **PULSES** with monstrous energy.
+
+**Pyraxis** spread his massive wings. His golden eyes look at you with **DETERMINATION**.
+
+**Pyraxis:** *"{player.character.name}... you've been a loyal ally. You showed me that humans can be noble."*
+
+```asciidoc
+  🐉
+▀▄▀▄▀▄▀▄▀
+DRAGON MAKES
+THE FINAL 
+DECISION
+▀▄▀▄▀▄▀▄▀
+```
+
+**Pyraxis:** *"The RIFT requires immense life force to close. My dragon magic... my ESSENCE can seal it."*
+
+**You:** *"NO! Pyraxis! We'll find another way!"*
+
+**Pyraxis smiles sadly.**
+
+**Pyraxis:** *"There is no other way, young warrior. But THIS... this is the RIGHT choice."*
+
+**PYRAXIS FLIES TOWARD THE RIFT!**
+
+His golden body **BLAZES** with blinding light!
+
+**⚡ RIFT ABSORBS DRAGON ENERGY! ⚡**
+
+```asciidoc
+████ PYRAXIS ████
+░▒▓█ ENTERS █▓▒░
+███ THE ABYSS ███
+```
+
+**MAGIC EXPLOSION!**
+
+The Rift **SHRINKS**... 
+Diminishes...
+Closes...
+
+**SEALS SHUT.**
+
+**💫 RIFT CLOSED 💫**
+
+Pyraxis is gone. His sacrifice **SAVED** the kingdom.
+
+People look to sky with **TEARS**.
+
+**Village saved.** 100 civilians live thanks to the dragon.
+
+{player.character.name}, Pyraxis is gone... but his **LEGACY** will remain FOREVER."""
+        
+        choices = [
+            {"text": "😭 Mourn the dragon", "next_scene": "g1_end_dragon_hero", "effect": {"reputation": 200}},
+            {"text": "🙏 'Thank you, old friend...'", "next_scene": "g1_end_dragon_hero", "effect": {"reputation": 200}},
+        ]
+    
+    # Set dragon sacrifice flags
+    state.quest_flags["dragon_sacrificed"] = True
+    state.quest_flags["rift_sealed"] = True
+    state.quest_flags["village_saved"] = True
+    
+    return {
+        "title": "Ofiara smoka" if lang == "pl" else "Dragon's Sacrifice",
+        "text": text,
+        "choices": choices,
+        "location": "dimensional_rift",
+        "epic_moment": True
+    }
+
+
+def get_branch_village_sacrifice(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Poświęcenie wioski - dark path"""
+    
+    if lang == "pl":
+        text = f"""**😭 DECYDUJESZ POŚWIĘCIĆ WIOSKĘ 😭**
+
+**Pyraxis** patrzy na ciebie z **NIEDOWIERZANIEM**.
+
+**Pyraxis:** *"...Chcesz poświęcić 100 NIEWINNYCH ludzi?"*
+
+**Ty:** *"Nie mamy wyboru! Rozłam się rozrasta! To oni... albo cały region!"*
+
+**Pyraxis:** *"To... to jest POTWORNOŚĆ! Myślałem, że jesteś lepszy!"*
+
+```asciidoc
+╔══════════════════════════╗
+║   WIOSKA: 100 CYWILÓW    ║
+║   - 23 dzieci            ║
+║   - 35 kobiet            ║
+║   - 42 mężczyzn          ║
+╚══════════════════════════╝
+```
+
+Ale **NIE MA CZASU** na debatę.
+
+**WYSYŁASZ WIOSKĘ W STRONĘ ROZŁAMU!**
+
+Cywile **KRZYCZĄ** w panice! Nie rozumieją co się dzieje!
+
+**Matka:** *"DLACZEGO NAS WYSYŁACIE?!"*
+**Dziecko:** *"MAMO! MAMO!"*
+
+**⚡ ROZŁAM POCHŁANIA WIOSKĘ ⚡**
+
+```asciidoc
+░░░ 100 DUSZ ░░░
+▓▓▓ POCHŁONIĘTE ▓▓▓
+███ PRZEZ OTCHŁAŃ ███
+```
+
+Krzyki cichną. Cisza.
+
+**ROZŁAM ZAMYKA SIĘ.**
+
+Wioski już nie ma. 100 ludzi... ZNIKNĘŁO.
+
+**Pyraxis** odlatuje bez słowa. Pakt ZERWANY.
+
+Ty stoisz sam. Ocalałeś królestwo... ale **CENĄ** było sumienie.
+
+{player.character.name}, **JAK będziesz z tym żyć?**"""
+        
+        choices = [
+            {"text": "😔 'Musiało tak być...'", "next_scene": "g1_end_dark_sacrifice", "effect": {"reputation": -300}},
+            {"text": "😭 Załamanie - co ja zrobiłem?", "next_scene": "g1_end_dark_sacrifice", "effect": {"reputation": -300}},
+        ]
+    else:
+        text = f"""**😭 YOU DECIDE TO SACRIFICE VILLAGE 😭**
+
+**Pyraxis** looks at you with **DISBELIEF**.
+
+**Pyraxis:** *"...You want to sacrifice 100 INNOCENT people?"*
+
+**You:** *"We have no choice! Rift is growing! It's them... or the entire region!"*
+
+**Pyraxis:** *"This... this is MONSTROUS! I thought you were better!"*
+
+```asciidoc
+╔══════════════════════════╗
+║   VILLAGE: 100 CIVILIANS ║
+║   - 23 children          ║
+║   - 35 women             ║
+║   - 42 men               ║
+╚══════════════════════════╝
+```
+
+But there's **NO TIME** for debate.
+
+**YOU SEND VILLAGE TOWARD THE RIFT!**
+
+Civilians **SCREAM** in panic! They don't understand what's happening!
+
+**Mother:** *"WHY ARE YOU SENDING US?!"*
+**Child:** *"MOMMY! MOMMY!"*
+
+**⚡ RIFT DEVOURS THE VILLAGE ⚡**
+
+```asciidoc
+░░░ 100 SOULS ░░░
+▓▓▓ CONSUMED ▓▓▓
+███ BY THE ABYSS ███
+```
+
+Screams fade. Silence.
+
+**RIFT CLOSES.**
+
+Village is gone. 100 people... VANISHED.
+
+**Pyraxis** flies away without word. Pact BROKEN.
+
+You stand alone. You saved kingdom... but **PRICE** was your conscience.
+
+{player.character.name}, **HOW will you live with this?**"""
+        
+        choices = [
+            {"text": "😔 'It had to be done...'", "next_scene": "g1_end_dark_sacrifice", "effect": {"reputation": -300}},
+            {"text": "😭 Breakdown - what have I done?", "next_scene": "g1_end_dark_sacrifice", "effect": {"reputation": -300}},
+        ]
+    
+    # Set dark sacrifice flags
+    state.quest_flags["village_sacrificed"] = True
+    state.quest_flags["dragon_pact_broken"] = True
+    state.quest_flags["rift_sealed"] = True
+    state.quest_flags["blood_on_hands"] = True
+    
+    return {
+        "title": "Mroczna ofiara" if lang == "pl" else "Dark Sacrifice",
+        "text": text,
+        "choices": choices,
+        "location": "dimensional_rift",
+        "dark_path": True,
+        "massive_reputation_loss": True
+    }
+
+
+def get_branch_dragon_betrayal(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Zdrada smoka - zerwanie paktu"""
+    
+    if lang == "pl":
+        text = f"""**😠 ZRYWASZ PAKT ZE SMOKIEM! 😠**
+
+**Ty:** *"ZDRADZIŁEŚ MNIE, Pyraxis! Ukrywałeś PRAWDĘ o Rozłamie!"*
+
+**Pyraxis** cofa się. W jego złotych oczach - **ZAWÓD**.
+
+**Pyraxis:** *"Ukrywałem? Mówiłem ci WSZYSTKO, co było bezpieczne! Pełna prawda by cię ZABIŁA!"*
+
+**Ty:** *"KŁAMSTWA! Nie mogę ci już ufać!"*
+
+```asciidoc
+╔═══════════════════════╗
+║  PAKT: ZERWANY ❌     ║
+║  SOJUSZ: KONIEC       ║
+╚═══════════════════════╝
+```
+
+**Pyraxis** prostuje się do pełnej wysokości. 40 STÓP smoka looms nad tobą.
+
+**Pyraxis:** *"Więc tak to się kończy. Dałem ci MĄDROŚĆ. Dałem ci MOJE ZAUFANIE."*
+
+**Pyraxis:** *"A ty odrzucasz wszystko przez **DUMĘ**."*
+
+Smok odwraca się i rozpościera skrzydła.
+
+**Pyraxis:** *"Idź swoją drogą, {player.character.name}. Ale bez mojej pomocy... twoja MISJA będzie DUŻO trudniejsza."*
+
+**WYRUSZASZ SAM.**
+
+```asciidoc
+━━━━━━━━━━━━━━━━━
+STRATY PO ZDRADZIE:
+━━━━━━━━━━━━━━━━━
+❌ Mądrość smoka
+❌ Magiczne wsparcie
+❌ Lot na grzbiecie smoka
+❌ +150 reputation bonus
+━━━━━━━━━━━━━━━━━
+```
+
+Rozłam nadal **PULSUJE**. Demony nadal atakują.
+
+Ale teraz... jesteś **SAM**."""
+        
+        choices = [
+            {"text": "😤 'Nie potrzebuję smoka!'", "next_scene": "g1_main_025", "effect": {"reputation": -50}},
+            {"text": "😞 'Może popełniłem błąd...'", "next_scene": "g1_main_025", "sets_flag": "regrets_betrayal"},
+            {"text": "🙏 'CZEKAJ! Przepraszam!' (DC 18 CHA)", "next_scene": "g1_main_024", "requires_roll": True, "stat": "charisma", "dc": 18},
+        ]
+    else:
+        text = f"""**😠 YOU BREAK PACT WITH DRAGON! 😠**
+
+**You:** *"YOU BETRAYED ME, Pyraxis! You hid the TRUTH about the Rift!"*
+
+**Pyraxis** backs away. In his golden eyes - **DISAPPOINTMENT**.
+
+**Pyraxis:** *"Hid? I told you EVERYTHING that was safe! Full truth would have KILLED you!"*
+
+**You:** *"LIES! I can't trust you anymore!"*
+
+```asciidoc
+╔═══════════════════════╗
+║  PACT: BROKEN ❌      ║
+║  ALLIANCE: ENDED      ║
+╚═══════════════════════╝
+```
+
+**Pyraxis** rises to full height. 40 FEET of dragon looms over you.
+
+**Pyraxis:** *"So this is how it ends. I gave you WISDOM. I gave you MY TRUST."*
+
+**Pyraxis:** *"And you reject everything due to **PRIDE**."*
+
+Dragon turns and spreads wings.
+
+**Pyraxis:** *"Go your own way, {player.character.name}. But without my help... your MISSION will be MUCH harder."*
+
+**YOU DEPART ALONE.**
+
+```asciidoc
+━━━━━━━━━━━━━━━━━
+LOSSES FROM BETRAYAL:
+━━━━━━━━━━━━━━━━━
+❌ Dragon wisdom
+❌ Magical support
+❌ Flight on dragon's back
+❌ +150 reputation bonus
+━━━━━━━━━━━━━━━━━
+```
+
+Rift still **PULSES**. Demons still attack.
+
+But now... you're **ALONE**."""
+        
+        choices = [
+            {"text": "😤 'I don't need dragon!'", "next_scene": "g1_main_025", "effect": {"reputation": -50}},
+            {"text": "😞 'Maybe I made mistake...'", "next_scene": "g1_main_025", "sets_flag": "regrets_betrayal"},
+            {"text": "🙏 'WAIT! I'm sorry!' (DC 18 CHA)", "next_scene": "g1_main_024", "requires_roll": True, "stat": "charisma", "dc": 18},
+        ]
+    
+    # Set betrayal flags
+    state.quest_flags["dragon_betrayed"] = True
+    state.quest_flags["dragon_pact_broken"] = True
+    state.quest_flags["solo_path"] = True
+    
+    return {
+        "title": "Zdrada" if lang == "pl" else "Betrayal",
+        "text": text,
+        "choices": choices,
+        "location": "dragon_lair",
+        "pact_broken": True
+    }
+
+
+def get_branch_kill_dragon(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Zabij smoka - boss fight"""
+    
+    if lang == "pl":
+        text = f"""**⚔️ ATAKUJESZ PYRAXISA! ⚔️**
+
+**Ty:** *"ZABIJĘ CIĘ ZA TO!"*
+
+Twój miecz **BŁYSKA** w powietrzu!
+
+**Pyraxis UNIKA** - łatwo, płynnie.
+
+**Pyraxis:** *"Więc WYBRAŁEŚ śmierć. Tak niech będzie."*
+
+```asciidoc
+╔════════════════════════╗
+║   🐉 BOSS FIGHT 🐉     ║
+║   PYRAXIS THE GOLDEN   ║
+║   HP: 300              ║
+║   ANCIENT DRAGON       ║
+╚════════════════════════╝
+```
+
+**Pyraxis ATAKUJE!**
+
+**🔥 PŁOMIENIE!** - Potężny strumień ognia!
+**-40 HP** - Twoja zbroja się topi!
+
+**Twoje HP:** {max(0, player.stats.hp - 40)}/{player.stats.hp}
+
+**Pyraxis:** *"Myślałeś, że możesz ZABIĆ SMOKA?! Jestem STARSZY niż twoje królestwo!"*
+
+**ATAK #2:** Ogonem - przeleciałeś 20 stóp!
+**-25 HP** - Uderzyłeś o ścianę jaskini
+
+**Twoje HP:** {max(0, player.stats.hp - 65)}/{player.stats.hp}
+
+**Pyraxis unosi się nad tobą - OGROMNY, POTĘŻNY.**
+
+**Pyraxis:** *"To twoja OSTATNIA szansa: Przeproś... lub GIŃ."*"""
+        
+        choices = [
+            {"text": "⚔️ 'NIGDY!' - Walcz dalej (DC 22)", "next_scene": "g1_end_death_dragon", "requires_roll": True, "stat": "strength", "dc": 22, "effect": {"hp": -65}},
+            {"text": "🙏 'Przepraszam... miałeś rację'", "next_scene": "g1_main_024", "effect": {"hp": -65, "reputation": -75}},
+            {"text": "🏃 UCIEKAJ z jaskini!", "next_scene": "g1_main_025", "effect": {"hp": -65}, "sets_flag": "fled_from_dragon"},
+        ]
+    else:
+        text = f"""**⚔️ YOU ATTACK PYRAXIS! ⚔️**
+
+**You:** *"I'LL KILL YOU FOR THIS!"*
+
+Your sword **FLASHES** in air!
+
+**Pyraxis DODGES** - easily, fluidly.
+
+**Pyraxis:** *"So you CHOSE death. So be it."*
+
+```asciidoc
+╔════════════════════════╗
+║   🐉 BOSS FIGHT 🐉     ║
+║   PYRAXIS THE GOLDEN   ║
+║   HP: 300              ║
+║   ANCIENT DRAGON       ║
+╚════════════════════════╝
+```
+
+**Pyraxis ATTACKS!**
+
+**🔥 FLAMES!** - Powerful fire stream!
+**-40 HP** - Your armor melts!
+
+**Your HP:** {max(0, player.stats.hp - 40)}/{player.stats.hp}
+
+**Pyraxis:** *"You thought you could KILL A DRAGON?! I'm OLDER than your kingdom!"*
+
+**ATTACK #2:** Tail sweep - you flew 20 feet!
+**-25 HP** - You hit cave wall
+
+**Your HP:** {max(0, player.stats.hp - 65)}/{player.stats.hp}
+
+**Pyraxis hovers above you - MASSIVE, POWERFUL.**
+
+**Pyraxis:** *"This is your LAST chance: Apologize... or DIE."*"""
+        
+        choices = [
+            {"text": "⚔️ 'NEVER!' - Keep fighting (DC 22)", "next_scene": "g1_end_death_dragon", "requires_roll": True, "stat": "strength", "dc": 22, "effect": {"hp": -65}},
+            {"text": "🙏 'I'm sorry... you were right'", "next_scene": "g1_main_024", "effect": {"hp": -65, "reputation": -75}},
+            {"text": "🏃 FLEE from cave!", "next_scene": "g1_main_025", "effect": {"hp": -65}, "sets_flag": "fled_from_dragon"},
+        ]
+    
+    # Set dragon combat flags
+    state.quest_flags["attacked_dragon"] = True
+    state.quest_flags["dragon_hostile"] = True
+    
+    return {
+        "title": "Walka ze smokiem" if lang == "pl" else "Dragon Fight",
+        "text": text,
+        "choices": choices,
+        "location": "dragon_lair",
+        "combat": True,
+        "boss_fight": True,
+        "extreme_danger": True
+    }
+
+
+# ==================== REBELLION BRANCHES ====================
+
+def get_branch_demon_negotiation(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Negocjacje z arcydemonem"""
+    
+    if lang == "pl":
+        text = f"""**🤝 PRÓBUJESZ NEGOCJOWAĆ Z DEMONEM! 🤝**
+
+Wchodzisz bliżej **ROZŁAMU**.
+
+Potworny **ARCHDEMON** wychyla się z Otchłani - 20 STÓP wysokości, rogi jak miecze, oczy jak płonące węgle.
+
+**Archdemon:** *"Śmiertelnik... OŚMIELASZ SIĘ rozmawiać ze mną?"*
+
+Jego głos rezonuje w twojej głowie jak grzmot.
+
+```asciidoc
+╔═════════════════════════╗
+║   😈 ARCHDEMON 😈       ║
+║   Velgorath Płomienisty ║
+║   Władca Otchłani       ║
+╚═════════════════════════╝
+```
+
+**{player.character.name}:** *"Słuchaj mnie! Ten konflikt nikogo nie ratuje! Twoi królowie otchłani używają cię jak pionka!"*
+
+**Velgorath ŚMIEJE SIĘ** - dźwięk jak trzask skał.
+
+**Velgorath:** *"PIONKA? Ja?! Jesteś **ŚMIESZNY**, śmiertelniku!"*
+
+**Ty:** *"Myślisz, że wysłali cię tu z dobroci serca? To **PUŁAPKA**! Gdy rozłam się zamknie, będziesz UWIĘZIONY w naszym świecie! Odcięty od Otchłani!"*
+
+**Velgorath zatrzymuje się.**
+
+**Velgorath:** *"...Co powiedziałeś?"*
+
+**Ty:** *"Rozłam jest **NIESTABILNY**. Gdy zamknie się naturalnie, zamknie się NA ZAWSZE. Z TOBĄ po tej stronie. Bez mocy Otchłani... będziesz **ŚMIERTELNY**."*
+
+```asciidoc
+[CHA CHECK: DC 18]
+Przekonaj demona, że jest 
+oszukiwany przez swoich 
+własnych panów.
+```
+
+**Velgorath patrzy w głąb Rozłamu.**
+
+**Velgorath:** *"...Kłamiesz, śmiertelniku. Ale jeśli NIE kłamiesz..."*
+
+Co oferujesz?"""
+        
+        choices = [
+            {"text": "🤝 'Pomogę ci wrócić bezpiecznie' (DC 18 CHA)", "next_scene": "g1_main_023", "requires_roll": True, "stat": "charisma", "dc": 18, "sets_flag": "demon_negotiated"},
+            {"text": "🗡️ 'Wracaj SAM - albo ginjest!' (DC 16 INT)", "next_scene": "g1_main_023", "requires_roll": True, "stat": "intelligence", "dc": 16},
+            {"text": "💰 'Dam ci 500 złota za odwrót'", "next_scene": "g1_main_023", "effect": {"gold": -500}, "sets_flag": "demon_bribed"},
+            {"text": "⚔️ 'To była sztuczka!' - ATAK", "next_scene": "g1_main_022", "effect": {"reputation": -25}},
+        ]
+    else:
+        text = f"""**🤝 YOU TRY TO NEGOTIATE WITH DEMON! 🤝**
+
+You step closer to the **RIFT**.
+
+A monstrous **ARCHDEMON** leans out from the Abyss - 20 FEET tall, horns like swords, eyes like burning coals.
+
+**Archdemon:** *"Mortal... you DARE speak to me?"*
+
+His voice resonates in your head like thunder.
+
+```asciidoc
+╔═════════════════════════╗
+║   😈 ARCHDEMON 😈       ║
+║   Velgorath the Burning ║
+║   Lord of the Abyss     ║
+╚═════════════════════════╝
+```
+
+**{player.character.name}:** *"Listen to me! This conflict saves no one! Your abyss lords are using you as a pawn!"*
+
+**Velgorath LAUGHS** - sound like cracking rocks.
+
+**Velgorath:** *"A PAWN? Me?! You are **AMUSING**, mortal!"*
+
+**You:** *"You think they sent you here out of kindness? It's a **TRAP**! When rift closes, you'll be TRAPPED in our world! Cut off from Abyss!"*
+
+**Velgorath stops.**
+
+**Velgorath:** *"...What did you say?"*
+
+**You:** *"The rift is **UNSTABLE**. When it closes naturally, it closes FOREVER. With YOU on this side. Without Abyss power... you'll be **MORTAL**."*
+
+```asciidoc
+[CHA CHECK: DC 18]
+Convince demon he's being 
+deceived by his own 
+masters.
+```
+
+**Velgorath looks into depths of Rift.**
+
+**Velgorath:** *"...You lie, mortal. But if you do NOT lie..."*
+
+What do you offer?"""
+        
+        choices = [
+            {"text": "🤝 'I'll help you return safely' (DC 18 CHA)", "next_scene": "g1_main_023", "requires_roll": True, "stat": "charisma", "dc": 18, "sets_flag": "demon_negotiated"},
+            {"text": "🗡️ 'Return on your OWN - or die!' (DC 16 INT)", "next_scene": "g1_main_023", "requires_roll": True, "stat": "intelligence", "dc": 16},
+            {"text": "💰 'I'll give you 500 gold to retreat'", "next_scene": "g1_main_023", "effect": {"gold": -500}, "sets_flag": "demon_bribed"},
+            {"text": "⚔️ 'It was a trick!' - ATTACK", "next_scene": "g1_main_022", "effect": {"reputation": -25}},
+        ]
+    
+    # Set negotiation attempt flag
+    state.quest_flags["demon_negotiation_attempted"] = True
+    
+    return {
+        "title": "Negocjacje z demonem" if lang == "pl" else "Demon Negotiation",
+        "text": text,
+        "choices": choices,
+        "location": "dimensional_rift",
+        "npc_present": ["archdemon_velgorath"],
+        "diplomatic": True
+    }
+
+
+def get_branch_palace_defense(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Obrona pałacu - loyalist path"""
+    
+    if lang == "pl":
+        text = f"""**👑 BRONISZ PAŁACU! 👑**
+
+Wybierasz stronę **KSIĘŻNICZKI ELARY**!
+
+**{player.character.name}:** *"Elara może być niedoskonała, ale to PRAWOWITA władczyni! Nie pozwolę na zamach stanu!"*
+
+**Lyra Stalowe Oko** patrzy na ciebie z **ROZCZAROWANIEM**.
+
+**Lyra:** *"Więc wybierasz TYRANIĘ nad WOLNOŚCIĄ. Pamiętaj tę decyzję, gdy lud będzie umierał w nędzy."*
+
+**Rebelianci atakują!**
+
+```asciidoc
+╔═══════════════════════╗
+║   OBRONA PAŁACU       ║
+║   Loyalist Path       ║
+║   50 rebeliantów      ║
+║   vs.                 ║
+║   20 strażników + TY  ║
+╚═══════════════════════╝
+```
+
+**ATAK #1:** 10 rebeliantów szturmuje bramę!
+
+**Ty:** *"TRZYMAĆ LINIĘ!"*
+
+Walczysz ramię w ramię ze strażnikami pałacowymi.
+
+**CLASH! CLASH! CLASH!**
+
+**-15 HP** - Ostrze trąca twoje ramię
+
+**Twoje HP:** {max(0, player.stats.hp - 15)}/{player.stats.hp}
+
+**ATAK #2:** Rebelianci używają taranów!
+
+**BOOM! BOOM!**
+
+Brama pałacu trzeszczy!
+
+**Elara** (z wieży): *"{player.character.name}! Wzmocnij LEWĄ flankę!"*
+
+**ATAK #3:** 20 rebeliantów z lewej strony!
+
+**Ty i 5 strażników** stawiacie opór!
+
+```asciidoc
+⚔️ COMBAT ⚔️
+Heroiczny last stand!
+```
+
+**-20 HP** - Ciężki cios w bok
+
+**Twoje HP:** {max(0, player.stats.hp - 35)}/{player.stats.hp}
+
+Ale **TRZYMASZ POZYCJĘ**!
+
+Rebelianci COFAJĄ SIĘ!
+
+**Elara:** *"ZWYCIĘŻYLIŚMY! {player.character.name}, jesteś BOHATEREM królestwa!"*
+
+Pałac **OCALONY**. Ale miasto podzielone."""
+        
+        choices = [
+            {"text": "👑 'Dla królestwa!'", "next_scene": "g1_main_031", "effect": {"hp": -35, "reputation": 100}},
+            {"text": "😔 'Czy to było słuszne?'", "next_scene": "g1_main_031", "effect": {"hp": -35, "reputation": 75}, "sets_flag": "doubts_loyalist_choice"},
+        ]
+    else:
+        text = f"""**👑 YOU DEFEND THE PALACE! 👑**
+
+You choose **PRINCESS ELARA'S** side!
+
+**{player.character.name}:** *"Elara may be imperfect, but she's RIGHTFUL ruler! I won't allow coup!"*
+
+**Lyra Steel-Eye** looks at you with **DISAPPOINTMENT**.
+
+**Lyra:** *"So you choose TYRANNY over FREEDOM. Remember this decision when people die in poverty."*
+
+**Rebels attack!**
+
+```asciidoc
+╔═══════════════════════╗
+║   PALACE DEFENSE      ║
+║   Loyalist Path       ║
+║   50 rebels           ║
+║   vs.                 ║
+║   20 guards + YOU     ║
+╚═══════════════════════╝
+```
+
+**ATTACK #1:** 10 rebels storm gate!
+
+**You:** *"HOLD THE LINE!"*
+
+You fight shoulder to shoulder with palace guards.
+
+**CLASH! CLASH! CLASH!**
+
+**-15 HP** - Blade grazes your shoulder
+
+**Your HP:** {max(0, player.stats.hp - 15)}/{player.stats.hp}
+
+**ATTACK #2:** Rebels use battering rams!
+
+**BOOM! BOOM!**
+
+Palace gate creaks!
+
+**Elara** (from tower): *"{player.character.name}! Reinforce LEFT flank!"*
+
+**ATTACK #3:** 20 rebels from left side!
+
+**You and 5 guards** hold position!
+
+```asciidoc
+⚔️ COMBAT ⚔️
+Heroic last stand!
+```
+
+**-20 HP** - Heavy blow to side
+
+**Your HP:** {max(0, player.stats.hp - 35)}/{player.stats.hp}
+
+But you **HOLD POSITION**!
+
+Rebels RETREAT!
+
+**Elara:** *"WE WON! {player.character.name}, you're a HERO of the kingdom!"*
+
+Palace **SAVED**. But city divided."""
+        
+        choices = [
+            {"text": "👑 'For the kingdom!'", "next_scene": "g1_main_031", "effect": {"hp": -35, "reputation": 100}},
+            {"text": "😔 'Was this right?'", "next_scene": "g1_main_031", "effect": {"hp": -35, "reputation": 75}, "sets_flag": "doubts_loyalist_choice"},
+        ]
+    
+    # Set palace defense flags
+    state.quest_flags["defended_palace"] = True
+    state.quest_flags["loyalist_path"] = True
+    state.quest_flags["rebellion_defeated"] = True
+    
+    return {
+        "title": "Obrona pałacu" if lang == "pl" else "Palace Defense",
+        "text": text,
+        "choices": choices,
+        "location": "royal_palace",
+        "combat": True,
+        "epic_battle": True
+    }
+
+
+def get_branch_fight_rebels(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Walka z rebeliantami - odrzucenie rebelii"""
+    
+    if lang == "pl":
+        text = f"""**⚔️ ATAKUJESZ REBELIANTÓW! ⚔️**
+
+**{player.character.name}:** *"Jesteście ZDRAJCAMI królestwa!"*
+
+Twój miecz **BŁYSKA**!
+
+**Lyra Stalowe Oko** cofa się, jej wojownicy formują linię obronną.
+
+**Lyra:** *"Więc WYBRAŁEŚ stronę tyranów. Tak niech będzie!"*
+
+```asciidoc
+╔═══════════════════════╗
+║   BITWA Z REBELIĄ     ║
+║   TY + 10 lojalnych   ║
+║   vs.                 ║
+║   LYRA + 30 rebeliant ║
+╚═══════════════════════╝
+```
+
+**Rebelianci atakują ZMASOWNIE!**
+
+**ATAK #1:** 5 rebeliantów z lewej strony!
+**-10 HP** - Cięcie w nogę
+
+**ATAK #2:** Lyra OSOBIŚCIE atakuje!
+
+```asciidoc
+⚔️ LYRA STALOWE OKO ⚔️
+Legendarna wojowniczka
+DC 20 Combat Check!
+```
+
+**CLASH!**
+
+Jej ostrze jest **BŁYSKAWICZNE**!
+
+**-25 HP** - Głębokie cięcie w ramię!
+
+**Twoje HP:** {max(0, player.stats.hp - 35)}/{player.stats.hp}
+
+**Lyra:** *"Walczysz ODWAŻNIE, {player.character.name}... ale po NIEWŁAŚCIWEJ stronie!"*
+
+**ATAK #3:** 10 rebeliantów otacza cię!
+
+Jesteś w **OKRĄŻENIU**!
+
+**Strażnicy:** *"RATUNKU! Nas przytłaczają!"*
+
+```asciidoc
+╔════════════════╗
+║  KRYTYCZNA     ║
+║  SYTUACJA!     ║
+╚════════════════╝
+```
+
+To **PRZEROSŁO** cię! Za dużo rebeliantów!
+
+Musisz **WYCOFAĆ SIĘ** lub zginiesz!"""
+        
+        choices = [
+            {"text": "🏃 WYCOFAJ SIĘ do pałacu!", "next_scene": "g1_branch_palace_defense", "effect": {"hp": -35}},
+            {"text": "⚔️ Walcz do KOŃCA! (DC 20)", "next_scene": "g1_end_death_rebels", "requires_roll": True, "stat": "strength", "dc": 20, "effect": {"hp": -35}},
+            {"text": "💬 'CZEKAJ! Posłuchajmy się!' (DC 17 CHA)", "next_scene": "g1_main_028", "requires_roll": True, "stat": "charisma", "dc": 17, "effect": {"hp": -35}},
+        ]
+    else:
+        text = f"""**⚔️ YOU ATTACK THE REBELS! ⚔️**
+
+**{player.character.name}:** *"You are TRAITORS to the kingdom!"*
+
+Your sword **FLASHES**!
+
+**Lyra Steel-Eye** backs away, her warriors form defensive line.
+
+**Lyra:** *"So you CHOSE the tyrants' side. So be it!"*
+
+```asciidoc
+╔═══════════════════════╗
+║   BATTLE VS REBELLION ║
+║   YOU + 10 loyalists  ║
+║   vs.                 ║
+║   LYRA + 30 rebels    ║
+╚═══════════════════════╝
+```
+
+**Rebels attack EN MASSE!**
+
+**ATTACK #1:** 5 rebels from left!
+**-10 HP** - Cut in leg
+
+**ATTACK #2:** Lyra PERSONALLY attacks!
+
+```asciidoc
+⚔️ LYRA STEEL-EYE ⚔️
+Legendary warrior
+DC 20 Combat Check!
+```
+
+**CLASH!**
+
+Her blade is **LIGHTNING FAST**!
+
+**-25 HP** - Deep cut in shoulder!
+
+**Your HP:** {max(0, player.stats.hp - 35)}/{player.stats.hp}
+
+**Lyra:** *"You fight BRAVELY, {player.character.name}... but on the WRONG side!"*
+
+**ATTACK #3:** 10 rebels surround you!
+
+You're **SURROUNDED**!
+
+**Guards:** *"HELP! We're overwhelmed!"*
+
+```asciidoc
+╔════════════════╗
+║  CRITICAL      ║
+║  SITUATION!    ║
+╚════════════════╝
+```
+
+This is **TOO MUCH**! Too many rebels!
+
+You must **RETREAT** or die!"""
+        
+        choices = [
+            {"text": "🏃 RETREAT to palace!", "next_scene": "g1_branch_palace_defense", "effect": {"hp": -35}},
+            {"text": "⚔️ Fight to the END! (DC 20)", "next_scene": "g1_end_death_rebels", "requires_roll": True, "stat": "strength", "dc": 20, "effect": {"hp": -35}},
+            {"text": "💬 'WAIT! Let's talk!' (DC 17 CHA)", "next_scene": "g1_main_028", "requires_roll": True, "stat": "charisma", "dc": 17, "effect": {"hp": -35}},
+        ]
+    
+    # Set combat flags
+    state.quest_flags["fought_rebels"] = True
+    state.quest_flags["lyra_hostile"] = True
+    
+    return {
+        "title": "Walka z rebeliantami" if lang == "pl" else "Rebel Combat",
+        "text": text,
+        "choices": choices,
+        "location": "capital_streets",
+        "combat": True,
+        "overwhelmed": True
+    }
+
+
+def get_branch_rear_guard(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Obrona tyłów - heroiczna ofiara"""
+    
+    if lang == "pl":
+        text = f"""**🛡️ BRONISZ TYŁÓW! 🛡️**
+
+Rebelianci **WYCOFUJĄ SIĘ** z pałacu.
+
+Ale armia królewska z **LORD GARRICKIEM** nadchodzi - 100 ŻOŁNIERZY!
+
+**Lyra:** *"Musimy się wycofać! Ale ktoś musi ZATRZYMAĆ ich na chwilę!"*
+
+**{player.character.name}:** *"JA to zrobię."*
+
+**Lyra:** *"...Co? To jest SAMOBÓJSTWO!"*
+
+**Ty:** *"Idźcie. TERAZ. Dam wam 5 minut."*
+
+```asciidoc
+╔═══════════════════════╗
+║   HEROICZNY           ║
+║   OSTATNI BASTION     ║
+║   1 vs 100            ║
+╚═══════════════════════╝
+```
+
+Rebelianci UCIEKAJĄ. Ty zostajesz **SAM**.
+
+Stajesz na wąskiej uliczce. Miecz wyciągnięty.
+
+**LORD GARRICK** (na czele armii): *"TEN tam! Pojedynczy rebeliant!"*
+
+**Żołnierze** zatrzymują się. Patrzą na ciebie.
+
+**LORD GARRICK:** *"Odsuń się, durniu! Nie chcesz zginąć za ZDRAJCÓW!"*
+
+**{player.character.name}:** *"NIE PRZEJDZIECIE."*
+
+```asciidoc
+╔════════════════════╗
+║   LAST STAND       ║
+║   100 soldiers     ║
+║   You hold 5 min   ║
+╚════════════════════╝
+```
+
+**LORD GARRICK:** *"...Jesteś SZALONY. ZABIJCIE GO!"*
+
+**20 ŻOŁNIERZY ATAKUJE!**
+
+**ATAK #1:** 5 żołnierzy z przodu!
+**-15 HP** - Paruj 3, 2 trafią!
+
+**ATAK #2:** 8 żołnierzy z boków!
+**-25 HP** - Za dużo! Za szybko!
+
+**Twoje HP:** {max(0, player.stats.hp - 40)}/{player.stats.hp}
+
+**Walczysz DESPERACKO!**
+
+Każda sekunda to **ŻYCIE** rebeliantów w odwrocie!
+
+**ATAK #3:** 10 więcej żołnierzy!
+
+**-30 HP** - Miecz przebija twoją zbroję!
+
+**Twoje HP:** {max(0, player.stats.hp - 70)}/{player.stats.hp}
+
+Upadasz na kolana. Ale **5 MINUT** minęło.
+
+Rebelianci są **BEZPIECZNI**.
+
+**LORD GARRICK:** *"...Ten durniu uratował ich. Ale to nic nie zmieni."*
+
+{player.character.name}, twoja **OFIARA** zostanie zapamiętana."""
+        
+        choices = [
+            {"text": "😭 'Dla... wolności...' - ostatnie słowa", "next_scene": "g1_end_heroic_sacrifice", "effect": {"hp": -70, "reputation": 300}},
+            {"text": "⚔️ 'Jeszcze... nie... koniec...' DC 22", "next_scene": "g1_main_030", "requires_roll": True, "stat": "constitution", "dc": 22, "effect": {"hp": -70}},
+        ]
+    else:
+        text = f"""**🛡️ YOU DEFEND REAR! 🛡️**
+
+Rebels **RETREAT** from palace.
+
+But royal army with **LORD GARRICK** approaches - 100 SOLDIERS!
+
+**Lyra:** *"We must retreat! But someone must STOP them briefly!"*
+
+**{player.character.name}:** *"I'LL do it."*
+
+**Lyra:** *"...What? That's SUICIDE!"*
+
+**You:** *"Go. NOW. I'll give you 5 minutes."*
+
+```asciidoc
+╔═══════════════════════╗
+║   HEROIC              ║
+║   LAST STAND          ║
+║   1 vs 100            ║
+╚═══════════════════════╝
+```
+
+Rebels FLEE. You stay **ALONE**.
+
+You stand in narrow street. Sword drawn.
+
+**LORD GARRICK** (leading army): *"THAT one! Single rebel!"*
+
+**Soldiers** stop. Look at you.
+
+**LORD GARRICK:** *"Step aside, fool! You don't want to die for TRAITORS!"*
+
+**{player.character.name}:** *"YOU SHALL NOT PASS."*
+
+```asciidoc
+╔════════════════════╗
+║   LAST STAND       ║
+║   100 soldiers     ║
+║   Hold for 5 min   ║
+╚════════════════════╝
+```
+
+**LORD GARRICK:** *"...You're INSANE. KILL HIM!"*
+
+**20 SOLDIERS ATTACK!**
+
+**ATTACK #1:** 5 soldiers from front!
+**-15 HP** - Parry 3, 2 hit!
+
+**ATTACK #2:** 8 soldiers from sides!
+**-25 HP** - Too many! Too fast!
+
+**Your HP:** {max(0, player.stats.hp - 40)}/{player.stats.hp}
+
+**You fight DESPERATELY!**
+
+Every second is rebel **LIFE** in retreat!
+
+**ATTACK #3:** 10 more soldiers!
+
+**-30 HP** - Sword pierces your armor!
+
+**Your HP:** {max(0, player.stats.hp - 70)}/{player.stats.hp}
+
+You fall to knees. But **5 MINUTES** passed.
+
+Rebels are **SAFE**.
+
+**LORD GARRICK:** *"...That fool saved them. But it changes nothing."*
+
+{player.character.name}, your **SACRIFICE** will be remembered."""
+        
+        choices = [
+            {"text": "😭 'For... freedom...' - last words", "next_scene": "g1_end_heroic_sacrifice", "effect": {"hp": -70, "reputation": 300}},
+            {"text": "⚔️ 'Not... yet... done...' DC 22", "next_scene": "g1_main_030", "requires_roll": True, "stat": "constitution", "dc": 22, "effect": {"hp": -70}},
+        ]
+    
+    # Set heroic flags
+    state.quest_flags["rear_guard_hero"] = True
+    state.quest_flags["rebels_saved"] = True
+    state.quest_flags["near_death"] = True
+    
+    return {
+        "title": "Ostatni bastion" if lang == "pl" else "Last Stand",
+        "text": text,
+        "choices": choices,
+        "location": "capital_streets",
+        "combat": True,
+        "heroic_sacrifice": True,
+        "legendary_moment": True
+    }
+
+
 # ==================== ENDINGS ====================
 
 def get_ending_kingdom_saved(lang: str, state: Gate1WorldState, player) -> Dict:
@@ -2894,7 +6457,7 @@ ROZŁAM ▂▃▅▇█▓▒░ ZAMYKA SIĘ ░▒▓█▇▅▃▂
 
 **📜 EPILOG:**
 
-• **KRÓLESTWO** odbudowuje się z ruin - {state.villages_saved if hasattr(state, 'villages_saved') else 0} wiosek ocalonych
+• **KRÓLESTWO** odbudowuje się z ruin - {state.quest_flags.get('villages_saved', 0)} wiosek ocalonych
 • **PRINCESSKA ELARA** koronowana jako nowa królowa, mądra i sprawiedliwa
 • **ZAKON RYCERZY** składa ci przysięgę wierności
 • **SER MARKUS** nazywa cię **"Zbawcą Królestwa"**
@@ -2918,8 +6481,8 @@ Jednak... głęboko w sercu **CZUJESZ**:
 **STATYSTYKI ZAKOŃCZENIA:**
 ```
 Rozłam:         ZAMKNIĘTY ✓
-Straty:         {state.villages_destroyed if hasattr(state, 'villages_destroyed') else 0} wiosek zniszczonych
-Uratowanych:    {state.villages_saved if hasattr(state, 'villages_saved') else 0} wiosek ocalonych
+Straty:         {state.quest_flags.get('villages_destroyed', 0)} wiosek zniszczonych
+Uratowanych:    {state.quest_flags.get('villages_saved', 0)} wiosek ocalonych
 Moralność:      {state.quest_flags.get('moral_alignment', 'neutral').upper()}
 Sojusznicy:     {', '.join([k.replace('_', ' ').title() for k, v in state.quest_flags.items() if 'allied' in k and v]) or 'Brak'}
 ```
@@ -2944,7 +6507,7 @@ RIFT ▂▃▅▇█▓▒░ CLOSING ░▒▓█▇▅▃▂
 
 **📜 EPILOGUE:**
 
-• **KINGDOM** rebuilds from ruins - {state.villages_saved if hasattr(state, 'villages_saved') else 0} villages saved
+• **KINGDOM** rebuilds from ruins - {state.quest_flags.get('villages_saved', 0)} villages saved
 • **PRINCESS ELARA** crowned as new queen, wise and just
 • **KNIGHT ORDER** swears fealty to you
 • **SER MARKUS** names you **"Savior of the Kingdom"**
@@ -2968,8 +6531,8 @@ Yet... deep in your heart **YOU FEEL**:
 **ENDING STATISTICS:**
 ```
 Rift:           SEALED ✓
-Losses:         {state.villages_destroyed if hasattr(state, 'villages_destroyed') else 0} villages destroyed
-Saved:          {state.villages_saved if hasattr(state, 'villages_saved') else 0} villages protected
+Losses:         {state.quest_flags.get('villages_destroyed', 0)} villages destroyed
+Saved:          {state.quest_flags.get('villages_saved', 0)} villages protected
 Morality:       {state.quest_flags.get('moral_alignment', 'neutral').upper()}
 Allies:         {', '.join([k.replace('_', ' ').title() for k, v in state.quest_flags.items() if 'allied' in k and v]) or 'None'}
 ```
@@ -2990,6 +6553,7 @@ _(You can now proceed to Gate 2 or explore Gate 1 in post-game mode)_
     player.experience += 500
     
     return {
+        "title": "🏆 Królestwo Uratowane" if lang == "pl" else "🏆 Kingdom Saved",
         "text": text,
         "choices": choices,
         "is_ending": True,
@@ -3106,6 +6670,7 @@ _(This ending blocks Gate 2 access. You can reset or continue ruling Gate 1)_
     ]
     
     return {
+        "title": "👿 Władca Demonów" if lang == "pl" else "👿 Demon Lord",
         "text": text,
         "choices": choices,
         "is_ending": True,
@@ -3221,6 +6786,7 @@ The **KINGDOM** celebrates its **FIRST DRAGON KNIGHT**.
     player.experience += 400
     
     return {
+        "title": "🐉 Pakt Smoka" if lang == "pl" else "🐉 Dragon Pact",
         "text": text,
         "choices": choices,
         "is_ending": True,
@@ -3324,6 +6890,7 @@ _(You can return and try differently, or live with consequences)_
     ]
     
     return {
+        "title": "⚖️ Pat" if lang == "pl" else "⚖️ Stalemate",
         "text": text,
         "choices": choices,
         "is_ending": True,
@@ -3473,6 +7040,7 @@ In next campaign you can resurrect them as mentor/spirit.
     player.experience += 1000
     
     return {
+        "title": "⚡ Ostateczna Ofiara" if lang == "pl" else "⚡ Ultimate Sacrifice",
         "text": text,
         "choices": choices,
         "is_ending": True,
@@ -3616,6 +7184,7 @@ Voice from Gate 9 (highest Gate):
     ]
     
     return {
+        "title": "🔮 Nowa Rzeczywistość" if lang == "pl" else "🔮 New Reality",
         "text": text,
         "choices": choices,
         "is_ending": True,
@@ -3777,6 +7346,7 @@ _(Was this really a victory?)_
     ]
     
     return {
+        "title": "👑 Wieczny Tron" if lang == "pl" else "👑 Eternal Throne",
         "text": text,
         "choices": choices,
         "is_ending": True,
@@ -3948,6 +7518,7 @@ Sometimes you don't know where {player.character.name} ends and Pyraxis begins..
     player.experience += 700
     
     return {
+        "title": "🐉 Fuzja Dragona" if lang == "pl" else "🐉 Dragon Fusion",
         "text": text,
         "choices": choices,
         "is_ending": True,
@@ -3987,7 +7558,7 @@ Ale... **CY JEST BOHATEREM**?
 
 **TWOJE ZBRODNIE:**
 
-{f"• Zniszczono {state.villages_destroyed} wiosek (setki cywilów martwych) 💀" if hasattr(state, 'villages_destroyed') and state.villages_destroyed > 0 else ""}
+{f"• Zniszczono {state.quest_flags.get('villages_destroyed', 0)} wiosek (setki cywilów martwych) 💀" if state.quest_flags.get('villages_destroyed', 0) > 0 else ""}
 {f"• Rebelia zmasakrowana (300+ egzekucji) ⚔️" if state.quest_flags.get("rebellion_destroyed") else ""}
 {f"• Smok Pyraxis zabity (gatunkobójstwo) 🐉" if state.quest_flags.get("dragon_hostile") and state.quest_flags.get("varathul_defeated") else ""}
 {f"• Księża zamordowani (świętokradztwo) ⛪" if state.quest_flags.get("priests_killed") else ""}
@@ -4123,6 +7694,7 @@ _(Additional side-quest campaign: "Road to Redemption" - 20 good missions)_
     ]
     
     return {
+        "title": "⚖️ Wygnanie" if lang == "pl" else "⚖️ Exile",
         "text": text,
         "choices": choices,
         "is_ending": True,
@@ -4354,6 +7926,7 @@ Maybe killed someone who had to live?
         state.quest_flags["loop_count"] += 1
     
     return {
+        "title": "⏰ Pętla Czasu" if lang == "pl" else "⏰ Time Loop",
         "text": text,
         "choices": choices,
         "is_ending": True,

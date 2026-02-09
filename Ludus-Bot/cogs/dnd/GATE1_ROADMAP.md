@@ -93,24 +93,40 @@
 ## 🌿 ROZGAŁĘZIENIA (Branch Scenes)
 
 ### Combat Branches
-- **g1_branch_attack_knight** - ✅ Atak na rycerza naforteca
-- **g1_branch_fight_guards** - Walka ze strażą (TPK możliwy)
-- **g1_branch_escape_fortress** - Ucieczka z fortecy
+- **g1_branch_attack_knight** - ✅ Atak na rycerza na forteca
+- **g1_branch_fight_guards** - ✅ Walka ze strażą do końca (5 vs 1, TPK risk)
+- **g1_branch_escape_fortress** - ✅ Ucieczka z fortecy (skok z muru do fosy, -20 HP)
+- **g1_branch_grovel** - ✅ Przeprosiny po ataku (status "tchórz", -100 reputation)
 - **g1_branch_demon_duel** - Pojedynek z demonem
 - **g1_branch_dragon_combat** - Walka ze smokiem
 
 ### Exploration Branches
-- **g1_branch_forest_escape** - Ucieczka w głąb lasu (spotkanie z wilkołakami)
+- **g1_branch_forest_escape** - ✅ Ucieczka w głąb lasu (spotkanie z wilkołakami Lunar Clan)
+- **g1_branch_werewolf_encounter** - ✅ Walka/negocjacje z wilkołakami + boss demon (Lesser Demon 80 HP)
+- **g1_branch_werewolf_pact** - ✅ Pakt z wilkołakami (Moon's Kiss - likantopia opcjonalna)
 - **g1_branch_temple_secret** - Sekrety pod świątynią
 - **g1_branch_ruins_past** - Portał do przeszłości w ruinach
 - **g1_branch_underworld** - Zejście do Krainy Umarłych
 
 ### Social Branches
-- **g1_branch_join_bandits** - Dołączenie do bandytów (dark)
+- **g1_branch_join_bandits** - ✅ Dołączenie do bandytów (test: zabij dziewczynkę lub znajdź alternatywę)
+- **g1_branch_bandit_negotiation** - ✅ Negocjacje z bandytami (ukradnij pierścień zamiast zabijać)
+- **g1_branch_bandit_camp** - ✅ Obóz bandytów Black Ticks + misja assassinacji księżniczki
 - **g1_branch_help_villagers** - Ratowanie wioski
-- **g1_branch_grovel** - Przeprosiny po ataku
 - **g1_branch_rebellion_join** - Dołączenie do rebelii
 - **g1_branch_church_alliance** - Sojusz z kościołem
+
+### Dragon Branches
+- **g1_branch_dragon_sacrifice** - ✅ Pyraxis się poświęca (heroiczne zakończenie, smok zamyka Rift)
+- **g1_branch_village_sacrifice** - ✅ Poświęcenie wioski (dark path: 100 cywilów ginie, -300 reputation)
+- **g1_branch_dragon_betrayal** - ✅ Zdrada smoka (zerwanie paktu, solo path)
+- **g1_branch_kill_dragon** - ✅ Boss fight przeciw Pyraxisowi (300 HP, extreme danger)
+
+### Rebellion Branches
+- **g1_branch_demon_negotiation** - ✅ Negocjacje z Archidemonem Velgorathem (przekonaj, że jest oszukiwany)
+- **g1_branch_palace_defense** - ✅ Obrona pałacu (loyalist path: 50 rebeliantów vs 20 strażników + TY)
+- **g1_branch_fight_rebels** - ✅ Walka z rebeliantami Lyry (combat z Lyra Steel-Eye)
+- **g1_branch_rear_guard** - ✅ Heroiczny last stand (1 vs 100, obrona tyłów rebeliantów)
 
 ---
 
