@@ -104,6 +104,7 @@
 - **g1_branch_forest_escape** - ✅ Ucieczka w głąb lasu (spotkanie z wilkołakami Lunar Clan)
 - **g1_branch_werewolf_encounter** - ✅ Walka/negocjacje z wilkołakami + boss demon (Lesser Demon 80 HP)
 - **g1_branch_werewolf_pact** - ✅ Pakt z wilkołakami (Moon's Kiss - likantopia opcjonalna)
+- **g1_branch_flee_future** - ✅ Ucieczka z przyszłości (traumatyczna wizja apokalipsy)
 - **g1_branch_temple_secret** - Sekrety pod świątynią
 - **g1_branch_ruins_past** - Portał do przeszłości w ruinach
 - **g1_branch_underworld** - Zejście do Krainy Umarłych
@@ -112,9 +113,24 @@
 - **g1_branch_join_bandits** - ✅ Dołączenie do bandytów (test: zabij dziewczynkę lub znajdź alternatywę)
 - **g1_branch_bandit_negotiation** - ✅ Negocjacje z bandytami (ukradnij pierścień zamiast zabijać)
 - **g1_branch_bandit_camp** - ✅ Obóz bandytów Black Ticks + misja assassinacji księżniczki
-- **g1_branch_help_villagers** - Ratowanie wioski
+- **g1_branch_help_villagers** - ✅ Ratowanie wioski (heroiczny wybór: 3 taktyki walki)
+- **g1_branch_village_combat** - ✅ Heroiczny szturm (frontalny atak, +50 rep, +100 gold)
+- **g1_branch_village_distraction** - ✅ Taktyka odwrócenia uwagi (pościg, ratuje wioskę)
+- **g1_branch_village_tactics** - ✅ Magia/taktyka z dystansu (+60 rep, +150 gold, Magic Ring +1)
 - **g1_branch_rebellion_join** - Dołączenie do rebelii
 - **g1_branch_church_alliance** - Sojusz z kościołem
+
+### Church/Temple Branches
+- **g1_branch_save_sacrifices** - ✅ Heroiczny ratunek ofiar rytuału (walka z 5 strażnikami, -30 HP, +100 rep, ratuje 3 akolicitów)
+- **g1_branch_kill_priestess** - ✅ Zabójstwo arcykapłanki (brutal path, -45 HP, -150 rep, ofiary giną, znalezienie dowodu)
+- **g1_branch_persuade_church** - ✅ Perswazja strażników kościelnych (DC 17 CHA, ratuje ofiary bez walki, +120 rep)
+- **g1_branch_temple_escape** - ✅ Ucieczka z katedry (DC 16 AGI, skok przez witraż, -15 HP, zdobycie dowodu)
+
+### Investigation/Lore Branches
+- **g1_branch_mysterious_elder** - ✅ Spotkanie z Obserwatorem (lore: 3 przyszłości, Bramy jako test, +25 wisdom)
+- **g1_branch_fight_priestess** - ✅ Walka w pałacu vs arcykapłanka (porażka: schwytanie, -35 HP, -100 rep, lochy)
+- **g1_branch_escape_palace** - ✅ Ucieczka z pałacu/lochów (pomoc więźnia, tunele/sewer escape, -10 HP, status poszukiwanego)
+- **g1_branch_temple_secret** - Sekrety pod świątynią
 
 ### Dragon Branches
 - **g1_branch_dragon_sacrifice** - ✅ Pyraxis się poświęca (heroiczne zakończenie, smok zamyka Rift)
@@ -127,6 +143,10 @@
 - **g1_branch_palace_defense** - ✅ Obrona pałacu (loyalist path: 50 rebeliantów vs 20 strażników + TY)
 - **g1_branch_fight_rebels** - ✅ Walka z rebeliantami Lyry (combat z Lyra Steel-Eye)
 - **g1_branch_rear_guard** - ✅ Heroiczny last stand (1 vs 100, obrona tyłów rebeliantów)
+
+### Special/Dark Path Branches
+- **g1_branch_demon_details** - ✅ Szczegóły paktu demonicznego (dowiedz się o cenach i korzyściach)
+- **g1_branch_destroy_artifacts** - ✅ Zniszczenie artefaktów (odrzuć Omnibroń, +200 rep, moralny triumf)
 
 ---
 
