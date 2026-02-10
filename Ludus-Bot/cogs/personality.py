@@ -18,7 +18,7 @@ class LudusPersonality(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.last_reaction_time = {}
-        self.cooldown_seconds = 10  # Cooldown per user to avoid spam
+        self.cooldown_seconds = 5  # Cooldown per user to avoid spam
         
         # Ludus custom emojis
         self.ludus_emojis = {
@@ -561,29 +561,40 @@ class LudusPersonality(commands.Cog):
         # Detects math questions like "what is 2+2", "2 plus 2", "calculate 5 times 3", etc.
         import re
         math_patterns = [
-            r"what\s+is\s+([-+*/xX0-9 .]+)",
-            r"([-+*/xX0-9 .]+)\s*\?",
-            r"calculate\s+([-+*/xX0-9 .]+)",
-            r"([-+*/xX0-9 .]+)\s*(plus|minus|times|divided by|\+|-|x|\*|/)\s*([-+*/xX0-9 .]+)",
+            r"what\s+is\s+([\d\s+\-*/xX.,]+)",
+            r"calculate\s+([\d\s+\-*/xX.,]+)",
+            r"([\d\s+\-*/xX.,]+)\s*\?",
+            r"([\d\s+\-*/xX.,]+)\s*(plus|minus|times|divided by|\+|-|x|\*|/)\s*([\d\s+\-*/xX.,]+)",
         ]
+        # Also check for math keywords
+        math_keywords = ["plus", "minus", "times", "divided by", "+", "-", "*", "/", "x", "add", "subtract", "multiply", "divide"]
         for pat in math_patterns:
             if re.search(pat, content):
+                return True
+        for kw in math_keywords:
+            if kw in content:
                 return True
         return False
 
     def _solve_math(self, content):
         # Extract and solve math expressions
         import re
-        # Replace words with symbols
         expr = content.lower()
-        expr = expr.replace('plus', '+').replace('minus', '-')
-        expr = expr.replace('times', '*').replace('x', '*').replace('divided by', '/').replace('÷', '/')
+        # Replace words with symbols
+        expr = expr.replace('plus', '+').replace('add', '+')
+        expr = expr.replace('minus', '-')
+        expr = expr.replace('subtract', '-')
+        expr = expr.replace('times', '*').replace('multiply', '*').replace('x', '*')
+        expr = expr.replace('divided by', '/').replace('divide', '/').replace('÷', '/')
+        # Remove question phrases
+        expr = re.sub(r"what is ", "", expr)
+        expr = re.sub(r"calculate ", "", expr)
+        expr = re.sub(r"\?", "", expr)
         # Find numbers and operators
-        match = re.search(r"([-+*/. 0-9]+)", expr)
+        match = re.search(r"([0-9+\-*/. ]+)", expr)
         if not match:
             return None
         expr = match.group(1)
-        # Remove extra spaces
         expr = expr.replace(' ', '')
         try:
             # Only allow safe characters
@@ -598,8 +609,25 @@ class LudusPersonality(commands.Cog):
         # Detects "Do you ...?", "Are you ...?", "Is it ...?", and 'or' questions
         import re
         # Yes/No: "do you ...?", "are you ...?", "is it ...?", etc.
-        if re.match(r"^(do|are|is|did|will|can|could|would|should|have|has|was|were) you .+\?", content):
-            return True
+        yesno_patterns = [
+            r"^(do|does|did|are|is|would|will|can|could|should|have|has|was|were) you .+\?",
+            r"^(do|does|did|are|is|would|will|can|could|should|have|has|was|were) .+\?",
+            r"^(should|could|would|will|can|is|are|was|were|have|has|did|does) .+\?",
+            r"^is .+\?",
+            r"^are .+\?",
+            r"^can .+\?",
+            r"^will .+\?",
+            r"^should .+\?",
+            r"^could .+\?",
+            r"^would .+\?",
+            r"^have .+\?",
+            r"^has .+\?",
+            r"^did .+\?",
+            r"^does .+\?",
+        ]
+        for pat in yesno_patterns:
+            if re.match(pat, content):
+                return True
         # Or: "Do you like apples or oranges?", "Is it red or blue?"
         if ' or ' in content:
             return True
@@ -607,22 +635,28 @@ class LudusPersonality(commands.Cog):
 
     def _answer_yesno_or(self, content, user_id, personality):
         import re
-        # Consistent answer per user/personality using hash
-        def consistent_choice(options):
+        def extract_or_options(question: str):
+            q = question.lower().strip()
+            # Remove leading question words and phrases
+            q = re.sub(r"^(do|does|did|are|is|would|will|can|could|should|have|has|was|were) you ", "", q)
+            q = re.sub(r"^(do|does|did|are|is|would|will|can|could|should|have|has|was|were) ", "", q)
+            q = re.sub(r"\?$", "", q)
+            options = q.split(" or ")
+            options = [opt.strip().capitalize() for opt in options if opt.strip()]
+            return options if len(options) >= 2 else None
+
+        def consistent_choice(user_id, personality, content, options):
             idx = abs(hash(f"{user_id}-{personality}-{content}")) % len(options)
             return options[idx]
-        # Or question
-        if ' or ' in content:
-            parts = re.split(r' or ', content)
-            # Try to find the last two options
-            if len(parts) >= 2:
-                left = parts[-2].split()[-1]
-                right = parts[-1].split()[0]
-                # If question is "Do you like apples or oranges?" reply with one
-                return consistent_choice([left.capitalize(), right.capitalize()])
-        # Yes/No question
+
+        # Or-question handling
+        options = extract_or_options(content)
+        if options:
+            return consistent_choice(user_id, personality, content, options)
+
+        # Yes/No question handling
         yesno = ["Yes.", "No."]
-        return consistent_choice(yesno)
+        return consistent_choice(user_id, personality, content, yesno)
     
     @commands.Cog.listener()
     async def on_command(self, ctx):
