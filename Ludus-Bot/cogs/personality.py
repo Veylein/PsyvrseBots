@@ -18,7 +18,7 @@ class LudusPersonality(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.last_reaction_time = {}
-        self.cooldown_seconds = 10  # Cooldown per user to avoid spam
+        self.cooldown_seconds = 5  # Cooldown per user to avoid spam
         
         # Ludus custom emojis
         self.ludus_emojis = {
