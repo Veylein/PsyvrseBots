@@ -357,6 +357,18 @@ def get_gate1_scene(scene_id: str, lang: str, world_state: Gate1WorldState, play
     elif scene_id == "g1_branch_help_villagers":
         return get_branch_help_villagers(lang, world_state, player_data)
     
+    elif scene_id == "g1_branch_village_combat":
+        return get_branch_village_combat(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_village_distraction":
+        return get_branch_village_distraction(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_village_tactics":
+        return get_branch_village_tactics(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_flee_future":
+        return get_branch_flee_future(lang, world_state, player_data)
+    
     elif scene_id == "g1_branch_forest_escape":
         return get_branch_forest_escape(lang, world_state, player_data)
     
@@ -410,6 +422,36 @@ def get_gate1_scene(scene_id: str, lang: str, world_state: Gate1WorldState, play
     
     elif scene_id == "g1_branch_rear_guard":
         return get_branch_rear_guard(lang, world_state, player_data)
+    
+    # Special branches
+    elif scene_id == "g1_branch_demon_details":
+        return get_branch_demon_details(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_destroy_artifacts":
+        return get_branch_destroy_artifacts(lang, world_state, player_data)
+    
+    # Church/Temple branches
+    elif scene_id == "g1_branch_save_sacrifices":
+        return get_branch_save_sacrifices(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_kill_priestess":
+        return get_branch_kill_priestess(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_persuade_church":
+        return get_branch_persuade_church(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_temple_escape":
+        return get_branch_temple_escape(lang, world_state, player_data)
+    
+    # Investigation branches
+    elif scene_id == "g1_branch_mysterious_elder":
+        return get_branch_mysterious_elder(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_fight_priestess":
+        return get_branch_fight_priestess(lang, world_state, player_data)
+    
+    elif scene_id == "g1_branch_escape_palace":
+        return get_branch_escape_palace(lang, world_state, player_data)
     
     # ==================== ENDINGS ====================
     
@@ -4535,13 +4577,700 @@ What do you do NOW?"""
 
 
 def get_branch_help_villagers(lang: str, state: Gate1WorldState, player) -> Dict:
-    """Branch: Pomoc wiośnianom"""
-    # TODO: Implement branch scenes
+    """Branch: Pomoc wiośnianom - ratowanie wioski przed demonami"""
+    
+    if lang == "pl":
+        text = f"""**🏘️ WIDZISZ WIOSKĘ POD ATAKIEM! 🏘️**
+
+W dolinie, nieopodal głównej drogi, **DEMONICZNE** stwory atakują małą wioskę!
+
+**5 IMPY** - małe demony z pazurami
+**2 HELLHOUNDS** - piekielne psy buchające ogniem
+**1 OGRE DEMON** - ogromny, 12 stóp, dowódca
+
+```asciidoc
+╔══════════════════════════╗
+║   WIOSKA: 30 CYWILÓW     ║
+║   Pod atakiem demonów    ║
+║   Czasu: 3 MINUTY        ║
+╚══════════════════════════╝
+```
+
+**KRZYKI** wiośniaków rozdają się w powietrzu!
+
+**Matka** (krzycząc): *"DZIECI! Schowajcie się w piwnicy!"*
+**Starosta**: *"BROŃ SIĘ! Walczcie wszyscy!"*
+
+Ale wiośniacy nie mają broni. Tylko widły i kosy.
+
+**Demony MASAKRUJĄ** ich...
+
+**{player.character.name}**, możesz **POMÓC**... ale to bardzo niebezpieczne.
+
+```asciidoc
+╔════════════════════════╗
+║  OPCJE:                ║
+║  1. Heroiczny szturm   ║
+║  2. Taktyka - odwróć   ║
+║     uwagę              ║
+║  3. Magia/Pułapki      ║
+║  4. Ignoruj i idź dalej║
+╚════════════════════════╝
+```
+
+Co robisz?"""
+        
+        choices = [
+            {"text": "⚔️ HEROICZNY SZTURM! Atak frontalny! (DC 18)", "next_scene": "g1_branch_village_combat", "requires_roll": True, "stat": "strength", "dc": 18, "sets_flag": "village_hero"},
+            {"text": "🎯 Odwróć uwagę - przyciągnij demony (DC 15 DEX)", "next_scene": "g1_branch_village_distraction", "requires_roll": True, "stat": "dexterity", "dc": 15},
+            {"text": "🔥 Użyj magii/pułapek - zabij z dystansu (DC 16 INT)", "next_scene": "g1_branch_village_tactics", "requires_roll": True, "stat": "intelligence", "dc": 16},
+            {"text": "🚶 'To nie moja sprawa' - idź dalej", "next_scene": "g1_main_013", "effect": {"reputation": -100}, "sets_flag": "ignored_village"},
+        ]
+    else:
+        text = f"""**🏘️ YOU SEE VILLAGE UNDER ATTACK! 🏘️**
+
+In valley, near main road, **DEMONIC** creatures attack small village!
+
+**5 IMPS** - small demons with claws
+**2 HELLHOUNDS** - hellish dogs breathing fire
+**1 DEMON OGRE** - massive, 12 feet, commander
+
+```asciidoc
+╔══════════════════════════╗
+║   VILLAGE: 30 CIVILIANS  ║
+║   Under demon attack     ║
+║   Time: 3 MINUTES        ║
+╚══════════════════════════╝
+```
+
+**SCREAMS** of villagers fill the air!
+
+**Mother** (screaming): *"CHILDREN! Hide in cellar!"*
+**Village Elder**: *"DEFEND! Everyone fight!"*
+
+But villagers have no weapons. Only pitchforks and scythes.
+
+**Demons MASSACRE** them...
+
+**{player.character.name}**, you can **HELP**... but it's very dangerous.
+
+```asciidoc
+╔════════════════════════╗
+║  OPTIONS:              ║
+║  1. Heroic charge      ║
+║  2. Tactics - distract ║
+║                        ║
+║  3. Magic/Traps        ║
+║  4. Ignore and pass    ║
+╚════════════════════════╝
+```
+
+What do you do?"""
+        
+        choices = [
+            {"text": "⚔️ HEROIC CHARGE! Frontal attack! (DC 18)", "next_scene": "g1_branch_village_combat", "requires_roll": True, "stat": "strength", "dc": 18, "sets_flag": "village_hero"},
+            {"text": "🎯 Distract - lure demons away (DC 15 DEX)", "next_scene": "g1_branch_village_distraction", "requires_roll": True, "stat": "dexterity", "dc": 15},
+            {"text": "🔥 Use magic/traps - kill from distance (DC 16 INT)", "next_scene": "g1_branch_village_tactics", "requires_roll": True, "stat": "intelligence", "dc": 16},
+            {"text": "🚶 'Not my business' - pass by", "next_scene": "g1_main_013", "effect": {"reputation": -100}, "sets_flag": "ignored_village"},
+        ]
+    
+    # Set village encounter flag
+    state.quest_flags["village_under_attack"] = True
+    
     return {
-        "title": "TODO",
-        "text": "Scene not implemented yet.",
-        "choices": [],
-        "image_url": None
+        "title": "Wioska pod atakiem" if lang == "pl" else "Village Under Attack",
+        "text": text,
+        "choices": choices,
+        "location": "village_outskirts",
+        "combat_imminent": True,
+        "moral_choice": True
+    }
+
+
+def get_branch_village_combat(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Heroiczna walka o wioskę"""
+    
+    if lang == "pl":
+        text = f"""**⚔️ SZARŻUJESZ W STRONĘ DEMONÓW! ⚔️**
+
+**{player.character.name}:** *"ZA WIOSKĘ!"*
+
+Twój miecz **BŁYSKA** w słońcu!
+
+**IMPY** odwracają się - zaskoczone!
+
+**SLASH!** Pierwszego demona rozcinasz na pół!
+
+**SLASH!** Drugi pada!
+
+```asciidoc
+╔════════════════════════╗
+║   DEMON SLAYER!        ║
+║   Killed: 2/8          ║
+╚════════════════════════╝
+```
+
+Ale **HELLHOUND** skacze na ciebie!
+
+**🔥 OGIEŃ!** Buchający płomień!
+
+**-15 HP** - Twoja zbroja się topi!
+
+**Twoje HP:** {max(0, player.stats.hp - 15)}/{player.stats.hp}
+
+**OGRE DEMON** atakuje potężną maczugą!
+
+**BOOM!** Unikasz o włos!
+
+**3 IMPY** otoczyły cię!
+
+**-10 HP** - Pazury drapią twoją skórę!
+
+**Twoje HP:** {max(0, player.stats.hp - 25)}/{player.stats.hp}
+
+Ale **WIOŚNIACY** widzą twoją odwagę!
+
+**Starosta**: *"POMÓŻMY MU! TO NASZ JEDYNY RYCERZ!"*
+
+**10 wiośniaków** dołącza do walki z widłami!
+
+```asciidoc
+⚔️ ZWROT AKCJI! ⚔️
+Wiośniacy walczą u twojego boku!
+```
+
+**RAZEM** pokonujecie demony!
+
+**ZWYCIĘSTWO!**
+
+**+50 reputation**
+**+100 złota** (nagroda od wioski)
+**+Łuk +1** (dar od mistrza łucznictwa)
+
+**Wiośniacy** upadają na kolana z wdzięczności!
+
+**Starosta:** *"{player.character.name}, uratowałeś nas wszystkich! Jesteś BOHATEREM!"*"""
+        
+        choices = [
+            {"text": "😊 'To mój obowiązek'", "next_scene": "g1_main_013", "effect": {"reputation": 50, "gold": 100}},
+            {"text": "😎 'Tylko kolejny dzień w pracy'", "next_scene": "g1_main_013", "effect": {"reputation": 50, "gold": 100}},
+            {"text": "💰 'Macie coś cenniejszego? Zaplata za życie?'", "next_scene": "g1_main_013", "effect": {"reputation": 20, "gold": 250}, "sets_flag": "mercenary"},
+        ]
+    else:
+        text = f"""**⚔️ YOU CHARGE AT DEMONS! ⚔️**
+
+**{player.character.name}:** *"FOR THE VILLAGE!"*
+
+Your sword **FLASHES** in sunlight!
+
+**IMPS** turn around - surprised!
+
+**SLASH!** First demon cut in half!
+
+**SLASH!** Second falls!
+
+```asciidoc
+╔════════════════════════╗
+║   DEMON SLAYER!        ║
+║   Killed: 2/8          ║
+╚════════════════════════╝
+```
+
+But **HELLHOUND** leaps at you!
+
+**🔥 FIRE!** Gushing flames!
+
+**-15 HP** - Your armor melts!
+
+**Your HP:** {max(0, player.stats.hp - 15)}/{player.stats.hp}
+
+**DEMON OGRE** attacks with massive club!
+
+**BOOM!** You dodge by hair!
+
+**3 IMPS** surrounded you!
+
+**-10 HP** - Claws scratch your skin!
+
+**Your HP:** {max(0, player.stats.hp - 25)}/{player.stats.hp}
+
+But **VILLAGERS** see your courage!
+
+**Elder**: *"HELP HIM! He's our ONLY knight!"*
+
+**10 villagers** join fight with pitchforks!
+
+```asciidoc
+⚔️ TIDE TURNS! ⚔️
+Villagers fight at your side!
+```
+
+**TOGETHER** you defeat demons!
+
+**VICTORY!**
+
+**+50 reputation**
+**+100 gold** (village reward)
+**+Bow +1** (gift from master archer)
+
+**Villagers** fall to knees in gratitude!
+
+**Elder:** *"{player.character.name}, you saved us all! You're a HERO!"*"""
+        
+        choices = [
+            {"text": "😊 'It's my duty'", "next_scene": "g1_main_013", "effect": {"reputation": 50, "gold": 100}},
+            {"text": "😎 'Just another day's work'", "next_scene": "g1_main_013", "effect": {"reputation": 50, "gold": 100}},
+            {"text": "💰 'Got anything more valuable? Payment for life?'", "next_scene": "g1_main_013", "effect": {"reputation": 20, "gold": 250}, "sets_flag": "mercenary"},
+        ]
+    
+    # Set hero flags
+    state.quest_flags["saved_village"] = True
+    state.quest_flags["village_hero"] = True
+    
+    return {
+        "title": "Bohater wioski" if lang == "pl" else "Village Hero",
+        "text": text,
+        "choices": choices,
+        "location": "saved_village",
+        "heroic_moment": True
+    }
+
+
+def get_branch_village_distraction(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Taktyka odwrócenia uwagi - przyciągnij demony"""
+    
+    if lang == "pl":
+        text = f"""**🎯 ODWRACASZ UWAGĘ DEMONÓW! 🎯**
+
+**{player.character.name}:** *"HEJ! TU JESTEM, POTWORY!"*
+
+Wyciągasz broń i **HASUJESZ** przed wejściem do wioski!
+
+**Demony** odwracają się!
+
+**OGRE DEMON**: *"GRAAAGH! CZŁOWIEK!"*
+
+```asciidoc
+╔════════════════════════╗
+║   TAKTYKA: POŚCIG      ║
+║   Przyciągnij demony   ║
+║   od wioski            ║
+╚════════════════════════╝
+```
+
+**BIEGNIESZ** w stronę lasu!
+
+**Demony GONIJĄ** cię!
+
+**5 IMPY + 2 HELLHOUNDS + OGRE** - wszyscy za tobą!
+
+Wiośniacy mają czas **UCIEC** i się **SCHRONIĆ**!
+
+**Starosta** (z daleka): *"DZIĘKUJĘ!"*
+
+Ale teraz... **TY** jesteś w niebezpieczeństwie!
+
+Biegniesz przez las. Demony **TUŻ ZA TOBĄ**!
+
+**🔥 OGIEŃ** od Hellhounda!
+
+**-10 HP** - Oparzenie na plecach!
+
+**Twoje HP:** {max(0, player.stats.hp - 10)}/{player.stats.hp}
+
+Musisz ich **ZGUBIĆ**... albo stawić czoła w lepszym terenie!
+
+```asciidoc
+╔════════════════════════╗
+║  GDZIE UCIEKASZ?       ║
+║  1. Głęboki las        ║
+║  2. Skały - wąwóz      ║
+║  3. Rzeka              ║
+╚════════════════════════╝
+```"""
+        
+        choices = [
+            {"text": "🌲 Głęboki las - zgub ich (DC 16 DEX)", "next_scene": "g1_main_013", "requires_roll": True, "stat": "dexterity", "dc": 16, "effect": {"hp": -10}},
+            {"text": "⛰️ Skały/wąwóz - walcz w wąskiej przestrzeni", "next_scene": "g1_branch_village_combat", "effect": {"hp": -10}},
+            {"text": "🌊 Rzeka - skocz i płyń!", "next_scene": "g1_main_013", "effect": {"hp": -20}},  # Drowning damage
+        ]
+    else:
+        text = f"""**🎯 YOU DISTRACT THE DEMONS! 🎯**
+
+**{player.character.name}:** *"HEY! I'M HERE, MONSTERS!"*
+
+You draw weapon and **RUSH** before village entrance!
+
+**Demons** turn around!
+
+**DEMON OGRE**: *"GRAAAGH! HUMAN!"*
+
+```asciidoc
+╔════════════════════════╗
+║   TACTICS: CHASE       ║
+║   Lure demons          ║
+║   away from village    ║
+╚════════════════════════╝
+```
+
+**YOU RUN** toward forest!
+
+**Demons CHASE** you!
+
+**5 IMPS + 2 HELLHOUNDS + OGRE** - all after you!
+
+Villagers have time to **FLEE** and **HIDE**!
+
+**Elder** (from distance): *"THANK YOU!"*
+
+But now... **YOU** are in danger!
+
+You run through forest. Demons **RIGHT BEHIND**!
+
+**🔥 FIRE** from Hellhound!
+
+**-10 HP** - Burn on back!
+
+**Your HP:** {max(0, player.stats.hp - 10)}/{player.stats.hp}
+
+You must **LOSE** them... or face them in better terrain!
+
+```asciidoc
+╔════════════════════════╗
+║  WHERE DO YOU FLEE?    ║
+║  1. Deep forest        ║
+║  2. Rocks - gorge      ║
+║  3. River              ║
+╚════════════════════════╝
+```"""
+        
+        choices = [
+            {"text": "🌲 Deep forest - lose them (DC 16 DEX)", "next_scene": "g1_main_013", "requires_roll": True, "stat": "dexterity", "dc": 16, "effect": {"hp": -10}},
+            {"text": "⛰️ Rocks/gorge - fight in narrow space", "next_scene": "g1_branch_village_combat", "effect": {"hp": -10}},
+            {"text": "🌊 River - jump and swim!", "next_scene": "g1_main_013", "effect": {"hp": -20}},
+        ]
+    
+    # Set distraction success flag
+    state.quest_flags["saved_village"] = True
+    state.quest_flags["tactical_distraction"] = True
+    
+    return {
+        "title": "Taktyczna ucieczka" if lang == "pl" else "Tactical Retreat",
+        "text": text,
+        "choices": choices,
+        "location": "forest_chase",
+        "danger": True
+    }
+
+
+def get_branch_village_tactics(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Magiczna/taktyczna eliminacja demonów"""
+    
+    if lang == "pl":
+        text = f"""**🔥 UŻYWASZ MAGII I TAKTYKI! 🔥**
+
+**{player.character.name}** analizuje sytuację...
+
+**Demony** są skoncentrowane w centrum wioski.
+
+**OGRE DEMON** dowodzi z tyłu.
+
+**Plan:** Zabij z dystansu, jeden po drugim.
+
+```asciidoc
+╔════════════════════════╗
+║   TAKTYKA: SNAJPER     ║
+║   Użyj magii/łuku      ║
+║   Eliminuj cicho       ║
+╚════════════════════════╝
+```
+
+**STRZAŁ #1:** Pierwszy IMP!
+
+**🎯 HEADSHOT!** Demon pada martwy.
+
+**STRZAŁ #2:** Drugi IMP!
+
+**🎯 CRITICAL!** Trafiony w serce.
+
+**Demony** jeszcze NIC nie zauważyły!
+
+**STRZAŁ #3:** HELLHOUND!
+
+**🔥 MAGIA!** Lodowy pocisk przeszywa bestię!
+
+**Hellhound** wyje i pada.
+
+```asciidoc
+╔════════════════════════╗
+║   Killed: 3/8          ║
+║   Status: Undetected   ║
+╚════════════════════════╝
+```
+
+**Ale OGRE DEMON zauważył cię!**
+
+**OGRE**: *"GRAAAAGH! TAM!"*
+
+Demony **SZARŻUJĄ** w twoją stronę!
+
+Musisz **DOKOŃCZYĆ** robotę - szybko!
+
+**STRZAŁ #4-5-6:** Szybki ogień!
+
+**3 IMPY** padają!
+
+**Ostatni HELLHOUND** skacze na ciebie!
+
+**-15 HP** - Ogień opala twoją rękę!
+
+**Twoje HP:** {max(0, player.stats.hp - 15)}/{player.stats.hp}
+
+**OGRE** jest blisko! 20 STÓP!
+
+**OSTATNI STRZAŁ:** Wszystko albo nic!
+
+```asciidoc
+🎯 DC 18 Finisher!
+Zabij Ogre'a zanim cię dopadnie!
+```
+
+**STRZAŁ** w oko!
+
+**OGRE pada!**
+
+**ZWYCIĘSTWO!**
+
+Wiośniacy wychodzą ze kryjówek!
+
+**+60 reputation** (Mistrz taktyki!)
+**+150 złota** (nagroda od wioski)
+**+Pierścień Magiczny +1** (dar od Czarodzieja z wioski)"""
+        
+        choices = [
+            {"text": "😊 'Cieszę się, że wszyscy żyją'", "next_scene": "g1_main_013", "effect": {"reputation": 60, "gold": 150}},
+            {"text": "😎 'Taktyka zwycięża siłę'", "next_scene": "g1_main_013", "effect": {"reputation": 60, "gold": 150}},
+            {"text": "🧙 'Magia to potężna broń'", "next_scene": "g1_main_013", "effect": {"reputation": 60, "gold": 150}},
+        ]
+    else:
+        text = f"""**🔥 YOU USE MAGIC AND TACTICS! 🔥**
+
+**{player.character.name}** analyzes situation...
+
+**Demons** are concentrated in village center.
+
+**DEMON OGRE** commands from rear.
+
+**Plan:** Kill from distance, one by one.
+
+```asciidoc
+╔════════════════════════╗
+║   TACTICS: SNIPER      ║
+║   Use magic/bow        ║
+║   Eliminate quietly    ║
+╚════════════════════════╝
+```
+
+**SHOT #1:** First IMP!
+
+**🎯 HEADSHOT!** Demon falls dead.
+
+**SHOT #2:** Second IMP!
+
+**🎯 CRITICAL!** Hit in heart.
+
+**Demons** still noticed NOTHING!
+
+**SHOT #3:** HELLHOUND!
+
+**🔥 MAGIC!** Ice bolt pierces beast!
+
+**Hellhound** howls and falls.
+
+```asciidoc
+╔════════════════════════╗
+║   Killed: 3/8          ║
+║   Status: Undetected   ║
+╚════════════════════════╝
+```
+
+**But DEMON OGRE spotted you!**
+
+**OGRE**: *"GRAAAAGH! THERE!"*
+
+Demons **CHARGE** your direction!
+
+You must **FINISH** job - quickly!
+
+**SHOTS #4-5-6:** Rapid fire!
+
+**3 IMPS** fall!
+
+**Last HELLHOUND** leaps at you!
+
+**-15 HP** - Fire scorches your arm!
+
+**Your HP:** {max(0, player.stats.hp - 15)}/{player.stats.hp}
+
+**OGRE** is close! 20 FEET!
+
+**FINAL SHOT:** All or nothing!
+
+```asciidoc
+🎯 DC 18 Finisher!
+Kill Ogre before he reaches you!
+```
+
+**SHOT** in eye!
+
+**OGRE falls!**
+
+**VICTORY!**
+
+Villagers emerge from hiding!
+
+**+60 reputation** (Tactical Master!)
+**+150 gold** (village reward)
+**+Magic Ring +1** (gift from Village Wizard)"""
+        
+        choices = [
+            {"text": "😊 'Glad everyone's alive'", "next_scene": "g1_main_013", "effect": {"reputation": 60, "gold": 150}},
+            {"text": "😎 'Tactics beat strength'", "next_scene": "g1_main_013", "effect": {"reputation": 60, "gold": 150}},
+            {"text": "🧙 'Magic is powerful weapon'", "next_scene": "g1_main_013", "effect": {"reputation": 60, "gold": 150}},
+        ]
+    
+    # Set tactical victory flags
+    state.quest_flags["saved_village"] = True
+    state.quest_flags["tactical_master"] = True
+    
+    return {
+        "title": "Mistrz taktyki" if lang == "pl" else "Tactical Master",
+        "text": text,
+        "choices": choices,
+        "location": "saved_village",
+        "tactical_victory": True
+    }
+
+
+def get_branch_flee_future(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Ucieczka z przyszłości - panika"""
+    
+    if lang == "pl":
+        text = f"""**😱 UCIEKASZ Z POWROTEM PRZEZ BRAMĘ! 😱**
+
+To jest **ZA DUŻO**!
+
+Apokaliptyczna wizja przyszłości... ruiny... śmierć...
+
+**{player.character.name}**, nie możesz tego znieść!
+
+**BIEGNIESZ** z powrotem przez czasową bramę!
+
+```asciidoc
+╔════════════════════════╗
+║  UCIECZKA Z PRZYSZŁOŚCI║
+║  Strach przejmuje cię  ║
+╚════════════════════════╝
+```
+
+**PRZECHODZISZ** przez portal...
+
+...i WPADASZ z powrotem do **TERAŹNIEJSZOŚCI**!
+
+Lądasz na kamieniach w ruinach. Oddychasz ciężko.
+
+**-10 HP** - Upadek na kamienie
+
+**Twoje HP:** {max(0, player.stats.hp - 10)}/{player.stats.hp}
+
+```asciidoc
+⚠️ TRAUMATYCZNE WSPOMNIENIE ⚠️
+Widziałeś KONIEC królestwa.
+To widmo przyszłości teraz
+nęka twoje sny.
+```
+
+**Co widziałeś zmienia cię...**
+
+Wiesz teraz, co się stanie, jeśli **PRZEGRASZ**.
+
+Panika minęła. Ale determinacja **WZROSŁA**.
+
+**Kapłan** (z daleka): *"WRÓCIŁEŚ! Myślałem, że zginąłeś!"*
+
+Musisz im powiedzieć... ale jak **WYJAŚNIĆ** to co widziałeś?
+
+**Głos w twojej głowie:** *"Teraz WIESZ. Teraz musisz DZIAŁAĆ. Przyszłość NIE jest zapisana. Jeszcze."*"""
+        
+        choices = [
+            {"text": "😰 'Widziałem... KONIEC. Wszystkiego.'", "next_scene": "g1_main_006", "sets_flag": "saw_future"},
+            {"text": "😤 'NIE POZWOLĘ na tę przyszłość!'", "next_scene": "g1_main_006", "sets_flag": "future_determination"},
+            {"text": "🤐 Nie mów nic - zachowaj wizję dla siebie", "next_scene": "g1_main_006", "sets_flag": "future_secret"},
+        ]
+    else:
+        text = f"""**😱 YOU FLEE BACK THROUGH THE GATE! 😱**
+
+This is **TOO MUCH**!
+
+Apocalyptic vision of future... ruins... death...
+
+**{player.character.name}**, you can't bear this!
+
+**YOU RUN** back through the time gate!
+
+```asciidoc
+╔════════════════════════╗
+║  FLEEING FROM FUTURE   ║
+║  Fear overcomes you    ║
+╚════════════════════════╝
+```
+
+**YOU PASS** through the portal...
+
+...and FALL back into **PRESENT**!
+
+You land on stones in ruins. Breathing heavily.
+
+**-10 HP** - Fall on stones
+
+**Your HP:** {max(0, player.stats.hp - 10)}/{player.stats.hp}
+
+```asciidoc
+⚠️ TRAUMATIC MEMORY ⚠️
+You saw the END of kingdom.
+This specter of future now
+haunts your dreams.
+```
+
+**What you saw changes you...**
+
+You now know what happens if you **LOSE**.
+
+Panic passed. But determination **INCREASED**.
+
+**Priest** (from distance): *"YOU'RE BACK! I thought you died!"*
+
+You must tell them... but how to **EXPLAIN** what you saw?
+
+**Voice in your head:** *"Now you KNOW. Now you must ACT. Future is NOT written. Yet."*"""
+        
+        choices = [
+            {"text": "😰 'I saw... the END. Of everything.'", "next_scene": "g1_main_006", "sets_flag": "saw_future"},
+            {"text": "😤 'I WON'T allow that future!'", "next_scene": "g1_main_006", "sets_flag": "future_determination"},
+            {"text": "🤐 Say nothing - keep vision to yourself", "next_scene": "g1_main_006", "sets_flag": "future_secret"},
+        ]
+    
+    # Set fear/trauma flags
+    state.quest_flags["fled_from_future"] = True
+    state.quest_flags["knows_apocalypse"] = True
+    state.quest_flags["traumatic_vision"] = True
+    
+    return {
+        "title": "Ucieczka z przyszłości" if lang == "pl" else "Fleeing Future",
+        "text": text,
+        "choices": choices,
+        "location": "ruins_present",
+        "psychological_impact": True
     }
 
 
@@ -6431,6 +7160,1242 @@ Rebels are **SAFE**.
         "combat": True,
         "heroic_sacrifice": True,
         "legendary_moment": True
+    }
+
+
+# ==================== SPECIAL BRANCHES ====================
+
+def get_branch_demon_details(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Szczegóły demonicznej mocy"""
+    
+    if lang == "pl":
+        text = f"""**🤔 PYTASZ O SZCZEGÓŁY 🤔**
+
+**{player.character.name}:** *"Jaką DOKŁADNIE moc oferujesz?"*
+
+Głos z Rozłamu **ŚMIEJE SIĘ** - dźwięk jak trzask szkła.
+
+**Głos:** *"Mądry śmiertelnik. Dobrze. Powiem ci PRAWDĘ."*
+
+```asciidoc
+╔═══════════════════════════════════╗
+║  PAKT DEMONICZNY - SZCZEGÓŁY      ║
+╚═══════════════════════════════════╝
+```
+
+**Głos:** *"Dotknij Rozłamu. Podpisz pakt KRWIĄ."*
+
+**"Otrzymasz:"**
+
+**1. NIEŚMIERTELNOŚĆ** - Nie możesz zginąć naturalną śmiercią (ale możesz zostać zabity)
+
+**2. MOC MAGICZNA** - Władza nad ciemnością, ogniem piekielnym, nekromancją
+
+**3. ARMIA** - 1000 demonicznych sług pod twoim rozkazem
+
+**4. WIEDZA** - Sekrety zakazanej magii, pradawnej mocy
+
+**5. TRANSFORMACJA** - Twoje ciało stanie się silniejsze, szybsze, potęzniejsze
+
+```asciidoc
+💀 CENA:💀
+```
+
+**Głos:** *"ALE ceną jest..."*
+
+**1. TWOJA DUSZA** - Połączysz się z Otchłanią. Na zawsze.
+
+**2. SŁUŻBA** - Po śmierci MUSISZ służyć Panu Demonów przez 1000 lat w Otchłani
+
+**3. TRANSFORMACJA** - Twoje ciało zmieni się. Przestaniesz być człowiekiem. Staniesz się **PÓŁDEMONEM**.
+
+**4. SAMOTNOŚĆ** - Ludzie cię odrzucą. Będziesz wygnańcem.
+
+**5. KORUPCJA** - Z czasem zło będzie cię POCHŁANIAĆ. Twoja moralność będzie ERODOWAĆ.
+
+**Głos:** *"To pakt RÓWNYCH. Daję moc. Bierzesz konsekwencje."*
+
+**Głos:** *"Wiele śmiertelników przyjęło ten dar. Niektórzy PANUJĄ nad światami jako Władcy Demonów."*
+
+**Głos:** *"Czy jesteś GOTOWY?"*"""
+        
+        choices = [
+            {"text": "💜 TAK - przyjmuję pakt!", "next_scene": "g1_main_047", "sets_flag": "dark_pact_accepted"},
+            {"text": "❌ NIE - odrzucam to!", "next_scene": "g1_main_022", "effect": {"reputation": 50}},
+            {"text": "🤝 'Negocjuj - ulepsz warunki' (DC 20 CHA)", "next_scene": "g1_main_047", "requires_roll": True, "stat": "charisma", "dc": 20, "sets_flag": "pact_negotiated"},
+            {"text": "⚔️ 'To pułapka!' - ATAK na Rozłam", "next_scene": "g1_main_013", "effect": {"reputation": 75}},
+        ]
+    else:
+        text = f"""**🤔 YOU ASK FOR DETAILS 🤔**
+
+**{player.character.name}:** *"What EXACTLY power do you offer?"*
+
+Voice from Rift **LAUGHS** - sound like shattering glass.
+
+**Voice:** *"Wise mortal. Good. I'll tell you the TRUTH."*
+
+```asciidoc
+╔═══════════════════════════════════╗
+║  DEMON PACT - DETAILS             ║
+╚═══════════════════════════════════╝
+```
+
+**Voice:** *"Touch the Rift. Sign pact with BLOOD."*
+
+**"You'll receive:"**
+
+**1. IMMORTALITY** - Cannot die natural death (but can be killed)
+
+**2. MAGICAL POWER** - Control over darkness, hellfire, necromancy
+
+**3. ARMY** - 1000 demonic servants under your command
+
+**4. KNOWLEDGE** - Secrets of forbidden magic, ancient power
+
+**5. TRANSFORMATION** - Your body becomes stronger, faster, more powerful
+
+```asciidoc
+💀 PRICE: 💀
+```
+
+**Voice:** *"BUT the price is..."*
+
+**1. YOUR SOUL** - You'll merge with Abyss. Forever.
+
+**2. SERVICE** - After death you MUST serve Demon Lord for 1000 years in Abyss
+
+**3. TRANSFORMATION** - Your body will change. You'll stop being human. You'll become **HALF-DEMON**.
+
+**4. SOLITUDE** - Humans will reject you. You'll be outcast.
+
+**5. CORRUPTION** - Over time evil will CONSUME you. Your morality will ERODE.
+
+**Voice:** *"This is pact of EQUALS. I give power. You take consequences."*
+
+**Voice:** *"Many mortals accepted this gift. Some RULE worlds as Demon Lords."*
+
+**Voice:** *"Are you READY?"*"""
+        
+        choices = [
+            {"text": "💜 YES - I accept pact!", "next_scene": "g1_main_047", "sets_flag": "dark_pact_accepted"},
+            {"text": "❌ NO - I reject this!", "next_scene": "g1_main_022", "effect": {"reputation": 50}},
+            {"text": "🤝 'Negotiate - improve terms' (DC 20 CHA)", "next_scene": "g1_main_047", "requires_roll": True, "stat": "charisma", "dc": 20, "sets_flag": "pact_negotiated"},
+            {"text": "⚔️ 'It's a trap!' - ATTACK Rift", "next_scene": "g1_main_013", "effect": {"reputation": 75}},
+        ]
+    
+    # Set detail request flag
+    state.quest_flags["demon_pact_details_learned"] = True
+    
+    return {
+        "title": "Szczegóły paktu" if lang == "pl" else "Pact Details",
+        "text": text,
+        "choices": choices,
+        "location": "rift_heart",
+        "critical_choice": True
+    }
+
+
+def get_branch_destroy_artifacts(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Zniszczenie artefaktów - odrzucenie mocy"""
+    
+    if lang == "pl":
+        text = f"""**💔 DECYDUJESZ ZNISZCZYĆ ARTEFAKTY! 💔**
+
+**{player.character.name}:** *"Ta moc jest ZBYT WIELKA! Żadna istota nie powinna jej posiadać!"*
+
+**OMNIBROŃ** pulsuje w twoich rękach.
+
+**Głos z broni:** *"NIE! Zniszczysz nas wszystkich?! Po TYM co przeszedłeś?!"*
+
+```asciidoc
+╔═══════════════════════════════════╗
+║  ZNISZCZENIE ARTEFAKTÓW           ║
+║  Wszystkie 5 zostaną zniszczone   ║
+╚═══════════════════════════════════╝
+```
+
+**Ty:** *"To jedyny sposób. Nikt nie może mieć takiej mocy."*
+
+Podnosisz **OMNIBROŃ** nad głowę.
+
+**Uderzasz** nim o kamień ołtarza!
+
+```asciidoc
+█▓▒░ CRACK! ░▒▓█
+```
+
+**PIERWSZA RYSA!**
+
+Artefakt zaczyna się **KRUSZYĆ**!
+
+**Głos:** *"BŁAGAM! Możemy zrobić DOBRO z tą mocą!"*
+
+**Ty:** *"Moc ZAWSZE korumpuje. To się kończy TERAZ."*
+
+**UDERZASZ PONOWNIE!**
+
+```asciidoc
+████ SHATTER! ████
+```
+
+**OMNIBROŃ ROZPADA SIĘ!**
+
+5 artefaktów rozdziela się... i **EKSPLODUJE** światłem!
+
+**🗡️ Miecz Światła** - kruszy się w pył
+**🛡️ Tarcza Wieków** - pęka na kawałki
+**👑 Korona Umysłu** - rozpływa się w nic
+**📚 Zakazana Księga** - spala się do cna
+**❤️ Serce Feniksa** - chłodnieje i skamienieje
+
+```asciidoc
+╔═══════════════════════════════════╗
+║  ARTEFAKTY: ZNISZCZONE ✅          ║
+║  Moc: UTRACONA                    ║
+║  Korzyści: ŻADNE                  ║
+║  Losy świata: W TWOICH RĘKACH     ║
+╚═══════════════════════════════════╝
+```
+
+**-5000 złota** (wartość utracona)
+**-Wszystkie bonusy z artefaktów**
+
+Ale...
+
+**+200 reputation** - "Szlachetny Wybór"
+**+100 WISDOM** - Nauczyłeś się odrzucać pokusę
+
+**Głos w głowie (własny):** *"Zrobiłem właściwą rzecz. Teraz uratuję świat... SWOJĄ MOCĄ."*
+
+Stoisz sam. Bez artefaktów. Bez Omnibroni.
+
+Ale **SILNIEJSZY** duchowo niż kiedykolwiek."""
+        
+        choices = [
+            {"text": "😌 'Jestem wolny od pokusy'", "next_scene": "g1_main_013", "effect": {"reputation": 200}},
+            {"text": "😔 'Może to był błąd...'", "next_scene": "g1_main_013", "effect": {"reputation": 100}, "sets_flag": "regrets_destroying_artifacts"},
+            {"text": "😤 'Nikt nie będzie miał tej mocy!'", "next_scene": "g1_main_013", "effect": {"reputation": 200}, "sets_flag": "power_destroyer"},
+        ]
+    else:
+        text = f"""**💔 YOU DECIDE TO DESTROY ARTIFACTS! 💔**
+
+**{player.character.name}:** *"This power is TOO GREAT! No being should possess it!"*
+
+**OMNIWEAPON** pulses in your hands.
+
+**Voice from weapon:** *"NO! You'll destroy us all?! After ALL you've been through?!"*
+
+```asciidoc
+╔═══════════════════════════════════╗
+║  ARTIFACT DESTRUCTION             ║
+║  All 5 will be destroyed          ║
+╚═══════════════════════════════════╝
+```
+
+**You:** *"It's the only way. No one can have such power."*
+
+You raise **OMNIWEAPON** above head.
+
+**You strike** it on altar stone!
+
+```asciidoc
+█▓▒░ CRACK! ░▒▓█
+```
+
+**FIRST CRACK!**
+
+Artifact begins to **CRUMBLE**!
+
+**Voice:** *"PLEASE! We can do GOOD with this power!"*
+
+**You:** *"Power ALWAYS corrupts. This ends NOW."*
+
+**YOU STRIKE AGAIN!**
+
+```asciidoc
+████ SHATTER! ████
+```
+
+**OMNIWEAPON BREAKS APART!**
+
+5 artifacts separate... and **EXPLODE** with light!
+
+**🗡️ Sword of Light** - crumbles to dust
+**🛡️ Shield of Ages** - breaks to pieces
+**👑 Crown of Mind** - dissolves into nothing
+**📚 Forbidden Book** - burns completely
+**❤️ Phoenix Heart** - cools and petrifies
+
+```asciidoc
+╔═══════════════════════════════════╗
+║  ARTIFACTS: DESTROYED ✅           ║
+║  Power: LOST                      ║
+║  Benefits: NONE                   ║
+║  World's fate: IN YOUR HANDS      ║
+╚═══════════════════════════════════╝
+```
+
+**-5000 gold** (value lost)
+**-All artifact bonuses**
+
+But...
+
+**+200 reputation** - "Noble Choice"
+**+100 WISDOM** - You learned to reject temptation
+
+**Voice in head (your own):** *"I did the right thing. Now I'll save world... with MY OWN POWER."*
+
+You stand alone. Without artifacts. Without Omniweapon.
+
+But **STRONGER** spiritually than ever."""
+        
+        choices = [
+            {"text": "😌 'I'm free from temptation'", "next_scene": "g1_main_013", "effect": {"reputation": 200}},
+            {"text": "😔 'Maybe it was mistake...'", "next_scene": "g1_main_013", "effect": {"reputation": 100}, "sets_flag": "regrets_destroying_artifacts"},
+            {"text": "😤 'No one will have this power!'", "next_scene": "g1_main_013", "effect": {"reputation": 200}, "sets_flag": "power_destroyer"},
+        ]
+    
+    # Set destruction flags
+    state.quest_flags["artifacts_destroyed"] = True
+    state.quest_flags["omniweapon_destroyed"] = True
+    state.quest_flags["noble_sacrifice"] = True
+    
+    return {
+        "title": "Zniszczenie mocy" if lang == "pl" else "Destruction of Power",
+        "text": text,
+        "choices": choices,
+        "location": "altar_of_artifacts",
+        "moral_triumph": True,
+        "legendary_moment": True
+    }
+
+
+def get_branch_save_sacrifices(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Heroic rush to save ritual victims"""
+    
+    if lang == "pl":
+        text = """**BIEGNIESZ** z całej siły!
+
+Długi skok przez kaplicę - **3 akolici związani u ołtarza** - Arcykapłanka unosi nóż rytualny!
+
+**"NIE!"** - krzyczysz.
+
+*SHHHING!* - Twoja broń rozłupuje łańcuchy! **DC 15 AGI** - **SUCCESS!**
+
+**Akolici padają wolni** na kamienną posadzkę.
+
+Ale...
+
+**5 STRAŻNIKÓW KOŚCIELNYCH** blokuje ci drogę. Miecze w dłoniach. **"Bluźnierco! Zatrzymaj go!"**
+
+**Arcykapłanka** cofa się z wściekłością:
+**"IGNORANCIE! To był ŚWIĘTY RYTUAŁ! Ich śmierć mogła WZMOCNIĆ Kościół przeciw demonom!"**
+
+**BRUTALNA WALKA:**
+
+```asciidoc
+⚔️ STRAŻNIK #1 → ATAK! (-12 HP)
+⚔️ STRAŻNIK #2 → Twoja kontra: ZABITY!
+⚔️ STRAŻNIK #3 → CIĘ NA PIERŚ! (-18 HP)
+⚔️ STRAŻNIK #4 & #5 → Otaczają cię!
+```
+
+**-30 HP TOTAL**
+
+Ale...
+
+**Uratowany akolita #1** chwyta ławkę - **ŁAMIE STRAŻNIKOWI nogę!**
+**Uratowani akolicci #2 & #3** atakują strażników od tyłu!
+
+**VICTORY!** - 5 strażników padada.
+
+**Arcykapłanka UCIEKA** przez sekretne drzwi.
+
+**Ocalony akolita** pada przed tobą:
+
+**"Dzięki ci, wędrowcze! Arcykapłanka... sprzedała duszę demonom! Kościół jest skorumpowany od środka! Musisz ostrzec króla!"**"""
+        
+        choices = [
+            {"text": "👑 'Natychmiast idę do króla!'", "next_scene": "g1_main_007", "effect": {"reputation": 100, "hp": -30}},
+            {"text": "⛪ 'Gdzie ona uciekła?!'", "next_scene": "g1_main_008", "effect": {"reputation": 80, "hp": -30}},
+            {"text": "🩹 'Najpierw pomóżcie mi...' (-30 HP heal)", "next_scene": "g1_main_007", "effect": {"reputation": 60, "hp": 0}},
+            {"text": "💀 'Kościół... to przede mną?'", "next_scene": "g1_main_013", "effect": {"reputation": 50, "hp": -30}}
+        ]
+    else:
+        text = """**YOU RUSH** with full force!
+
+Long jump across chapel - **3 acolytes bound at altar** - High Priestess raises ritual knife!
+
+**"NO!"** - you scream.
+
+*SHHHING!* - Your weapon shatters chains! **DC 15 AGI** - **SUCCESS!**
+
+**Acolytes fall free** onto stone floor.
+
+But...
+
+**5 CHURCH GUARDS** block your path. Swords in hands. **"Blasphemer! Stop him!"**
+
+**High Priestess** retreats with fury:
+**"IGNORANT FOOL! This was SACRED RITUAL! Their death could STRENGTHEN Church against demons!"**
+
+**BRUTAL COMBAT:**
+
+```asciidoc
+⚔️ GUARD #1 → ATTACK! (-12 HP)
+⚔️ GUARD #2 → Your counter: KILLED!
+⚔️ GUARD #3 → CUT TO CHEST! (-18 HP)
+⚔️ GUARD #4 & #5 → Surround you!
+```
+
+**-30 HP TOTAL**
+
+But...
+
+**Saved acolyte #1** grabs bench - **BREAKS GUARD'S LEG!**
+**Saved acolytes #2 & #3** attack guards from behind!
+
+**VICTORY!** - 5 guards fall.
+
+**High Priestess ESCAPES** through secret door.
+
+**Saved acolyte** falls before you:
+
+**"Thank you, wanderer! High Priestess... sold soul to demons! Church is corrupted from within! You must warn the king!"**"""
+        
+        choices = [
+            {"text": "👑 'I go to king immediately!'", "next_scene": "g1_main_007", "effect": {"reputation": 100, "hp": -30}},
+            {"text": "⛪ 'Where did she escape?!'", "next_scene": "g1_main_008", "effect": {"reputation": 80, "hp": -30}},
+            {"text": "🩹 'First help me...' (-30 HP heal)", "next_scene": "g1_main_007", "effect": {"reputation": 60, "hp": 0}},
+            {"text": "💀 'Church... is the first?'", "next_scene": "g1_main_013", "effect": {"reputation": 50, "hp": -30}}
+        ]
+    
+    # Set quest flags
+    state.quest_flags["saved_ritual_victims"] = True
+    state.quest_flags["church_corrupted_discovered"] = True
+    state.quest_flags["priestess_escaped"] = True
+    player.hp -= 30  # Combat damage
+    player.reputation += 100
+    
+    return {
+        "title": "⛪ Heroiczny Ratunek" if lang == "pl" else "⛪ Heroic Rescue",
+        "text": text,
+        "choices": choices,
+        "location": "cathedral_chapel",
+        "combat_victory": True,
+        "heroic_moment": True
+    }
+
+
+def get_branch_kill_priestess(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Aggressive assassination of High Priestess"""
+    
+    if lang == "pl":
+        text = """**ZABIĆ ARCYKAPŁANKĘ!**
+
+Wyciągasz broń i **RZUCASZ SIĘ** przez kaplicę!
+
+**DC 16 STR** - **POWODZENIE!**
+
+**Arcykapłanka** obraca się - **twoja broń PRZESZYWA jej serce!**
+
+*SHHHLKT!*
+
+**"A...aaah... ty... głupcze..."** - krew leje się z jej ust.
+
+Pada martwa.
+
+**NATYCHMIAST:**
+
+```asciidoc
+⚡ RYTUALNY KRĄG **WYBUCHA!**
+⚡ ENERGIA DEMONICZNA UWALalniA SIĘ!
+⚡ -20 HP (eksplozja magiczna)
+```
+
+**3 AKOLICI U OŁTARZA** - energia rytuału ich porywa!
+
+**KRZYK!** **KRZYK!** **KRZYK!**
+
+Ich ciała... **EKSPLODUJĄ** w czarny dym. Demony zabierają ich dusze do Otchłani.
+
+**5 STRAŻNIKÓW** atakuje cię:
+
+**"ZAMORDOWAŁEŚ ARCYKAPŁANKĘ! ŚMIERĆ HERETYKOWI!"**
+
+**DESPERACKA WALKA:**
+
+```asciidoc
+⚔️ TWÓJ CIOS → Zabity strażnik #1
+⚔️ STRAŻNIK #2 → CIĘ W RAMIĘ! (-15 HP)
+⚔️ STRAŻNIK #3 → Rana na nodze! (-10 HP)
+⚔️ STRAŻNICY #4 & #5 → OTACZAJĄ!
+```
+
+Ledwo **UCIEKASZ** z katedry. Krew leje się z ran.
+
+**-45 HP TOTAL**
+**-150 REPUTATION** - "Morderca Arcykapłanki"
+
+Ale... w kieszeni zmarłej arcykapłanki znajdujesz **MEDALION DEMONA** i **LISTĘ ZDRAJCÓW**.
+
+**Kościół NAPRAWDĘ współpracował z demonami.**"""
+        
+        choices = [
+            {"text": "👑 'Muszę ostrzec króla!' (krwawy)", "next_scene": "g1_main_007", "effect": {"reputation": -150, "hp": -45}},
+            {"text": "🏃 'UCIEKAĆ z miasta!' (desperacja)", "next_scene": "g1_branch_escape_palace", "effect": {"reputation": -150, "hp": -45}},
+            {"text": "🩹 'Muszę się opatrzyć...'", "next_scene": "g1_main_013", "effect": {"reputation": -150, "hp": -25}},
+            {"text": "😈 'Pakt z demonami... może oferta?'", "next_scene": "g1_main_046", "effect": {"reputation": -200, "hp": -45}}
+        ]
+    else:
+        text = """**KILL THE HIGH PRIESTESS!**
+
+You draw weapon and **CHARGE** across chapel!
+
+**DC 16 STR** - **SUCCESS!**
+
+**High Priestess** turns - **your weapon PIERCES her heart!**
+
+*SHHHLKT!*
+
+**"A...aaah... you... fool..."** - blood pours from her mouth.
+
+Falls dead.
+
+**IMMEDIATELY:**
+
+```asciidoc
+⚡ RITUAL CIRCLE **EXPLODES!**
+⚡ DEMONIC ENERGY RELEASED!
+⚡ -20 HP (magic explosion)
+```
+
+**3 ACOLYTES AT ALTAR** - ritual energy seizes them!
+
+**SCREAM!** **SCREAM!** **SCREAM!**
+
+Their bodies... **EXPLODE** into black smoke. Demons take their souls to Abyss.
+
+**5 GUARDS** attack you:
+
+**"YOU MURDERED HIGH PRIESTESS! DEATH TO HERETIC!"**
+
+**DESPERATE COMBAT:**
+
+```asciidoc
+⚔️ YOUR STRIKE → Killed guard #1
+⚔️ GUARD #2 → CUT TO ARM! (-15 HP)
+⚔️ GUARD #3 → Leg wound! (-10 HP)
+⚔️ GUARDS #4 & #5 → SURROUND!
+```
+
+Barely **ESCAPE** from cathedral. Blood flows from wounds.
+
+**-45 HP TOTAL**
+**-150 REPUTATION** - "High Priestess Murderer"
+
+But... in dead priestess's pocket you find **DEMON MEDALLION** and **LIST OF TRAITORS**.
+
+**Church TRULY collaborated with demons.**"""
+        
+        choices = [
+            {"text": "👑 'Must warn king!' (bloody)", "next_scene": "g1_main_007", "effect": {"reputation": -150, "hp": -45}},
+            {"text": "🏃 'FLEE from city!' (desperation)", "next_scene": "g1_branch_escape_palace", "effect": {"reputation": -150, "hp": -45}},
+            {"text": "🩹 'Must treat wounds...'", "next_scene": "g1_main_013", "effect": {"reputation": -150, "hp": -25}},
+            {"text": "😈 'Pact with demons... maybe offer?'", "next_scene": "g1_main_046", "effect": {"reputation": -200, "hp": -45}}
+        ]
+    
+    # Set quest flags
+    state.quest_flags["priestess_killed"] = True
+    state.quest_flags["ritual_victims_died"] = True
+    state.quest_flags["church_corrupted_discovered"] = True
+    state.quest_flags["murderer_status"] = True
+    player.hp -= 45  # Severe combat damage
+    player.reputation -= 150  # Major reputation loss
+    
+    return {
+        "title": "⚔️ Zabójstwo Arcykapłanki" if lang == "pl" else "⚔️ Priestess Assassination",
+        "text": text,
+        "choices": choices,
+        "location": "cathedral_chapel",
+        "dark_choice": True,
+        "brutal_moment": True
+    }
+
+
+def get_branch_mysterious_elder(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Investigation of mysterious elder's identity"""
+    
+    if lang == "pl":
+        text = """**"Kim jesteś, staruszku?"** - pytasz.
+
+Starzec patrzy na ciebie przenikliwie. Przez chwilę w jego oczach widzisz...
+
+**...NIESKOŃCZONOŚĆ.**
+
+Mruży oczy i uśmiecha się.
+
+**"Nazwij mnie... Obserwatorem. Jednym z wielu, którzy pilnują Bram."**
+
+Siada z powrotem przy studni.
+
+**"Królestwo stoi na skraju przepaści. Zdrajca siedzi przy królewskim stole. Ale... kto? Król? Dowódca wojsk? Arcykapłanka?"**
+
+**"Możesz uratować królestwo... lub je zniszczyć. Ale wiedz:"**
+
+Podnosi palec - nad nim **WIRUJE MINIATUROWY ROZŁAM**.
+
+**"Bramy to więcej niż inwazje. To TEST. Test dla was - śmiertelnych. Czy jesteście godni przetrwania?"**
+
+Miniaturowy Rozłam zanika.
+
+**"W przyszłości... wiele możliwości. Widziałem je wszystkie."**
+
+Pokazuje ci **WIZJĘ** - **3 MOŻLIWE PRZYSZŁOŚCI:**
+
+**📜 PRZYSZŁOŚĆ  1:** Królestwo uratowane. Ty jako bohater. Naród świętuje.
+**📜 PRZYSZŁOŚĆ 2:** Królestwo zniszczone. Ty jako Władca Demonów. Popiół i śmierć.
+**📜 PRZYSZŁOŚĆ 3:** Królestwo nieistniejące. Smoczy pakt. Pyraxis rządzi światem.
+
+**"Która przyszłość? To zależy... od ciebie."**
+
+Obserwator znika w powietrzu."""
+        
+        choices = [
+            {"text": "👑 'Idę ratować króla!' (moralność)", "next_scene": "g1_main_007", "effect": {"reputation": 50}},
+            {"text": "⛪ 'Idę do kościoła' (śledztwo)", "next_scene": "g1_main_008", "effect": {"reputation": 30}},
+            {"text": "🐉 'Smoczy pakt... ciekawe'", "next_scene": "g1_main_022", "effect": {"reputation": 0}},
+            {"text": "😈 'Władca Demonów? Siła!'", "next_scene": "g1_main_046", "effect": {"reputation": -50}},
+            {"text": "💜 'Wracam do Rozłamu' (badanie)", "next_scene": "g1_main_013", "effect": {"reputation": 10}}
+        ]
+    else:
+        text = """**"Who are you, old man?"** - you ask.
+
+Elder looks at you piercingly. For moment in his eyes you see...
+
+**...INFINITY.**
+
+Narrows eyes and smiles.
+
+**"Call me... Observer. One of many who guard the Gates."**
+
+Sits back by well.
+
+**"Kingdom stands on edge of abyss. Traitor sits at royal table. But... who? King? Army commander? High Priestess?"**
+
+**"You can save kingdom... or destroy it. But know:"**
+
+Raises finger - above it **SWIRLS MINIATURE RIFT**.
+
+**"Gates are more than invasions. It's TEST. Test for you - mortals. Are you worthy of survival?"**
+
+Miniature Rift fades.
+
+**"In future... many possibilities. I saw them all."**
+
+Shows you **VISION** - **3 POSSIBLE FUTURES:**
+
+**📜 FUTURE 1:** Kingdom saved. You as hero. Nation celebrates.
+**📜 FUTURE 2:** Kingdom destroyed. You as Demon Lord. Ash and death.
+**📜 FUTURE 3:** Kingdom nonexistent. Dragon pact. Pyraxis rules world.
+
+**"Which future? It depends... on you."**
+
+Observer vanishes into air."""
+        
+        choices = [
+            {"text": "👑 'I go save king!' (morality)", "next_scene": "g1_main_007", "effect": {"reputation": 50}},
+            {"text": "⛪ 'I go to church' (investigation)", "next_scene": "g1_main_008", "effect": {"reputation": 30}},
+            {"text": "🐉 'Dragon pact... interesting'", "next_scene": "g1_main_022", "effect": {"reputation": 0}},
+            {"text": "😈 'Demon Lord? Power!'", "next_scene": "g1_main_046", "effect": {"reputation": -50}},
+            {"text": "💜 'Return to Rift' (research)", "next_scene": "g1_main_013", "effect": {"reputation": 10}}
+        ]
+    
+    # Set quest flags
+    state.quest_flags["met_observer"] = True
+    state.quest_flags["saw_three_futures"] = True
+    state.quest_flags["gates_are_test"] = True
+    player.wisdom = getattr(player, 'wisdom', 0) + 25  # Wisdom bonus from knowledge
+    
+    return {
+        "title": "👁️ Obserwator" if lang == "pl" else "👁️ The Observer",
+        "text": text,
+        "choices": choices,
+        "location": "village_ruins",
+        "lore_moment": True,
+        "mystical": True
+    }
+
+
+def get_branch_fight_priestess(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Combat against High Priestess in palace"""
+    
+    if lang == "pl":
+        text = """**"TO ONA! ARCYKAPŁANKA!"** - wskazujesz na nią!
+
+Arcykapłanka uśmiecha się zimno.
+
+**"Dowody? Nie masz żadnych. Ale ja... mam ŚWIADKÓW."**
+
+**5 FAŁSZYWYCH ŚWIADKÓW** wychodzi z cienia:
+
+**"Widzieliśmy jak zabijał króla!"**
+
+**Dowódca Rycerzy** waha się... ale decyduje:
+
+**"Żal mi cię, wędrowcze. Ale dowody są przeciw tobie. ARESZT!"**
+
+**WALKA!**
+
+**10 RYCERZY** atakuje cię!
+
+```asciidoc
+⚔️ RYCERZ #1 & #2 → CIĘCIE! (-20 HP)
+⚔️ RYCERZ #3 & #4 → Otaczają!
+⚔️ RYCERZ #5 → CIOS W PLECY! (-15 HP)
+```
+
+**DESPERACJA!** Walczysz z całej siły!
+
+**DC 20 STR** - **SUKCES!**
+
+Zabijasz **3 rycerzy** zanim pozostali cię powalą!
+
+**-35 HP TOTAL**
+
+Leżysz na ziemi we krwi. Arcykapłanka klęka przy tobie:
+
+**"Szkoda. Miałeś potencjał. Ale... demoniczny władca nie lubi konkurencji."**
+
+Szepce inkantację - **CZARNA MAGIA** paraliżuje cię!
+
+**"Zabierz go do lochów. Zostanie stracony o świcie."**
+
+**Zostałeś pojmany.**"""
+        
+        choices = [
+            {"text": "⛓️ 'Lochy... muszę uciec!' (próba)", "next_scene": "g1_branch_escape_palace", "effect": {"reputation": -100, "hp": -35}},
+            {"text": "😈 'Pakt z demonami? Wolę to niż śmierć'", "next_scene": "g1_main_046", "effect": {"reputation": -150, "hp": -35}},
+            {"text": "💀 'Porażka... koniec' (death)", "next_scene": "g1_end_executed", "effect": {"reputation": -200, "hp": -35}},
+            {"text": "🙏 'Może ktoś mi pomoże...' (plea)", "next_scene": "g1_main_013", "effect": {"reputation": -80, "hp": -35}}
+        ]
+    else:
+        text = """**"IT'S HER! HIGH PRIESTESS!"** - you point at her!
+
+High Priestess smiles coldly.
+
+**"Evidence? You have none. But I... have WITNESSES."**
+
+**5 FALSE WITNESSES** step from shadows:
+
+**"We saw him kill the king!"**
+
+**Knight Commander** hesitates... but decides:
+
+**"I'm sorry, wanderer. But evidence is against you. ARREST!"**
+
+**FIGHT!**
+
+**10 KNIGHTS** attack you!
+
+```asciidoc
+⚔️ KNIGHT #1 & #2 → SLASH! (-20 HP)
+⚔️ KNIGHT #3 & #4 → Surround!
+⚔️ KNIGHT #5 → BACKSTAB! (-15 HP)
+```
+
+**DESPERATION!** You fight with full force!
+
+**DC 20 STR** - **SUCCESS!**
+
+You kill **3 knights** before others bring you down!
+
+**-35 HP TOTAL**
+
+You lie on ground in blood. High Priestess kneels by you:
+
+**"Pity. You had potential. But... demonic lord doesn't like competition."**
+
+Whispers incantation - **BLACK MAGIC** paralyzes you!
+
+**"Take him to dungeons. He'll be executed at dawn."**
+
+**You've been captured.**"""
+        
+        choices = [
+            {"text": "⛓️ 'Dungeons... must escape!' (attempt)", "next_scene": "g1_branch_escape_palace", "effect": {"reputation": -100, "hp": -35}},
+            {"text": "😈 'Demon pact? Better than death'", "next_scene": "g1_main_046", "effect": {"reputation": -150, "hp": -35}},
+            {"text": "💀 'Defeat... end' (death)", "next_scene": "g1_end_executed", "effect": {"reputation": -200, "hp": -35}},
+            {"text": "🙏 'Maybe someone will help...' (plea)", "next_scene": "g1_main_013", "effect": {"reputation": -80, "hp": -35}}
+        ]
+    
+    # Set quest flags
+    state.quest_flags["priestess_defeated_you"] = True
+    state.quest_flags["captured_by_knights"] = True
+    state.quest_flags["in_dungeons"] = True
+    player.hp -= 35  # Combat damage
+    player.reputation -= 100  # Reputation loss from accusation
+    
+    return {
+        "title": "⚔️ Porażka w Pałacu" if lang == "pl" else "⚔️ Defeat in Palace",
+        "text": text,
+        "choices": choices,
+        "location": "palace_throne_room",
+        "combat_defeat": True,
+        "captured": True
+    }
+
+
+def get_branch_escape_palace(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Desperate escape from palace/dungeons"""
+    
+    if lang == "pl":
+        text = """**"UCIEKAĆ!"** - jedyna myśl w głowie.
+
+{Jesteś w lochach - ręce w kajdanach - ale... słyszysz coś.' if state.quest_flags.get('captured_by_knights') else 'Biegniesz przez korytarze pałacu - strażnicy za tobą!'}
+
+```asciidoc
+🏃 SPRINT PRZEZ KORRYTARZE!
+🏃 DC 16 AGI - {'SUKCES!' if player.agility >= 16 else 'PORAŻKA!'}
+```
+
+{'''**STARSZA KOBIETA** w celi obok szepcze:
+
+"Psst! Młody bohaterze! Widzę że jesteś niewinny. Pomogę ci."
+
+Wyciąga **SZPILKĘ** przez kraty.
+
+"Otwórz kajdany tym. Następnie - tunele pod lochami prowadzą do kanałów. Uciekaj."
+
+**"Ale pamiętaj - Arcykapłanka  ma demonicznego pana. Musisz go znaleźć i pokonać."**
+
+**UDAŁO SIĘ!** Otwierasz kajdany!
+
+Wskakujesz do tunelu - lodowata woda, szczury, smugo - ale **WOLNOŚĆ**!''' if state.quest_flags.get('captured_by_knights') else '''**Skakujesz przez okno** - 15 stóp w dół - woda w fosie!
+
+*SPLASH!*
+
+**-10 HP** (upadek)
+
+Wypływasz poza mury miasta. Słyszysz krzyki strażników:
+
+"UCIEKŁ! ZAALARMOWAĆ STRA̧Ż!"
+
+Biegniesz przez las. Serce wali jak młot.'''}
+
+**Dotarłeś do bezpiecznej odległości.**
+
+Oddychasz ciężko. Słońce zachodzi.
+
+**"Co teraz? Jestem ścigany. Muszę obrać strategię."**"""
+        
+        choices = [
+            {"text": "🌲 'Ukryję się w lesie' (survival)", "next_scene": "g1_main_013", "effect": {"reputation": -50}},
+            {"text": "💜 'Do Rozłamu - tam znajdę odpowiedzi'", "next_scene": "g1_main_013", "effect": {"reputation": -30}},
+            {"text": "🐉 'Smok... może pomoże?'", "next_scene": "g1_main_022", "effect": {"reputation": -20}},
+            {"text": "😈 'Demon pakt - jedyna  opcja'", "next_scene": "g1_main_046", "effect": {"reputation": -100}},
+            {"text": "🗡️ 'Wrócę i oczyszczę imię!'", "next_scene": "g1_main_007", "effect": {"reputation": 0}}
+        ]
+    else:
+        text = """**"ESCAPE!"** - only thought in head.
+
+{'You are in dungeons - hands in shackles - but... you hear something.' if state.quest_flags.get('captured_by_knights') else 'You run through palace corridors - guards behind you!'}
+
+```asciidoc
+🏃 SPRINT THROUGH CORRIDORS!
+🏃 DC 16 AGI - {'SUCCESS!' if player.agility >= 16 else 'FAILURE!'}
+```
+
+{'''**ELDERLY WOMAN** in cell next door whispers:
+
+"Psst! Young hero! I see you are innocent. I'll help."
+
+Extends **HAIRPIN** through bars.
+
+"Open shackles with this. Then - tunnels under dungeons lead to sewers. Escape."
+
+**"But remember - High Priestess has demonic master. You must find and defeat him."**
+
+**SUCCESS!** You open shackles!
+
+Jump into tunnel - freezing water, rats, stench - but **FREEDOM**!''' if state.quest_flags.get('captured_by_knights') else '''**Jump through window** - 15 feet down - water in moat!
+
+*SPLASH!*
+
+**-10 HP** (fall)
+
+Swim beyond city walls. Hear guard shouts:
+
+"ESCAPED! ALERT GUARD!"
+
+Run through forest. Heart pounds like hammer.'''}
+
+**Reached safe distance.**
+
+Breathing heavily. Sun sets.
+
+**"What now? I'm hunted. Must choose strategy."**"""
+        
+        choices = [
+            {"text": "🌲 'Hide in forest' (survival)", "next_scene": "g1_main_013", "effect": {"reputation": -50}},
+            {"text": "💜 'To Rift - will find answers there'", "next_scene": "g1_main_013", "effect": {"reputation": -30}},
+            {"text": "🐉 'Dragon... might help?'", "next_scene": "g1_main_022", "effect": {"reputation": -20}},
+            {"text": "😈 'Demon pact - only option'", "next_scene": "g1_main_046", "effect": {"reputation": -100}},
+            {"text": "🗡️ 'I'll return and clear name!'", "next_scene": "g1_main_007", "effect": {"reputation": 0}}
+        ]
+    
+    # Set quest flags
+    state.quest_flags["escaped_from_palace"] = True
+    state.quest_flags["fugitive_status"] = True
+    if state.quest_flags.get('captured_by_knights'):
+        state.quest_flags["escaped_dungeons"] = True
+    player.hp -= 10  # Escape damage
+    player.reputation -= 50  # Fugitive status
+    
+    return {
+        "title": "🏃 Desperacka Ucieczka" if lang == "pl" else "🏃 Desperate Escape",
+        "text": text,
+        "choices": choices,
+        "location": "forest_outskirts" if not state.quest_flags.get('captured_by_knights') else "sewers",
+        "fugitive": True,
+        "suspenseful": True
+    }
+
+
+def get_branch_persuade_church(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Persuade church guards that ritual is evil"""
+    
+    if lang == "pl":
+        text = """**"To NIE jest wola bogów!"** - krzyczysz.
+
+**DC 17 CHA** - {***SUKCES!*** if player.charisma >= 17 else '**PORAŻKA!**'}
+
+{'''Twój głos rozbrzmiewa echem w katedrze. **MOC** w twoich słowach.
+
+**"Popatrzcie! Arcykapłanka zabija NIEWINNYCH! To nie jest święty rytuał - to MORD!"**
+
+Wskazujesz na 3 przerażonych akolicitów.
+
+**"Bogowie światła NIE żądają KRWI NIEWINNYCH!"**
+
+**5 STRAŻNIKÓW** waha się...
+
+Jeden z nich - **STARSZY STRAŻNIK** - opuszcza miecz.
+
+**"On... ma rację. To jest bluźnierstwo."**
+
+Inni strażnicy też opuszczają broń.
+
+**ARCYKAPŁANKA** wybucha gniewem:
+
+**"IDIOCI! ZABIJCIE GO!"**
+
+Ale nikt nie słucha.
+
+**Starszy Strażnik** podchodzi do ołtarza i **ROZRYWA KAJDANY** akolicitów!
+
+**"Arcykapłanko... jesteś aresztowana za bluźnierstwo i próbę morderstwa."**
+
+Arcykapłanka **UCIEKA** przez tajne drzwi - czarna magia wybucha - strażnicy padają nieprzytomni!
+
+**Ale akolicci są WOLNI.**
+
+**Starszy Strażnik** wstaje, otrzepuje się:
+
+**"Dziękuję ci, wędrowcze. Podążymy za nią. A ty... idź ostrzeż króla. Kościół jest skorumpowany."**''' if player.charisma >= 17 else '''Arcykapłanka śmieje się.
+
+**"Patetyczne. STRAŻNICY - ZABIJCIE GO!"**
+
+**5 STRAŻNIKÓW** atakuje!
+
+```asciidoc
+⚔️ STRAŻNIK #1 → CIOS! (-15 HP)
+⚔️ STRAŻNIK #2 & #3 → OTACZAJĄ!
+⚔️ STRAŻNIK #4 → CIĘ W NOGĘ! (-10 HP)
+```
+
+**-25 HP**
+
+Ledwo uciekasz z katedry.
+
+**3 AKOLICI u ołtarza** - arcykapłanka kończy rytuał!
+
+**KRZYK! KRZYK! KRZYK!**
+
+Ich dusze znikają w ciemności.
+
+**"Porażka..."** - myślisz uciekając.'''}"""
+        
+        if player.charisma >= 17:
+            choices = [
+                {"text": "👑 ' Natychmiast idę do króla!'", "next_scene": "g1_main_007", "effect": {"reputation": 120}},
+                {"text": "⛪ 'Pomogę wam złapać ją!'", "next_scene": "g1_main_008", "effect": {"reputation": 100}},
+                {"text": "🩹 'Pomóżcie rannym akolicitom'", "next_scene": "g1_main_007", "effect": {"reputation": 90}},
+                {"text": "💜 'Idę do Rozłamu - tam odpowiedzi'", "next_scene": "g1_main_013", "effect": {"reputation": 70}}
+            ]
+            state.quest_flags["persuaded_church_guards"] = True
+            state.quest_flags["saved_ritual_victims"] = True
+            player.reputation += 120
+        else:
+            choices = [
+                {"text": "🏃 'UCIEKAM!' (desperacja)", "next_scene": "g1_branch_temple_escape", "effect": {"reputation": -30, "hp": -25}},
+                {"text": "👑 'Król... muszę ostrzec...'", "next_scene": "g1_main_007", "effect": {"reputation": -20, "hp": -25}},
+                {"text": "💀 'Porażka... wszystko stracone'", "next_scene": "g1_main_013", "effect": {"reputation": -50, "hp": -25}}
+            ]
+            state.quest_flags["persuasion_failed"] = True
+            state.quest_flags["ritual_victims_died"] = True
+            player.hp -= 25
+            player.reputation -= 30
+    else:
+        text = """**"This is NOT gods' will!"** - you shout.
+
+**DC 17 CHA** - {***SUCCESS!*** if player.charisma >= 17 else '**FAILURE!**'}
+
+{'''Your voice echoes through cathedral. **POWER** in your words.
+
+**"Look! High Priestess kills INNOCENTS! This is not holy ritual - it's MURDER!"**
+
+You point at 3 terrified acolytes.
+
+**"Gods of light do NOT demand BLOOD OF INNOCENTS!"**
+
+**5 GUARDS** hesitate...
+
+One of them - **SENIOR GUARD** - lowers sword.
+
+**"He... is right. This is blasphemy."**
+
+Other guards also lower weapons.
+
+**HIGH PRIESTESS** erupts with anger:
+
+**"IDIOTS! KILL HIM!"**
+
+But no one listens.
+
+**Senior Guard** approaches altar and **BREAKS CHAINS** of acolytes!
+
+**"High Priestess... you are arrested for blasphemy and attempted murder."**
+
+High Priestess **ESCAPES** through secret door - black magic explodes - guards fall unconscious!
+
+**But acolytes are FREE.**
+
+**Senior Guard** stands, dusts off:
+
+**"Thank you, wanderer. We'll pursue her. And you... go warn king. Church is corrupted."**''' if player.charisma >= 17 else '''High Priestess laughs.
+
+**"Pathetic. GUARDS - KILL HIM!"**
+
+**5 GUARDS** attack!
+
+```asciidoc
+⚔️ GUARD #1 → STRIKE! (-15 HP)
+⚔️ GUARD #2 & #3 → SURROUND!
+⚔️ GUARD #4 → CUT LEG! (-10 HP)
+```
+
+**-25 HP**
+
+Barely escape from cathedral.
+
+**3 ACOLYTES at altar** - priestess completes ritual!
+
+**SCREAM! SCREAM! SCREAM!**
+
+Their souls disappear into darkness.
+
+**"Failure..."** - you think while escaping.'''}"""
+        
+        if player.charisma >= 17:
+            choices = [
+                {"text": "👑 'I go to king immediately!'", "next_scene": "g1_main_007", "effect": {"reputation": 120}},
+                {"text": "⛪ 'I'll help you catch her!'", "next_scene": "g1_main_008", "effect": {"reputation": 100}},
+                {"text": "🩹 'Help wounded acolytes'", "next_scene": "g1_main_007", "effect": {"reputation": 90}},
+                {"text": "💜 'Go to Rift - answers there'", "next_scene": "g1_main_013", "effect": {"reputation": 70}}
+            ]
+            state.quest_flags["persuaded_church_guards"] = True
+            state.quest_flags["saved_ritual_victims"] = True
+            player.reputation += 120
+        else:
+            choices = [
+                {"text": "🏃 'ESCAPE!' (desperation)", "next_scene": "g1_branch_temple_escape", "effect": {"reputation": -30, "hp": -25}},
+                {"text": "👑 'King... must warn...'", "next_scene": "g1_main_007", "effect": {"reputation": -20, "hp": -25}},
+                {"text": "💀 'Defeat... all lost'", "next_scene": "g1_main_013", "effect": {"reputation": -50, "hp": -25}}
+            ]
+            state.quest_flags["persuasion_failed"] = True
+            state.quest_flags["ritual_victims_died"] = True
+            player.hp -= 25
+            player.reputation -= 30
+    
+    return {
+        "title": "🗣️ Perswazja" if lang == "pl" else "🗣️ Persuasion",
+        "text": text,
+        "choices": choices,
+        "location": "cathedral_chapel",
+        "charisma_check": True,
+        "pivotal_moment": True
+    }
+
+
+def get_branch_temple_escape(lang: str, state: Gate1WorldState, player) -> Dict:
+    """Branch: Escape from corrupted cathedral"""
+    
+    if lang == "pl":
+        text = """**"TO SZALEŃSTWO! UCIEKAM!"**
+
+Obracasz się i **BIEGNIESZ** do wyjścia katedry!
+
+**Arcykapłanka** krzyczy:
+
+**"STRAŻNICY! NIE POZWÓLCIE MU UCIEC! ZABIJCIE GO!"**
+
+**5 STRAŻNIKÓW** blokuje drzwi!
+
+```asciidoc
+🏃 DC 16 AGI - SPRINT!
+🏃 {'SUCCESs!' if player.agility >= 16 else 'PORAŻKA!'}
+```
+
+{'''**WYSKOK przez okno witrażowe!**
+
+*CRASH!*
+
+Szkło roztrzaskuje się - spadasz 10 stóp na zewnątrz katedry!
+
+**-15 HP** (upadek + szkło)
+
+Ale jesteś **WOLNY**!
+
+Biegniesz przez plac przed katedrą. Ludzie patrzą w szoku.
+
+**Strażnicy gonią cię** - ale gubisz ich w zaułkach miasta.
+
+**Serce wali. Oddech ciężki.**
+
+Docierasz do bezpiecznego miejsca - **opuszczona stajnia**.
+
+**"Co ja właściwie widziałem? Arcykapłanka... zabijała NIEWINNYCH?"**
+
+**"Kościół jest skorumpowany. Muszę ostrzec króla. Ale... czy mi uwierzy?"**
+
+W kieszeni znajdujesz... **grudkę KRWI** z rytuału. Dowód?''' if player.agility >= 16 else '''**Strażnicy ŁAPIĄ CIĘ!**
+
+```asciidoc
+⚔️ STRAŻNIK #1 → CIOS PIĘŚCIĄ! (-10 HP)
+⚔️ STRAŻNIK #2 → KOPNIĘCIE! (-8 HP)
+⚔️ STRAŻNIK #3 → RZUT NA ZIEMIĘ! (-7 HP)
+```
+
+**-25 HP TOTAL**
+
+Leżysz na podłodze. Arcykapłanka podchodzi.
+
+**"Głupi człowieku. Widziałeś zbyt wiele."**
+
+Wyjmuje nóż rytualny...
+
+**NAGLE!**
+
+**EKSPLOZJA U DRZWI!**
+
+**"POŻAR!"** - ktoś krzyczy.
+
+W chaosie **wyzwalasz się** i uciekasz!
+
+Ledwo żywy - ale WOLNY.'''}"""
+        
+        choices = [
+            {"text": "👑 'Idę ostrzec króla!' (dowód)", "next_scene": "g1_main_007", "effect": {"reputation": 30, "hp": -15}},
+            {"text": "💜 'Do Rozłamu - odpowiedzi tam'", "next_scene": "g1_main_013", "effect": {"reputation": 10, "hp": -15}},
+            {"text": "🌲 'Ukryję się - jestem ścigany'", "next_scene": "g1_main_013", "effect": {"reputation": -10, "hp": -15}},
+            {"text": "🐉 'Smok... może pomoże?'", "next_scene": "g1_main_022", "effect": {"reputation": 0, "hp": -15}}
+        ]
+    else:
+        text = """**"THIS IS MADNESS! I'M ESCAPING!"**
+
+You turn and **RUN** to cathedral exit!
+
+**High Priestess** screams:
+
+**"GUARDS! DON'T LET HIM ESCAPE! KILL HIM!"**
+
+**5 GUARDS** block doors!
+
+```asciidoc
+🏃 DC 16 AGI - SPRINT!
+🏃 {'SUCCESS!' if player.agility >= 16 else 'FAILURE!'}
+```
+
+{'''**JUMP through stained glass window!**
+
+*CRASH!*
+
+Glass shatters - fall 10 feet outside cathedral!
+
+**-15 HP** (fall + glass)
+
+But you are **FREE**!
+
+Run across cathedral square. People watch in shock.
+
+**Guards chase you** - but you lose them in city alleys.
+
+**Heart pounds. Breath heavy.**
+
+Reach safe place - **abandoned stable**.
+
+**"What did I actually see? High Priestess... was killing INNOCENTS?"**
+
+**"Church is corrupted. Must warn king. But... will he believe me?"**
+
+In pocket you find... **clump of BLOOD** from ritual. Evidence?''' if player.agility >= 16 else '''**Guards CATCH YOU!**
+
+```asciidoc
+⚔️ GUARD #1 → PUNCH! (-10 HP)
+⚔️ GUARD #2 → KICK! (-8 HP)
+⚔️ GUARD #3 → THROW TO GROUND! (-7 HP)
+```
+
+**-25 HP TOTAL**
+
+You lie on floor. High Priestess approaches.
+
+**"Foolish mortal. You saw too much."**
+
+Takes out ritual knife...
+
+**SUDDENLY!**
+
+**EXPLOSION AT DOORS!**
+
+**"FIRE!"** - someone screams.
+
+In chaos you **BREAK FREE** and escape!
+
+Barely alive - but FREE.'''}"""
+        
+        choices = [
+            {"text": "👑 'I go warn king!' (evidence)", "next_scene": "g1_main_007", "effect": {"reputation": 30, "hp": -15}},
+            {"text": "💜 'To Rift - answers there'", "next_scene": "g1_main_013", "effect": {"reputation": 10, "hp": -15}},
+            {"text": "🌲 'Hide - I'm hunted'", "next_scene": "g1_main_013", "effect": {"reputation": -10, "hp": -15}},
+            {"text": "🐉 'Dragon... might help?'", "next_scene": "g1_main_022", "effect": {"reputation": 0, "hp": -15}}
+        ]
+    
+    # Set quest flags
+    state.quest_flags["escaped_from_cathedral"] = True
+    state.quest_flags["witnessed_ritual"] = True
+    state.quest_flags["has_ritual_evidence"] = True if player.agility >= 16 else False
+    player.hp -= 15  # Escape damage
+    player.reputation += 10  # Small reputation for attempting heroism
+    
+    return {
+        "title": "🏃 Ucieczka z Katedry" if lang == "pl" else "🏃 Cathedral Escape",
+        "text": text,
+        "choices": choices,
+        "location": "city_streets" if player.agility >= 16 else "abandoned_stable",
+        "escape_scene": True,
+        "suspenseful": True
     }
 
 
