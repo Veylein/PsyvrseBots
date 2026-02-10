@@ -6,6 +6,11 @@ import asyncio
 from typing import Optional
 import json
 import os
+import sys
+
+# Add utils to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from utils.card_visuals import create_comparison_image, parse_card
 
 
 # ==================== GAMBLING AWARENESS ====================
@@ -474,13 +479,27 @@ class HigherLowerView(discord.ui.View):
 # ==================== GAMBLING COG ====================
 
 class Gambling(commands.Cog):
-    """Casino-style gambling games: Poker, Slots, Roulette, Higher/Lower"""
+    """🎰 Casino-style gambling games with beautiful graphics: Poker, Slots, Roulette, and more"""
     
     def __init__(self, bot):
         self.bot = bot
         data_dir = os.getenv("RENDER_DISK_PATH", "data")
         self.gambling_stats_file = os.path.join(data_dir, "gambling_stats.json")
         self.gambling_stats = self.load_stats()
+        
+        # Card deck preferences (per user)
+        self.user_decks = {}  # user_id -> 'classic' / 'dark' / 'platinum'
+    
+    def get_user_deck(self, user_id: int) -> str:
+        """Get user's preferred card deck"""
+        return self.user_decks.get(user_id, 'classic')
+    
+    def format_card_for_visual(self, card_tuple) -> str:
+        """Convert (rank, suit) tuple to visual format"""
+        rank, suit = card_tuple
+        # Suit mapping from symbols to letters
+        suit_map = {'♠': 's', '♥': 'h', '♦': 'd', '♣': 'c'}
+        return f"{rank}{suit_map.get(suit, 's')}"
     
     # Helper method to get user from context
     def _get_user(self, ctx_or_interaction, is_slash: bool):
@@ -613,83 +632,7 @@ class Gambling(commands.Cog):
         
         await ctx.send(embed=embed)
     
-    @commands.command(name="poker")
-    async def poker_prefix(self, ctx, bet: int):
-        """Play 5-card poker (L!poker <bet>)"""
-        await ctx.send("❌ Poker requires interactive buttons! Please use `/poker <bet>` instead.")
-    
-    @app_commands.command(name="poker", description="Play 5-card poker (10-10,000 coins)")
-    async def poker_slash(self, interaction: discord.Interaction, bet: int):
-        """Play poker against the house"""
-        economy_cog = self.bot.get_cog("Economy")
-        if not economy_cog:
-            await interaction.response.send_message("❌ Economy system not loaded!")
-            return
-        
-        # Validate bet
-        if bet < 10 or bet > 10000:
-            await interaction.response.send_message("❌ Bet must be between 10 and 10,000 coins!")
-            return
-        
-        balance = economy_cog.get_balance(interaction.user.id)
-        if balance < bet:
-            await interaction.response.send_message(f"❌ You only have {balance:,} coins!")
-            return
-        
-        # Deduct bet
-        economy_cog.economy_data[str(interaction.user.id)]["balance"] -= bet
-        economy_cog.save_economy()
-        
-        # Deal cards
-        deck = self.create_deck()
-        player_hand = [deck.pop() for _ in range(5)]
-        dealer_hand = [deck.pop() for _ in range(5)]
-        
-        # Evaluate hands
-        player_rank, player_name = self.evaluate_poker_hand(player_hand)
-        dealer_rank, dealer_name = self.evaluate_poker_hand(dealer_hand)
-        
-        # Determine winner - reduced payouts
-        if player_rank > dealer_rank:
-            # Nerf: divide multiplier by 2 for less profit
-            payout = bet * max(1.5, player_rank / 2)
-            payout = int(payout)
-            economy_cog.add_coins(interaction.user.id, payout, "poker_win")
-            result = f"🎉 You win with **{player_name}**!"
-            color = discord.Color.green()
-            won = True
-        elif player_rank < dealer_rank:
-            payout = 0
-            result = f"😔 Dealer wins with **{dealer_name}**"
-            color = discord.Color.red()
-            won = False
-        else:
-            # Tie - return bet
-            economy_cog.add_coins(interaction.user.id, bet, "poker_tie")
-            payout = bet
-            result = f"🤝 Push! Both have **{player_name}**"
-            color = discord.Color.gold()
-            won = False
-        
-        # Record stats
-        self.record_game(interaction.user.id, "poker", bet, won, payout)
-        # Update most played games
-        profile_cog = self.bot.get_cog("Profile")
-        if profile_cog and hasattr(profile_cog, "profile_manager"):
-            profile_cog.profile_manager.record_game_played(interaction.user.id, "poker")
-        
-        # Create embed
-        embed = discord.Embed(title="🃏 Poker", color=color)
-        embed.add_field(name="Your Hand", value=self.format_hand(player_hand), inline=True)
-        embed.add_field(name="Dealer Hand", value=self.format_hand(dealer_hand), inline=True)
-        embed.add_field(name="Result", value=result, inline=False)
-        
-        if won:
-            embed.add_field(name="Payout", value=f"+{payout:,} coins", inline=False)
-        
-        # Add disclaimer button
-        view = GamblingDisclaimerView()
-        await interaction.response.send_message(embed=embed, view=view)
+    # Note: Poker commands removed - use /poker from poker_texas.py for full Texas Hold'em
     
     def create_deck(self):
         """Create a standard 52-card deck"""
@@ -1666,6 +1609,11 @@ class Gambling(commands.Cog):
             await interaction.edit_original_response(embed=embed, view=view)
         else:
             await msg.edit(embed=embed, view=view)
+
+
+# ==================== POKER VIEW ====================
+
+# PokerPlayAgainView removed - use new Texas Hold'em poker from poker_texas.py
 
 async def setup(bot):
     await bot.add_cog(Gambling(bot))
