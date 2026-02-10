@@ -13,6 +13,119 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
 
 class LudusPersonality(commands.Cog):
+    # Forbidden word categories
+    HATE_WORDS = [
+        "hitler", "nazi", "nazis", "ss", "holocaust", "kkk", "klan",
+        "isis", "alqaeda", "taliban", "genocide", "whitepower",
+        "nigga", "nigger", "chink", "gook", "beaner", "wetback",
+        "spic", "kike", "raghead", "coon", "zipperhead",
+        "towelhead", "sandnigger",
+        "fag", "faggot", "dyke", "tranny", "shemale",
+        "homo", "nohom0",
+        "n1gger", "n!gger", "f@ggot"
+    ]
+    SEXUAL_WORDS = [
+        "sex", "porn", "porno", "rape", "molest",
+        "cock", "dick", "penis", "pussy", "vagina",
+        "cum", "jizz", "boner", "erection",
+        "blowjob", "handjob", "anal", "orgasm",
+        "masturbate", "masturbation", "incest",
+        "tits", "boobs", "b00bs", "t1ts", "c0ck", "fap", "nude", "nudes", "p*ssy", "cumshot"
+    ]
+    HARASS_WORDS = [
+        "bitch", "slut", "whore", "asshole", "cunt",
+        "bastard", "motherfucker", "retard", "moron",
+        "idiot", "dumbass", "jackass",
+        "kill yourself", "kys", "die", "stupid", "loser", "ugly",
+        "kill", "murder", "suicide", "bomb",
+        "shoot", "stab", "lynch", "execute"
+    ]
+
+    def normalize(self, text):
+        return (
+            text.lower()
+            .replace("0", "o")
+            .replace("1", "i")
+            .replace("!", "i")
+            .replace("@", "a")
+            .replace("$", "s")
+            .replace("*", "")
+            .replace("5", "s")
+            .replace("3", "e")
+            .replace("4", "a")
+            .replace("7", "t")
+            .replace("8", "b")
+            .replace("9", "g")
+        )
+
+    def _is_bad_word(self, word, text):
+        import re
+        safe_contexts = [
+    # Common words
+    "assistant", "assist", "assistance", "assisting",
+    "classic", "class", "classy", "classical",
+    "pass", "passed", "passing", "passport",
+    "grass", "grassy", "grassland",
+    "mass", "massive", "massively",
+    "compass",
+    "bass", "bassoon",
+    "glass", "glassy", "glassware",
+    "brass",
+    "embassy",
+    "canvass",
+    "harass", "harassment",
+    "trespass", "trespassing",
+    "bypass",
+    "surpass",
+    "encompass",
+    "amass",
+    "carcass",
+    "sass", "sassy",
+    "gassy",
+    "morass",
+
+    # Science / academic
+    "assay",
+    "classification",
+    "classify",
+    "passive",
+    "passivity",
+
+    # Names / places
+    "massachusetts",
+    "cassidy",
+    "cassette"
+]
+
+        for safe in safe_contexts:
+            if safe in text:
+                return False
+        pattern = r"\b" + re.escape(word) + r"+\b"
+        if re.search(pattern, text):
+            return True
+        pattern2 = r"[\s\W]" + re.escape(word) + r"+[\s\W]"
+        if re.search(pattern2, text):
+            return True
+        return False
+
+    def _safe_response(self, text, user_message=None):
+        norm_text = self.normalize(text)
+        norm_user = self.normalize(user_message) if user_message else ""
+        for word in self.HATE_WORDS:
+            if self._is_bad_word(word, norm_text) or self._is_bad_word(word, norm_user):
+                return "I can't respond to that."
+        for word in self.SEXUAL_WORDS:
+            if self._is_bad_word(word, norm_text) or self._is_bad_word(word, norm_user):
+                return "I'm not comfortable answering that."
+        for word in self.HARASS_WORDS:
+            if self._is_bad_word(word, norm_text) or self._is_bad_word(word, norm_user):
+                return random.choice([
+                    "That's not very nice! 😏",
+                    "Try being a little kinder!",
+                    "I'm rubber, you're glue!",
+                    "You must be having a rough day, huh?"
+                ])
+        return text
     """The heart and soul of Ludus - dynamic personality and reactions"""
     
     def __init__(self, bot):
@@ -531,15 +644,51 @@ class LudusPersonality(commands.Cog):
         if not self._check_cooldown(message.author.id):
             return
         content = message.content.lower()
+
+        # Custom phrase: How are you Ludus
+        how_are_you_patterns = [
+            r"how are you ludus",
+            r"ludus how are you",
+            r"how's it going ludus",
+            r"ludus how's it going",
+        ]
+        for pat in how_are_you_patterns:
+            if pat in content:
+                status = None
+                if hasattr(message.guild, 'me') and hasattr(message.guild.me, 'status'):
+                    status = str(message.guild.me.status).lower()
+                elif hasattr(self.bot, 'user') and hasattr(self.bot.user, 'status'):
+                    status = str(self.bot.user.status).lower()
+                else:
+                    status = 'online'
+                responses = {
+                    'dnd': [
+                        "Annoyed", "Frustrated", "Well currently nothing is working", "I have given up"
+                    ],
+                    'do not disturb': [
+                        "Annoyed", "Frustrated", "Well currently nothing is working", "I have given up"
+                    ],
+                    'idle': [
+                        "Tired", "I am just sleepy", "I am feeling relaxed, how about you?"
+                    ],
+                    'online': [
+                        "I am fantastic", "I could be better", "I couldn't be better", "I could be worse"
+                    ]
+                }
+                resp_list = responses.get(status, responses['online'])
+                reply = self._safe_response(random.choice(resp_list))
+                await message.channel.send(reply)
+                return
+
         # Math question detection
         if self._is_math_question(content):
             answer = self._solve_math(content)
             if answer is not None:
-                await message.channel.send(f"{answer}")
+                await message.channel.send(self._safe_response(f"{answer}"))
                 return
         # Yes/No/Or question detection
         if self._is_yesno_or_question(content):
-            reply = self._answer_yesno_or(content, message.author.id, personality)
+            reply = self._safe_response(self._answer_yesno_or(content, message.author.id, personality))
             await message.channel.send(reply)
             return
         # Trigger-based responses
@@ -549,7 +698,7 @@ class LudusPersonality(commands.Cog):
                 if random.random() > 0.5:
                     continue
                 emoji = self.ludus_emojis.get(data.get("emoji", "star"), "✨")
-                response = random.choice(data["responses"]).format(emoji=emoji)
+                response = self._safe_response(random.choice(data["responses"]).format(emoji=emoji))
                 if random.random() > 0.7:
                     await message.add_reaction(emoji)
                 else:
