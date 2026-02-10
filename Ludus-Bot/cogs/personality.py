@@ -444,7 +444,15 @@ class LudusPersonality(commands.Cog):
         if not interaction.guild:
             await interaction.response.send_message("This command must be used in a server.", ephemeral=True)
             return
-        member = interaction.guild.get_member(interaction.user.id)
+        # Try to get the member reliably
+        member = None
+        if isinstance(interaction.user, discord.Member):
+            member = interaction.user
+        else:
+            try:
+                member = await interaction.guild.fetch_member(interaction.user.id)
+            except Exception:
+                member = None
         if member is None:
             await interaction.response.send_message("Could not determine your server membership. Please try again or contact an admin.", ephemeral=True)
             return
