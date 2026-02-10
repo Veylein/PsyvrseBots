@@ -445,6 +445,9 @@ class LudusPersonality(commands.Cog):
             await interaction.response.send_message("This command must be used in a server.", ephemeral=True)
             return
         member = interaction.guild.get_member(interaction.user.id)
+        if member is None:
+            await interaction.response.send_message("Could not determine your server membership. Please try again or contact an admin.", ephemeral=True)
+            return
         if not member.guild_permissions.administrator:
             await interaction.response.send_message("You must be a server administrator to change personality settings.", ephemeral=True)
             return
