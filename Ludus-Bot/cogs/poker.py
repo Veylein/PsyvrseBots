@@ -600,6 +600,27 @@ class PokerActionView(discord.ui.View):
         
         await interaction.response.edit_message(view=self)
         self.stop()
+    
+    @discord.ui.button(label="🚪 Leave", style=discord.ButtonStyle.secondary, row=2)
+    async def leave_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.player['user'].id:
+            await interaction.response.send_message("❌ Not your turn!", ephemeral=True)
+            return
+        self.game.action_fold(self.player)
+        self.player['last_action'] = "🚪 LEFT GAME"
+        self.player['acted_this_round'] = True
+        self.player['folded'] = True
+        
+        # Disable all buttons
+        for item in self.children:
+            item.disabled = True
+        
+        # Unlock waiting for action
+        self.game.action_event.set()
+        
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send(f"🚪 **{self.player['user'].display_name}** left the game!", ephemeral=False)
+        self.stop()
 
 
 class RaiseModal(discord.ui.Modal, title="Raise"):
@@ -638,6 +659,95 @@ class RaiseModal(discord.ui.Modal, title="Raise"):
             self.view.stop()
         except ValueError:
             await interaction.response.send_message("❌ Enter a number!", ephemeral=True)
+
+
+class CustomBetModal(discord.ui.Modal, title='Custom Bet Amount'):
+    """Modal for custom bet input"""
+    
+    bet_input = discord.ui.TextInput(
+        label='Enter bet amount',
+        placeholder='Enter amount between 50 and your balance...',
+        required=True,
+        min_length=2,
+        max_length=10
+    )
+    
+    def __init__(self, user_id, balance, game_type="poker"):
+        super().__init__()
+        self.user_id = user_id
+        self.balance = balance
+        self.game_type = game_type
+        self.selected_bet = None
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            bet = int(self.bet_input.value)
+            if bet < 50:
+                await interaction.response.send_message("❌ Minimum bet is 50 coins!", ephemeral=True)
+                return
+            if bet > self.balance:
+                await interaction.response.send_message(f"❌ You only have {self.balance} coins!", ephemeral=True)
+                return
+            self.selected_bet = bet
+            await interaction.response.send_message(f"✅ Bet set to {bet} 💠", ephemeral=True)
+        except ValueError:
+            await interaction.response.send_message("❌ Please enter a valid number!", ephemeral=True)
+
+
+class BetSelectView(discord.ui.View):
+    """View for selecting bet amount"""
+    
+    def __init__(self, user_id, balance, game_type="poker"):
+        super().__init__(timeout=60)
+        self.user_id = user_id
+        self.selected_bet = None
+        self.game_type = game_type
+        self.balance = balance
+        
+        # Add bet buttons based on balance
+        bet_options = [50, 100, 250, 500, 1000]
+        for bet in bet_options:
+            if bet <= balance:
+                btn = discord.ui.Button(
+                    label=f"{bet} 💠",
+                    style=discord.ButtonStyle.primary,
+                    custom_id=f"bet_{bet}"
+                )
+                btn.callback = self.create_callback(bet)
+                self.add_item(btn)
+        
+        # Add custom bet button
+        custom_btn = discord.ui.Button(
+            label="Custom 🎲",
+            style=discord.ButtonStyle.secondary,
+            custom_id="bet_custom"
+        )
+        custom_btn.callback = self.custom_bet_callback
+        self.add_item(custom_btn)
+    
+    def create_callback(self, bet_amount):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.user_id:
+                await interaction.response.send_message("❌ This is not your game!", ephemeral=True)
+                return
+            self.selected_bet = bet_amount
+            await interaction.response.defer()
+            self.stop()
+        return callback
+    
+    async def custom_bet_callback(self, interaction: discord.Interaction):
+        """Handle custom bet button"""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This is not your game!", ephemeral=True)
+            return
+        
+        modal = CustomBetModal(self.user_id, self.balance, self.game_type)
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        
+        if modal.selected_bet:
+            self.selected_bet = modal.selected_bet
+            self.stop()
 
 
 class PokerLobbyView(discord.ui.View):
@@ -875,10 +985,10 @@ class PokerCog(commands.Cog):
     @app_commands.command(name="poker", description="Texas Hold'em Poker")
     @app_commands.describe(mode="Game mode: fast (5-card vs Tryn) or long (Texas Hold'em lobby)")
     @app_commands.choices(mode=[
-        app_commands.Choice(name="🎯 Fast - 5-card vs Tryn", value="fast"),
+        app_commands.Choice(name="🎯 Fast - Quick game vs Dealer", value="fast"),
         app_commands.Choice(name="🎲 Long - Full Texas Hold'em with lobby", value="long")
     ])
-    async def poker(self, interaction: discord.Interaction, mode: str = "long"):
+    async def poker(self, interaction: discord.Interaction, mode: str = "fast"):
         """Start a Texas Hold'em poker game"""
         if mode == "fast":
             await self.play_fast_poker(interaction)
@@ -1166,13 +1276,26 @@ class PokerCog(commands.Cog):
         
         # Check balance
         balance = economy_cog.get_balance(interaction.user.id)
-        bet_amount = 100
         
-        if balance < bet_amount:
-            await interaction.response.send_message(f"❌ You need at least {bet_amount} coins to play!", ephemeral=True)
+        if balance < 50:
+            await interaction.response.send_message("❌ You need at least 50 coins to play!", ephemeral=True)
             return
         
-        await interaction.response.defer()
+        # Show bet selection
+        bet_view = BetSelectView(interaction.user.id, balance, "poker")
+        embed = discord.Embed(
+            title="🎴 5-Card Poker - Select Bet 🎴",
+            description=f"Balance: **{balance}** 💠\nSelect your bet amount:",
+            color=discord.Color.gold()
+        )
+        
+        await interaction.response.send_message(embed=embed, view=bet_view, ephemeral=True)
+        await bet_view.wait()
+        
+        if not bet_view.selected_bet:
+            return
+        
+        bet_amount = bet_view.selected_bet
         
         # Deduct bet
         economy_cog.remove_coins(interaction.user.id, bet_amount)
@@ -2051,13 +2174,18 @@ def get_card_image(rank, suit, deck='classic', size=None):
     return None
 
 def get_font(size, bold=False):
-    """Get font"""
+    """Get font from assets/fonts"""
     try:
-        if bold:
-            return ImageFont.truetype("arialbd.ttf", size)
-        return ImageFont.truetype("arial.ttf", size)
+        # Use Arial from assets/fonts (bold uses same file with larger size simulation)
+        return ImageFont.truetype("assets/fonts/Arial.ttf", size)
     except:
-        return ImageFont.load_default()
+        try:
+            # Fallback to system fonts
+            if bold:
+                return ImageFont.truetype("arialbd.ttf", size)
+            return ImageFont.truetype("arial.ttf", size)
+        except:
+            return ImageFont.load_default()
 
 def draw_card(draw, x, y, rank, suit, width=CARD_WIDTH, height=CARD_HEIGHT, img_base=None, deck='classic'):
     """Draws a single card using local PNG files"""
