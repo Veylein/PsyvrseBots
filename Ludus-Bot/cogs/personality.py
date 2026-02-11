@@ -153,9 +153,20 @@ class LudusPersonality(commands.Cog):
             "trophy": "<:LudusTrophy:1439151104137891900>",
             "unamused": "<:LudusUnamused:1439150773283061762>",
             "game": "<:GameLudus:1439151118503645204>",
+            "wave": "👋",
+            "think": "🤔",
+            "party": "🥳",
+            "coffee": "☕",
+            "book": "📚",
+            "music": "🎵",
+            "sleep": "😴",
+            "fire": "🔥",
+            "question": "❓",
+            "hug": "🤗",
         }
         
         # Personalities: Each is a dict of triggers and response logic
+        # Expanded triggers for more unique conversations
         self.personalities = {
             "default": {
                 "name": "Classic Ludus",
@@ -188,6 +199,45 @@ class LudusPersonality(commands.Cog):
                         "Nice indeed! {emoji}", "I agree! {emoji}", "That was smooth! {emoji}",
                         "You have great taste! {emoji}", "Nice move! {emoji}", "You make everything better! {emoji}",
                         "Nice one, friend! {emoji}", "You always know what to say! {emoji}"
+                    ]},
+                    "hello": {"emoji": "wave", "responses": [
+                        "Hey there! {emoji}", "Hello! {emoji}", "Hi! {emoji}", "Greetings! {emoji}", "Yo! {emoji}", "Howdy! {emoji}", "What's up? {emoji}", "Hey friend! {emoji}"
+                    ]},
+                    "hey": {"emoji": "wave", "responses": [
+                        "Hey! {emoji}", "Hey hey! {emoji}", "Hey there! {emoji}", "Yo! {emoji}", "Hi! {emoji}", "Howdy! {emoji}", "Hey, how's it going? {emoji}"
+                    ]},
+                    "sup": {"emoji": "wave", "responses": [
+                        "Sup! {emoji}", "What's up? {emoji}", "Not much, you? {emoji}", "Just vibing! {emoji}", "All good here! {emoji}"
+                    ]},
+                    "thanks": {"emoji": "blush", "responses": [
+                        "You're welcome! {emoji}", "No problem! {emoji}", "Anytime! {emoji}", "Glad to help! {emoji}", "Thank YOU! {emoji}", "Happy to help! {emoji}"
+                    ]},
+                    "question": {"emoji": "question", "responses": [
+                        "Ask away! {emoji}", "I'm all ears! {emoji}", "What's on your mind? {emoji}", "I'll do my best to answer! {emoji}", "Go ahead, I'm listening! {emoji}"
+                    ]},
+                    "coffee": {"emoji": "coffee", "responses": [
+                        "Coffee break! {emoji}", "I could use a cup too! {emoji}", "Nothing like a good coffee! {emoji}", "Coffee makes everything better! {emoji}"
+                    ]},
+                    "read": {"emoji": "book", "responses": [
+                        "Reading is fun! {emoji}", "Books are the best! {emoji}", "What are you reading? {emoji}", "I love a good story! {emoji}"
+                    ]},
+                    "music": {"emoji": "music", "responses": [
+                        "Let's jam! {emoji}", "Music time! {emoji}", "What's your favorite song? {emoji}", "Music makes everything better! {emoji}"
+                    ]},
+                    "sleep": {"emoji": "sleep", "responses": [
+                        "Sleepy time! {emoji}", "Don't forget to rest! {emoji}", "Sweet dreams! {emoji}", "Nap time! {emoji}"
+                    ]},
+                    "fire": {"emoji": "fire", "responses": [
+                        "That's fire! {emoji}", "So hot right now! {emoji}", "Absolute flames! {emoji}", "🔥🔥🔥 {emoji}"
+                    ]},
+                    "hug": {"emoji": "hug", "responses": [
+                        "Sending a virtual hug! {emoji}", "Hugs! {emoji}", "You deserve a hug! {emoji}", "Group hug! {emoji}"
+                    ]},
+                    "think": {"emoji": "think", "responses": [
+                        "Let me think... {emoji}", "Hmm... {emoji}", "That's a thinker! {emoji}", "Deep thoughts! {emoji}"
+                    ]},
+                    "party": {"emoji": "party", "responses": [
+                        "Party time! {emoji}", "Let's celebrate! {emoji}", "🎉 {emoji}", "Bring on the fun! {emoji}"
                     ]},
                     "thank": {"emoji": "blush", "responses": [
                         "You're welcome! {emoji}", "Anytime! {emoji}", "Happy to help! {emoji}",
@@ -784,15 +834,25 @@ class LudusPersonality(commands.Cog):
 
     def _answer_yesno_or(self, content, user_id, personality):
         import re
+
         def extract_or_options(question: str):
+            import re
             q = question.lower().strip()
             # Remove leading question words and phrases
             q = re.sub(r"^(do|does|did|are|is|would|will|can|could|should|have|has|was|were) you ", "", q)
             q = re.sub(r"^(do|does|did|are|is|would|will|can|could|should|have|has|was|were) ", "", q)
-            q = re.sub(r"\?$", "", q)
-            options = q.split(" or ")
+            q = re.sub(r"[\?!.]$", "", q)  # remove trailing punctuation
+            # Remove punctuation before splitting
+            q = re.sub(r"[\.,;:!?]", "", q)
+            # Split on ' or ' with optional whitespace and punctuation
+            options = re.split(r"\s+or\s+", q)
             options = [opt.strip().capitalize() for opt in options if opt.strip()]
-            return options if len(options) >= 2 else None
+            # Remove leading 'like', 'such as', etc. for more realism
+            cleaned = []
+            for opt in options:
+                opt = re.sub(r"^(like|such as|including) ", "", opt)
+                cleaned.append(opt)
+            return cleaned if len(cleaned) >= 2 else None
 
         def consistent_choice(user_id, personality, content, options):
             idx = abs(hash(f"{user_id}-{personality}-{content}")) % len(options)
