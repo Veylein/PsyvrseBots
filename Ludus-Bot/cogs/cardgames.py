@@ -4,9 +4,21 @@ from discord import app_commands
 import random
 import asyncio
 from typing import Optional, Dict, Any, Tuple, Union, List
+import sys
+import os
+
+# Add utils to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from utils.card_visuals import (
+    create_hand_image,
+    create_blackjack_image,
+    create_war_image,
+    create_comparison_image,
+    parse_card
+)
 
 class CardGames(commands.Cog):
-    """Card games: Go Fish (vs bot or player), Blackjack (vs dealer), War (instant), UNO (multiplayer)"""
+    """🎴 Card games with beautiful graphics: Go Fish, Blackjack, War"""
     
     def __init__(self, bot):
         self.bot = bot
@@ -14,6 +26,24 @@ class CardGames(commands.Cog):
         self.player_to_game: Dict[int, Tuple[Union[int, str], ...]] = {}
         self.blackjack_games: Dict[int, Dict[str, Any]] = {}
         self.active_uno_games = {}  # For UNO games
+        
+        # Card deck preferences (per user)
+        self.user_decks = {}  # user_id -> 'classic' / 'dark' / 'platinum'
+
+    def get_user_deck(self, user_id: int) -> str:
+        """Get user's preferred card deck"""
+        return self.user_decks.get(user_id, 'classic')
+    
+    def format_card_for_display(self, card: str) -> str:
+        """Convert internal format to display format (e.g., 'A♠' -> 'As')"""
+        if not card or card == "JOKER":
+            return card
+        # Card is already in format like "A♠", convert to "As"
+        suit_map = {"♠": "s", "♥": "h", "♦": "d", "♣": "c"}
+        for symbol, letter in suit_map.items():
+            if symbol in card:
+                return card.replace(symbol, letter)
+        return card
 
     def build_deck(self, jokers: int = 0):
         suits = ["♠", "♥", "♦", "♣"]
@@ -224,19 +254,38 @@ class CardGames(commands.Cog):
         opp_id = p2_id if author.id == p1_id else p1_id
         opp_books = len(state['books'][opp_id])
         
+        # Convert cards to visual format
+        visual_cards = [self.format_card_for_display(c) for c in hand]
+        
         try:
-            embed = discord.Embed(title="🎣 Your Go Fish hand", color=discord.Color.blue())
-            embed.add_field(name="Cards", value=self.pretty_hand(hand), inline=False)
+            # Create visual hand
+            deck = self.get_user_deck(author.id)
+            hand_image = create_hand_image(
+                visual_cards, 
+                title=f"🎣 Go Fish - Your Hand ({len(books)} books)",
+                deck=deck
+            )
+            
+            embed = discord.Embed(title="🎣 Your Go Fish Hand", color=discord.Color.blue())
             embed.add_field(name="Your Books", value=f"{len(books)} ({', '.join(books) if books else 'none'})", inline=True)
             embed.add_field(name="Opponent Books", value=str(opp_books), inline=True)
             embed.add_field(name="Turn", value=state['names'][state['turn']], inline=False)
-            await author.send(embed=embed)
-            msg = "✅ I sent your hand via DM."
+            embed.add_field(name="Cards in Hand", value=str(len(hand)), inline=True)
+            embed.add_field(name="Deck Remaining", value=str(len(state['deck'])), inline=True)
+            embed.set_image(url="attachment://hand.png")
+            embed.set_footer(text="💡 Use buttons or /gofish ask <rank> to ask for cards")
+            
+            # Create interactive view for asking cards
+            view = GoFishAskView(self, author.id, state, game_id, ctx, interaction)
+            
+            await author.send(embed=embed, file=hand_image, view=view)
+            msg = "✅ I sent your hand via DM with interactive buttons!"
             if interaction:
                 await interaction.followup.send(msg)
             else:
                 await ctx.send(msg)
-        except:
+        except Exception as e:
+            print(f"Error sending Go Fish hand: {e}")
             msg = "❌ Couldn't DM you. Make sure DMs are open."
             if interaction:
                 await interaction.followup.send(msg)
@@ -497,18 +546,45 @@ class CardGames(commands.Cog):
         state = {'deck': deck, 'player': player, 'dealer': dealer}
         self.blackjack_games[author.id] = state
         
+        # Convert to visual format
+        player_visual = [self.format_card_for_display(c) for c in player]
+        dealer_visual = [self.format_card_for_display(c) for c in dealer]
+        
+        player_total = self._bj_value(player)
+        dealer_shown = self._bj_value([dealer[0]])
+        
         try:
-            await author.send(embed=discord.Embed(
+            # Create visual blackjack image
+            deck_pref = self.get_user_deck(author.id)
+            bj_image = create_blackjack_image(
+                player_visual,
+                dealer_visual,
+                player_total,
+                dealer_shown,
+                author.display_name,
+                deck=deck_pref,
+                show_dealer_card=False
+            )
+            
+            embed = discord.Embed(
                 title="🃏 Blackjack — Game Started",
-                description=f"**Your hand:** {self.pretty_hand(player)} **(Total: {self._bj_value(player)})**\n**Dealer shows:** {dealer[0]}",
+                description=f"**Your total:** {player_total}\n**Dealer shows:** {dealer[0]}",
                 color=discord.Color.dark_purple()
-            ))
-            msg = "🃏 Blackjack started! I DM'd your hand. Use `L!blackjack hit/stand` or `/blackjack hit/stand`."
+            )
+            embed.set_image(url="attachment://blackjack.png")
+            embed.set_footer(text="Use the buttons below to play!")
+            
+            # Create interactive view
+            view = BlackjackGameView(self, author.id)
+            
+            await author.send(embed=embed, file=bj_image, view=view)
+            msg = "🃏 Blackjack started! I DM'd your hand with interactive buttons!"
             if interaction:
                 await interaction.followup.send(msg)
             else:
                 await ctx.send(msg)
-        except:
+        except Exception as e:
+            print(f"Error starting blackjack: {e}")
             del self.blackjack_games[author.id]
             msg = "❌ Couldn't DM you. Enable DMs to play blackjack."
             if interaction:
@@ -646,15 +722,42 @@ class CardGames(commands.Cog):
             else:
                 await ctx.send(msg)
             return
-            
+        
+        # Convert to visual format
+        player_visual = [self.format_card_for_display(c) for c in state['player']]
+        dealer_visual = [self.format_card_for_display(c) for c in state['dealer']]
+        
+        player_total = self._bj_value(state['player'])
+        dealer_shown = self._bj_value([state['dealer'][0]])
+        
         try:
-            await author.send(embed=discord.Embed(
+            # Create visual blackjack image
+            deck = self.get_user_deck(author.id)
+            bj_image = create_blackjack_image(
+                player_visual,
+                dealer_visual,
+                player_total,
+                dealer_shown,
+                author.display_name,
+                deck=deck,
+                show_dealer_card=False
+            )
+            
+            embed = discord.Embed(
                 title="🃏 Blackjack — Your Hand",
-                description=f"{self.pretty_hand(state['player'])} **(Total: {self._bj_value(state['player'])})**",
+                description=f"**Your total:** {player_total}\n**Dealer shows:** {state['dealer'][0]}",
                 color=discord.Color.dark_purple()
-            ))
-            msg = "✅ I sent your hand via DM."
-        except:
+            )
+            embed.set_image(url="attachment://blackjack.png")
+            embed.set_footer(text="Use buttons to Hit or Stand")
+            
+            # Create view
+            view = BlackjackGameView(self, author.id)
+            
+            await author.send(embed=embed, file=bj_image, view=view)
+            msg = "✅ I sent your hand via DM with interactive buttons."
+        except Exception as e:
+            print(f"Error showing blackjack hand: {e}")
             msg = "❌ Couldn't DM you."
         
         if interaction:
@@ -704,29 +807,286 @@ class CardGames(commands.Cog):
         order = {"A":14, "K":13, "Q":12, "J":11, "10":10, "9":9, "8":8, "7":7, "6":6, "5":5, "4":4, "3":3, "2":2}
         def val(card):
             return order.get(self.rank_of(card), 0)
-            
+        
+        # Determine result
         if val(user_card) > val(opp_card):
-            result = f"🎉 {author.mention} wins the round!"
+            result = f"🎉 {author.mention} wins!"
             color = discord.Color.green()
+            result_text = f"{author.display_name} WINS!"
         elif val(user_card) < val(opp_card):
-            result = f"😔 {opponent.mention if opponent else '**Bot**'} wins the round!"
+            opp_name = opponent.mention if opponent else '**Bot**'
+            result = f"😔 {opp_name} wins!"
             color = discord.Color.red()
+            result_text = f"{opponent.display_name if opponent else 'Bot'} WINS!"
         else:
-            result = "⚔️ It's a tie (WAR)!"
+            result = "⚔️ It's a WAR (tie)!"
             color = discord.Color.gold()
-            
-        embed = discord.Embed(title="⚔️ War", color=color)
-        embed.add_field(name=f"{author.display_name}'s Card", value=f"**{user_card}**", inline=True)
-        embed.add_field(name=f"{opponent.display_name if opponent else 'Bot'}'s Card", value=f"**{opp_card}**", inline=True)
-        embed.add_field(name="Result", value=result, inline=False)
+            result_text = "TIE - WAR!"
+        
+        # Create visual comparison
+        user_visual = self.format_card_for_display(user_card)
+        opp_visual = self.format_card_for_display(opp_card)
+        
+        deck = self.get_user_deck(author.id)
+        war_image = create_war_image(
+            user_visual,
+            opp_visual,
+            author.display_name,
+            opponent.display_name if opponent else "Bot",
+            deck=deck,
+            result_text=result_text
+        )
+        
+        embed = discord.Embed(title="⚔️ War Game", color=color, description=result)
+        embed.add_field(name=f"{author.display_name}'s Card", value=f"**{user_card}** (Value: {val(user_card)})", inline=True)
+        embed.add_field(name=f"{opponent.display_name if opponent else 'Bot'}'s Card", value=f"**{opp_card}** (Value: {val(opp_card)})", inline=True)
+        embed.set_image(url="attachment://war.png")
+        embed.set_footer(text="⚔️ Highest card wins! | Use /war to play again")
+        
+        # Add play again button
+        view = WarPlayAgainView(self, author, opponent)
         
         if interaction:
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, file=war_image, view=view)
         else:
             try:
-                await ctx.reply(embed=embed)
+                await ctx.reply(embed=embed, file=war_image, view=view)
             except:
-                await ctx.send(embed=embed)
+                await ctx.send(embed=embed, file=war_image, view=view)
+
+# ==================== DISCORD COMPONENTS V2 ====================
+
+class GoFishAskView(discord.ui.View):
+    """Interactive view for asking cards in Go Fish"""
+    
+    def __init__(self, cog, user_id, game_state, game_id, ctx, interaction):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.user_id = user_id
+        self.game_state = game_state
+        self.game_id = game_id
+        self.ctx = ctx
+        self.interaction = interaction
+        
+        # Add rank selection dropdown
+        self.add_item(GoFishRankSelect(cog, user_id, game_state, game_id, ctx, interaction))
+    
+    async def on_timeout(self):
+        """Called when view times out"""
+        for item in self.children:
+            item.disabled = True
+
+class GoFishRankSelect(discord.ui.Select):
+    """Dropdown for selecting rank to ask for"""
+    
+    def __init__(self, cog, user_id, game_state, game_id, ctx, interaction_orig):
+        self.cog = cog
+        self.user_id = user_id
+        self.game_state = game_state
+        self.game_id = game_id
+        self.ctx = ctx
+        self.interaction_orig = interaction_orig
+        
+        # Get unique ranks in player's hand
+        hand = game_state['hands'].get(user_id, [])
+        ranks = sorted(set([cog.rank_of(card) for card in hand]), 
+                      key=lambda x: ["A","2","3","4","5","6","7","8","9","10","J","Q","K"].index(x) if x in ["A","2","3","4","5","6","7","8","9","10","J","Q","K"] else 99)
+        
+        options = [
+            discord.SelectOption(label=rank, description=f"Ask for {rank}'s", emoji="🎴")
+            for rank in ranks[:25]  # Max 25 options
+        ]
+        
+        if not options:
+            options = [discord.SelectOption(label="No cards", description="Draw from deck first")]
+        
+        super().__init__(
+            placeholder="🎴 Choose a rank to ask for...",
+            options=options,
+            custom_id="gofish_rank_select"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        """Handle rank selection"""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        rank = self.values[0]
+        await interaction.response.defer(ephemeral=True)
+        
+        # Call the ask logic
+        await self.cog._gofish_ask(interaction.user, rank, self.ctx, self.interaction_orig)
+
+class BlackjackGameView(discord.ui.View):
+    """Interactive view for Blackjack game"""
+    
+    def __init__(self, cog, user_id):
+        super().__init__(timeout=180)
+        self.cog = cog
+        self.user_id = user_id
+    
+    @discord.ui.button(label="Hit", style=discord.ButtonStyle.success, emoji="🎴")
+    async def hit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        
+        state = self.cog.blackjack_games.get(self.user_id)
+        if not state:
+            await interaction.followup.send("❌ Game not found!", ephemeral=True)
+            return
+        
+        # Hit logic
+        card = state['deck'].pop()
+        state['player'].append(card)
+        total = self.cog._bj_value(state['player'])
+        
+        # Convert to visual format
+        player_visual = [self.cog.format_card_for_display(c) for c in state['player']]
+        dealer_visual = [self.cog.format_card_for_display(c) for c in state['dealer']]
+        
+        deck = self.cog.get_user_deck(self.user_id)
+        bj_image = create_blackjack_image(
+            player_visual,
+            dealer_visual,
+            total,
+            self.cog._bj_value([state['dealer'][0]]),
+            interaction.user.display_name,
+            deck=deck,
+            show_dealer_card=False
+        )
+        
+        if total > 21:
+            # Busted!
+            del self.cog.blackjack_games[self.user_id]
+            
+            embed = discord.Embed(
+                title="💥 Busted!",
+                description=f"You busted with **{total}**.",
+                color=discord.Color.red()
+            )
+            embed.set_image(url="attachment://blackjack.png")
+            embed.set_footer(text="😢 Better luck next time! Use /blackjack to play again")
+            
+            for item in self.children:
+                item.disabled = True
+            
+            await interaction.followup.send(embed=embed, file=bj_image, view=self)
+        else:
+            # Continue playing
+            embed = discord.Embed(
+                title="🃏 Blackjack - You Hit!",
+                description=f"You drew **{card}**\n\nYour total: **{total}**",
+                color=discord.Color.blue()
+            )
+            embed.set_image(url="attachment://blackjack.png")
+            embed.set_footer(text="Hit to draw another card, Stand to end your turn")
+            
+            await interaction.followup.send(embed=embed, file=bj_image, view=self)
+    
+    @discord.ui.button(label="Stand", style=discord.ButtonStyle.primary, emoji="✋")
+    async def stand_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        
+        state = self.cog.blackjack_games.get(self.user_id)
+        if not state:
+            await interaction.followup.send("❌ Game not found!", ephemeral=True)
+            return
+        
+        # Dealer plays
+        dealer = state['dealer']
+        while self.cog._bj_value(dealer) < 17:
+            dealer.append(state['deck'].pop())
+        
+        player_total = self.cog._bj_value(state['player'])
+        dealer_total = self.cog._bj_value(dealer)
+        
+        # Determine winner
+        if dealer_total > 21 or player_total > dealer_total:
+            result = "🎉 You Win!"
+            color = discord.Color.green()
+        elif dealer_total == player_total:
+            result = "🤝 Push (Tie)"
+            color = discord.Color.gold()
+        else:
+            result = "😔 Dealer Wins"
+            color = discord.Color.red()
+        
+        # Convert to visual format
+        player_visual = [self.cog.format_card_for_display(c) for c in state['player']]
+        dealer_visual = [self.cog.format_card_for_display(c) for c in dealer]
+        
+        deck = self.cog.get_user_deck(self.user_id)
+        bj_image = create_blackjack_image(
+            player_visual,
+            dealer_visual,
+            player_total,
+            dealer_total,
+            interaction.user.display_name,
+            deck=deck,
+            show_dealer_card=True
+        )
+        
+        del self.cog.blackjack_games[self.user_id]
+        
+        embed = discord.Embed(title="🃏 Blackjack - Game Over", description=result, color=color)
+        embed.add_field(name="Your Hand", value=f"**{player_total}**", inline=True)
+        embed.add_field(name="Dealer Hand", value=f"**{dealer_total}**", inline=True)
+        embed.set_image(url="attachment://blackjack.png")
+        embed.set_footer(text="Use /blackjack to play again!")
+        
+        for item in self.children:
+            item.disabled = True
+        
+        await interaction.followup.send(embed=embed, file=bj_image, view=self)
+    
+    @discord.ui.button(label="Quit", style=discord.ButtonStyle.danger, emoji="❌")
+    async def quit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This isn't your game!", ephemeral=True)
+            return
+        
+        if self.user_id in self.cog.blackjack_games:
+            del self.cog.blackjack_games[self.user_id]
+        
+        for item in self.children:
+            item.disabled = True
+        
+        await interaction.response.edit_message(content="🛑 Game ended.", view=self)
+
+class WarPlayAgainView(discord.ui.View):
+    """View for playing War again"""
+    
+    def __init__(self, cog, player, opponent):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.player = player
+        self.opponent = opponent
+    
+    @discord.ui.button(label="Play Again", style=discord.ButtonStyle.success, emoji="⚔️")
+    async def play_again_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.player.id:
+            await interaction.response.send_message("❌ Only the original player can start a new game!", ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        await self.cog._play_war(self.player, self.opponent, None, interaction)
+        
+        # Disable button
+        for item in self.children:
+            item.disabled = True
+        
+        try:
+            await interaction.message.edit(view=self)
+        except:
+            pass
 
 async def setup(bot):
     await bot.add_cog(CardGames(bot))
