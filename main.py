@@ -21,11 +21,7 @@ Bots are started one-by-one with a short delay to avoid rate-limit spikes.
 BASE_DIR = Path(__file__).parent.resolve()
 START_DELAY = 6  # seconds between bot startups
 
-BOT_ORDER = [
-    "Conditor",
-    "Sonus",
-    "Villicus",
-    "Eventus",
+BOT_ORDER = [ 
     "Pax",
     "Ludus",
 ]
