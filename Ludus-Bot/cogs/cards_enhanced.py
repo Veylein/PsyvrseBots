@@ -3,19 +3,39 @@ from discord.ext import commands
 from discord import app_commands
 import random
 from typing import Optional
+import sys
+import os
+
+# Add utils to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from utils.card_visuals import create_hand_image, create_table_image
 
 from discord import app_commands
 from discord.ui import View, Button
 from cogs.minigames import PaginatedHelpView
 
 class Cards(commands.Cog):
-    """Card games with ephemeral messages for privacy"""
+    """🎴 Enhanced card games with stunning visuals: Solitaire, Spades, Crazy Eights, and more"""
 
     def __init__(self, bot):
         self.bot = bot
         self.active_games = {}
         self.card_values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
         self.card_suits = ['♠️', '♥️', '♦️', '♣️']
+        
+        # Card deck preferences (per user)
+        self.user_decks = {}  # user_id -> 'classic' / 'dark' / 'platinum'
+    
+    def get_user_deck(self, user_id: int) -> str:
+        """Get user's preferred card deck"""
+        return self.user_decks.get(user_id, 'classic')
+    
+    def format_card_for_visual(self, card_tuple) -> str:
+        """Convert (value, suit) tuple to visual format"""
+        value, suit = card_tuple
+        # Suit mapping from emoji to letters
+        suit_map = {'♠️': 's', '♥️': 'h', '♦️': 'd', '♣️': 'c'}
+        return f"{value}{suit_map.get(suit, 's')}"
 
     @app_commands.command(name="cardshelp", description="View all card game commands and info (paginated)")
     async def cardshelp_slash(self, interaction: discord.Interaction):
