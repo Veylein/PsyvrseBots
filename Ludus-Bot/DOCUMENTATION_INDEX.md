@@ -66,10 +66,6 @@ Complete analysis of fishing.py, mining.py, farming.py, zoo.py (7,499 lines tota
   - Plot-based farming (4-20 plots)
   - 4 farm upgrades
   - Leveling system
-- **Zoo Collection (800 lines):**
-  - 60+ animals across 8 game sources
-  - 15% encounter chance
-  - Collection tracking
 - **~50,000 words of documentation**
 
 
