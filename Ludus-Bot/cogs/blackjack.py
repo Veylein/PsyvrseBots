@@ -363,8 +363,27 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
     gap_between_rows = 80  # Increased from 60
     total_rows_height = num_rows * row_height + (num_rows - 1) * gap_between_rows if num_rows > 0 else 0
     
-    # Use wider table for blackjack to accommodate more cards
-    table_width = 1000
+    # Calculate required table width based on player count and cards
+    small_card_width = 70
+    base_table_width = 1000
+    
+    if players:
+        # Pre-calculate max box width needed
+        max_cards_any_player = max(len(p.get('cards', [])) for p in players)
+        cards_width = max_cards_any_player * small_card_width + (max_cards_any_player - 1) * 5
+        max_box_width = max(200, cards_width + 30)
+        
+        # Calculate required width for 3 players per row
+        players_per_row = 3
+        min_gap = 30
+        required_row_width = (max_box_width + min_gap) * min(players_per_row, len(players))
+        
+        # Add padding and check if we need wider table
+        required_table_width = required_row_width + 120  # Extra padding for margins
+        table_width = max(base_table_width, required_table_width)
+    else:
+        table_width = base_table_width
+    
     table_height = TABLE_HEIGHT + 300 + total_rows_height  # Increased from 200
     img = Image.new('RGB', (table_width, table_height), FELT_GREEN)
     draw = ImageDraw.Draw(img)
@@ -461,12 +480,12 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
     
     # Players section
     if players:
-        small_card_width = 70  # Increased from 60
-        small_card_height = 98  # Increased from 84
+        small_card_width = 84  # Reduced to fit more cards
+        small_card_height = 114  # Proportionally reduced
         
         num_players = len(players)
         max_spacing = 200  # Increased from 140
-        available_width = table_width - 60  # More padding
+        available_width = table_width - 100  # More padding for safety
         
         # Layout: 3 players per row
         rows = []
@@ -586,7 +605,7 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
                 )
                 
                 # Player name (centered in box)
-                name_font_small = get_font(24, bold=True)  # Increased from 18
+                name_font_small = get_font(28, bold=True)  # Increased for better visibility
                 name = player['user'].display_name[:12]
                 name_bbox = draw.textbbox((0, 0), name, font=name_font_small)
                 name_width = name_bbox[2] - name_bbox[0]
@@ -594,7 +613,7 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
                 draw.text((name_x, player_y), name, fill=TEXT_WHITE, font=name_font_small)
                 
                 # Player value and bet (centered)
-                value_font_small = get_font(20, bold=True)  # Increased from 16
+                value_font_small = get_font(26, bold=True)  # Larger gold text for better visibility
                 # In PVP, calculate visible cards value (1st + 3rd+ cards only)
                 if is_pvp and current_player_index is not None and current_player_index != global_player_index and not show_dealer:
                     # Calculate visible value: 1st card + cards from index 2 onwards
@@ -608,7 +627,7 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
                 value_bbox = draw.textbbox((0, 0), value_text, font=value_font_small)
                 value_width = value_bbox[2] - value_bbox[0]
                 value_x = box_left + (box_width - value_width) // 2
-                draw.text((value_x, player_y + 28), value_text, fill=TEXT_GOLD, font=value_font_small)  # Increased from +20
+                draw.text((value_x, player_y + 32), value_text, fill=TEXT_GOLD, font=value_font_small)  # Increased from +20
                 
                 # Player cards (centered in box)
                 if cards:
@@ -636,7 +655,7 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
                 
                 # Status text (centered)
                 if status == 'bust':
-                    status_font = get_font(22, bold=True)  # Increased from 18
+                    status_font = get_font(24, bold=True)  # Increased from 18
                     status_bbox = draw.textbbox((0, 0), "BUST", font=status_font)
                     status_width = status_bbox[2] - status_bbox[0]
                     status_x = box_left + (box_width - status_width) // 2
@@ -1693,10 +1712,13 @@ class BlackjackCog(commands.Cog):
 
     async def play_long_blackjack(self, interaction: discord.Interaction):
         """Long blackjack with multiplayer lobby - same structure as poker"""
+        # Defer immediately to prevent timeout
+        await interaction.response.defer()
+        
         uid = str(interaction.user.id)
         economy_cog = self.get_economy_cog()
         if not economy_cog:
-            await interaction.response.send_message("❌ Economy system not available!", ephemeral=True)
+            await interaction.followup.send("❌ Economy system not available!", ephemeral=True)
             return
         
         # Create lobby structure like poker
@@ -1731,7 +1753,7 @@ class BlackjackCog(commands.Cog):
         lobby['view'] = view
         embed = view.create_lobby_embed()
         
-        await interaction.response.send_message(embed=embed, view=view)
+        await interaction.followup.send(embed=embed, view=view)
         msg = await interaction.original_response()
         lobby['messageId'] = msg.id
         
