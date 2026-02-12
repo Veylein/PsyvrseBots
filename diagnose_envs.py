@@ -10,10 +10,7 @@ import sys
 import subprocess
 
 KEYS = [
-    "CONDITOR_TOKEN",
-    "CONDITOR_GUILD_ID",
     "LUDUS_TOKEN",
-    "VILLICUS_TOKEN",
     "PAX_TOKEN",
 ]
 
