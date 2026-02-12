@@ -45,7 +45,7 @@ for node in ast.walk(tree):
             # only replace if original starts with f or F in prefix
             # find prefix by scanning backwards from start to include possible prefixes like fr, rf
             # but easier: check if orig starts with f or contains f before quote
-            if orig.lstrip().startswith(('f"',"f'","F\"","F\'","fr\"","fr\'","rf\"","rf\'","Fr\"','Fr\'')):
+            if orig.lstrip().startswith(('f"', "f'", "F\"", "F'", "fr\"", "fr'", "rf\"", "rf'", "Fr\"", "Fr'")):
                 repl_text = new_literal
             else:
                 # still, try to strip leading f or F in orig
