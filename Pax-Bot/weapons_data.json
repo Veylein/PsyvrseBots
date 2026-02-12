@@ -1,0 +1,52 @@
+{
+  "weapons": [
+    {
+      "id": "sword_001",
+      "name": "Iron Sword",
+      "emoji": "⚔️",
+      "description": "A sturdy iron sword, perfect for beginners.",
+      "damage": 15,
+      "durability": 100,
+      "rarity": "common",
+      "type": "melee",
+      "special_effect": null,
+      "crafting_recipe": {
+        "iron_ingots": 3,
+        "wood": 1
+      },
+      "found_in": ["Blacksmith", "Loot Chest"]
+    },
+    {
+      "id": "bow_001",
+      "name": "Hunter's Bow",
+      "emoji": "🏹",
+      "description": "A lightweight bow for skilled hunters.",
+      "damage": 10,
+      "durability": 80,
+      "rarity": "uncommon",
+      "type": "ranged",
+      "special_effect": "piercing",
+      "crafting_recipe": {
+        "wood": 2,
+        "string": 1
+      },
+      "found_in": ["Forest", "Loot Chest"]
+    },
+    {
+      "id": "staff_001",
+      "name": "Mage's Staff",
+      "emoji": "🪄",
+      "description": "A magical staff imbued with arcane power.",
+      "damage": 25,
+      "durability": 50,
+      "rarity": "rare",
+      "type": "magic",
+      "special_effect": "burn",
+      "crafting_recipe": {
+        "magic_crystals": 5,
+        "wood": 2
+      },
+      "found_in": ["Wizard's Tower", "Loot Chest"]
+    }
+  ]
+}

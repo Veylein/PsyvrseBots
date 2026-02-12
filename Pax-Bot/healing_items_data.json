@@ -1,0 +1,34 @@
+{
+  "healing_items": [
+    {
+      "id": "potion_001",
+      "name": "Health Potion",
+      "emoji": "🍷",
+      "description": "Restores 50 health points.",
+      "healing_amount": 50,
+      "rarity": "common",
+      "cooldown": 30,
+      "stackable": true,
+      "crafting_recipe": {
+        "herbs": 2,
+        "water": 1
+      },
+      "found_in": ["Apothecary", "Loot Chest"]
+    },
+    {
+      "id": "elixir_001",
+      "name": "Elixir of Vitality",
+      "emoji": "💊",
+      "description": "Restores 100 health points and boosts stamina.",
+      "healing_amount": 100,
+      "rarity": "rare",
+      "cooldown": 60,
+      "stackable": false,
+      "crafting_recipe": {
+        "rare_herbs": 3,
+        "magic_water": 1
+      },
+      "found_in": ["Ancient Ruins", "Loot Chest"]
+    }
+  ]
+}

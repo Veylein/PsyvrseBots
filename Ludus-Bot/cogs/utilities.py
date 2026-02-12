@@ -14,7 +14,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
 
-ALLOWED_SAY_USER_ID = 1382187068373074001
+ALLOWED_SAY_USER_ID = 1382187068373074001, 1311394031640776716, 1138720397567742014
 
 class MinigamePaginator(View):
     def __init__(self, ctx, pages):
@@ -605,8 +605,22 @@ class Utilities(commands.Cog):
         
         return None
 
+    @commands.command(name="say")
+    async def say(self, ctx, *, text: str = None):
+        """Echo a message as the bot."""
+        if ctx.author.id not in ALLOWED_SAY_USER_ID: 
+            await ctx.send("You are not authorized to use this command.")
+            return
+
+        if not text:
+            await ctx.send("Please provide a message to echo.")
+            return
+
+        await ctx.send(text)
+
     @commands.command(name="setup")
     async def setup(self, ctx):
+        """Send the setup guide embed."""
         embed = await self._create_setup_embed()
         await ctx.send(embed=embed)
 
@@ -730,33 +744,6 @@ class Utilities(commands.Cog):
         embed.set_footer(text="Ludus - Your Living Discord MMO | Use /setup anytime to see this guide")
         
         return embed
-
-    @commands.command(name="say")
-    async def say(self, ctx, *, text: str = None):
-        has_permission = False
-        # Bot owners always allowed
-        if ctx.author.id in getattr(self.bot, "owner_ids", []):
-            has_permission = True
-        # Original checks
-        elif ctx.author.id == ALLOWED_SAY_USER_ID:
-            has_permission = True
-        elif ctx.guild and isinstance(ctx.author, discord.Member) and ctx.author.guild_permissions.manage_messages:
-            has_permission = True
-        
-        if not has_permission:
-            await ctx.send("❌ You need the **Manage Messages** permission to use this command!")
-            return
-        
-        if not text:
-            await ctx.send("❌ Please provide text for me to say! Example: `L!say Hello everyone!`")
-            return
-        
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            pass
-        
-        await ctx.send(text)
 
 async def setup(bot):
     await bot.add_cog(Utilities(bot))

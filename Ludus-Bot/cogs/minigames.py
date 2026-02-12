@@ -271,242 +271,185 @@ class Minigames(commands.Cog):
                 await ctx.send(f"No — it was **{picked}**")
             return
 
-    async def _handle_game(self, ctx: commands.Context, game_name: str):
-        """Generic dispatcher that runs the chosen minigame by name."""
-        # map names to simple behaviors
-        name = game_name
-        # basic helpers
-        def rnd_word(words: List[str]):
-            return random.choice(words)
+        # KIND 10: find pair
+        if kind_id == 10:
+            items = ["apple", "banana", "cherry", "apple", "banana", "cherry"]
+            random.shuffle(items)
+            await ctx.send(f"Find the matching pair: {', '.join(items)}")
 
-        if name == "coinflip":
-            choice = random.choice(("heads", "tails"))
-            await ctx.send(f"I flipped a coin: **{choice}**")
-            return
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel
 
-        if name == "roll":
-            n = random.randint(1, 100)
-            await ctx.send(f"You rolled: **{n}**")
-            return
-
-        if name == "guess_number":
-            target = random.randint(1, 20)
-            await ctx.send("I'm thinking of a number 1-20. You have 4 guesses.")
-            for i in range(4):
-                try:
-                    msg = await self.bot.wait_for('message', timeout=25.0, check=self._author_channel_check(ctx))
-                except asyncio.TimeoutError:
-                    await ctx.send(f"Timed out — the number was **{target}**.")
-                    return
-                try:
-                    guess = int(msg.content.strip())
-                except Exception:
-                    await ctx.send("Send a number.")
-                    continue
-                if guess == target:
-                    await ctx.send(f"Correct! The number was **{target}**")
-                    await self._award_win(ctx, name)
-                    return
-                await ctx.send("Too high." if guess > target else "Too low.")
-            await ctx.send(f"Out of guesses — it was **{target}**")
-            return
-
-        if name == "rps":
-            await ctx.send("Rock / Paper / Scissors — type your choice.")
             try:
-                msg = await self.bot.wait_for('message', timeout=20.0, check=self._author_channel_check(ctx))
-            except asyncio.TimeoutError:
-                await ctx.send("Timed out.")
-                return
-            user = msg.content.lower().strip()
-            choices = ("rock", "paper", "scissors")
-            if user not in choices:
-                await ctx.send("Use rock, paper or scissors.")
-                return
-            botc = random.choice(choices)
-            outcome = "tie"
-            if (user, botc) in (("rock", "scissors"), ("scissors", "paper"), ("paper", "rock")):
-                outcome = "you win"
-            elif user != botc:
-                outcome = "you lose"
-            await ctx.send(f"I chose **{botc}** — {outcome}.")
-            if outcome == "you win":
-                await self._award_win(ctx, name)
-            return
-
-        if name == "higher_lower":
-            a = random.randint(1, 50)
-            b = random.randint(1, 50)
-            await ctx.send(f"First: **{a}**. Will the next number be higher or lower? (type higher/lower)")
-            try:
-                msg = await self.bot.wait_for('message', timeout=20.0, check=self._author_channel_check(ctx))
-            except asyncio.TimeoutError:
-                await ctx.send("Timed out.")
-                return
-            pick = msg.content.lower().strip()
-            if pick not in ("higher", "lower"):
-                await ctx.send("Reply with 'higher' or 'lower'.")
-                return
-            result = "higher" if b > a else "lower" if b < a else "equal"
-            await ctx.send(f"Next number: **{b}** — you guessed **{pick}**. Result: **{result}**")
-            return
-
-        if name == "memory":
-            emojis = ["🍎", "🍌", "🍒", "🍇", "🍉", "🍓", "🍍"]
-            seq = [random.choice(emojis) for _ in range(3)]
-            await ctx.send("Memorize this sequence:")
-            await ctx.send(" ".join(seq))
-            await asyncio.sleep(3)
-            await ctx.send("Now type the sequence exactly as shown (space separated).")
-            try:
-                msg = await self.bot.wait_for('message', timeout=15.0, check=self._author_channel_check(ctx))
-            except asyncio.TimeoutError:
-                await ctx.send("Timed out.")
-                return
-            if msg.content.strip() == " ".join(seq):
-                await ctx.send("Correct!")
-                await self._award_win(ctx, name)
-            else:
-                await ctx.send(f"Wrong. The sequence was: {' '.join(seq)}")
-            return
-
-        if name == "reaction_time":
-            await ctx.send("Get ready...")
-            await asyncio.sleep(random.uniform(1.0, 3.0))
-            start = time.perf_counter()
-            await ctx.send("GO!")
-            try:
-                _ = await self.bot.wait_for('message', timeout=10.0, check=self._author_channel_check(ctx))
-            except asyncio.TimeoutError:
-                await ctx.send("Too slow or timed out.")
-                return
-            end = time.perf_counter()
-            await ctx.send(f"Reaction time: {(end-start)*1000:.0f} ms")
-            return
-
-        if name == "typing_race":
-            sentence = "The quick brown fox jumps over the lazy dog"
-            await ctx.send(f"Type exactly: {sentence}")
-            start = time.perf_counter()
-            try:
-                msg = await self.bot.wait_for('message', timeout=25.0, check=self._author_channel_check(ctx))
-            except asyncio.TimeoutError:
-                await ctx.send("Timed out.")
-                return
-            end = time.perf_counter()
-            correct = msg.content.strip() == sentence
-            await ctx.send(f"Time: {end-start:.2f}s — {'Correct' if correct else 'Incorrect'}")
-            if correct:
-                await self._award_win(ctx, name)
-            return
-
-        if name == "hangman":
-            words = ["python", "discord", "ludus", "minigame"]
-            word = rnd_word(words)
-            revealed = ['_' for _ in word]
-            tries = 6
-            used = set()
-            await ctx.send(f"Hangman: {' '.join(revealed)}")
-            while tries > 0 and '_' in revealed:
-                try:
-                    msg = await self.bot.wait_for('message', timeout=30.0, check=self._author_channel_check(ctx))
-                except asyncio.TimeoutError:
-                    await ctx.send(f"Timed out. Word was **{word}**")
-                    return
-                guess = msg.content.lower().strip()
-                if len(guess) != 1 or not guess.isalpha():
-                    await ctx.send("Reply with a single letter.")
-                    continue
-                if guess in used:
-                    await ctx.send("Already tried that.")
-                    continue
-                used.add(guess)
-                if guess in word:
-                    for i, ch in enumerate(word):
-                        if ch == guess:
-                            revealed[i] = guess
-                    await ctx.send(' '.join(revealed))
+                msg = await self.bot.wait_for("message", check=check, timeout=15.0)
+                if msg.content.lower() in items and items.count(msg.content.lower()) > 1:
+                    await ctx.send("Correct! You found a pair.")
+                    await self._award_win(ctx, "find_pair")
                 else:
-                    tries -= 1
-                    await ctx.send(f"Wrong. {tries} tries left.")
-            if '_' not in revealed:
-                await ctx.send(f"You win! **{word}**")
-                await self._award_win(ctx, name)
-            else:
-                await ctx.send(f"Out of tries. Word was **{word}**")
-            return
-
-        if name == "unscramble":
-            words = ["apple", "bread", "crane", "delta", "eagle"]
-            word = rnd_word(words)
-            scrambled = ''.join(random.sample(list(word), len(word)))
-            await ctx.send(f"Unscramble: **{scrambled}**")
-            try:
-                msg = await self.bot.wait_for('message', timeout=20.0, check=self._author_channel_check(ctx))
+                    await ctx.send("Wrong! No matching pair found.")
             except asyncio.TimeoutError:
-                await ctx.send(f"Timed out. Answer: **{word}**")
-                return
-            if msg.content.lower().strip() == word:
-                await ctx.send("Correct!")
-                await self._award_win(ctx, name)
-            else:
-                await ctx.send(f"No — it was **{word}**")
-            return
+                await ctx.send("You ran out of time!")
 
-        if name == "quick_math":
-            a = random.randint(1, 12)
-            b = random.randint(1, 12)
-            op = random.choice(['+', '-', '*'])
-            expr = f"{a}{op}{b}"
-            ans = eval(expr)
-            await ctx.send(f"Solve: {expr}")
+        # KIND 11: odd one out
+        if kind_id == 11:
+            items = ["cat", "dog", "fish", "car"]
+            odd_one = "car"
+            random.shuffle(items)
+            await ctx.send(f"Identify the odd one out: {', '.join(items)}")
+
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel
+
             try:
-                msg = await self.bot.wait_for('message', timeout=15.0, check=self._author_channel_check(ctx))
+                msg = await self.bot.wait_for("message", check=check, timeout=15.0)
+                if msg.content.lower() == odd_one:
+                    await ctx.send("Correct! You found the odd one out.")
+                    await self._award_win(ctx, "odd_one_out")
+                else:
+                    await ctx.send(f"Wrong! The odd one out was {odd_one}.")
             except asyncio.TimeoutError:
-                await ctx.send(f"Timed out. Answer: **{ans}**")
-                return
-            try:
-                val = int(msg.content.strip())
-            except Exception:
-                await ctx.send("Send a number.")
-                return
-            if val == ans:
-                await ctx.send("Correct!")
-                await self._award_win(ctx, name)
-            else:
-                await ctx.send(f"Wrong — {ans}")
-            return
+                await ctx.send(f"You ran out of time! The odd one out was {odd_one}.")
 
-        if name == "trivia":
-            qas = [("What color is the sky on a clear day?", "blue"), ("How many legs has a spider?", "8")]
-            q, a = rnd_word(qas)
-            await ctx.send(q)
+        # KIND 12: sequence complete
+        if kind_id == 12:
+            sequence = [random.randint(1, 10) for _ in range(4)]
+            next_number = sequence[-1] + (sequence[-1] - sequence[-2])
+            await ctx.send(f"Complete the sequence: {', '.join(map(str, sequence))}, ?")
+
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel
+
             try:
-                msg = await self.bot.wait_for('message', timeout=20.0, check=self._author_channel_check(ctx))
+                msg = await self.bot.wait_for("message", check=check, timeout=15.0)
+                if int(msg.content) == next_number:
+                    await ctx.send("Correct! You completed the sequence.")
+                    await self._award_win(ctx, "sequence_complete")
+                else:
+                    await ctx.send(f"Wrong! The next number was {next_number}.")
             except asyncio.TimeoutError:
-                await ctx.send(f"Timed out. Answer: **{a}**")
-                return
-            if msg.content.lower().strip() == a.lower():
-                await ctx.send("Correct!")
-                await self._award_win(ctx, name)
-            else:
-                await ctx.send(f"No — {a}")
-            return
+                await ctx.send(f"You ran out of time! The next number was {next_number}.")
 
-        if name == "choose":
-            await ctx.send("Send options separated by commas (e.g. a,b,c)")
+        # KIND 13: tap count
+        if kind_id == 13:
+            await ctx.send("Tap the reaction as many times as you can in 10 seconds!")
+            message = await ctx.send("Start tapping! 🖱️")
+            await message.add_reaction("🖱️")
+
+            def check(reaction, user):
+                return user == ctx.author and str(reaction.emoji) == "🖱️"
+
             try:
-                msg = await self.bot.wait_for('message', timeout=25.0, check=self._author_channel_check(ctx))
+                reaction_count = 0
+                while True:
+                    reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=10.0)
+                    reaction_count += 1
             except asyncio.TimeoutError:
-                await ctx.send("Timed out.")
-                return
-            opts = [o.strip() for o in msg.content.split(',') if o.strip()]
-            if not opts:
-                await ctx.send("No options provided.")
-                return
-            await ctx.send(f"I pick: **{random.choice(opts)}**")
-            return
+                await ctx.send(f"Time's up! You tapped {reaction_count} times.")
+                await self._award_win(ctx, "tap_count")
 
+        # KIND 14: bubble pop
+        if kind_id == 14:
+            bubbles = ["🟢", "🔵", "🟡", "🔴"]
+            await ctx.send(f"Pop the bubbles by typing their colors: {', '.join(bubbles)}")
+
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() in ["green", "blue", "yellow", "red"]
+
+            try:
+                msg = await self.bot.wait_for("message", check=check, timeout=15.0)
+                await ctx.send("Pop! You popped a bubble.")
+                await self._award_win(ctx, "bubble_pop")
+            except asyncio.TimeoutError:
+                await ctx.send("You ran out of time! The bubbles floated away.")
+
+        # KIND 15: quick draw
+        if kind_id == 15:
+            char = random.choice(["A", "B", "C", "D", "E"])
+            await ctx.send(f"Type this character as fast as you can: **{char}**")
+
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel and m.content == char
+
+            start_time = time.perf_counter()
+            try:
+                msg = await self.bot.wait_for("message", check=check, timeout=10.0)
+                reaction_time = time.perf_counter() - start_time
+                await ctx.send(f"You typed it in {reaction_time:.2f} seconds! Well done.")
+                await self._award_win(ctx, "quick_draw")
+            except asyncio.TimeoutError:
+                await ctx.send("You didn't type the character in time!")
+
+        # KIND 16: number chain
+        if kind_id == 16:
+            await ctx.send("Start the number chain! Say a number.")
+
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel and m.content.isdigit()
+
+            try:
+                msg = await self.bot.wait_for("message", check=check, timeout=30.0)
+                next_number = int(msg.content) + 1
+                await ctx.send(f"Great! Now say the next number: {next_number}.")
+            except asyncio.TimeoutError:
+                await ctx.send("You took too long to respond!")
+
+        # KIND 17: color guess
+        if kind_id == 17:
+            colors = ["red", "blue", "green", "yellow"]
+            correct_color = random.choice(colors)
+            await ctx.send(f"Guess the color I'm thinking of: {', '.join(colors)}")
+
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() in colors
+
+            try:
+                msg = await self.bot.wait_for("message", check=check, timeout=15.0)
+                if msg.content.lower() == correct_color:
+                    await ctx.send("Correct! You guessed the color.")
+                    await self._award_win(ctx, "color_guess")
+                else:
+                    await ctx.send(f"Wrong! The correct color was {correct_color}.")
+            except asyncio.TimeoutError:
+                await ctx.send(f"You ran out of time! The correct color was {correct_color}.")
+
+        # KIND 18: flip words
+        if kind_id == 18:
+            sentence = "The quick brown fox"
+            flipped = " ".join(reversed(sentence.split()))
+            await ctx.send(f"Flip the order of these words: **{sentence}**")
+
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel
+
+            try:
+                msg = await self.bot.wait_for("message", check=check, timeout=15.0)
+                if msg.content == flipped:
+                    await ctx.send("Correct! You flipped the words.")
+                    await self._award_win(ctx, "flip_words")
+                else:
+                    await ctx.send(f"Wrong! The correct order was: {flipped}.")
+            except asyncio.TimeoutError:
+                await ctx.send(f"You ran out of time! The correct order was: {flipped}")
+
+        # KIND 19: pick a card
+        if kind_id == 19:
+            suits = ["Hearts", "Diamonds", "Clubs", "Spades"]
+            ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace"]
+            card = f"{random.choice(ranks)} of {random.choice(suits)}"
+            await ctx.send(f"I picked a card. Guess what it is!")
+
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel
+
+            try:
+                msg = await self.bot.wait_for("message", check=check, timeout=30.0)
+                if msg.content.lower() == card.lower():
+                    await ctx.send("Correct! You guessed the card.")
+                    await self._award_win(ctx, "pick_a_card")
+                else:
+                    await ctx.send(f"Wrong! The card was {card}.")
+            except asyncio.TimeoutError:
+                await ctx.send(f"You ran out of time! The card was {card}.")
         # fallback generic: simple fortune
         await ctx.send(random.choice(["Nice!", "Try again.", "Nope."]))
 
@@ -701,7 +644,7 @@ async def setup(bot: commands.Bot):
         ("dice_frenzy_ii_micro", "Dice frenzy II", "micro_122"),
         ("math_sprint_pro_ii_micro", "Math sprint pro II", "micro_123"),
         ("reverse_phrase_iii_micro", "Reverse the phrase III", "micro_124"),
-        ("emoji_recall_pro_ii_micro", "Emoji recall pro II", "micro_125"),
+        ("emoji_recall_pro_iii_micro", "Emoji recall pro III", "micro_125"),
         ("color_master_iii_micro", "Color master III", "micro_126"),
         ("typing_reflex_pro_ii_micro", "Typing reflex pro II", "micro_127"),
         ("unscramble_expert_ii_micro", "Unscramble expert II", "micro_128"),
@@ -711,75 +654,24 @@ async def setup(bot: commands.Bot):
         ("dice_master_iii_micro", "Dice master III", "micro_132"),
         ("rapid_arithmetic_ii_micro", "Rapid arithmetic II", "micro_133"),
         ("reverse_champion_ii_micro", "Reverse champion II", "micro_134"),
-        ("emoji_memory_champion_ii_micro", "Emoji memory champion II", "micro_135"),
-        ("color_chooser_pro_ii_micro", "Color chooser pro II", "micro_136"),
-        ("typing_champion_ii_micro", "Typing champion II", "micro_137"),
-        ("unscramble_champion_ii_micro", "Unscramble champion II", "micro_138"),
-        ("trivia_blitz_master_ii_micro", "Trivia blitz master II", "micro_139"),
-        ("pick_secret_item_ii_micro", "Pick-the-secret-item II", "micro_140"),
-        ("parity_grandmaster_ii_micro", "Parity grandmaster II", "micro_141"),
-        ("dice_grandmaster_ii_micro", "Dice grandmaster II", "micro_142"),
-        ("mental_math_grand_ii_micro", "Mental math grand II", "micro_143"),
-        ("reverse_grand_ii_micro", "Reverse grand II", "micro_144"),
-        ("emoji_grand_recall_ii_micro", "Emoji grand recall II", "micro_145"),
-        ("color_grandmaster_ii_micro", "Color grandmaster II", "micro_146"),
-        ("typing_grandmaster_ii_micro", "Typing grandmaster II", "micro_147"),
-        ("unscramble_grandmaster_ii_micro", "Unscramble grandmaster II", "micro_148"),
-        ("ultimate_trivia_ii_micro", "Ultimate trivia II", "micro_149"),
-        ("hidden_item_grand_ii_micro", "Hidden item grand challenge II", "micro_150"),
-        # Next 50 micro minigames (201-250)
-        ("parity_master_iv_micro", "Parity master IV", "micro_151"),
-        ("dice_showoff_iii_micro", "Dice sum showoff III", "micro_152"),
-        ("math_lightning_iii_micro", "Math lightning III", "micro_153"),
-        ("reverse_sprint_iii_micro", "Reverse word sprint III", "micro_154"),
-        ("emoji_recall_challenge_iii_micro", "Emoji recall challenge III", "micro_155"),
-        ("color_conundrum_iii_micro", "Color pick conundrum III", "micro_156"),
-        ("typing_reflex_iii_micro", "Typing reflex III", "micro_157"),
-        ("unscramble_dash_iii_micro", "Unscramble dash III", "micro_158"),
-        ("quick_tf_iii_micro", "Quick true/false III", "micro_159"),
-        ("guess_object_iii_micro", "Guess the object III", "micro_160"),
-        ("even_odd_rapid_iv_micro", "Even/Odd rapid IV", "micro_161"),
-        ("mega_dice_sum_iii_micro", "Mega dice sum III", "micro_162"),
-        ("crunch_numbers_iii_micro", "Crunch the numbers III", "micro_163"),
-        ("mirror_phrase_test_iii_micro", "Mirror phrase test III", "micro_164"),
-        ("emoji_memory_extreme_iii_micro", "Emoji memory extreme III", "micro_165"),
-        ("color_roulette_iii_micro", "Color roulette III", "micro_166"),
-        ("speed_typing_blitz_iii_micro", "Speed typing blitz III", "micro_167"),
-        ("word_scramble_relay_iii_micro", "Word scramble relay III", "micro_168"),
-        ("yes_no_rapidfire_iii_micro", "Yes/No rapidfire III", "micro_169"),
-        ("pick_item_master_iii_micro", "Pick-the-item master III", "micro_170"),
-        ("parity_blitz_iii_micro", "Parity blitz III", "micro_171"),
-        ("dice_frenzy_iii_micro", "Dice frenzy III", "micro_172"),
-        ("math_sprint_pro_iii_micro", "Math sprint pro III", "micro_173"),
-        ("reverse_phrase_iv_micro", "Reverse the phrase IV", "micro_174"),
-        ("emoji_recall_pro_iii_micro", "Emoji recall pro III", "micro_175"),
-        ("color_master_iv_micro", "Color master IV", "micro_176"),
-        ("typing_reflex_pro_iii_micro", "Typing reflex pro III", "micro_177"),
-        ("unscramble_expert_iii_micro", "Unscramble expert III", "micro_178"),
-        ("true_false_blitz_iii_micro", "True/False blitz III", "micro_179"),
-        ("find_hidden_thing_iii_micro", "Find the hidden thing III", "micro_180"),
-        ("even_odd_challenge_iii_micro", "Even/Odd challenge III", "micro_181"),
-        ("dice_master_iv_micro", "Dice master IV", "micro_182"),
-        ("rapid_arithmetic_iii_micro", "Rapid arithmetic III", "micro_183"),
-        ("reverse_champion_iii_micro", "Reverse champion III", "micro_184"),
-        ("emoji_memory_champion_iii_micro", "Emoji memory champion III", "micro_185"),
-        ("color_chooser_pro_iii_micro", "Color chooser pro III", "micro_186"),
-        ("typing_champion_iii_micro", "Typing champion III", "micro_187"),
-        ("unscramble_champion_iii_micro", "Unscramble champion III", "micro_188"),
-        ("trivia_blitz_master_iii_micro", "Trivia blitz master III", "micro_189"),
-        ("pick_secret_item_iii_micro", "Pick-the-secret-item III", "micro_190"),
-        ("parity_grandmaster_iii_micro", "Parity grandmaster III", "micro_191"),
-        ("dice_grandmaster_iii_micro", "Dice grandmaster III", "micro_192"),
-        ("mental_math_grand_iii_micro", "Mental math grand III", "micro_193"),
-        ("reverse_grand_iii_micro", "Reverse grand III", "micro_194"),
-        ("emoji_grand_recall_iii_micro", "Emoji grand recall III", "micro_195"),
-        ("color_grandmaster_iii_micro", "Color grandmaster III", "micro_196"),
-        ("typing_grandmaster_iii_micro", "Typing grandmaster III", "micro_197"),
-        ("unscramble_grandmaster_iii_micro", "Unscramble grandmaster III", "micro_198"),
+        ("emoji_memory_champion_iii_micro", "Emoji memory champion III", "micro_135"),
+        ("color_chooser_pro_iii_micro", "Color chooser pro III", "micro_136"),
+        ("typing_champion_iii_micro", "Typing champion III", "micro_137"),
+        ("unscramble_champion_iii_micro", "Unscramble champion III", "micro_138"),
+        ("trivia_blitz_master_iii_micro", "Trivia blitz master III", "micro_139"),
+        ("pick_secret_item_iii_micro", "Pick-the-secret-item III", "micro_140"),
+        ("parity_grandmaster_iii_micro", "Parity grandmaster III", "micro_141"),
+        ("dice_grandmaster_iii_micro", "Dice grandmaster III", "micro_142"),
+        ("mental_math_grand_iii_micro", "Mental math grand III", "micro_143"),
+        ("reverse_grand_iii_micro", "Reverse grand III", "micro_144"),
+        ("emoji_grand_recall_iii_micro", "Emoji grand recall III", "micro_145"),
+        ("color_grandmaster_iii_micro", "Color grandmaster III", "micro_146"),
+        ("typing_grandmaster_iii_micro", "Typing grandmaster III", "micro_147"),
+        ("unscramble_grandmaster_iii_micro", "Unscramble grandmaster III", "micro_148"),
         ("ultimate_trivia_iii_micro", "Ultimate trivia III", "micro_199"),
         ("hidden_item_grand_iii_micro", "Hidden item grand challenge III", "micro_200"),
         # Final 50 micro minigames (201-250)
-        ("parity_master_v_micro", "Parity master V", "micro_201"),
+        ("parity_master_iv_micro", "Parity master IV", "micro_201"),
         ("dice_showoff_iv_micro", "Dice sum showoff IV", "micro_202"),
         ("math_lightning_iv_micro", "Math lightning IV", "micro_203"),
         ("reverse_sprint_iv_micro", "Reverse word sprint IV", "micro_204"),
