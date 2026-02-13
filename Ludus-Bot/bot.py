@@ -300,6 +300,9 @@ async def load_cogs():
         if cog_name == "leveling":
             skipped_cogs.append(f"{cog_name} (disabled - causes issues)")
             continue
+        if cog_name == "intelligence":
+            skipped_cogs.append(f"{cog_name} (disabled - under development)")
+            continue
         if cog_name == "music" and not config.get("music_enabled", True):
             skipped_cogs.append(f"{cog_name} (disabled in config.json)")
             continue
