@@ -47,7 +47,6 @@ except Exception:
 if not os.environ.get("LUDUS_TOKEN"):
         print("LUDUS_TOKEN not set!")
         sys.exit(1)
-        os.system(f"{sys.executable} bot.py")
 
 # Load Opus for voice support (optional) — don't crash if library missing
 try:
@@ -510,11 +509,6 @@ async def on_ready():
             # Sync dev-only commands to each dev guild
             for guild in dev_guild_objs:
                 try:
-                    # The bot's main tree still has all commands.
-                    # By specifying a guild, sync will only update commands for that guild.
-                    # We assume here that discord.py is smart enough to only sync the commands
-                    # that are registered with a specific guild_id or are new.
-                    # Let's try a more direct approach.
                     dev_tree = discord.app_commands.CommandTree(bot)
                     for cmd_name in DEV_ONLY_COMMANDS:
                         cmd = bot.tree.get_command(cmd_name)
@@ -554,3 +548,68 @@ async def on_ready():
         traceback.print_exc()
 
     # Start auto-saving tasks
+    try:
+        from cogs.economy import auto_save_economy
+        auto_save_economy.start(bot)
+        print("✅ Economy auto-saving task started.")
+    except Exception as e:
+        print(f"❌ Failed to start economy auto-saving: {e}")
+        traceback.print_exc()
+
+    try:
+        from cogs.reminders import check_reminders
+        check_reminders.start(bot)
+        print("✅ Reminders checking task started.")
+    except Exception as e:
+        print(f"❌ Failed to start reminder checking: {e}")
+        traceback.print_exc()
+
+    try:
+        from cogs.dueling import update_duels
+        update_duels.start(bot)
+        print("✅ Dueling update task started.")
+    except Exception as e:
+        print(f"❌ Failed to start dueling updates: {e}")
+        traceback.print_exc()
+
+    try:
+        from cogs.daily_rewards import reset_daily_claims
+        reset_daily_claims.start(bot)
+        print("✅ Daily reward reset task started.")
+    except Exception as e:
+        print(f"❌ Failed to start daily reward reset: {e}")
+        traceback.print_exc()
+        
+    print("="*50)
+    print("✅ All startup tasks complete. Bot is fully operational.")
+    print("="*50)
+
+
+@bot.event
+async def on_message(message):
+    # Don't respond to ourselves
+    if message.author == bot.user:
+        return
+
+    # Check if the message is a direct mention or starts with "Hey Ludus"
+    if bot.user.mentioned_in(message) or message.content.lower().startswith('hey ludus'):
+        # You can add more sophisticated logic here to parse the question
+        # For now, let's just send a simple reply.
+        await message.channel.send(f"Hello {message.author.mention}! How can I help you today?")
+
+    # This allows other on_message events and commands to continue processing
+    await bot.process_commands(message)
+
+
+# Main entry point
+TOKEN = os.environ.get("LUDUS_TOKEN")
+if not TOKEN:
+    print("[FATAL] LUDUS_TOKEN environment variable not set. Cannot start bot.")
+    sys.exit(1)
+
+print("[MAIN] Starting Ludus Bot...")
+try:
+    bot.run(TOKEN)
+except Exception as e:
+    print(f"[FATAL] An error occurred while running the bot: {e}")
+    traceback.print_exc()
