@@ -655,7 +655,7 @@ class LudusPersonality(commands.Cog):
                 content = content.replace(mention, " ")
                 addressed = True
         lowered = content.lower()
-        if "ludus" in lowered:
+        if "ludus" in lowered: n 
             addressed = True
         if not message.guild:
             addressed = True
