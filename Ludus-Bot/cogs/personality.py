@@ -133,6 +133,12 @@ class LudusPersonality(commands.Cog):
         self.bot = bot
         self.last_reaction_time = {}
         self.cooldown_seconds = 5  # Cooldown per user to avoid spam
+        # Path for persistent knowledge and memory
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir, exist_ok=True)
+        self.knowledge_path = os.path.join(data_dir, "ludus_personality_knowledge.json")
+        self.knowledge_data = self._load_knowledge()
         
         # Ludus custom emojis
         self.ludus_emojis = {

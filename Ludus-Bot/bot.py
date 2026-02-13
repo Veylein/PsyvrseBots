@@ -17,6 +17,24 @@ import aiofiles
 from googletrans import Translator
 import difflib
 
+# Load Ludus Q&A and user memory
+LUDUS_QA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'ludus_qa.json')
+def load_ludus_qa():
+    try:
+        with open(LUDUS_QA_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {"questions": [], "users": {}}
+
+def save_ludus_qa(data):
+    try:
+        with open(LUDUS_QA_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
+
+ludus_qa_data = load_ludus_qa()
+
 dotenv.load_dotenv()
 # Configure logging to file+console. If Render provides a disk path, use it.
 LOG_DIR = Path(os.getenv("RENDER_DISK_PATH", ".")) / "logs"
@@ -575,20 +593,18 @@ async def on_ready():
     print("="*50)
 
 
+
+# Forward all message handling to LudusPersonality cog if loaded
 @bot.event
 async def on_message(message):
-    # Don't respond to ourselves
     if message.author == bot.user:
         return
-
-    # Check if the message is a direct mention or starts with "Hey Ludus"
-    if bot.user.mentioned_in(message) or message.content.lower().startswith('hey ludus'):
-        # You can add more sophisticated logic here to parse the question
-        # For now, let's just send a simple reply.
-        await message.channel.send(f"Hello {message.author.mention}! How can I help you today?")
-
-    # This allows other on_message events and commands to continue processing
-    await bot.process_commands(message)
+    # If LudusPersonality cog is loaded, let it handle all messages
+    personality_cog = bot.get_cog("LudusPersonality")
+    if personality_cog:
+        await personality_cog.on_message(message)
+    else:
+        await bot.process_commands(message)
 
 
 # Main entry point
