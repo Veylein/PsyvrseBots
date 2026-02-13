@@ -300,9 +300,6 @@ async def load_cogs():
         if cog_name == "leveling":
             skipped_cogs.append(f"{cog_name} (disabled - causes issues)")
             continue
-        if cog_name == "intelligence":
-            skipped_cogs.append(f"{cog_name} (disabled - under development)")
-            continue
         if cog_name == "music" and not config.get("music_enabled", True):
             skipped_cogs.append(f"{cog_name} (disabled in config.json)")
             continue
@@ -803,4 +800,8 @@ async def on_interaction(interaction: discord.Interaction):
 # --- FIXED: Removed duplicate config reload (it served no purpose) ---
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        bot.run(os.environ["LUDUS_TOKEN"])
+    except Exception as e:
+        print(f"Error running bot: {e}")
+        logger.exception("Bot failed to run")
