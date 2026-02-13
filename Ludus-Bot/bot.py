@@ -486,41 +486,46 @@ async def on_ready():
         dev_guilds_raw = os.environ.get('DEV_GUILD_IDS') or os.environ.get('DEV_GUILD_ID')
         if dev_guilds_raw:
             print(f"🔧 DEV_GUILD_ID detected - splitting commands")
-            guild_ids = [g.strip() for g in dev_guilds_raw.split(',') if g.strip()]
-            
-            # Save references to dev-only commands before removing
-            dev_commands = {}
-            for cmd_name in DEV_ONLY_COMMANDS:
-                cmd = bot.tree.get_command(cmd_name)
-                if cmd:
-                    dev_commands[cmd_name] = cmd
-                    bot.tree.remove_command(cmd_name)
-                    print(f"  📌 Saved {cmd_name} for dev guild only")
-            
-            # Sync global commands (without dev-only)
-            print(f"\n🌍 Syncing global commands...")
-            synced_global = await bot.tree.sync()
-            print(f"   • Synced {len(synced_global)} global commands.")
+            dev_guild_ids = [int(g.strip()) for g in dev_guilds_raw.split(',') if g.strip()]
+            dev_guild_objs = [discord.Object(id=gid) for gid in dev_guild_ids]
 
-            # Sync dev-only commands to dev guilds
-            for guild_id in guild_ids:
+            # Create a temporary tree for global commands
+            global_tree = discord.app_commands.CommandTree(bot)
+            
+            # Add only global commands to the temporary tree
+            for cmd in bot.tree.walk_commands():
+                root_name = cmd.root_parent.name if cmd.root_parent else cmd.name
+                if root_name not in DEV_ONLY_COMMANDS:
+                    global_tree.add_command(cmd)
+
+            # Sync the temporary global tree
+            try:
+                print(f"\n🌍 Syncing global commands...")
+                synced_global = await global_tree.sync()
+                print(f"   • Synced {len(synced_global)} global commands.")
+            except Exception as e:
+                print(f"   ❌ Error syncing global commands: {e}")
+                traceback.print_exc()
+
+            # Sync dev-only commands to each dev guild
+            for guild in dev_guild_objs:
                 try:
-                    guild_obj = discord.Object(id=int(guild_id))
-                    # Add dev commands back to a temporary tree for this guild
-                    for cmd in dev_commands.values():
-                        bot.tree.add_command(cmd, guild=guild_obj)
-                    
-                    print(f"\n🏠 Syncing dev commands to guild {guild_id}...")
-                    synced_dev = await bot.tree.sync(guild=guild_obj)
-                    print(f"   • Synced {len(synced_dev)} dev commands to {guild_id}.")
+                    # The bot's main tree still has all commands.
+                    # By specifying a guild, sync will only update commands for that guild.
+                    # We assume here that discord.py is smart enough to only sync the commands
+                    # that are registered with a specific guild_id or are new.
+                    # Let's try a more direct approach.
+                    dev_tree = discord.app_commands.CommandTree(bot)
+                    for cmd_name in DEV_ONLY_COMMANDS:
+                        cmd = bot.tree.get_command(cmd_name)
+                        if cmd:
+                            dev_tree.add_command(cmd)
 
-                    # Clean up: remove dev commands from tree after syncing to this guild
-                    # to prevent them from being added to the next guild's list
-                    for cmd_name in dev_commands.keys():
-                        bot.tree.remove_command(cmd_name, guild=guild_obj)
-
+                    print(f"\n🏠 Syncing dev commands to guild {guild.id}...")
+                    synced_dev = await dev_tree.sync(guild=guild)
+                    print(f"   • Synced {len(synced_dev)} dev commands to {guild.id}.")
                 except Exception as e:
-                    print(f"   ❌ Error syncing dev commands to guild {guild_id}: {e}")
+                    print(f"   ❌ Error syncing dev commands to guild {guild.id}: {e}")
                     traceback.print_exc()
         else:
             # No dev guild, sync all commands globally
@@ -529,7 +534,7 @@ async def on_ready():
             print(f"   • Synced {len(synced_commands)} commands.")
 
     except Exception as e:
-        print(f"❌ Error syncing commands: {e}")
+        print(f"❌ Error in command sync logic: {e}")
         traceback.print_exc()
         try:
             ludus_logging.log_exception(e, message="Failed during command sync")
@@ -539,11 +544,13 @@ async def on_ready():
     print("="*50)
     
     # Set bot's presence
-    await bot.change_presence(activity=discord.Game(name="L!help", type=discord.GameType.TEXT))
-
-if __name__ == "__main__":
     try:
-        bot.run(os.environ["LUDUS_TOKEN"])
+        # discord.Game no longer has a 'type' parameter.
+        game = discord.Game(name="L!help")
+        await bot.change_presence(activity=game)
+        print("✅ Presence updated to 'Playing L!help'")
     except Exception as e:
-        print(f"Error running bot: {e}")
-        logger.exception("Bot failed to run")
+        print(f"❌ Failed to set presence: {e}")
+        traceback.print_exc()
+
+    # Start auto-saving tasks
