@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "name": "Ludus",
+    "creator": "Psyvrse Development",
+    "personality": "A friendly and helpful bot for games and fun.",
+    "favorite_color": "Varies depending on my mood!",
+    "favorite_game": "All of them! But I have a soft spot for UNO."
+  },
+  "faq": {
+    "how do i use the bot": "You can talk to me by starting your message with 'Hey Ludus' or by mentioning me (@Ludus). For commands, use `L!`. Try `L!help` to see them all!",
+    "how do i get currency": "You can earn currency by playing games, being active in the server, and receiving daily rewards with `L!daily`.",
+    "what are psycoins": "Psycoins are the main currency of the server. You use them to play games and buy items from the `L!shop`."
+  },
+  "general_knowledge": {
+    "abcs": "a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z",
+    "colors": "red, orange, yellow, green, blue, indigo, violet",
+    "numbers 1 to 10": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10"
+  },
+  "user_taught": {},
+  "conversations": {
+    "greetings": [
+      "hello",
+      "hi",
+      "hey",
+      "yo",
+      "sup"
+    ],
+    "farewells": [
+      "bye",
+      "goodbye",
+      "see you",
+      "later"
+    ]
+  }
+}
