@@ -14,6 +14,8 @@ import ludus_logging
 from utils import user_storage
 from datetime import datetime
 import aiofiles
+from googletrans import Translator
+import difflib
 
 dotenv.load_dotenv()
 # Configure logging to file+console. If Render provides a disk path, use it.
@@ -794,58 +796,6 @@ async def on_interaction(interaction: discord.Interaction):
         except:
             pass
 
-
-@bot.event
-async def on_error(event_method, *args, **kwargs):
-    """Global fallback for uncaught errors in events."""
-    try:
-        logger.exception("Unhandled error in event %s", event_method)
-        try:
-            ludus_logging.log_message(level="ERROR", title="Unhandled event error", message=f"Event: {event_method}")
-        except Exception:
-            pass
-    except Exception:
-        print("Unhandled error in event", event_method)
-
-# Blacklist checking
-def is_blacklisted(user_id=None, guild_id=None):
-    """Check if user or guild is blacklisted"""
-    blacklist = load_blacklist()
-    if user_id and str(user_id) in blacklist.get("users", []):
-        return True
-    if guild_id and str(guild_id) in blacklist.get("guilds", []):
-        return True
-    return False
-
-async def main():
-    # Cogs are now loaded in setup_hook (runs automatically before bot.start)
-    token = os.getenv("LUDUS_TOKEN")
-    if not token:
-        print("Error: No Discord token found! Please set LUDUS_TOKEN in Secrets or add 'token' to config.json.")
-        return
-    
-    try:
-        async with bot:
-            await bot.start(token)
-    except discord.errors.LoginFailure:
-        logger.error("Invalid Discord token provided")
-    except KeyboardInterrupt:
-        logger.info("Bot shutdown requested by user")
-        print("\n👋 Bot shutting down gracefully...")
-    except Exception as e:
-        logger.exception("Bot stopped with exception: %s", e)
-        print(f"\n❌ Bot crashed: {e}")
-        # On error, wait a bit before letting the process restart
-        await asyncio.sleep(5)
-    finally:
-        # Flush user storage queue on shutdown
-        try:
-            from utils import user_storage
-            print("[BOT] Flushing user storage queue...")
-            await user_storage.flush_user_storage_queue()
-            print("[BOT] User storage queue flushed")
-        except Exception as e:
-            print(f"[BOT] Error flushing user storage queue: {e}")
 
 # --- FIXED: Removed duplicate config reload (it served no purpose) ---
 

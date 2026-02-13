@@ -166,7 +166,7 @@ class LudusPersonality(commands.Cog):
         }
         
         # Personalities: Each is a dict of triggers and response logic
-        # Expanded triggers for more unique conversations
+        # Expanded triggers for smarter and more engaging conversations
         self.personalities = {
             "default": {
                 "name": "Classic Ludus",
