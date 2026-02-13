@@ -745,6 +745,27 @@ class Utilities(commands.Cog):
         
         return embed
 
+    @commands.command(name="feedback")
+    async def feedback(self, ctx, *, text: str):
+        """Send feedback to the designated feedback channel."""
+        feedback_channel_id = 1467981316028108918  # Replace with the actual channel ID
+        feedback_channel = self.bot.get_channel(feedback_channel_id)
+
+        if feedback_channel is None:
+            await ctx.send("Feedback channel not found. Please contact the bot administrator.")
+            return
+
+        embed = discord.Embed(
+            title="New Feedback",
+            description=text,
+            color=0x00FF00
+        )
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
+        embed.set_footer(text=f"User ID: {ctx.author.id}")
+
+        await feedback_channel.send(embed=embed)
+        await ctx.send("Thank you for your feedback! It has been sent successfully.")
+
 async def setup(bot):
     await bot.add_cog(Utilities(bot))
 
