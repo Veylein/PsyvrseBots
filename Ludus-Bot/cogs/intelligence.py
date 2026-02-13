@@ -46,8 +46,13 @@ class Intelligence(commands.Cog):
         if message.author.bot:
             return
 
-        # Check if the bot is mentioned or if it's a DM
-        if self.bot.user not in message.mentions and not isinstance(message.channel, discord.DMChannel):
+        content_lower = message.content.lower()
+        is_dm = isinstance(message.channel, discord.DMChannel)
+        is_mention = self.bot.user in message.mentions
+        is_heyludus = content_lower.startswith('hey ludus')
+
+        # Check if the bot is being addressed
+        if not (is_dm or is_mention or is_heyludus):
             return
             
         # Ignore commands
@@ -55,11 +60,19 @@ class Intelligence(commands.Cog):
         if ctx.valid:
             return
 
-        content = message.content.lower().strip()
+        content = message.content.strip()
         
-        # Remove mention
-        if self.bot.user.mention in content:
+        # Remove trigger phrases to get the actual query
+        if is_mention:
             content = content.replace(self.bot.user.mention, "").strip()
+        elif is_heyludus:
+            content = content[len('hey ludus'):].strip()
+            if content.startswith(','):
+                content = content[1:].strip()
+
+        # If after removing triggers the content is empty, do nothing.
+        if not content:
+            return
 
         # --- Language Detection and Translation ---
         try:
@@ -70,17 +83,18 @@ class Intelligence(commands.Cog):
             detected_lang = 'en'
 
         original_content = content
+        translated_content = content.lower()
         if detected_lang != 'en':
             try:
                 translated = self.translator.translate(content, src=detected_lang, dest='en')
-                content = translated.text.lower()
+                translated_content = translated.text.lower()
             except Exception:
                 # If translation fails, proceed with original content
                 pass
         # --- End Language Detection ---
 
         # Check for greetings
-        if content in self.knowledge.get("greetings", []):
+        if translated_content in self.knowledge.get("greetings", []):
             response = f"Hello {message.author.mention}!"
             if detected_lang != 'en':
                 response = self.translator.translate(response, dest=detected_lang).text
@@ -88,7 +102,7 @@ class Intelligence(commands.Cog):
             return
 
         # Check for farewells
-        if content in self.knowledge.get("farewells", []):
+        if translated_content in self.knowledge.get("farewells", []):
             response = f"Goodbye {message.author.mention}!"
             if detected_lang != 'en':
                 response = self.translator.translate(response, dest=detected_lang).text
@@ -96,7 +110,7 @@ class Intelligence(commands.Cog):
             return
 
         # Check knowledge base
-        best_match, score = process.extractOne(content, self.knowledge["knowledge"].keys())
+        best_match, score = process.extractOne(translated_content, self.knowledge["knowledge"].keys())
         
         if score > 80:
             answer = self.knowledge["knowledge"][best_match]
@@ -124,7 +138,9 @@ class Intelligence(commands.Cog):
                 if new_answer_lang != 'en':
                     new_answer = self.translator.translate(new_answer, dest='en').text
 
-                self.knowledge["knowledge"][original_content.strip('?')] = new_answer
+                # Store the original question (in its original language)
+                question_to_store = original_content.strip().rstrip('?')
+                self.knowledge["knowledge"][question_to_store] = new_answer
                 self.save_knowledge()
                 
                 response = f"Thank you! I've learned that '{original_content}' means '{new_answer}'."
@@ -140,8 +156,8 @@ class Intelligence(commands.Cog):
             return
 
         # Simple statement learning
-        elif " is " in content and len(content.split(" is ")) == 2:
-            parts = content.split(" is ")
+        elif " is " in translated_content and len(translated_content.split(" is ")) == 2:
+            parts = translated_content.split(" is ")
             subject = parts[0].strip()
             fact = parts[1].strip()
             if subject and fact:
