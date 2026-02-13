@@ -496,7 +496,11 @@ async def on_ready():
                 for cmd in bot.tree.get_commands():  # top-level commands only
                     if cmd.name.lower() in dev_only_roots:
                         cmd._guild_ids = dev_guild_ids  # ensure these stay guild-bound
-                        cmd.extras['_dev_only_managed'] = True
+                        extras = getattr(cmd, "extras", None)
+                        if extras is None:
+                            cmd.extras = {}
+                            extras = cmd.extras
+                        extras['_dev_only_managed'] = True
                         restricted.append(cmd.name)
 
             if restricted:
@@ -505,8 +509,22 @@ async def on_ready():
                 print("ℹ️ No matching commands found for DEV_ONLY_COMMANDS list.")
 
             print("\n🌍 Syncing global commands (dev-only ones remain guild-scoped)...")
-            synced_global = await bot.tree.sync()
-            print(f"   • Synced {len(synced_global)} global commands.")
+            try:
+                synced_global = await bot.tree.sync()
+                print(f"   • Synced {len(synced_global)} global commands.")
+            except discord.HTTPException as http_error:
+                if http_error.code == 50240:
+                    print("   ⚠️ Entry point command must remain global; reverting dev-only restrictions.")
+                    print("   ⚠️ Remove that command from DEV_ONLY_COMMANDS to silence this warning.")
+                    for cmd in bot.tree.get_commands():
+                        extras = getattr(cmd, "extras", {})
+                        if extras.get('_dev_only_managed'):
+                            cmd._guild_ids = None
+                            extras['_dev_only_forced_global'] = True
+                    synced_global = await bot.tree.sync()
+                    print(f"   • Re-synced {len(synced_global)} commands globally after fallback.")
+                else:
+                    raise
 
             for guild in dev_guild_objs:
                 try:
