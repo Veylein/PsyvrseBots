@@ -137,7 +137,7 @@ class LudusPersonality(commands.Cog):
         data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
         if not os.path.exists(data_dir):
             os.makedirs(data_dir, exist_ok=True)
-        self.knowledge_path = os.path.join(data_dir, "ludus_personality_knowledge.json")
+        self.knowledge_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "knowledge.json")
         self.knowledge_data = self._load_knowledge()
         
         # Ludus custom emojis
@@ -661,7 +661,7 @@ class LudusPersonality(commands.Cog):
                 content = content.replace(mention, " ")
                 addressed = True
         lowered = content.lower()
-        if "ludus" in lowered: n 
+        if "ludus" in lowered:
             addressed = True
         if not message.guild:
             addressed = True
