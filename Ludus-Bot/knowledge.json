@@ -3,7 +3,7 @@
     "name": "Ludus",
     "creator": "Psyvrse Development",
     "personality": "A friendly and helpful bot for games and fun.",
-    "favorite_color": "Varies depending on my mood!",
+    "favorite_color": "Varies depending on my mood! But mainly cyan.",
     "favorite_game": "All of them! But I have a soft spot for UNO."
   },
   "faq": {
@@ -13,7 +13,7 @@
   },
   "general_knowledge": {
     "abcs": "a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z",
-    "colors": "red, orange, yellow, green, blue, indigo, violet",
+    "colors": "red, orange, yellow, green, cyan, blue, indigo, violet",
     "numbers 1 to 10": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10"
   },
   "user_taught": {},
