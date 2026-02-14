@@ -17,7 +17,9 @@ import aiofiles
 from googletrans import Translator
 import difflib
 
-file_path = "/Ludus-Bot/data/user_template.json"
+file_path = os.path.join(os.path.dirname(__file__), 'data', 'user_template.json')
+dir_path = os.path.dirname(file_path)
+os.makedirs(dir_path, exist_ok=True)
 
 # Ensure directory exists before file operations
 dir_path = os.path.dirname(file_path)
