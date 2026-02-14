@@ -19,6 +19,10 @@ import difflib
 
 file_path = "/Ludus-Bot/data/user_template.json"
 
+# Ensure directory exists before file operations
+dir_path = os.path.dirname(file_path)
+os.makedirs(dir_path, exist_ok=True)
+
 # load
 try:
     with open(file_path, "r") as f:
