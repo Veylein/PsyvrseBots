@@ -5,10 +5,12 @@ import asyncio
 import random
 import json
 import os
+import io
 
 from discord import app_commands
 from discord.ui import View, Button
 from cogs.minigames import PaginatedHelpView
+from PIL import Image, ImageDraw
 try:
     from .tcg import manager as tcg_manager
     from .psyvrse_tcg import CARD_DATABASE
@@ -19,23 +21,52 @@ except Exception:
 class MinesweeperGame:
     """Represents a single Minesweeper game session"""
     
-    def __init__(self, rows: int, cols: int, mines: int, user_id: int):
+    def __init__(self, rows: int, cols: int, mines: int, user_id: int, bot=None):
         self.rows = rows
         self.cols = cols
         self.mines = mines
         self.user_id = user_id
         
-        # Load emoji mapping
+        # Load custom emoji from JSON
+        defaults = {
+            "mine": "💣", "flag": "🚩", "hidden": "🟦",
+            "revealed_empty": "⬜", "exploded": "💥",
+            "0": "⬜", "1": "1️⃣", "2": "2️⃣", "3": "3️⃣",
+            "4": "4️⃣", "5": "5️⃣", "6": "6️⃣", "7": "7️⃣", "8": "8️⃣"
+        }
+        
         try:
             with open("data/minesweeper_emoji_mapping.json", "r") as f:
-                self.emoji = json.load(f)
-        except:
-            self.emoji = {
-                "mine": "💣", "flag": "🚩", "hidden": "⬜",
-                "revealed_empty": "⬛", "exploded": "💥",
-                "0": "0️⃣", "1": "1️⃣", "2": "2️⃣", "3": "3️⃣",
-                "4": "4️⃣", "5": "5️⃣", "6": "6️⃣", "7": "7️⃣", "8": "8️⃣"
-            }
+                emoji_config = json.load(f)
+            
+            self.emoji = {}
+            
+            # Convert IDs to emoji objects if bot provided
+            if bot:
+                for key, value in emoji_config.items():
+                    if isinstance(value, str):
+                        value = value.strip()
+                    
+                    # Try to get custom emoji by ID
+                    if isinstance(value, str) and value.isdigit():
+                        emoji_obj = bot.get_emoji(int(value))
+                        if emoji_obj:
+                            self.emoji[key] = str(emoji_obj)
+                        else:
+                            self.emoji[key] = defaults.get(key, "❓")
+                    else:
+                        # Already an emoji or unicode
+                        self.emoji[key] = value
+            else:
+                self.emoji = emoji_config
+            
+            # Fill missing keys with defaults
+            for key, val in defaults.items():
+                if key not in self.emoji:
+                    self.emoji[key] = val
+                    
+        except Exception:
+            self.emoji = defaults
         
         # Game state
         self.board = [[0 for _ in range(cols)] for _ in range(rows)]
@@ -146,29 +177,32 @@ class MinesweeperGame:
     
     def render_board(self) -> str:
         """Render board as emoji grid"""
+        number_emojis = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
         lines = []
         
-        # Add column numbers
-        header = "  " + " ".join(str(i) for i in range(min(self.cols, 10)))
+        # Column header
+        header = "⬛"
+        for c in range(min(self.cols, 10)):
+            header += number_emojis[c]
         lines.append(header)
         
         for r in range(self.rows):
-            line = f"{r} "
+            line_parts = [number_emojis[r] if r < 10 else number_emojis[r % 10]]
             for c in range(self.cols):
                 if self.flagged[r][c]:
-                    line += self.emoji["flag"] + " "
+                    line_parts.append(self.emoji["flag"])
                 elif not self.revealed[r][c]:
-                    line += self.emoji["hidden"] + " "
+                    line_parts.append(self.emoji["hidden"])
                 elif self.board[r][c] == -1:
                     if self.game_over:
-                        line += self.emoji["exploded"] + " "
+                        line_parts.append(self.emoji["exploded"])
                     else:
-                        line += self.emoji["mine"] + " "
+                        line_parts.append(self.emoji["mine"])
                 elif self.board[r][c] == 0:
-                    line += self.emoji["revealed_empty"] + " "
+                    line_parts.append(self.emoji["revealed_empty"])
                 else:
-                    line += self.emoji[str(self.board[r][c])] + " "
-            lines.append(line)
+                    line_parts.append(self.emoji[str(self.board[r][c])])
+            lines.append("".join(line_parts))
         
         return "\n".join(lines)
     
@@ -285,7 +319,7 @@ class MinesweeperView(discord.ui.LayoutView):
         else:
             title = "# 💣 MINESWEEPER"
         
-        board_display = f"```\n{self.game.render_board()}\n```"
+        board_display = self.game.render_board()
         stats = self.game.get_stats()
         
         content = f"{title}\n\n{stats}\n\n{board_display}\n\n**Mode:** {'⛏️ Reveal' if self.mode == 'reveal' else '🚩 Flag'}"
@@ -415,7 +449,7 @@ class PuzzleGames(commands.Cog):
         rows, cols, mines = difficulties[difficulty.lower()]
         
         # Create game
-        game = MinesweeperGame(rows, cols, mines, interaction.user.id)
+        game = MinesweeperGame(rows, cols, mines, interaction.user.id, self.bot)
         game_id = f"{interaction.guild.id}_{interaction.user.id}_minesweeper"
         self.active_games[game_id] = game
         
@@ -767,6 +801,7 @@ class PuzzleGames(commands.Cog):
                     await interaction.followup.send(embed=embed)
                     del self.active_games[game_id]
                 break
+
 
 async def setup(bot):
     await bot.add_cog(PuzzleGames(bot))
