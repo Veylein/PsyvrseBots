@@ -625,8 +625,8 @@ async def on_message(message):
     personality_cog = bot.get_cog("LudusPersonality")
     if personality_cog:
         await personality_cog.on_message(message)
-    else:
-        await bot.process_commands(message)
+    # Always process prefix commands
+    await bot.process_commands(message)
 
 
 # Main entry point
