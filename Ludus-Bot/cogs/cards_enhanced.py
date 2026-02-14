@@ -22,13 +22,16 @@ class Cards(commands.Cog):
         self.active_games = {}
         self.card_values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
         self.card_suits = ['♠️', '♥️', '♦️', '♣️']
-        
-        # Card deck preferences (per user)
-        self.user_decks = {}  # user_id -> 'classic' / 'dark' / 'platinum'
     
     def get_user_deck(self, user_id: int) -> str:
-        """Get user's preferred card deck"""
-        return self.user_decks.get(user_id, 'classic')
+        """Get user's preferred card deck from economy system"""
+        try:
+            economy_cog = self.bot.get_cog('Economy')
+            if economy_cog:
+                return economy_cog.get_user_card_deck(user_id)
+        except:
+            pass
+        return 'classic'  # Default if economy not available
     
     def format_card_for_visual(self, card_tuple) -> str:
         """Convert (value, suit) tuple to visual format"""

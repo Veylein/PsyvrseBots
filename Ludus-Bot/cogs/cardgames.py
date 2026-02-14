@@ -26,13 +26,16 @@ class CardGames(commands.Cog):
         self.player_to_game: Dict[int, Tuple[Union[int, str], ...]] = {}
         self.blackjack_games: Dict[int, Dict[str, Any]] = {}
         self.active_uno_games = {}  # For UNO games
-        
-        # Card deck preferences (per user)
-        self.user_decks = {}  # user_id -> 'classic' / 'dark' / 'platinum'
 
     def get_user_deck(self, user_id: int) -> str:
-        """Get user's preferred card deck"""
-        return self.user_decks.get(user_id, 'classic')
+        """Get user's preferred card deck from economy system"""
+        try:
+            economy_cog = self.bot.get_cog('Economy')
+            if economy_cog:
+                return economy_cog.get_user_card_deck(user_id)
+        except:
+            pass
+        return 'classic'  # Default if economy not available
     
     def format_card_for_display(self, card: str) -> str:
         """Convert internal format to display format (e.g., 'A♠' -> 'As')"""
@@ -562,8 +565,10 @@ class CardGames(commands.Cog):
                 player_total,
                 dealer_shown,
                 author.display_name,
-                deck=deck_pref,
-                show_dealer_card=False
+                bet=0,
+                player_deck=deck_pref,
+                dealer_deck='classic',
+                show_dealer=False
             )
             
             embed = discord.Embed(
@@ -739,8 +744,10 @@ class CardGames(commands.Cog):
                 player_total,
                 dealer_shown,
                 author.display_name,
-                deck=deck,
-                show_dealer_card=False
+                bet=0,
+                player_deck=deck,
+                dealer_deck='classic',
+                show_dealer=False
             )
             
             embed = discord.Embed(
@@ -812,36 +819,40 @@ class CardGames(commands.Cog):
         if val(user_card) > val(opp_card):
             result = f"🎉 {author.mention} wins!"
             color = discord.Color.green()
-            result_text = f"{author.display_name} WINS!"
+            result_text = f"{author.display_name} WINS"
         elif val(user_card) < val(opp_card):
             opp_name = opponent.mention if opponent else '**Bot**'
             result = f"😔 {opp_name} wins!"
             color = discord.Color.red()
-            result_text = f"{opponent.display_name if opponent else 'Bot'} WINS!"
+            result_text = f"{opponent.display_name if opponent else 'Bot'} WINS"
         else:
-            result = "⚔️ It's a WAR (tie)!"
+            result = "It's a WAR (tie)!"
             color = discord.Color.gold()
-            result_text = "TIE - WAR!"
+            result_text = "TIE - WAR"
         
         # Create visual comparison
         user_visual = self.format_card_for_display(user_card)
         opp_visual = self.format_card_for_display(opp_card)
         
-        deck = self.get_user_deck(author.id)
+        # Get decks - player has custom, bot/opponent has classic or their own
+        player_deck = self.get_user_deck(author.id)
+        opponent_deck = 'classic' if not opponent else self.get_user_deck(opponent.id)
+        
         war_image = create_war_image(
             user_visual,
             opp_visual,
             author.display_name,
             opponent.display_name if opponent else "Bot",
-            deck=deck,
-            result_text=result_text
+            deck=player_deck,
+            result_text=result_text,
+            opponent_deck=opponent_deck
         )
         
         embed = discord.Embed(title="⚔️ War Game", color=color, description=result)
         embed.add_field(name=f"{author.display_name}'s Card", value=f"**{user_card}** (Value: {val(user_card)})", inline=True)
         embed.add_field(name=f"{opponent.display_name if opponent else 'Bot'}'s Card", value=f"**{opp_card}** (Value: {val(opp_card)})", inline=True)
         embed.set_image(url="attachment://war.png")
-        embed.set_footer(text="⚔️ Highest card wins! | Use /war to play again")
+        embed.set_footer(text="Highest card wins | Use /war to play again")
         
         # Add play again button
         view = WarPlayAgainView(self, author, opponent)
@@ -853,8 +864,6 @@ class CardGames(commands.Cog):
                 await ctx.reply(embed=embed, file=war_image, view=view)
             except:
                 await ctx.send(embed=embed, file=war_image, view=view)
-
-# ==================== DISCORD COMPONENTS V2 ====================
 
 class GoFishAskView(discord.ui.View):
     """Interactive view for asking cards in Go Fish"""
@@ -955,8 +964,10 @@ class BlackjackGameView(discord.ui.View):
             total,
             self.cog._bj_value([state['dealer'][0]]),
             interaction.user.display_name,
-            deck=deck,
-            show_dealer_card=False
+            bet=0,
+            player_deck=deck,
+            dealer_deck='classic',
+            show_dealer=False
         )
         
         if total > 21:
@@ -1030,8 +1041,10 @@ class BlackjackGameView(discord.ui.View):
             player_total,
             dealer_total,
             interaction.user.display_name,
-            deck=deck,
-            show_dealer_card=True
+            bet=0,
+            player_deck=deck,
+            dealer_deck='classic',
+            show_dealer=True
         )
         
         del self.cog.blackjack_games[self.user_id]

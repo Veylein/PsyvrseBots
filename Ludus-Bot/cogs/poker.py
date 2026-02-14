@@ -20,6 +20,7 @@ from io import BytesIO
 # Cache
 active_games = {}
 CARD_EMOJI_MAPPING = {}
+_poker_bot = None  # Global bot reference for card deck access
 
 def load_card_emoji_mapping():
     global CARD_EMOJI_MAPPING
@@ -132,9 +133,18 @@ def get_player_background_url(guild_id, user_id):
     return None
 
 def get_player_card_deck(guild_id, user_id):
-    """Gets player's active card deck (disabled for now)"""
-    # TODO: Re-implement with proper profile system
-    return 'classic'  # Default deck
+    """Gets player's active card deck from economy system"""
+    global _poker_bot
+    
+    if _poker_bot:
+        try:
+            economy_cog = _poker_bot.get_cog('Economy')
+            if economy_cog:
+                return economy_cog.get_user_card_deck(user_id)
+        except Exception as e:
+            print(f"⚠️ Error getting player card deck: {e}")
+    
+    return 'classic'  # Default deck if economy not available
 
 
 class PokerGame:
@@ -758,6 +768,17 @@ class PokerLobbyView(discord.ui.View):
         self.lobby_id = lobby_id
         self.lobby = lobby
         self.economy_cog = economy_cog
+        self.update_buttons()
+    
+    def update_buttons(self):
+        """Update button states based on lobby status"""
+        real_players = [p for p in self.lobby['players'] if not p.get('is_bot')]
+        
+        # Find start button and disable if insufficient real players
+        for child in self.children:
+            if isinstance(child, discord.ui.Button) and child.custom_id == "poker_lobby_start":
+                # Need at least 2 real players for poker
+                child.disabled = len(real_players) < 2
     
     @discord.ui.button(label="🤖➕", style=discord.ButtonStyle.secondary, custom_id="poker_lobby_bot_add", row=0)
     async def bot_add_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -796,6 +817,7 @@ class PokerLobbyView(discord.ui.View):
         
         # WAŻNE: defer() PRZED edit()
         await interaction.response.defer()
+        self.update_buttons()
         await interaction.message.edit(embed=self.create_lobby_embed(), view=self)
     
     @discord.ui.button(label="🤖➖", style=discord.ButtonStyle.secondary, custom_id="poker_lobby_bot_remove", row=0)
@@ -817,6 +839,7 @@ class PokerLobbyView(discord.ui.View):
         
         # IMPORTANT: defer() BEFORE edit()
         await interaction.response.defer()
+        self.update_buttons()
         await interaction.message.edit(embed=self.create_lobby_embed(), view=self)
     
     @discord.ui.button(label="Join", style=discord.ButtonStyle.success, custom_id="poker_lobby_join", row=1)
@@ -852,6 +875,7 @@ class PokerLobbyView(discord.ui.View):
         
         # IMPORTANT: defer() BEFORE edit()
         await interaction.response.defer()
+        self.update_buttons()
         await interaction.message.edit(embed=self.create_lobby_embed(), view=self)
     
     @discord.ui.button(label="Leave", style=discord.ButtonStyle.danger, custom_id="poker_lobby_leave", row=1)
@@ -875,6 +899,7 @@ class PokerLobbyView(discord.ui.View):
         
         # IMPORTANT: defer() BEFORE edit()
         await interaction.response.defer()
+        self.update_buttons()
         await interaction.message.edit(embed=self.create_lobby_embed(), view=self)
     
     @discord.ui.button(label="⚙️ Settings", style=discord.ButtonStyle.secondary, custom_id="poker_lobby_settings", row=2)
@@ -900,8 +925,10 @@ class PokerLobbyView(discord.ui.View):
             await interaction.response.send_message("❌ Only host!", ephemeral=True)
             return
         
-        if len(self.lobby['players']) < 2:
-            await interaction.response.send_message("❌ Minimum 2 players!", ephemeral=True)
+        # Count only real players (not bots) - need at least 2 for poker
+        real_players = [p for p in self.lobby['players'] if not p.get('is_bot')]
+        if len(real_players) < 2:
+            await interaction.response.send_message("❌ Need at least 2 real players!", ephemeral=True)
             return
         
         # Confirm interaction before stopping the View
@@ -954,7 +981,9 @@ class PokerLobbyView(discord.ui.View):
 
 class PokerCog(commands.Cog):
     def __init__(self, bot):
+        global _poker_bot
         self.bot = bot
+        _poker_bot = bot  # Set global reference
         load_card_emoji_mapping()
         
         # Load owner_ids from config.json
@@ -1061,6 +1090,11 @@ class PokerCog(commands.Cog):
     
     async def start_game(self, lobby, channel, economy_cog):
         """Start game"""
+        # Check minimum players
+        if len(lobby['players']) < 2:
+            await channel.send("❌ Need at least 2 players to start poker!")
+            return
+        
         lobby_id = f"poker_{channel.id}_{int(lobby['last_activity'])}"
         
         if lobby_id in self.bot.active_lobbies:
@@ -1267,7 +1301,7 @@ class PokerCog(commands.Cog):
             
             await channel.send("🏁 **Game ended!**")
     
-    async def play_fast_poker(self, interaction: discord.Interaction):
+    async def play_fast_poker(self, interaction: discord.Interaction, preset_bet: int = None):
         """Fast 5-card poker vs Tryn bot"""
         economy_cog = self.get_economy_cog()
         if not economy_cog:
@@ -1281,21 +1315,29 @@ class PokerCog(commands.Cog):
             await interaction.response.send_message("❌ You need at least 50 coins to play!", ephemeral=True)
             return
         
-        # Show bet selection
-        bet_view = BetSelectView(interaction.user.id, balance, "poker")
-        embed = discord.Embed(
-            title="🎴 5-Card Poker - Select Bet 🎴",
-            description=f"Balance: **{balance}** 💠\nSelect your bet amount:",
-            color=discord.Color.gold()
-        )
-        
-        await interaction.response.send_message(embed=embed, view=bet_view, ephemeral=True)
-        await bet_view.wait()
-        
-        if not bet_view.selected_bet:
-            return
-        
-        bet_amount = bet_view.selected_bet
+        # Use preset bet or show selection
+        if preset_bet:
+            bet_amount = preset_bet
+            if balance < bet_amount:
+                await interaction.response.send_message(f"❌ You need at least {bet_amount} coins!", ephemeral=True)
+                return
+            await interaction.response.defer()
+        else:
+            # Show bet selection
+            bet_view = BetSelectView(interaction.user.id, balance, "poker")
+            embed = discord.Embed(
+                title="5-Card Poker - Select Bet",
+                description=f"Balance: **{balance}** 💠\nSelect your bet amount:",
+                color=discord.Color.gold()
+            )
+            
+            await interaction.response.send_message(embed=embed, view=bet_view, ephemeral=True)
+            await bet_view.wait()
+            
+            if not bet_view.selected_bet:
+                return
+            
+            bet_amount = bet_view.selected_bet
         
         # Deduct bet
         economy_cog.remove_coins(interaction.user.id, bet_amount)
@@ -1318,6 +1360,9 @@ class PokerCog(commands.Cog):
         player_hand_name = get_hand_name(player_hand[0])
         tryn_hand_name = get_hand_name(tryn_hand[0])
         
+        # Get player's card deck
+        player_deck = get_player_card_deck(interaction.guild.id if interaction.guild else None, interaction.user.id)
+        
         # Create visual comparison image
         comparison_image = await asyncio.to_thread(
             create_fast_poker_comparison_image,
@@ -1326,26 +1371,27 @@ class PokerCog(commands.Cog):
             player_hand_name,
             tryn_cards,
             tryn_hand_name,
-            result
+            result,
+            player_deck
         )
         
         # Calculate winnings
         if result == 1:
             winnings = bet_amount * 2
             economy_cog.add_coins(interaction.user.id, winnings, "fast_poker_win")
-            result_text = f"🎉 **You win!**\n+{winnings - bet_amount} coins"
+            result_text = f"**You win!**\n+{winnings - bet_amount} coins"
             color = discord.Color.gold()
         elif result == -1:
-            result_text = f"💔 **Dealer wins!**\n-{bet_amount} coins"
+            result_text = f"**Dealer wins!**\n-{bet_amount} coins"
             color = discord.Color.red()
         else:
             economy_cog.add_coins(interaction.user.id, bet_amount, "fast_poker_tie")
-            result_text = "🤝 **Draw!**\nBet returned"
+            result_text = "**Draw!**\nBet returned"
             color = discord.Color.blue()
         
         # Create embed
         embed = discord.Embed(
-            title="🎴 5-Card Poker",
+            title="5-Card Poker",
             description=result_text,
             color=color
         )
@@ -1355,9 +1401,12 @@ class PokerCog(commands.Cog):
         
         embed.set_image(url=f"attachment://{comparison_image.filename}")
         
-        # Add "Play Again" button
-        view = discord.ui.View()
-        play_again_btn = discord.ui.Button(label="🎴 Play Again", style=discord.ButtonStyle.success, custom_id="poker_fast_again")
+        # Add "Play Again" and "Same Bet" buttons
+        view = discord.ui.View(timeout=None)
+        
+        play_again_btn = discord.ui.Button(label="Play Again", style=discord.ButtonStyle.primary)
+        same_bet_btn = discord.ui.Button(label=f"Same Bet ({bet_amount})", style=discord.ButtonStyle.success)
+        disclaimer_btn = discord.ui.Button(label="⚠️", style=discord.ButtonStyle.secondary, row=1)
         
         async def play_again_callback(btn_interaction: discord.Interaction):
             if btn_interaction.user.id != interaction.user.id:
@@ -1365,10 +1414,45 @@ class PokerCog(commands.Cog):
                 return
             await self.play_fast_poker(btn_interaction)
         
-        play_again_btn.callback = play_again_callback
-        view.add_item(play_again_btn)
+        async def same_bet_callback(btn_interaction: discord.Interaction):
+            if btn_interaction.user.id != interaction.user.id:
+                await btn_interaction.response.send_message("❌ This is not your game!", ephemeral=True)
+                return
+            await self.play_fast_poker(btn_interaction, preset_bet=bet_amount)
         
-        await interaction.edit_original_response(embed=embed, attachments=[comparison_image], view=view)
+        async def disclaimer_callback(btn_interaction: discord.Interaction):
+            disclaimer_text = """
+**⚠️ Our Stance on Gambling**
+
+It is important to remember that **gambling is not a way to make money**, real or fake. It is a form of entertainment and should be treated as such.
+
+**If you or someone you know is struggling with gambling addiction, please seek help.**
+
+Additionally, please remember that **the odds are always in favor of the house. The house always wins.**
+
+**⚠️ IMPORTANT:** You should **NEVER** spend real money to gamble in games. If someone is offering to sell you in-game currency for real money, they are breaking our listed rules and should be reported.
+
+🆘 **Need Help?** 
+• National Council on Problem Gambling: 1-800-522-4700
+• Visit: ncpgambling.org
+"""
+            embed = discord.Embed(
+                title="⚠️ Responsible Gaming Information",
+                description=disclaimer_text,
+                color=discord.Color.orange()
+            )
+            embed.set_footer(text="Please gamble responsibly. This is for entertainment only.")
+            await btn_interaction.response.send_message(embed=embed, ephemeral=True)
+        
+        play_again_btn.callback = play_again_callback
+        same_bet_btn.callback = same_bet_callback
+        disclaimer_btn.callback = disclaimer_callback
+        view.add_item(play_again_btn)
+        view.add_item(same_bet_btn)
+        view.add_item(disclaimer_btn)
+        
+        # Send to channel (non-ephemeral)
+        await interaction.followup.send(embed=embed, file=comparison_image, view=view)
     
     async def display_state(self, game):
         """Wyświetl stan gry"""
@@ -2591,7 +2675,7 @@ def create_hand_image(hole_cards, background_url=None, card_deck='classic'):
     
     return discord.File(fp=buffer, filename='poker_hand.png')
 
-def create_fast_poker_comparison_image(player_name, player_cards, player_hand_name, dealer_cards, dealer_hand_name, result):
+def create_fast_poker_comparison_image(player_name, player_cards, player_hand_name, dealer_cards, dealer_hand_name, result, player_deck='classic'):
     """
     Creates cleaner comparison image for fast poker
     
@@ -2602,6 +2686,7 @@ def create_fast_poker_comparison_image(player_name, player_cards, player_hand_na
         dealer_cards: List of 5 dealer cards
         dealer_hand_name: Dealer's hand name
         result: 1 = player wins, -1 = dealer wins, 0 = tie
+        player_deck: Player's card deck (classic/dark/platinum)
     
     Returns:
         discord.File with PNG image
@@ -2645,11 +2730,11 @@ def create_fast_poker_comparison_image(player_name, player_cards, player_hand_na
     hand_width = hand_bbox[2] - hand_bbox[0]
     draw.text(((width - hand_width) // 2, player_y + 35), player_hand_name, fill=TEXT_GOLD, font=hand_font)
     
-    # Player cards
+    # Player cards (uses player's deck)
     player_cards_y = player_y + 80
     for i, (rank, suit) in enumerate(player_cards):
         x = cards_start_x + i * (card_w + card_spacing)
-        draw_card(draw, x, player_cards_y, rank, suit, width=card_w, height=card_h, img_base=img)
+        draw_card(draw, x, player_cards_y, rank, suit, width=card_w, height=card_h, img_base=img, deck=player_deck)
     
     # VS divider
     divider_y = player_cards_y + card_h + 40
@@ -2687,11 +2772,11 @@ def create_fast_poker_comparison_image(player_name, player_cards, player_hand_na
     dealer_hand_width = dealer_hand_bbox[2] - dealer_hand_bbox[0]
     draw.text(((width - dealer_hand_width) // 2, dealer_y + 35), dealer_hand_name, fill=TEXT_GOLD, font=hand_font)
     
-    # Dealer cards
+    # Dealer cards (always classic deck)
     dealer_cards_y = dealer_y + 80
     for i, (rank, suit) in enumerate(dealer_cards):
         x = cards_start_x + i * (card_w + card_spacing)
-        draw_card(draw, x, dealer_cards_y, rank, suit, width=card_w, height=card_h, img_base=img)
+        draw_card(draw, x, dealer_cards_y, rank, suit, width=card_w, height=card_h, img_base=img, deck='classic')
     
     # Save to buffer
     buffer = io.BytesIO()

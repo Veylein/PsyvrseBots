@@ -154,7 +154,7 @@ class BetSelectView(discord.ui.View):
 class BlackjackActionView(discord.ui.View):
     """Action buttons for blackjack"""
     
-    def __init__(self, player_id, can_double=True, player_cards=None, player_value=0, player_name="", is_pvp=False):
+    def __init__(self, player_id, can_double=True, player_cards=None, player_value=0, player_name="", is_pvp=False, economy_cog=None):
         super().__init__(timeout=120)
         self.player_id = player_id
         self.action = None
@@ -162,6 +162,7 @@ class BlackjackActionView(discord.ui.View):
         self.player_value = player_value
         self.player_name = player_name
         self.is_pvp = is_pvp
+        self.economy_cog = economy_cog
         
         if not can_double:
             self.double_btn.disabled = True
@@ -226,13 +227,19 @@ class BlackjackActionView(discord.ui.View):
         else:
             display_value = str(self.player_value)
         
+        # Get user's card deck
+        deck = 'classic'
+        if self.economy_cog:
+            deck = self.economy_cog.get_user_card_deck(interaction.user.id)
+        
         # Create hand image with hidden 2nd card in PVP
         hand_image = await asyncio.to_thread(
             create_blackjack_hand_image,
             self.player_cards,
             self.player_value,
             self.player_name,
-            is_pvp=self.is_pvp
+            is_pvp=self.is_pvp,
+            deck=deck
         )
         hand_embed = discord.Embed(
             title="🃏 Your Cards 🃏",
@@ -244,6 +251,33 @@ class BlackjackActionView(discord.ui.View):
         # Send as ephemeral
         await interaction.response.send_message(embed=hand_embed, file=hand_image, ephemeral=True)
         # Don't stop the view - just showing cards
+    
+    @discord.ui.button(label="⚠️", style=discord.ButtonStyle.secondary, row=2)
+    async def disclaimer_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show gambling disclaimer"""
+        disclaimer_text = """
+**⚠️ Our Stance on Gambling**
+
+It is important to remember that **gambling is not a way to make money**, real or fake. It is a form of entertainment and should be treated as such.
+
+**If you or someone you know is struggling with gambling addiction, please seek help.**
+
+Additionally, please remember that **the odds are always in favor of the house. The house always wins.**
+
+**⚠️ IMPORTANT:** You should **NEVER** spend real money to gamble in games. If someone is offering to sell you in-game currency for real money, they are breaking our listed rules and should be reported.
+
+🆘 **Need Help?** 
+• National Council on Problem Gambling: 1-800-522-4700
+• Visit: ncpgambling.org
+"""
+        embed = discord.Embed(
+            title="⚠️ Responsible Gaming Information",
+            description=disclaimer_text,
+            color=discord.Color.orange()
+        )
+        embed.set_footer(text="Please gamble responsibly. This is for entertainment only.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        # Don't stop the view - just showing disclaimer
 
 
 def calculate_hand_value(cards):
@@ -274,7 +308,7 @@ def calculate_hand_value(cards):
     return value
 
 
-def create_blackjack_hand_image(cards, value, player_name, is_pvp=False):
+def create_blackjack_hand_image(cards, value, player_name, is_pvp=False, deck='classic'):
     """Create image showing player's current hand in blackjack"""
     from poker import CARD_WIDTH, CARD_HEIGHT, CARD_SPACING, FELT_GREEN, FELT_DARK, TEXT_GOLD, draw_card, draw_card_back, parse_card, get_font
     
@@ -319,11 +353,11 @@ def create_blackjack_hand_image(cards, value, player_name, is_pvp=False):
             x = start_x + i * (CARD_WIDTH + CARD_SPACING)
             # Hide 2nd card (index 1) in PVP
             if is_pvp and i == 1:
-                draw_card_back(draw, x, cards_y, width=CARD_WIDTH, height=CARD_HEIGHT, img_base=img)
+                draw_card_back(draw, x, cards_y, width=CARD_WIDTH, height=CARD_HEIGHT, img_base=img, deck=deck)
             else:
                 rank, suit = parse_card(card)
                 if rank and suit:
-                    draw_card(draw, x, cards_y, rank, suit, img_base=img)
+                    draw_card(draw, x, cards_y, rank, suit, img_base=img, deck=deck)
     
     # Save to buffer
     buffer = io.BytesIO()
@@ -333,7 +367,7 @@ def create_blackjack_hand_image(cards, value, player_name, is_pvp=False):
     return discord.File(fp=buffer, filename='blackjack_hand.png')
 
 
-def create_blackjack_table_image(dealer_cards, dealer_value, players, show_dealer=False, pot=0, is_pvp=False, current_player_index=None):
+def create_blackjack_table_image(dealer_cards, dealer_value, players, show_dealer=False, pot=0, is_pvp=False, current_player_index=None, deck='classic'):
     """Create blackjack table image with all players - uses assets/fonts
     
     Args:
@@ -344,6 +378,7 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
         pot: Total pot (sum of all bets)
         is_pvp: Whether it's PVP mode (no dealer)
         current_player_index: Index of current player (for hiding other players' cards in PVP)
+        deck: Card deck theme ('classic', 'dark', 'platinum')
     
     Returns:
         discord.File with PNG image
@@ -461,7 +496,7 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
                 # Show card
                 rank, suit = parse_card(card)
                 if rank and suit:
-                    draw_card(draw, x, dealer_cards_y, rank, suit, width=card_w, height=card_h, img_base=img)
+                    draw_card(draw, x, dealer_cards_y, rank, suit, width=card_w, height=card_h, img_base=img, deck=deck)
             else:
                 # Hide card (card back)
                 draw_card_back(draw, x, dealer_cards_y, width=card_w, height=card_h, img_base=img)
@@ -651,7 +686,7 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
                             rank, suit = parse_card(card)
                             if rank and suit:
                                 draw_card(draw, card_x, card_y, rank, suit, 
-                                        width=small_card_width, height=small_card_height, img_base=img)
+                                        width=small_card_width, height=small_card_height, img_base=img, deck=deck)
                 
                 # Status text (centered)
                 if status == 'bust':
@@ -677,8 +712,8 @@ def create_blackjack_table_image(dealer_cards, dealer_value, players, show_deale
 
 
 def create_blackjack_image(player_cards, dealer_cards, player_value, dealer_value, 
-                           player_name, bet, result=None, show_dealer=False):
-    """Create blackjack game image"""
+                           player_name, bet, result=None, show_dealer=False, player_deck='classic', dealer_deck='classic'):
+    """Create blackjack game image with separate decks for player and dealer"""
     width = 900
     height = 750
     
@@ -735,7 +770,7 @@ def create_blackjack_image(player_cards, dealer_cards, player_value, dealer_valu
         if i == 0 or show_dealer:
             rank, suit = parse_card(card)
             if rank and suit:
-                draw_card(draw, x, dealer_cards_y, rank, suit, width=card_w, height=card_h, img_base=img)
+                draw_card(draw, x, dealer_cards_y, rank, suit, width=card_w, height=card_h, img_base=img, deck=dealer_deck)
         else:
             draw_card_back(draw, x, dealer_cards_y, width=card_w, height=card_h, img_base=img)
     
@@ -797,7 +832,7 @@ def create_blackjack_image(player_cards, dealer_cards, player_value, dealer_valu
         x = player_start_x + i * (card_w + spacing)
         rank, suit = parse_card(card)
         if rank and suit:
-            draw_card(draw, x, player_cards_y, rank, suit, width=card_w, height=card_h, img_base=img)
+            draw_card(draw, x, player_cards_y, rank, suit, width=card_w, height=card_h, img_base=img, deck=player_deck)
     
     # Save to buffer
     buffer = io.BytesIO()
@@ -815,6 +850,17 @@ class BlackjackLobbyView(discord.ui.View):
         self.lobby_id = lobby_id
         self.lobby = lobby
         self.economy_cog = economy_cog
+        self.update_buttons()
+    
+    def update_buttons(self):
+        """Update button states based on lobby status"""
+        real_players = [p for p in self.lobby['players'] if not p.get('is_bot')]
+        
+        # Find start button and disable if insufficient real players
+        for child in self.children:
+            if isinstance(child, discord.ui.Button) and child.custom_id == "blackjack_lobby_start":
+                # Need at least 1 real player (can add bots)
+                child.disabled = len(real_players) < 1
     
     @discord.ui.button(label="🤖➕", style=discord.ButtonStyle.secondary, custom_id="blackjack_lobby_bot_add", row=0)
     async def bot_add_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -850,6 +896,7 @@ class BlackjackLobbyView(discord.ui.View):
         self.lobby['last_activity'] = time.time()
         
         await interaction.response.defer()
+        self.update_buttons()
         await interaction.message.edit(embed=self.create_lobby_embed(), view=self)
     
     @discord.ui.button(label="🤖➖", style=discord.ButtonStyle.secondary, custom_id="blackjack_lobby_bot_remove", row=0)
@@ -870,6 +917,7 @@ class BlackjackLobbyView(discord.ui.View):
         self.lobby['last_activity'] = time.time()
         
         await interaction.response.defer()
+        self.update_buttons()
         await interaction.message.edit(embed=self.create_lobby_embed(), view=self)
     
     @discord.ui.button(label="Join", style=discord.ButtonStyle.success, custom_id="blackjack_lobby_join", row=1)
@@ -901,6 +949,7 @@ class BlackjackLobbyView(discord.ui.View):
         self.lobby['last_activity'] = time.time()
         
         await interaction.response.defer()
+        self.update_buttons()
         await interaction.message.edit(embed=self.create_lobby_embed(), view=self)
     
     @discord.ui.button(label="Leave", style=discord.ButtonStyle.danger, custom_id="blackjack_lobby_leave", row=1)
@@ -918,6 +967,7 @@ class BlackjackLobbyView(discord.ui.View):
             return
         
         await interaction.response.defer()
+        self.update_buttons()
         await interaction.message.edit(embed=self.create_lobby_embed(), view=self)
     
     @discord.ui.button(label="⚙️ Settings", style=discord.ButtonStyle.secondary, custom_id="blackjack_lobby_settings", row=2)
@@ -943,8 +993,10 @@ class BlackjackLobbyView(discord.ui.View):
             await interaction.response.send_message("❌ Only host can start!", ephemeral=True)
             return
         
-        if len(self.lobby['players']) < 1:
-            await interaction.response.send_message("❌ Minimum 1 player!", ephemeral=True)
+        # Count only real players (not bots)
+        real_players = [p for p in self.lobby['players'] if not p.get('is_bot')]
+        if len(real_players) < 1:
+            await interaction.response.send_message("❌ Need at least 1 real player!", ephemeral=True)
             return
         
         await interaction.response.send_message("🎲 Starting game...", ephemeral=True)
@@ -1005,9 +1057,19 @@ class BlackjackGame:
                 'is_bot': player_data.get('is_bot', False)
             })
     
+    def get_user_deck(self, user_id):
+        """Get user's equipped card deck (classic/dark/platinum)"""
+        return self.economy_cog.get_user_card_deck(user_id)
+    
     async def start_game(self):
         """Start the blackjack game"""
         if len(self.players) < 1:
+            return
+        
+        # Check minimum players (at least 2 for multiplayer)
+        real_players = [p for p in self.players if not p.get('is_bot')]
+        if len(real_players) < 1 or (len(self.players) < 2 and len(real_players) < 2):
+            await self.channel.send("❌ Need at least 2 players (or 1 player + bot) to start!")
             return
         
         is_pvp = self.settings.get('game_mode', 'coop') == 'pvp'
@@ -1133,6 +1195,11 @@ class BlackjackGame:
     
     async def play_player_turn(self, player, deck, dealer_cards, dealer_value, is_pvp, current_index):
         """Play one player's turn"""
+        # Get card deck for current player
+        card_deck = 'classic'
+        if not player.get('is_bot'):
+            card_deck = self.get_user_deck(player['user'].id)
+        
         while player['value'] < 21 and player['status'] == 'playing':
             # Create visual table
             table_image = await asyncio.to_thread(
@@ -1143,7 +1210,8 @@ class BlackjackGame:
                 show_dealer=False,
                 pot=sum(p['bet'] for p in self.players),
                 is_pvp=is_pvp,
-                current_player_index=current_index
+                current_player_index=current_index,
+                deck=card_deck
             )
             
             if is_pvp:
@@ -1200,7 +1268,8 @@ class BlackjackGame:
                     player_cards=player['cards'],
                     player_value=player['value'],
                     player_name=player['user'].display_name,
-                    is_pvp=is_pvp
+                    is_pvp=is_pvp,
+                    economy_cog=self.economy_cog
                 )
                 
                 # Send main table to channel
@@ -1243,6 +1312,13 @@ class BlackjackGame:
     
     async def show_final_results(self, dealer_cards, dealer_value, dealer_blackjack, is_pvp):
         """Show final results"""
+        # Get card deck from first human player (host by default)
+        card_deck = 'classic'
+        for player in self.players:
+            if not player.get('is_bot'):
+                card_deck = self.get_user_deck(player['user'].id)
+                break
+        
         table_image = await asyncio.to_thread(
             create_blackjack_table_image,
             dealer_cards,
@@ -1251,7 +1327,8 @@ class BlackjackGame:
             show_dealer=True,
             pot=sum(p['bet'] for p in self.players),
             is_pvp=is_pvp,
-            current_player_index=-1  # Show all cards
+            current_player_index=-1,  # Show all cards
+            deck=card_deck
         )
         
         summary_lines = []
@@ -1387,6 +1464,13 @@ class BlackjackCog(commands.Cog):
     def get_economy_cog(self):
         """Get economy cog"""
         return self.bot.get_cog('Economy')
+    
+    def get_user_deck(self, user_id: int) -> str:
+        """Get user's preferred card deck from economy system"""
+        economy = self.get_economy_cog()
+        if economy:
+            return economy.get_user_card_deck(user_id)
+        return 'classic'  # Default if economy not available
     
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
@@ -1528,33 +1612,44 @@ class BlackjackCog(commands.Cog):
         else:
             await self.play_long_blackjack(interaction)
     
-    async def play_fast_blackjack(self, interaction: discord.Interaction):
-        """Fast blackjack vs dealer"""
+    async def play_fast_blackjack(self, interaction: discord.Interaction, preset_bet: int = None):
+        """Fast blackjack vs dealer - dealer always uses classic deck, player uses custom deck"""
         economy_cog = self.get_economy_cog()
         if not economy_cog:
             await interaction.response.send_message("❌ Economy system not available!", ephemeral=True)
             return
+        
+        # Get user's card deck (player only)
+        card_deck = self.get_user_deck(interaction.user.id)
         
         balance = economy_cog.get_balance(interaction.user.id)
         if balance < 50:
             await interaction.response.send_message("❌ You need at least 50 coins to play!", ephemeral=True)
             return
         
-        # Show bet selection
-        bet_view = BetSelectView(interaction.user.id, balance, "blackjack")
-        embed = discord.Embed(
-            title="♠️ Blackjack - Select Bet ♠️",
-            description=f"Balance: **{balance}** 💠\nSelect your bet amount:",
-            color=discord.Color.gold()
-        )
-        
-        await interaction.response.send_message(embed=embed, view=bet_view, ephemeral=True)
-        await bet_view.wait()
-        
-        if not bet_view.selected_bet:
-            return
-        
-        bet_amount = bet_view.selected_bet
+        # Use preset bet or show selection
+        if preset_bet:
+            bet_amount = preset_bet
+            if balance < bet_amount:
+                await interaction.response.send_message(f"❌ You need at least {bet_amount} coins!", ephemeral=True)
+                return
+            await interaction.response.defer()
+        else:
+            # Show bet selection
+            bet_view = BetSelectView(interaction.user.id, balance, "blackjack")
+            embed = discord.Embed(
+                title="Blackjack - Select Bet",
+                description=f"Balance: **{balance}** 💠\nSelect your bet amount:",
+                color=discord.Color.gold()
+            )
+            
+            await interaction.response.send_message(embed=embed, view=bet_view, ephemeral=True)
+            await bet_view.wait()
+            
+            if not bet_view.selected_bet:
+                return
+            
+            bet_amount = bet_view.selected_bet
         
         # Deduct bet
         economy_cog.remove_coins(interaction.user.id, bet_amount)
@@ -1568,6 +1663,9 @@ class BlackjackCog(commands.Cog):
         
         player_value = calculate_hand_value(player_cards)
         dealer_value = calculate_hand_value(dealer_cards)
+        
+        # Variable to track the game message
+        game_message = None
         
         # Check for blackjacks
         player_bj = player_value == 21
@@ -1591,7 +1689,8 @@ class BlackjackCog(commands.Cog):
             game_image = await asyncio.to_thread(
                 create_blackjack_image,
                 player_cards, dealer_cards, player_value, dealer_value,
-                interaction.user.display_name, bet_amount, result, True
+                interaction.user.display_name, bet_amount, result, True, 
+                player_deck=card_deck, dealer_deck='classic'
             )
             
             embed = discord.Embed(
@@ -1601,9 +1700,12 @@ class BlackjackCog(commands.Cog):
             )
             embed.set_image(url=f"attachment://blackjack.png")
             
-            # Play again button
-            play_again_view = discord.ui.View()
-            play_again_btn = discord.ui.Button(label="🎴 Play Again", style=discord.ButtonStyle.success)
+            # Play again buttons
+            play_again_view = discord.ui.View(timeout=None)
+            
+            play_again_btn = discord.ui.Button(label="Play Again", style=discord.ButtonStyle.primary)
+            same_bet_btn = discord.ui.Button(label=f"Same Bet ({bet_amount})", style=discord.ButtonStyle.success)
+            disclaimer_btn = discord.ui.Button(label="⚠️", style=discord.ButtonStyle.secondary, row=1)
             
             async def play_again_callback(btn_interaction: discord.Interaction):
                 if btn_interaction.user.id != interaction.user.id:
@@ -1611,10 +1713,45 @@ class BlackjackCog(commands.Cog):
                     return
                 await self.play_fast_blackjack(btn_interaction)
             
-            play_again_btn.callback = play_again_callback
-            play_again_view.add_item(play_again_btn)
+            async def same_bet_callback(btn_interaction: discord.Interaction):
+                if btn_interaction.user.id != interaction.user.id:
+                    await btn_interaction.response.send_message("❌ Not your game!", ephemeral=True)
+                    return
+                await self.play_fast_blackjack(btn_interaction, preset_bet=bet_amount)
             
-            await interaction.edit_original_response(embed=embed, attachments=[game_image], view=play_again_view)
+            async def disclaimer_callback(btn_interaction: discord.Interaction):
+                disclaimer_text = """
+**⚠️ Our Stance on Gambling**
+
+It is important to remember that **gambling is not a way to make money**, real or fake. It is a form of entertainment and should be treated as such.
+
+**If you or someone you know is struggling with gambling addiction, please seek help.**
+
+Additionally, please remember that **the odds are always in favor of the house. The house always wins.**
+
+**⚠️ IMPORTANT:** You should **NEVER** spend real money to gamble in games. If someone is offering to sell you in-game currency for real money, they are breaking our listed rules and should be reported.
+
+🆘 **Need Help?** 
+• National Council on Problem Gambling: 1-800-522-4700
+• Visit: ncpgambling.org
+"""
+                embed = discord.Embed(
+                    title="⚠️ Responsible Gaming Information",
+                    description=disclaimer_text,
+                    color=discord.Color.orange()
+                )
+                embed.set_footer(text="Please gamble responsibly. This is for entertainment only.")
+                await btn_interaction.response.send_message(embed=embed, ephemeral=True)
+            
+            play_again_btn.callback = play_again_callback
+            same_bet_btn.callback = same_bet_callback
+            disclaimer_btn.callback = disclaimer_callback
+            play_again_view.add_item(play_again_btn)
+            play_again_view.add_item(same_bet_btn)
+            play_again_view.add_item(disclaimer_btn)
+            
+            # Send to channel (non-ephemeral)
+            await interaction.followup.send(embed=embed, file=game_image, view=play_again_view)
             return
         
         # Player's turn
@@ -1622,20 +1759,26 @@ class BlackjackCog(commands.Cog):
             game_image = await asyncio.to_thread(
                 create_blackjack_image,
                 player_cards, dealer_cards, player_value, dealer_value,
-                interaction.user.display_name, bet_amount, None, False
+                interaction.user.display_name, bet_amount, None, False, 
+                player_deck=card_deck, dealer_deck='classic'
             )
             
             embed = discord.Embed(
-                title="♠️ Your Turn ♠️",
+                title="Your Turn",
                 description=f"Your value: **{player_value}**\nChoose your action:",
                 color=discord.Color.blue()
             )
             embed.set_image(url=f"attachment://blackjack.png")
             
             can_double = len(player_cards) == 2 and balance >= bet_amount
-            action_view = BlackjackActionView(interaction.user.id, can_double)
+            action_view = BlackjackActionView(interaction.user.id, can_double, economy_cog=economy_cog)
             
-            await interaction.edit_original_response(embed=embed, attachments=[game_image], view=action_view)
+            # Send first message or edit existing
+            if game_message is None:
+                game_message = await interaction.followup.send(embed=embed, file=game_image, view=action_view, wait=True)
+            else:
+                await game_message.edit(embed=embed, attachments=[game_image], view=action_view)
+            
             await action_view.wait()
             
             if not action_view.action or action_view.action == "stand":
@@ -1684,19 +1827,23 @@ class BlackjackCog(commands.Cog):
         game_image = await asyncio.to_thread(
             create_blackjack_image,
             player_cards, dealer_cards, player_value, dealer_value,
-            interaction.user.display_name, bet_amount, result, show_dealer
+            interaction.user.display_name, bet_amount, result, show_dealer, 
+            player_deck=card_deck, dealer_deck='classic'
         )
         
         embed = discord.Embed(
-            title="♠️ Blackjack Result ♠️",
+            title="Blackjack Result",
             description=winnings_text,
             color=discord.Color.gold() if result == "win" else (discord.Color.red() if result == "lose" else discord.Color.blue())
         )
         embed.set_image(url=f"attachment://blackjack.png")
         
-        # Play again button
-        play_again_view = discord.ui.View()
-        play_again_btn = discord.ui.Button(label="🎴 Play Again", style=discord.ButtonStyle.success)
+        # Play again buttons
+        play_again_view = discord.ui.View(timeout=None)
+        
+        play_again_btn = discord.ui.Button(label="Play Again", style=discord.ButtonStyle.primary)
+        same_bet_btn = discord.ui.Button(label=f"Same Bet ({bet_amount})", style=discord.ButtonStyle.success)
+        disclaimer_btn = discord.ui.Button(label="⚠️", style=discord.ButtonStyle.secondary, row=1)
         
         async def play_again_callback(btn_interaction: discord.Interaction):
             if btn_interaction.user.id != interaction.user.id:
@@ -1704,10 +1851,48 @@ class BlackjackCog(commands.Cog):
                 return
             await self.play_fast_blackjack(btn_interaction)
         
-        play_again_btn.callback = play_again_callback
-        play_again_view.add_item(play_again_btn)
+        async def same_bet_callback(btn_interaction: discord.Interaction):
+            if btn_interaction.user.id != interaction.user.id:
+                await btn_interaction.response.send_message("❌ Not your game!", ephemeral=True)
+                return
+            await self.play_fast_blackjack(btn_interaction, preset_bet=bet_amount)
         
-        await interaction.edit_original_response(embed=embed, attachments=[game_image], view=play_again_view)
+        async def disclaimer_callback(btn_interaction: discord.Interaction):
+            disclaimer_text = """
+**⚠️ Our Stance on Gambling**
+
+It is important to remember that **gambling is not a way to make money**, real or fake. It is a form of entertainment and should be treated as such.
+
+**If you or someone you know is struggling with gambling addiction, please seek help.**
+
+Additionally, please remember that **the odds are always in favor of the house. The house always wins.**
+
+**⚠️ IMPORTANT:** You should **NEVER** spend real money to gamble in games. If someone is offering to sell you in-game currency for real money, they are breaking our listed rules and should be reported.
+
+🆘 **Need Help?** 
+• National Council on Problem Gambling: 1-800-522-4700
+• Visit: ncpgambling.org
+"""
+            embed = discord.Embed(
+                title="⚠️ Responsible Gaming Information",
+                description=disclaimer_text,
+                color=discord.Color.orange()
+            )
+            embed.set_footer(text="Please gamble responsibly. This is for entertainment only.")
+            await btn_interaction.response.send_message(embed=embed, ephemeral=True)
+        
+        play_again_btn.callback = play_again_callback
+        same_bet_btn.callback = same_bet_callback
+        disclaimer_btn.callback = disclaimer_callback
+        play_again_view.add_item(play_again_btn)
+        play_again_view.add_item(same_bet_btn)
+        play_again_view.add_item(disclaimer_btn)
+        
+        # Edit the game message with final result
+        if game_message:
+            await game_message.edit(embed=embed, attachments=[game_image], view=play_again_view)
+        else:
+            await interaction.followup.send(embed=embed, file=game_image, view=play_again_view)
 
 
     async def play_long_blackjack(self, interaction: discord.Interaction):

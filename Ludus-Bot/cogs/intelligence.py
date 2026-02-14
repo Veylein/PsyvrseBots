@@ -177,5 +177,5 @@ class Intelligence(commands.Cog):
                 self.save_knowledge()
                 await message.channel.send(f"Thanks! I've learned that {subject} is {fact}.")
 
-def setup(bot):
-    bot.add_cog(Intelligence(bot))
+async def setup(bot):
+    await bot.add_cog(Intelligence(bot))

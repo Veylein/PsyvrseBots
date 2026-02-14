@@ -13,6 +13,77 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
 from utils import user_storage
 
+
+class ShopView(discord.ui.View):
+    """Shop view with dropdown menu for purchasing"""
+    
+    def __init__(self, economy_cog, user):
+        super().__init__(timeout=120)
+        self.economy_cog = economy_cog
+        self.user = user
+        
+        # Create select menu
+        options = []
+        for item_id, item in economy_cog.shop_items.items():
+            options.append(
+                discord.SelectOption(
+                    label=item["name"],
+                    value=item_id,
+                    description=f"{item['price']:,} PsyCoins - {item['description'][:50]}"
+                )
+            )
+        
+        select = discord.ui.Select(
+            placeholder="Select an item to purchase...",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+        select.callback = self.select_callback
+        self.add_item(select)
+    
+    async def select_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This isn't your shop!", ephemeral=True)
+            return
+        
+        item_id = interaction.data["values"][0]
+        item = self.economy_cog.shop_items[item_id]
+        balance = self.economy_cog.get_balance(self.user.id)
+        
+        if balance < item["price"]:
+            await interaction.response.send_message(
+                f"❌ Not enough PsyCoins! You need **{item['price']:,}** but only have **{balance:,}**.",
+                ephemeral=True
+            )
+            return
+        
+        # Process purchase
+        if self.economy_cog.remove_coins(self.user.id, item["price"]):
+            self.economy_cog.add_item(self.user.id, item_id, 1)
+            
+            embed = EmbedBuilder.success(
+                "Purchase Successful!",
+                f"You bought **{item['name']}** for **{item['price']:,} PsyCoins**"
+            )
+            embed.add_field(name="Remaining Balance", value=f"{self.economy_cog.get_balance(self.user.id):,} PsyCoins")
+            
+            if item_id == "card_box":
+                embed.add_field(
+                    name="💡 Tip",
+                    value="Use `/use card_box` to open it and get a random card deck!",
+                    inline=False
+                )
+            
+            await interaction.response.send_message(embed=embed)
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This isn't your shop!", ephemeral=True)
+            return False
+        return True
+
+
 class Economy(commands.Cog):
     """PsyCoins economy system - earn, spend, and manage your currency"""
     
@@ -56,6 +127,14 @@ class Economy(commands.Cog):
             "mystery_box": {"name": "🎁 Mystery Box", "price": 1000, "description": "Random reward - could be anything!"},
             "streak_shield": {"name": "🛡️ Streak Shield", "price": 800, "description": "Protect your daily streak once"},
             "double_coins": {"name": "💰 Double Coins", "price": 1500, "description": "Double coin rewards for 24 hours"},
+            "card_box": {"name": "🎴 Card Box", "price": 2500, "description": "Random card deck (Classic/Dark/Platinum) for poker games!"},
+        }
+        
+        # Card decks available from card boxes
+        self.card_decks = {
+            "classic": {"name": "🂡 Classic Deck", "rarity": "Common", "weight": 50},
+            "dark": {"name": "🃏 Dark Deck", "rarity": "Rare", "weight": 30},
+            "platinum": {"name": "💎 Platinum Deck", "rarity": "Legendary", "weight": 20}
         }
 
     def load_economy(self):
@@ -478,7 +557,7 @@ class Economy(commands.Cog):
     async def _show_shop(self, ctx, interaction):
         embed = EmbedBuilder.economy(
             "PsyCoin Shop",
-            "Purchase items with your PsyCoins!\nUse `L!buy <item>` or `/buy <item>` to purchase"
+            "Purchase items with your PsyCoins! Use dropdown menu below to buy."
         )
         
         for item_id, item in self.shop_items.items():
@@ -488,10 +567,13 @@ class Economy(commands.Cog):
                 inline=False
             )
         
+        # Create dropdown select menu for purchasing
+        view = ShopView(self, interaction.user if interaction else ctx.author)
+        
         if interaction:
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, view=view)
         else:
-            await ctx.send(embed=embed)
+            await ctx.send(embed=embed, view=view)
 
     @commands.command(name="buy")
     async def buy(self, ctx, item_id: str, quantity: int = 1):
@@ -598,6 +680,38 @@ class Economy(commands.Cog):
         await interaction.response.defer()
         await self._use_item(interaction.user, item_id, None, interaction)
 
+    def get_user_card_deck(self, user_id: int) -> str:
+        """Get user's currently equipped card deck"""
+        user_key = str(user_id)
+        inventory = self.get_inventory(user_id)
+        return inventory.get("equipped_deck", "classic")
+    
+    def set_user_card_deck(self, user_id: int, deck_name: str):
+        """Set user's equipped card deck"""
+        user_key = str(user_id)
+        inventory = self.get_inventory(user_id)
+        inventory["equipped_deck"] = deck_name
+        self.inventory_dirty = True
+    
+    def get_owned_decks(self, user_id: int) -> list:
+        """Get list of card decks user owns"""
+        user_key = str(user_id)
+        inventory = self.get_inventory(user_id)
+        owned = ["classic"]  # Everyone has classic
+        
+        for deck in ["dark", "platinum"]:
+            if inventory.get(f"deck_{deck}", False):
+                owned.append(deck)
+        
+        return owned
+    
+    def unlock_deck(self, user_id: int, deck_name: str):
+        """Unlock a card deck for user"""
+        user_key = str(user_id)
+        inventory = self.get_inventory(user_id)
+        inventory[f"deck_{deck_name}"] = True
+        self.inventory_dirty = True
+
     async def _use_item(self, user, item_id, ctx, interaction):
         if not self.remove_item(user.id, item_id):
             msg = f"❌ You don't have a `{item_id}` in your inventory!"
@@ -636,6 +750,24 @@ class Economy(commands.Cog):
         elif item_id == "luck_charm":
             self.add_boost(user.id, "luck_charm", 24)
             msg = "🍀 Luck Charm activated! Increased win rates for 24 hours!"
+        elif item_id == "card_box":
+            # Open card box - random card deck
+            decks = list(self.card_decks.keys())
+            weights = [self.card_decks[d]["weight"] for d in decks]
+            drawn_deck = random.choices(decks, weights=weights, k=1)[0]
+            
+            deck_info = self.card_decks[drawn_deck]
+            self.unlock_deck(user.id, drawn_deck)
+            
+            # Auto-equip if it's their first non-classic deck
+            owned = self.get_owned_decks(user.id)
+            if len(owned) == 2:  # Only classic + new deck
+                self.set_user_card_deck(user.id, drawn_deck)
+                equip_msg = " (Auto-equipped!)"
+            else:
+                equip_msg = f" Use `/equipdeck {drawn_deck}` to use it!"
+            
+            msg = f"🎴 **Card Box opened!**\n\nYou got: **{deck_info['name']}** ({deck_info['rarity']}){equip_msg}"
         else:
             msg = f"✅ You used {self.shop_items.get(item_id, {}).get('name', item_id)}!"
         
@@ -913,6 +1045,64 @@ class Economy(commands.Cog):
             value="100 💰 = 1 💎\n50 💰 = 1 🌾\n25 💰 = 1 🎮\n30 💰 = 1 🎣",
             inline=False
         )
+        
+        await interaction.response.send_message(embed=embed)
+    
+    @app_commands.command(name="equipdeck", description="Equip a card deck for poker games")
+    @app_commands.describe(deck="Card deck to equip (classic/dark/platinum)")
+    @app_commands.choices(deck=[
+        app_commands.Choice(name="🃏 Classic Deck", value="classic"),
+        app_commands.Choice(name="🖤 Dark Deck", value="dark"),
+        app_commands.Choice(name="💎 Platinum Deck", value="platinum")
+    ])
+    async def equipdeck_slash(self, interaction: discord.Interaction, deck: app_commands.Choice[str]):
+        deck_name = deck.value if isinstance(deck, app_commands.Choice) else deck
+        
+        # Check if user owns the deck
+        owned_decks = self.get_owned_decks(interaction.user.id)
+        
+        if deck_name not in owned_decks:
+            await interaction.response.send_message(
+                f"❌ You don't own the **{deck_name}** deck!\n"
+                f"Purchase a 🎴 Card Box from the shop to unlock new decks!",
+                ephemeral=True
+            )
+            return
+        
+        # Equip the deck
+        self.set_user_card_deck(interaction.user.id, deck_name)
+        
+        deck_info = self.card_decks.get(deck_name, {"name": deck_name.title(), "rarity": "Unknown"})
+        
+        embed = EmbedBuilder.success(
+            "Deck Equipped!",
+            f"You equipped **{deck_info['name']}** ({deck_info.get('rarity', 'Common')})\n\n"
+            f"This deck will be used in all your poker games!"
+        )
+        
+        await interaction.response.send_message(embed=embed)
+    
+    @app_commands.command(name="mydecks", description="View your owned card decks")
+    async def mydecks_slash(self, interaction: discord.Interaction):
+        owned_decks = self.get_owned_decks(interaction.user.id)
+        current_deck = self.get_user_card_deck(interaction.user.id)
+        
+        embed = EmbedBuilder.create(
+            title="🎴 Your Card Decks",
+            description=f"Currently equipped: **{current_deck.title()}**",
+            color=Colors.PRIMARY
+        )
+        
+        for deck_name in owned_decks:
+            deck_info = self.card_decks.get(deck_name, {"name": deck_name.title(), "rarity": "Common"})
+            equipped = " ✅ (Equipped)" if deck_name == current_deck else ""
+            embed.add_field(
+                name=f"{deck_info['name']}{equipped}",
+                value=f"Rarity: {deck_info.get('rarity', 'Common')}",
+                inline=True
+            )
+        
+        embed.set_footer(text="Use /equipdeck to change your active deck!")
         
         await interaction.response.send_message(embed=embed)
 

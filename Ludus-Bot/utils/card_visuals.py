@@ -411,7 +411,7 @@ def create_blackjack_image(player_hand, dealer_hand, player_total, dealer_total,
 # ==================== WAR SPECIFIC ====================
 
 def create_war_image(player_card, opponent_card, player_name="You", 
-                    opponent_name="Opponent", deck='classic', result_text=None):
+                    opponent_name="Opponent", deck='classic', result_text=None, opponent_deck='classic'):
     """Create War game visualization"""
     width = 500
     height = 350
@@ -424,12 +424,12 @@ def create_war_image(player_card, opponent_card, player_name="You",
     
     # Title
     title_font = get_font(36, bold=True)
-    draw.text((width // 2 - 60, 20), "⚔ WAR ⚔", fill=TEXT_GOLD, font=title_font)
+    draw.text((width // 2 - 60, 20), "WAR", fill=TEXT_GOLD, font=title_font)
     
     # Cards side by side
     card_y = 100
     
-    # Player card (left)
+    # Player card (left) - uses player's deck
     name_font = get_font(18, bold=True)
     draw.text((80, 70), player_name, fill=TEXT_WHITE, font=name_font)
     draw_card_string(draw, 70, card_y, player_card, img_base=img, deck=deck)
@@ -438,9 +438,9 @@ def create_war_image(player_card, opponent_card, player_name="You",
     vs_font = get_font(32, bold=True)
     draw.text((width // 2 - 25, card_y + 40), "VS", fill=TEXT_GOLD, font=vs_font)
     
-    # Opponent card (right)
+    # Opponent card (right) - uses opponent's deck (classic for bot)
     draw.text((width - 180, 70), opponent_name, fill=TEXT_WHITE, font=name_font)
-    draw_card_string(draw, width - 160, card_y, opponent_card, img_base=img, deck=deck)
+    draw_card_string(draw, width - 160, card_y, opponent_card, img_base=img, deck=opponent_deck)
     
     # Result
     if result_text:
