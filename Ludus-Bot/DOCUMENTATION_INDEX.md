@@ -72,7 +72,7 @@ Complete analysis of fishing.py, mining.py, farming.py, zoo.py (7,499 lines tota
 #### **[🎰 PART 4A: Gambling & Arcade Games](documentation/FULL_DOCUMENTATION_PART4A.md)** 
 Complete analysis of gambling.py, arcadegames.py, game_challenges.py (2,600 lines total):
 - **Gambling System (1,671 lines):**
-  - 8 casino games (slots, poker, roulette, higher/lower, dice, crash, minesweeper, coinflip)
+  - 8 casino games (slots, poker, roulette, higher/lower, dice, crash, mines, coinflip)
   - Comprehensive statistics tracking (per-user, per-game)
   - Win/loss ratios, biggest wins, net profit
   - Responsible gaming disclaimer system
