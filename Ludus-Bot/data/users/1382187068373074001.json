@@ -1,0 +1,22 @@
+{
+  "user_id": 1382187068373074001,
+  "username": "veylein#0000",
+  "discriminator": "0001",
+  "created_at": "2026-02-13T00:00:00Z",
+  "last_seen": null,
+  "wallet": {"psycoins": 100, "bank": 50},
+  "economy": {"total_earned": 100, "total_spent": 0, "transactions": []},
+  "minigames": {"total_played": 1, "wins": 1, "losses": 0, "draws": 0, "total_coins_earned": 100, "by_game": {"testgame": {"played": 1, "wins": 1, "losses": 0, "draws": 0, "last_played": "2026-02-13T00:00:00Z", "total_coins": 100, "history": [{"time": "2026-02-13T00:00:00Z", "result": "win", "coins": 100}]}}, "recent_plays": [{"time": "2026-02-13T00:00:00Z", "game": "testgame", "result": "win", "coins": 100}]},
+  "games": {},
+  "activity": {"counts": {"command": 1}, "by_name": {"testcommand": 1}, "recent": [{"time": "2026-02-13T00:00:00Z", "type": "command", "name": "testcommand"}]},
+  "fishing": {"total_fished": 0, "best_fish": null, "areas_visited": {}, "last_fish_time": null},
+  "pets": {"owned": [], "active_pet_id": null, "pet_stats": {}},
+  "inventory": {"items": [], "materials": {}},
+  "quests": {"active": [], "completed": []},
+  "achievements": [],
+  "progression": {"xp": 0, "level": 1, "rank_points": 0},
+  "social": {"reputation": 0, "friends": [], "blocks": []},
+  "moderation": {"is_flagged": false, "cheat_flags": 0, "notes": [], "last_flagged_at": null},
+  "preferences": {"dms_enabled": true, "notify_on_win": true, "locale": "en-US"},
+  "meta": {"template_version": 1, "updated_at": "2026-02-13T00:00:00Z", "last_active": "2026-02-13T00:00:00Z"}
+}
