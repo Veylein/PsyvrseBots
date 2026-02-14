@@ -86,7 +86,11 @@ class FirstExperience(commands.Cog):
         # This prevents spamming servers with join messages
         pass
     
-    @commands.command(name="start", aliases=["begin", "adventure"])
+    @commands.hybrid_command(
+        name="start",
+        aliases=["begin", "adventure"],
+        description="Start your Ludus adventure (perfect for new players)"
+    )
     async def start_adventure(self, ctx):
         """Start your Ludus adventure (for new users)"""
         user_id = str(ctx.author.id)

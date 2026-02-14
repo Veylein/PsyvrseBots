@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import discord
 from discord.ext import commands
 import json
@@ -14,6 +14,48 @@ import ludus_logging
 from utils import user_storage
 from datetime import datetime
 import aiofiles
+from googletrans import Translator
+import difflib
+
+file_path = os.path.join(os.path.dirname(__file__), 'data', 'user_template.json')
+dir_path = os.path.dirname(file_path)
+os.makedirs(dir_path, exist_ok=True)
+
+# Ensure directory exists before file operations
+dir_path = os.path.dirname(file_path)
+os.makedirs(dir_path, exist_ok=True)
+
+# load
+try:
+    with open(file_path, "r") as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
+
+# update data
+data["123456789"] = {"coins": 100}
+
+# save
+with open(file_path, "w") as f:
+    json.dump(data, f, indent=4)
+
+# Load Ludus Q&A and user memory
+LUDUS_QA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'ludus_qa.json')
+def load_ludus_qa():
+    try:
+        with open(LUDUS_QA_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {"questions": [], "users": {}}
+
+def save_ludus_qa(data):
+    try:
+        with open(LUDUS_QA_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
+
+ludus_qa_data = load_ludus_qa()
 
 dotenv.load_dotenv()
 # Configure logging to file+console. If Render provides a disk path, use it.
@@ -45,15 +87,15 @@ except Exception:
 if not os.environ.get("LUDUS_TOKEN"):
         print("LUDUS_TOKEN not set!")
         sys.exit(1)
-        os.system(f"{sys.executable} bot.py")
 
-# Load Opus for voice support (optional) — don't crash if library missing
+# Load Opus for voice support (optional) â€” don't crash if library missing
 try:
     if not discord.opus.is_loaded():
         try:
             discord.opus.load_opus('libopus.so.0')
         except Exception:
             # attempt default platform loader; if still missing, skip voice features
+
             try:
                 discord.opus.load_opus()
             except Exception:
@@ -84,7 +126,7 @@ bot = commands.Bot(
     intents=intents, 
     owner_ids=owner_ids_set,
     help_command=None,  # Disable default help to use custom help cog
-    description="🎮 The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with ❤️ by Psyvrse Development.",
+    description="ðŸŽ® The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with â¤ï¸ by Psyvrse Development.",
     # Performance/stability settings for cloud hosting
     max_messages=1000,  # Limit message cache to reduce memory
     chunk_guilds_at_startup=False,  # Don't fetch all members on startup
@@ -272,7 +314,7 @@ async def load_cogs():
     skipped_cogs = []
     
     print("\n" + "="*50)
-    print("🔧 LOADING COGS...")
+    print("ðŸ”§ LOADING COGS...")
     print("="*50)
     
     for entry in os.listdir("./cogs"):
@@ -308,10 +350,10 @@ async def load_cogs():
         try:
             await bot.load_extension(f"cogs.{cog_name}")
             loaded_cogs.append(cog_name)
-            print(f"  ✅ {cog_name}")
+            print(f"  âœ… {cog_name}")
         except Exception as e:
             failed_cogs.append((cog_name, str(e)))
-            print(f"  ❌ {cog_name}: {e}")
+            print(f"  âŒ {cog_name}: {e}")
             traceback.print_exc()
             try:
                 ludus_logging.log_exception(e, message=f"Failed to load cog {cog_name}")
@@ -320,69 +362,69 @@ async def load_cogs():
     
     # Print summary
     print("\n" + "="*50)
-    print("📊 COG LOADING SUMMARY")
+    print("ðŸ“Š COG LOADING SUMMARY")
     print("="*50)
-    print(f"✅ Loaded: {len(loaded_cogs)} cogs")
+    print(f"âœ… Loaded: {len(loaded_cogs)} cogs")
     for cog in sorted(loaded_cogs):
-        print(f"   • {cog}")
+        print(f"   â€¢ {cog}")
     
     if skipped_cogs:
-        print(f"\n⏭️  Skipped: {len(skipped_cogs)} cogs")
+        print(f"\nâ­ï¸  Skipped: {len(skipped_cogs)} cogs")
         for skip_info in sorted(skipped_cogs):
-            print(f"   • {skip_info}")
+            print(f"   â€¢ {skip_info}")
     
     if failed_cogs:
-        print(f"\n❌ Failed: {len(failed_cogs)} cogs")
+        print(f"\nâŒ Failed: {len(failed_cogs)} cogs")
         for cog_name, error in sorted(failed_cogs):
-            print(f"   • {cog_name}: {error[:80]}")
+            print(f"   â€¢ {cog_name}: {error[:80]}")
     
     print("="*50 + "\n")
 
 @bot.event
 async def on_connect():
     """Called when bot successfully connects to Discord"""
-    print("✅ Connected to Discord!")
+    print("âœ… Connected to Discord!")
     logger.info("Bot connected to Discord")
 
 @bot.event
 async def on_disconnect():
     """Called when bot disconnects from Discord"""
-    print("⚠️ Disconnected from Discord - will attempt reconnect")
+    print("âš ï¸ Disconnected from Discord - will attempt reconnect")
     logger.warning("Bot disconnected from Discord")
 
 @bot.event
 async def on_resume():
     """Called when bot successfully resumes session after disconnect"""
-    print("✅ Successfully resumed Discord session")
+    print("âœ… Successfully resumed Discord session")
     logger.info("Bot resumed Discord session")
 
 @bot.event
 async def on_ready():
     print("\n" + "="*50)
-    print("🚀 BOT IS READY!")
+    print("ðŸš€ BOT IS READY!")
     print("="*50)
-    print(f"👤 Logged in as: {bot.user.name} (ID: {bot.user.id})")
-    print(f"🔑 Bot owner_ids: {bot.owner_ids}")
+    print(f"ðŸ‘¤ Logged in as: {bot.user.name} (ID: {bot.user.id})")
+    print(f"ðŸ”‘ Bot owner_ids: {bot.owner_ids}")
     try:
         app_info = await bot.application_info()
-        print(f"👑 Application owner: {app_info.owner.id}")
+        print(f"ðŸ‘‘ Application owner: {app_info.owner.id}")
     except:
-        print(f"👑 Application owner: Unknown")
+        print(f"ðŸ‘‘ Application owner: Unknown")
     
-    print(f"\n📊 Statistics:")
-    print(f"   • Guilds: {len(bot.guilds)}")
-    print(f"   • Users: {len(bot.users)}")
-    print(f"   • Cogs loaded: {len(bot.cogs)}")
+    print(f"\nðŸ“Š Statistics:")
+    print(f"   â€¢ Guilds: {len(bot.guilds)}")
+    print(f"   â€¢ Users: {len(bot.users)}")
+    print(f"   â€¢ Cogs loaded: {len(bot.cogs)}")
     
     # List all loaded cogs
-    print(f"\n🔧 Active Cogs ({len(bot.cogs)}):")
+    print(f"\nðŸ”§ Active Cogs ({len(bot.cogs)}):")
     for cog_name in sorted(bot.cogs.keys()):
         cog = bot.cogs[cog_name]
         # Count commands in this cog
         cog_commands = [cmd for cmd in bot.walk_commands() if cmd.cog_name == cog_name]
         cog_app_commands = [cmd for cmd in bot.tree.walk_commands() if hasattr(cmd, 'binding') and cmd.binding == cog]
         total = len(cog_commands) + len(cog_app_commands)
-        print(f"   • {cog_name} ({total} commands)")
+        print(f"   â€¢ {cog_name} ({total} commands)")
     
     # Count and list commands
     text_commands = [c for c in bot.commands]
@@ -392,19 +434,19 @@ async def on_ready():
     for cmd in bot.tree.walk_commands():
         all_app_commands.append(cmd)
     
-    print(f"\n⚡ Commands Summary:")
-    print(f"   • Text commands: {len(text_commands)}")
-    print(f"   • Slash commands: {len(all_app_commands)} (walk_commands)")
-    print(f"   • Top-level slash: {len(bot.tree.get_commands())} (get_commands)")
-    print(f"   • Total: {len(text_commands) + len(all_app_commands)}")
+    print(f"\nâš¡ Commands Summary:")
+    print(f"   â€¢ Text commands: {len(text_commands)}")
+    print(f"   â€¢ Slash commands: {len(all_app_commands)} (walk_commands)")
+    print(f"   â€¢ Top-level slash: {len(bot.tree.get_commands())} (get_commands)")
+    print(f"   â€¢ Total: {len(text_commands) + len(all_app_commands)}")
     
     # List text commands
     if text_commands:
-        print(f"\n📝 Text Commands ({len(text_commands)}):")
+        print(f"\nðŸ“ Text Commands ({len(text_commands)}):")
         for cmd in sorted(text_commands, key=lambda x: x.name):
             aliases = f" (aliases: {', '.join(cmd.aliases)})" if cmd.aliases else ""
             cog_name = cmd.cog_name if cmd.cog_name else "No Cog"
-            print(f"   • {config['prefix']}{cmd.name}{aliases} [{cog_name}]")
+            print(f"   â€¢ {config['prefix']}{cmd.name}{aliases} [{cog_name}]")
     
     # List slash commands
     if all_app_commands:
@@ -419,13 +461,13 @@ async def on_ready():
             else:
                 global_cmds.append(cmd)
         
-        print(f"\n⚡ Slash Commands ({len(all_app_commands)} total):")
-        print(f"   🌍 Global: {len(global_cmds)}")
-        print(f"   🏠 Guild-specific: {len(guild_cmds)}")
+        print(f"\nâš¡ Slash Commands ({len(all_app_commands)} total):")
+        print(f"   ðŸŒ Global: {len(global_cmds)}")
+        print(f"   ðŸ  Guild-specific: {len(guild_cmds)}")
         
         # Show global commands
         if global_cmds:
-            print(f"\n🌍 Global Commands ({len(global_cmds)}):")
+            print(f"\nðŸŒ Global Commands ({len(global_cmds)}):")
             
             # Group by parent
             root_commands = {}
@@ -447,407 +489,155 @@ async def on_ready():
                 
                 # Check if it has subcommands
                 if cmd.qualified_name in subcommands:
-                    print(f"   • /{cmd.name} [GROUP] ({cog_name})")
+                    print(f"   â€¢ /{cmd.name} [GROUP] ({cog_name})")
                     for subcmd in sorted(subcommands[cmd.qualified_name], key=lambda x: x.name):
-                        print(f"      ├─ /{cmd.name} {subcmd.name}")
+                        print(f"      â”œâ”€ /{cmd.name} {subcmd.name}")
                 else:
-                    print(f"   • /{cmd.name} ({cog_name})")
+                    print(f"   â€¢ /{cmd.name} ({cog_name})")
             
             # Show orphaned subcommands (shouldn't happen but just in case)
             for parent_name, subs in subcommands.items():
                 if parent_name not in root_commands:
-                    print(f"   • /{parent_name} [MISSING PARENT]")
+                    print(f"   â€¢ /{parent_name} [MISSING PARENT]")
                     for subcmd in subs:
-                        print(f"      ├─ {subcmd.name}")
+                        print(f"      â”œâ”€ {subcmd.name}")
         
         # Show guild-specific commands
         if guild_cmds:
-            print(f"\n🏠 Guild-Specific Commands ({len(guild_cmds)}):")
+            print(f"\nðŸ  Guild-Specific Commands ({len(guild_cmds)}):")
             for cmd in sorted(guild_cmds, key=lambda x: x.qualified_name):
                 guild_ids_str = f" [Guilds: {', '.join(str(g) for g in (cmd.guild_ids or [])[:3])}]"
                 cog_name = cmd.binding.__cog_name__ if hasattr(cmd, 'binding') and cmd.binding else "Unknown"
-                print(f"   • /{cmd.qualified_name} ({cog_name}){guild_ids_str}")
+                print(f"   â€¢ /{cmd.qualified_name} ({cog_name}){guild_ids_str}")
     
     print("="*50)
     
     # ===== DEV GUILD COMMAND SYNC SYSTEM =====
     print("\n" + "="*50)
-    print("🔄 SYNCING SLASH COMMANDS...")
+    print("ðŸ”„ SYNCING SLASH COMMANDS...")
     print("="*50)
-    
+
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
-    DEV_ONLY_COMMANDS = ['dnd']  # Add command names here for dev guild testing
-    
+    # Do NOT include entry point commands (like 'start') in DEV_ONLY_COMMANDS!
+    DEV_ONLY_COMMANDS = ['dnd']  # Only non-entry-point commands for dev guild testing
+
     try:
         import os
+
         dev_guilds_raw = os.environ.get('DEV_GUILD_IDS') or os.environ.get('DEV_GUILD_ID')
         if dev_guilds_raw:
-            print(f"🔧 DEV_GUILD_ID detected - splitting commands")
-            guild_ids = [g.strip() for g in dev_guilds_raw.split(',') if g.strip()]
-            
-            # Save references to dev-only commands before removing
-            dev_commands = {}
-            for cmd_name in DEV_ONLY_COMMANDS:
-                cmd = bot.tree.get_command(cmd_name)
-                if cmd:
-                    dev_commands[cmd_name] = cmd
-                    bot.tree.remove_command(cmd_name)
-                    print(f"  📌 Saved {cmd_name} for dev guild only")
-            
-            # Sync global commands (without dev-only)
-            print(f"\n🌍 Syncing global commands...")
-            synced_global = await bot.tree.sync()
-            print(f"✅ Synced {len(synced_global)} commands globally")
-            if len(synced_global) <= 20:
-                for cmd in synced_global:
-                    print(f"   • /{cmd.name}")
-            else:
-                print(f"   (Too many to list - {len(synced_global)} total)")
-            
-            # Sync dev-only commands to guild
-            for dev_gid in guild_ids:
+            print("ðŸ”§ DEV_GUILD_ID detected - splitting commands")
+            dev_guild_ids = [int(g.strip()) for g in dev_guilds_raw.split(',') if g.strip()]
+            dev_guild_objs = [discord.Object(id=gid) for gid in dev_guild_ids]
+
+            # Mark dev-only commands to sync only to provided guild IDs
+            dev_only_roots = {name.lower() for name in DEV_ONLY_COMMANDS}
+            restricted = []
+            skipped_entry_point = []
+            if dev_only_roots:
+                for cmd in bot.tree.get_commands():  # top-level commands only
+                    if cmd.name.lower() in dev_only_roots:
+                        cmd_type = getattr(cmd, "type", None)
+                        is_entry_point = str(cmd_type).lower().endswith("primary_entry_point") or cmd.name.lower() == "start"
+                        if is_entry_point:
+                            skipped_entry_point.append(cmd.name)
+                            continue
+                        cmd._guild_ids = dev_guild_ids  # ensure these stay guild-bound
+                        extras = getattr(cmd, "extras", None)
+                        if extras is None:
+                            cmd.extras = {}
+                            extras = cmd.extras
+                        extras['_dev_only_managed'] = True
+                        restricted.append(cmd.name)
+
+            if restricted:
+                print(f"ðŸ”’ Dev-only commands: {', '.join(sorted(restricted))}")
+            elif DEV_ONLY_COMMANDS:
+                print("â„¹ï¸ No matching commands found for DEV_ONLY_COMMANDS list.")
+
+            if skipped_entry_point:
+                print("   Warning: entry point command(s) cannot be dev-only and were left global.")
+                print("   " + ", ".join(sorted(set(skipped_entry_point))))
+
+            print("\nðŸŒ Syncing global commands (dev-only ones remain guild-scoped)...")
+            try:
+                synced_global = await bot.tree.sync()
+                print(f"   â€¢ Synced {len(synced_global)} global commands.")
+            except discord.HTTPException as http_error:
+                if http_error.code == 50240:
+                    print("   âš ï¸ Global sync rejected (50240): entry-point command removal is not allowed.")
+                    print("   âš ï¸ Keeping entry-point commands global and continuing startup.")
+                    print("   âš ï¸ Remove the entry-point command from DEV_ONLY_COMMANDS to avoid this.")
+                else:
+                    raise
+
+            for guild in dev_guild_objs:
                 try:
-                    guild_obj = discord.Object(id=int(dev_gid))
-                    bot.tree.clear_commands(guild=guild_obj)
-                    
-                    # Add saved dev commands to guild tree
-                    for cmd_name, cmd in dev_commands.items():
-                        bot.tree.add_command(cmd, guild=guild_obj)
-                        print(f"  📌 Added {cmd_name} to guild {dev_gid}")
-                    
-                    synced_guild = await bot.tree.sync(guild=guild_obj)
-                    print(f"✅ Synced {len(synced_guild)} dev commands to guild {dev_gid}")
-                    if len(synced_guild) <= 20:
-                        for cmd in synced_guild:
-                            print(f"   • /{cmd.name}")
-                except Exception as e:
-                    print(f"❌ Failed to sync to guild {dev_gid}: {e}")
+                    print(f"\nðŸ  Syncing commands to guild {guild.id}...")
+                    synced_dev = await bot.tree.sync(guild=guild)
+                    print(f"   â€¢ Synced {len(synced_dev)} commands to {guild.id}.")
+                except Exception as sync_error:
+                    print(f"   âŒ Error syncing commands to guild {guild.id}: {sync_error}")
                     traceback.print_exc()
         else:
-            print(f"\n🌍 Syncing all commands globally...")
-            synced = await bot.tree.sync()
-            print(f"✅ Synced {len(synced)} commands globally")
-            
-            if len(synced) <= 30:
-                # Show all commands with groups
-                for cmd in sorted(synced, key=lambda x: x.name):
-                    if hasattr(cmd, 'options') and cmd.options:
-                        # Check if it's a group (has subcommands)
-                        has_subcommands = any(opt.type == 1 for opt in cmd.options if hasattr(opt, 'type'))
-                        if has_subcommands:
-                            print(f"   • /{cmd.name} [GROUP with subcommands]")
-                        else:
-                            print(f"   • /{cmd.name}")
-                    else:
-                        print(f"   • /{cmd.name}")
-            elif len(synced) <= 100:
-                # Just show names
-                cmd_names = sorted([cmd.name for cmd in synced])
-                for i in range(0, len(cmd_names), 5):
-                    batch = cmd_names[i:i+5]
-                    print(f"   • {', '.join(batch)}")
-            else:
-                print(f"   (Too many to list - {len(synced)} total)")
-                # Show first 20
-                for cmd in sorted(synced, key=lambda x: x.name)[:20]:
-                    print(f"   • /{cmd.name}")
-                print(f"   ... and {len(synced) - 20} more")
-        
-        print("="*50 + "\n")
+            # No dev guild, sync all commands globally
+            if DEV_ONLY_COMMANDS:
+                for cmd in bot.tree.get_commands():
+                    if cmd.extras.get('_dev_only_managed'):
+                        cmd._guild_ids = None
+            print("ðŸŒ Syncing all commands globally...")
+            synced_commands = await bot.tree.sync()
+            print(f"   â€¢ Synced {len(synced_commands)} commands.")
+
     except Exception as e:
-        print(f"❌ Error syncing commands: {e}")
+        print(f"âŒ Error in command sync logic: {e}")
         traceback.print_exc()
         try:
-            ludus_logging.log_exception(e, message="Error syncing commands")
+            ludus_logging.log_exception(e, message="Failed during command sync")
         except Exception:
             pass
 
-def load_blacklist():
-    """Load blacklist data"""
-    if os.path.exists("blacklist.json"):
-        with open("blacklist.json", 'r') as f:
-            return json.load(f)
-    return {"users": [], "servers": []}
-
-def is_blacklisted(user_id: int = None, guild_id: int = None) -> bool:
-    """Check if user or guild is blacklisted"""
-    blacklist = load_blacklist()
-    if user_id and user_id in blacklist.get("users", []):
-        return True
-    if guild_id and guild_id in blacklist.get("servers", []):
-        return True
-    return False
-
-def load_server_config(guild_id):
-    """Load server-specific configuration"""
-    config_file = "data/server_configs.json"
+    print("="*50)
+    
+    # Set bot's presence
     try:
-        with open(config_file, 'r') as f:
-            configs = json.load(f)
-            return configs.get(str(guild_id), {
-                "welcome_dm": True,
-                "personality_reactions": True,
-                "disabled_commands": [],
-                "rate_limit_enabled": True
-            })
-    except FileNotFoundError:
-        return {
-            "welcome_dm": True,
-            "personality_reactions": True,
-            "disabled_commands": [],
-            "rate_limit_enabled": True
-        }
+        # discord.Game no longer has a 'type' parameter.
+        game = discord.Game(name="L!help")
+        await bot.change_presence(activity=game)
+        print("âœ… Presence updated to 'Playing L!help'")
+    except Exception as e:
+        print(f"âŒ Failed to set presence: {e}")
+        traceback.print_exc()
 
-@bot.tree.interaction_check
-async def global_interaction_check(interaction: discord.Interaction) -> bool:
-    """Global check for all slash commands - blocks blacklisted users/servers"""
-    if is_blacklisted(user_id=interaction.user.id, guild_id=interaction.guild_id if interaction.guild else None):
-        await interaction.response.send_message(
-            "🚫 You or this server has been blacklisted from using this bot.",
-            ephemeral=True
-        )
-        return False
-    return True
+    print("="*50)
+    print("âœ… All startup tasks complete. Bot is fully operational.")
+    print("="*50)
 
-@bot.event
-async def on_command_error(ctx, error):
-    """Global error handler for prefix commands"""
-    if isinstance(error, commands.CheckFailure):
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("❌ You need administrator permissions to use this command.")
-        else:
-            await ctx.send("❌ You don't have permission to use this command.")
-    elif isinstance(error, commands.CommandNotFound):
-        # Silently ignore - don't spam for unknown commands
-        pass
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing required argument: `{error.param.name}`\n💡 Use `L!help {ctx.command.name}` for usage info.")
-    elif isinstance(error, commands.CommandOnCooldown):
-        await ctx.send(f"⏰ This command is on cooldown. Try again in {error.retry_after:.1f}s.")
-    elif isinstance(error, commands.BotMissingPermissions):
-        await ctx.send(f"❌ I'm missing permissions: {', '.join(error.missing_permissions)}")
-    else:
-        # Log error but show clean message to users
-        try:
-            ludus_logging.log_exception(error, ctx=ctx, message=f"Command error in {ctx.command}")
-        except Exception:
-            pass
-        print(f"[BOT] Command error in {ctx.command}: {error}")
-        traceback.print_exception(type(error), error, error.__traceback__)
-        await ctx.send("❌ An error occurred. Please try again or contact a server administrator.")
 
-@bot.event
-async def on_command(ctx):
-    """Track first-time command usage and send welcome DM"""
-    if ctx.author.bot:
-        return
-    
-    # Check if command is disabled in this server
-    if ctx.guild:
-        server_config = load_server_config(ctx.guild.id)
-        if ctx.command.name in server_config["disabled_commands"]:
-            await ctx.send("❌ This command has been disabled by server administrators.")
-            raise commands.CheckFailure("Command disabled by server config")
-    
-    # Load first-time users tracking
-    tracking_file = "data/first_time_users.json"
-    os.makedirs("data", exist_ok=True)
-    
-    try:
-        with open(tracking_file, 'r') as f:
-            first_time_users = json.load(f)
-    except FileNotFoundError:
-        first_time_users = []
-    
-    # If user hasn't been welcomed yet AND server allows welcome DMs
-    user_id = ctx.author.id
-    if user_id not in first_time_users:
-        # Check server config for welcome_dm setting
-        welcome_enabled = True
-        if ctx.guild:
-            server_config = load_server_config(ctx.guild.id)
-            welcome_enabled = server_config.get("welcome_dm", True)
-        
-        if welcome_enabled:
-            first_time_users.append(user_id)
-            
-            # Save updated tracking
-            with open(tracking_file, 'w') as f:
-                json.dump(first_time_users, f)
-            
-            # Send welcome DM
-            try:
-                embed = discord.Embed(
-                    title=f"🎮 Welcome to Ludus!",
-                    description=f"Hey {ctx.author.mention}! Thanks for using Ludus!\n\n"
-                           "**The Ultimate Discord Bot Experience**\n\n"
-                           f"💰 **Economy** - Earn, spend, and trade coins\n"
-                           f"🎲 **100+ Minigames** - Quick games for fun\n"
-                           f"🏪 **Business System** - Create your shop\n"
-                           f"🌾 **Farming** - Grow and sell crops\n"
-                           f"👑 **Guilds** - Build communities\n"
-                           f"🏆 **200+ Achievements** - Unlock goals\n"
-                           f"❤️ **Social Features** - Pets, friends, events\n"
-                           f"📊 **Progression** - Track everything!\n\n"
-                           "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                           "**🚀 Quick Start:**\n"
-                           f"• `L!daily` - Claim daily rewards\n"
-                           f"• `L!balance` - Check your coins\n"
-                           f"• `L!profile` - View your stats\n"
-                           f"• `L!tutorial` - Full interactive guide\n"
-                           f"• `L!help` - All commands\n\n"
-                           "💡 **Pro Tip:** Every action earns coins and XP!",
-                        color=0x00ff00
-                )
-                embed.set_footer(text="Use L!tutorial anytime for detailed guides")
-                
-                await ctx.author.send(embed=embed)
-                print(f"[BOT] Sent welcome DM to {ctx.author} ({user_id})")
-            except discord.Forbidden:
-                print(f"[BOT] Couldn't send DM to {ctx.author} ({user_id}) - DMs disabled")
-            except Exception as e:
-                print(f"[BOT] Error sending welcome DM to {user_id}: {e}")
 
+# Forward all message handling to LudusPersonality cog if loaded
 @bot.event
 async def on_message(message):
-    """Process messages and check blacklist for prefix commands"""
-    if message.author.bot:
+    if message.author == bot.user:
         return
-    
-    # Check for active chess games and process moves
-    chess_cog = bot.get_cog('ChessCog')
-    if chess_cog:
-        # Check if there's an active chess game in this channel
-        for game_id, game in list(bot.active_games.items()):
-            if game_id.startswith('chess_') and game.get('messageId'):
-                # Check if message is in the same channel as the game
-                try:
-                    game_message = await message.channel.fetch_message(game['messageId'])
-                    if game_message.channel.id == message.channel.id:
-                        # Check if the message author is a player in this game
-                        if str(message.author.id) in game['players']:
-                            # Try to process as a chess move
-                            await chess_cog.process_chess_move(message, game_id, game)
-                            return  # Don't process as command if it's a valid move attempt
-                except:
-                    pass
-    
-    # Check blacklist before processing commands
-    if message.content.startswith(config["prefix"]):
-        if is_blacklisted(user_id=message.author.id, guild_id=message.guild.id if message.guild else None):
-            await message.channel.send("🚫 You or this server has been blacklisted from using this bot.")
-            return
-    
+    # If LudusPersonality cog is loaded, let it handle all messages
+    personality_cog = bot.get_cog("LudusPersonality")
+    if personality_cog:
+        await personality_cog.on_message(message)
+    # Always process prefix commands
     await bot.process_commands(message)
 
-@bot.event
-async def on_interaction(interaction: discord.Interaction):
-    """Handle button/select interactions for games"""
-    # Only handle component interactions (buttons/selects), not slash commands
-    if interaction.type != discord.InteractionType.component:
-        # Let discord.py handle slash commands automatically
-        return
-    
-    try:
-        custom_id = interaction.data.get('custom_id', '')
-        
-        # UNO interactions
-        if custom_id.startswith('uno_'):
-            uno_cog = bot.get_cog('UnoCog')
-            if uno_cog:
-                await uno_cog.handle_uno_interaction(interaction, custom_id)
-                return
-        
-        # TTT (Tic-Tac-Toe) interactions
-        if custom_id.startswith('ttt_'):
-            boardgames_cog = bot.get_cog('BoardGames')
-            if boardgames_cog:
-                await boardgames_cog.handle_ttt_interaction(interaction, custom_id)
-                return
-        
-        # Chess interactions
-        if custom_id.startswith('chess_'):
-            chess_cog = bot.get_cog('ChessCog')
-            if chess_cog:
-                await chess_cog.handle_chess_interaction(interaction, custom_id)
-                return
-        
-        # Checkers interactions
-        if custom_id.startswith('checkers_'):
-            chess_cog = bot.get_cog('ChessCog')
-            if chess_cog:
-                await chess_cog.handle_checkers_interaction(interaction, custom_id)
-                return
-        
-        # Add other game handlers here as needed
-        
-    except Exception as e:
-        logger.exception("Error handling interaction: %s", e)
-        try:
-            ludus_logging.log_exception(e, interaction=interaction, message="Error handling interaction")
-        except Exception:
-            pass
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred processing your interaction.", ephemeral=True)
-        except:
-            pass
 
+# Main entry point
+TOKEN = os.environ.get("LUDUS_TOKEN")
+if not TOKEN:
+    print("[FATAL] LUDUS_TOKEN environment variable not set. Cannot start bot.")
+    sys.exit(1)
 
-@bot.event
-async def on_error(event_method, *args, **kwargs):
-    """Global fallback for uncaught errors in events."""
-    try:
-        logger.exception("Unhandled error in event %s", event_method)
-        try:
-            ludus_logging.log_message(level="ERROR", title="Unhandled event error", message=f"Event: {event_method}")
-        except Exception:
-            pass
-    except Exception:
-        print("Unhandled error in event", event_method)
-
-# Blacklist checking
-def is_blacklisted(user_id=None, guild_id=None):
-    """Check if user or guild is blacklisted"""
-    blacklist = load_blacklist()
-    if user_id and str(user_id) in blacklist.get("users", []):
-        return True
-    if guild_id and str(guild_id) in blacklist.get("guilds", []):
-        return True
-    return False
-
-async def main():
-    # Cogs are now loaded in setup_hook (runs automatically before bot.start)
-    token = os.getenv("LUDUS_TOKEN")
-    if not token:
-        print("Error: No Discord token found! Please set LUDUS_TOKEN in Secrets or add 'token' to config.json.")
-        return
-    
-    try:
-        async with bot:
-            await bot.start(token)
-    except discord.errors.LoginFailure:
-        logger.error("Invalid Discord token provided")
-    except KeyboardInterrupt:
-        logger.info("Bot shutdown requested by user")
-        print("\n👋 Bot shutting down gracefully...")
-    except Exception as e:
-        logger.exception("Bot stopped with exception: %s", e)
-        print(f"\n❌ Bot crashed: {e}")
-        # On error, wait a bit before letting the process restart
-        await asyncio.sleep(5)
-    finally:
-        # Flush user storage queue on shutdown
-        try:
-            from utils import user_storage
-            print("[BOT] Flushing user storage queue...")
-            await user_storage.flush_user_storage_queue()
-            print("[BOT] User storage queue flushed")
-        except Exception as e:
-            print(f"[BOT] Error flushing user storage queue: {e}")
-
-# --- FIXED: Removed duplicate config reload (it served no purpose) ---
-
-if __name__ == "__main__":
-    asyncio.run(main())
+print("[MAIN] Starting Ludus Bot...")
+try:
+    bot.run(TOKEN)
+except Exception as e:
+    print(f"[FATAL] An error occurred while running the bot: {e}")
+    traceback.print_exc()

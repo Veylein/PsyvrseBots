@@ -1,26 +1,48 @@
 {
     "quests": [
-        "1\ufe0f\u20e3 First Steps: Spread Positivity! \ud83c\udf38\nSay 5 positive words in chat to earn chi!\n**Reward:** 50 chi",
-        "2\ufe0f\u20e3 Create Your Garden \ud83e\udeb7\nUse `P!creategarden` to start your chi farming journey!\n**Reward:** 100 chi",
-        "3\ufe0f\u20e3 Join the Team Spirit \ud83d\udc3c\nCreate a team with `P!createteam` or join one with `P!jointeam`!\n**Reward:** 150 chi",
-        "4\ufe0f\u20e3 Challenge a Friend \u2694\ufe0f\nStart your first duel with `P!duel @user`!\n**Reward:** 200 chi",
-        "5\ufe0f\u20e3 Upgrade Your Team Base \ud83c\udfe0\nAdd a decoration to your team base with `P!base decorate`!\n**Reward:** 300 chi",
-        "6\ufe0f\u20e3 Grow Your Garden \ud83c\udf8b\nUpgrade your garden tier with `P!garden upgrade`!\n**Reward:** 400 chi",
-        "7\ufe0f\u20e3 Claim an Artifact \u2728\nFind and claim an artifact when one spawns with `P!find artifact`!\n**Reward:** 500 chi",
-        "8\ufe0f\u20e3 Make a Trade \ud83e\udd1d\nTrade chi or artifacts with another user using `P!trade`!\n**Reward:** 600 chi",
-        "9\ufe0f\u20e3 Defeat a Boss \ud83d\udc09\nComplete a team boss battle with `P!teamboss`!\n**Reward:** 800 chi",
-        "\ud83d\udd1f Tutorial Master \ud83c\udfc6\nComplete all 9 tutorial quests above!\n**Reward:** 1000 chi"
+        {
+            "id": "daily_001",
+            "name": "Daily Greeting",
+            "description": "Say hello in the chat to earn chi!",
+            "difficulty": "easy",
+            "type": "daily",
+            "reward": 50
+        },
+        {
+            "id": "daily_002",
+            "name": "Daily Duel",
+            "description": "Challenge a friend to a duel.",
+            "difficulty": "medium",
+            "type": "daily",
+            "reward": 100
+        },
+        {
+            "id": "weekly_001",
+            "name": "Weekly Team Spirit",
+            "description": "Participate in 5 team events this week.",
+            "difficulty": "hard",
+            "type": "weekly",
+            "reward": 500
+        },
+        {
+            "id": "weekly_002",
+            "name": "Artifact Hunter",
+            "description": "Find and claim 3 artifacts this week.",
+            "difficulty": "hard",
+            "type": "weekly",
+            "reward": 700
+        },
+        "1️⃣ Welcome to Pax! 🎉\nSay hello in the chat to get started!\n**Reward:** 50 chi",
+        "2️⃣ Explore the Garden 🌱\nUse `P!garden create` to start your chi farming journey!\n**Reward:** 100 chi",
+        "3️⃣ Join a Team 🤝\nCreate or join a team with `P!team create` or `P!team join`!\n**Reward:** 150 chi",
+        "4️⃣ Challenge a Friend ⚔️\nStart a duel with `P!duel @user`!\n**Reward:** 200 chi",
+        "5️⃣ Decorate Your Base 🏡\nAdd a decoration to your team base with `P!base decorate`!\n**Reward:** 300 chi",
+        "6️⃣ Upgrade Your Garden 🌼\nLevel up your garden with `P!garden upgrade`!\n**Reward:** 400 chi",
+        "7️⃣ Discover an Artifact ✨\nFind and claim an artifact with `P!artifact find`!\n**Reward:** 500 chi",
+        "8️⃣ Make a Trade 🤝\nTrade items or chi with another user using `P!trade`!\n**Reward:** 600 chi",
+        "9️⃣ Defeat a Boss 🐉\nComplete a team boss battle with `P!boss fight`!\n**Reward:** 800 chi",
+        "🏆 Tutorial Master 🏅\nComplete all 9 tutorial quests above!\n**Reward:** 1000 chi"
     ],
-    "month": "Tutorial Quests",
-    "user_progress": {
-        "1395632289832243291": [
-            1
-        ],
-        "1415694055609729178": [
-            2
-        ],
-        "1382187068373074001": [
-            2
-        ]
-    }
+    "month": "February Quests",
+    "user_progress": {}
 }

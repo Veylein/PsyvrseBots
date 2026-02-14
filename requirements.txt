@@ -23,3 +23,6 @@ uvicorn
 yt-dlp>=2024.12.23
 jsonschema
 chess>=1.10.0
+googletrans
+fuzzywuzzy
+python-Levenshtein

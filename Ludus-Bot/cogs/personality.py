@@ -1,7 +1,6 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord import app_commands
 from typing import Optional
 import random
 import asyncio
@@ -9,6 +8,8 @@ from datetime import datetime
 import sys
 import os
 import json
+import re
+from difflib import get_close_matches
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
 
@@ -132,6 +133,12 @@ class LudusPersonality(commands.Cog):
         self.bot = bot
         self.last_reaction_time = {}
         self.cooldown_seconds = 5  # Cooldown per user to avoid spam
+        # Path for persistent knowledge and memory
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir, exist_ok=True)
+        self.knowledge_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "knowledge.json")
+        self.knowledge_data = self._load_knowledge()
         
         # Ludus custom emojis
         self.ludus_emojis = {
@@ -166,7 +173,7 @@ class LudusPersonality(commands.Cog):
         }
         
         # Personalities: Each is a dict of triggers and response logic
-        # Expanded triggers for more unique conversations
+        # Expanded triggers for smarter and more engaging conversations
         self.personalities = {
             "default": {
                 "name": "Classic Ludus",
@@ -569,6 +576,201 @@ class LudusPersonality(commands.Cog):
         
         # Personality modes based on playstyle (tracks per user)
         self.user_personalities = {}
+
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.knowledge_path = os.path.join(base_dir, "knowledge.json")
+        self.knowledge_lock = asyncio.Lock()
+        self.knowledge_mtime = None
+        self.knowledge_data = self._load_knowledge()
+    
+    def _load_knowledge(self):
+        default_structure = {
+            "identity": {},
+            "faq": {},
+            "general_knowledge": {},
+            "user_taught": {},
+            "conversations": {}
+        }
+        try:
+            with open(self.knowledge_path, 'r', encoding='utf-8') as knowledge_file:
+                data = json.load(knowledge_file)
+            try:
+                self.knowledge_mtime = os.path.getmtime(self.knowledge_path)
+            except OSError:
+                self.knowledge_mtime = None
+        except (FileNotFoundError, json.JSONDecodeError):
+            data = {key: value.copy() if isinstance(value, dict) else value for key, value in default_structure.items()}
+            self.knowledge_mtime = None
+        if "user_taught" not in data or not isinstance(data["user_taught"], dict):
+            data["user_taught"] = {}
+        return data
+
+    def _save_knowledge(self):
+        directory = os.path.dirname(self.knowledge_path)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+        with open(self.knowledge_path, 'w', encoding='utf-8') as knowledge_file:
+            json.dump(self.knowledge_data, knowledge_file, indent=2, ensure_ascii=True)
+        try:
+            self.knowledge_mtime = os.path.getmtime(self.knowledge_path)
+        except OSError:
+            self.knowledge_mtime = None
+
+    def _refresh_knowledge_if_needed(self):
+        try:
+            current_mtime = os.path.getmtime(self.knowledge_path)
+        except OSError:
+            current_mtime = None
+        if current_mtime != self.knowledge_mtime:
+            self.knowledge_data = self._load_knowledge()
+
+    def _normalize_question_text(self, text):
+        cleaned = text.lower()
+        cleaned = re.sub(r"<@!?\\d+>", " ", cleaned)
+        cleaned = re.sub(r"[^a-z0-9\s]", " ", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned
+
+    def _looks_like_question(self, text):
+        if not text:
+            return False
+        normalized = text.lower().strip()
+        if len(normalized) < 6:
+            return False
+        if '?' in text:
+            return True
+        question_starters = (
+            "what", "whats", "what's", "who", "when", "where",
+            "why", "how", "which", "tell me", "explain", "define",
+            "meaning of"
+        )
+        return any(normalized.startswith(f"{starter} ") or normalized.startswith(f"{starter}\'") for starter in question_starters)
+
+    def _extract_question_text(self, message):
+        content = message.content.strip()
+        if not content:
+            return None
+        addressed = False
+        mention_targets = set()
+        if self.bot.user:
+            mention_targets.add(self.bot.user.mention)
+        if message.guild and message.guild.me:
+            mention_targets.add(message.guild.me.mention)
+        for mention in mention_targets:
+            if mention and mention in content:
+                content = content.replace(mention, " ")
+                addressed = True
+        lowered = content.lower()
+        if "ludus" in lowered:
+            addressed = True
+        if not message.guild:
+            addressed = True
+        content = re.sub(r"^(hey|hi|hello|yo|sup|hey there|hiya)\s+(ludus|bot)[:,]?\s*", "", content, flags=re.IGNORECASE)
+        content = re.sub(r"^ludus[:,]?\s*", "", content, flags=re.IGNORECASE)
+        content = re.sub(r"\s+", " ", content).strip()
+        if not addressed:
+            return None
+        if not self._looks_like_question(content):
+            return None
+        return content
+
+    def _fuzzy_key(self, normalized_question, candidates):
+        candidate_list = [candidate for candidate in candidates if candidate]
+        if not candidate_list:
+            return None
+        matches = get_close_matches(normalized_question, candidate_list, n=1, cutoff=0.78)
+        return matches[0] if matches else None
+
+    def _resolve_answer_entry(self, entry):
+        if isinstance(entry, dict):
+            return entry.get("answer")
+        return entry
+
+    def _match_from_dict(self, normalized_question, data):
+        if not isinstance(data, dict):
+            return None
+        if normalized_question in data:
+            return self._resolve_answer_entry(data[normalized_question])
+        for key, value in data.items():
+            if key in normalized_question or normalized_question in key:
+                return self._resolve_answer_entry(value)
+        fuzzy_key = self._fuzzy_key(normalized_question, data.keys())
+        if fuzzy_key:
+            return self._resolve_answer_entry(data[fuzzy_key])
+        return None
+
+    def _get_known_answer(self, question_text):
+        self._refresh_knowledge_if_needed()
+        normalized_question = self._normalize_question_text(question_text)
+        knowledge = self.knowledge_data or {}
+
+        user_taught = knowledge.get("user_taught", {})
+        answer = self._match_from_dict(normalized_question, user_taught)
+        if answer:
+            return answer
+
+        faq_lookup = {
+            self._normalize_question_text(key): value
+            for key, value in knowledge.get("faq", {}).items()
+        }
+        answer = self._match_from_dict(normalized_question, faq_lookup)
+        if answer:
+            return answer
+
+        for key, value in knowledge.get("identity", {}).items():
+            key_norm = self._normalize_question_text(key)
+            if key_norm and key_norm in normalized_question:
+                return value
+
+        for key, value in knowledge.get("general_knowledge", {}).items():
+            key_norm = self._normalize_question_text(key)
+            if key_norm and key_norm in normalized_question:
+                return value
+
+        return None
+
+    async def _store_learned_answer(self, question_text, answer_text, user_id):
+        normalized_question = self._normalize_question_text(question_text)
+        async with self.knowledge_lock:
+            if "user_taught" not in self.knowledge_data or not isinstance(self.knowledge_data["user_taught"], dict):
+                self.knowledge_data["user_taught"] = {}
+            self.knowledge_data["user_taught"][normalized_question] = {
+                "question": question_text.strip(),
+                "answer": answer_text.strip(),
+                "taught_by": user_id,
+                "taught_at": datetime.utcnow().isoformat()
+            }
+            self._save_knowledge()
+
+    async def _handle_learning_question(self, message, question_text):
+        answer = self._get_known_answer(question_text)
+        if answer:
+            await message.channel.send(self._safe_response(answer, user_message=message.content))
+            return True
+
+        await message.channel.send("I don't know that yet. Can you tell me the answer? Reply within 60 seconds!")
+
+        def check(reply):
+            return reply.author.id == message.author.id and reply.channel.id == message.channel.id
+
+        try:
+            reply = await self.bot.wait_for("message", timeout=60, check=check)
+        except asyncio.TimeoutError:
+            await message.channel.send("No worries! Maybe you can teach me later.")
+            return True
+
+        user_answer = reply.content.strip()
+        if not user_answer:
+            await message.channel.send("Hmm, I didn't catch an answer there.")
+            return True
+
+        if self._safe_response(user_answer, user_message=user_answer) != user_answer:
+            await message.channel.send("I can't learn that answer. Maybe try phrasing it differently.")
+            return True
+
+        await self._store_learned_answer(question_text, user_answer, message.author.id)
+        await message.channel.send("Thanks! I'll remember that for next time.")
+        return True
     
     def _load_server_config(self, guild_id):
         """Load server configuration"""
@@ -735,6 +937,12 @@ class LudusPersonality(commands.Cog):
             answer = self._solve_math(content)
             if answer is not None:
                 await message.channel.send(self._safe_response(f"{answer}"))
+                return
+
+        question_text = self._extract_question_text(message)
+        if question_text:
+            handled = await self._handle_learning_question(message, question_text)
+            if handled:
                 return
         # Yes/No/Or question detection
         if self._is_yesno_or_question(content):

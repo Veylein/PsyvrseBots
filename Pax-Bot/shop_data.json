@@ -1,4 +1,39 @@
 {
+    "categories": [
+        {
+            "id": "weapons",
+            "name": "Weapons",
+            "description": "Powerful tools for combat."
+        },
+        {
+            "id": "healing_items",
+            "name": "Healing Items",
+            "description": "Restore health and stamina."
+        },
+        {
+            "id": "cosmetics",
+            "name": "Cosmetics",
+            "description": "Customize your appearance."
+        }
+    ],
+    "limited_time_offers": [
+        {
+            "item_id": "lt_weapon_001",
+            "name": "Flaming Sword",
+            "cost": 10,
+            "type": "weapon",
+            "rarity": "legendary",
+            "available_until": "2026-02-29"
+        },
+        {
+            "item_id": "lt_potion_001",
+            "name": "Potion of Immortality",
+            "cost": 15,
+            "type": "healing_item",
+            "rarity": "epic",
+            "available_until": "2026-02-29"
+        }
+    ],
     "items": [
         {
             "item_id": "R1",
@@ -50,64 +85,11 @@
             "realm": "Pandian Realm"
         },
         {
-            "item_id": "R8",
-            "name": "Exclusive Title + Rare Artifact",
-            "cost": 7,
-            "type": "default",
-            "realm": "Pandian Realm"
-        },
-        {
-            "item_id": "R9",
-            "name": "7 Levels",
-            "cost": 5,
-            "type": "default",
-            "realm": "Pandian Realm"
-        },
-        {
-            "item_id": "R10",
-            "name": "Legendary Pet Egg",
-            "cost": 10,
-            "type": "default",
-            "realm": "Pandian Realm"
-        },
-        {
-            "item_id": "R11",
-            "name": "15 Free Levels",
-            "cost": 10,
-            "type": "default",
-            "realm": "Pandian Realm"
-        },
-        {
-            "item_id": "R12",
-            "name": "+100 Permanent HP",
-            "cost": 3,
-            "type": "permanent_hp",
-            "hp_bonus": 100,
-            "realm": "Pandian Realm"
-        },
-        {
-            "item_id": "R13",
-            "name": "+250 Permanent HP",
-            "cost": 6,
-            "type": "permanent_hp",
-            "hp_bonus": 250,
-            "realm": "Pandian Realm"
-        },
-        {
-            "item_id": "R14",
-            "name": "+500 Permanent HP",
-            "cost": 12,
-            "type": "permanent_hp",
-            "hp_bonus": 500,
-            "realm": "Pandian Realm"
-        },
-        {
-            "item_id": "R15",
-            "name": "+1000 Permanent HP",
-            "cost": 25,
-            "type": "permanent_hp",
-            "hp_bonus": 1000,
-            "realm": "Pandian Realm"
+            "item_id": "REBIRTH_SHOP",
+            "name": "Rebirth Shop (Under Construction)",
+            "cost": 0,
+            "type": "placeholder",
+            "realm": "Under Construction"
         }
     ]
 }

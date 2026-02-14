@@ -13,6 +13,7 @@ class LudusLogger:
     def __init__(self):
         self.bot: Optional[discord.Client] = None
         self.log_channel_id: Optional[int] = None
+        self._send_failure_reported = False
         try:
             if LOG_CHANNEL_ENV:
                 self.log_channel_id = int(LOG_CHANNEL_ENV)
@@ -86,9 +87,12 @@ class LudusLogger:
 
         try:
             await ch.send(embed=embed)
-        except Exception:
-            # Last resort fallback to stdout
-            print(f"Failed sending log to channel {self.log_channel_id}")
+            self._send_failure_reported = False
+        except Exception as send_error:
+            # Last resort fallback to stdout (once per failure streak)
+            if not self._send_failure_reported:
+                print(f"Failed sending log to channel {self.log_channel_id}: {send_error}")
+                self._send_failure_reported = True
 
 
 _L = LudusLogger()

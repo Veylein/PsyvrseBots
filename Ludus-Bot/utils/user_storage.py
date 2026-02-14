@@ -1,3 +1,24 @@
+# Simple user file management utility
+import os
+import json
+
+DATA_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'data', 'users')
+os.makedirs(DATA_FOLDER, exist_ok=True)
+
+def get_user_file_simple(user_id):
+    return os.path.join(DATA_FOLDER, f"{user_id}.json")
+
+def load_user_simple(user_id):
+    file_path = get_user_file_simple(user_id)
+    if not os.path.exists(file_path):
+        return {"coins": 0}  # default user template
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_user_simple(user_id, data):
+    file_path = get_user_file_simple(user_id)
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
 import json
 import threading
 from pathlib import Path

@@ -22,8 +22,9 @@ BASE_DIR = Path(__file__).parent.resolve()
 START_DELAY = 6  # seconds between bot startups
 
 BOT_ORDER = [ 
-    "Pax",
-    "Ludus",
+    "PsySource",
+    "Pax-Bot",
+    "Ludus-Bot",
 ]
 
 ENTRY_CANDIDATES = [
