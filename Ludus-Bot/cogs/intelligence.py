@@ -5,6 +5,8 @@ import os
 from fuzzywuzzy import process
 from googletrans import Translator, LANGUAGES
 
+import asyncio
+
 class Intelligence(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -54,14 +56,14 @@ class Intelligence(commands.Cog):
         # Check if the bot is being addressed
         if not (is_dm or is_mention or is_heyludus):
             return
-            
+
         # Ignore commands
         ctx = await self.bot.get_context(message)
         if ctx.valid:
             return
 
         content = message.content.strip()
-        
+
         # Remove trigger phrases to get the actual query
         if is_mention:
             content = content.replace(self.bot.user.mention, "").strip()
@@ -110,8 +112,18 @@ class Intelligence(commands.Cog):
             return
 
         # Check knowledge base
-        best_match, score = process.extractOne(translated_content, self.knowledge["knowledge"].keys())
-        
+        result = process.extractOne(
+            translated_content,
+            list(self.knowledge["knowledge"].keys())
+        )
+
+        if not result:
+            best_match = None
+            score = 0
+        else:
+            best_match = result[0]
+            score = result[1]
+
         if score > 80:
             answer = self.knowledge["knowledge"][best_match]
             if detected_lang != 'en':
@@ -132,7 +144,7 @@ class Intelligence(commands.Cog):
             try:
                 answer_msg = await self.bot.wait_for('message', timeout=60.0, check=check)
                 new_answer = answer_msg.content
-                
+
                 # If the user taught in another language, translate the answer to english for storage
                 new_answer_lang = self.translator.detect(new_answer).lang
                 if new_answer_lang != 'en':
@@ -142,7 +154,7 @@ class Intelligence(commands.Cog):
                 question_to_store = original_content.strip().rstrip('?')
                 self.knowledge["knowledge"][question_to_store] = new_answer
                 self.save_knowledge()
-                
+
                 response = f"Thank you! I've learned that '{original_content}' means '{new_answer}'."
                 if detected_lang != 'en':
                     response = self.translator.translate(response, dest=detected_lang).text
@@ -164,7 +176,6 @@ class Intelligence(commands.Cog):
                 self.knowledge["knowledge"][subject] = fact
                 self.save_knowledge()
                 await message.channel.send(f"Thanks! I've learned that {subject} is {fact}.")
-
 
 def setup(bot):
     bot.add_cog(Intelligence(bot))
