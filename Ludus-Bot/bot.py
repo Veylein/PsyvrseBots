@@ -17,6 +17,22 @@ import aiofiles
 from googletrans import Translator
 import difflib
 
+file_path = "/Ludus-Bot/data/user_template.json"
+
+# load
+try:
+    with open(file_path, "r") as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
+
+# update data
+data["123456789"] = {"coins": 100}
+
+# save
+with open(file_path, "w") as f:
+    json.dump(data, f, indent=4)
+
 # Load Ludus Q&A and user memory
 LUDUS_QA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'ludus_qa.json')
 def load_ludus_qa():
