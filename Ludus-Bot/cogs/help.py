@@ -141,8 +141,6 @@ class Help(commands.Cog):
                     ("event war <hours>", "Server faction war"),
                     ("joinfaction <name>", "Join faction"),
                     ("warleaderboard", "War standings"),
-                    # Removed obsolete categories: Progression (leveling), Fun++ and Music
-                    # They did not match the current cogs available in the repository.
                     ("pet play", "Play with pet"),
                     ("pet walk", "Walk your pet"),
                     ("pet rename <name>", "Rename pet"),
@@ -155,17 +153,6 @@ class Help(commands.Cog):
                     ("quests", "View active daily quests"),
                     ("achievements", "View achievements"),
                     ("questclaim <id>", "Claim quest reward"),
-                ]
-            },
-            "📊 Progression": {
-                "key": "level",
-                "desc": "XP, levels, and rankings",
-                "commands": [
-                    ("rank [@user]", "Check level and XP"),
-                    ("leveltop", "Top 10 by level"),
-                    ("profile [@user]", "Complete profile"),
-                    ("duel @user <game>", "Competitive duel"),
-                    ("tournament <game>", "Join tournament"),
                 ]
             },
             "💼 Business": {
@@ -223,7 +210,6 @@ class Help(commands.Cog):
                 "key": "admin",
                 "desc": "Server configuration (Admin only)",
                 "commands": [
-                    ("setleveling <channel>", "Enable leveling"),
                     ("/counting [channel]", "Setup counting game"),
                     ("/starboard <emoji> <channel> <amt>", "Setup starboard"),
                     ("serverconfig", "Configuration menu"),
