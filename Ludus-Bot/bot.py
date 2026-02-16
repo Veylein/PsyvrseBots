@@ -516,85 +516,92 @@ async def on_ready():
     print("\n" + "="*50)
     print("🔄 SYNCING SLASH COMMANDS...")
     print("="*50)
-
+    
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
-    # Do NOT include entry point commands (like 'start') in DEV_ONLY_COMMANDS!
-    DEV_ONLY_COMMANDS = ['dnd']  # Only non-entry-point commands for dev guild testing
-
+    DEV_ONLY_COMMANDS = ['dnd','poker']  # Add command names here for dev guild testing
+    
     try:
         import os
-
         dev_guilds_raw = os.environ.get('DEV_GUILD_IDS') or os.environ.get('DEV_GUILD_ID')
         if dev_guilds_raw:
-            print("🛠️ DEV_GUILD_ID detected - splitting commands")
-            dev_guild_ids = [int(g.strip()) for g in dev_guilds_raw.split(',') if g.strip()]
-            dev_guild_objs = [discord.Object(id=gid) for gid in dev_guild_ids]
-
-            # Mark dev-only commands to sync only to provided guild IDs
-            dev_only_roots = {name.lower() for name in DEV_ONLY_COMMANDS}
-            restricted = []
-            skipped_entry_point = []
-            if dev_only_roots:
-                for cmd in bot.tree.get_commands():  # top-level commands only
-                    if cmd.name.lower() in dev_only_roots:
-                        cmd_type = getattr(cmd, "type", None)
-                        is_entry_point = str(cmd_type).lower().endswith("primary_entry_point") or cmd.name.lower() == "start"
-                        if is_entry_point:
-                            skipped_entry_point.append(cmd.name)
-                            continue
-                        cmd._guild_ids = dev_guild_ids  # ensure these stay guild-bound
-                        extras = getattr(cmd, "extras", None)
-                        if extras is None:
-                            cmd.extras = {}
-                            extras = cmd.extras
-                        extras['_dev_only_managed'] = True
-                        restricted.append(cmd.name)
-
-            if restricted:
-                print(f"🔧 Dev-only commands: {', '.join(sorted(restricted))}")
-            elif DEV_ONLY_COMMANDS:
-                print("ℹ️ No matching commands found for DEV_ONLY_COMMANDS list.")
-
-            if skipped_entry_point:
-                print("   Warning: entry point command(s) cannot be dev-only and were left global.")
-                print("   " + ", ".join(sorted(set(skipped_entry_point))))
-
-            print("\n🌍 Syncing global commands (dev-only ones remain guild-scoped)...")
-            try:
-                synced_global = await bot.tree.sync()
-                print(f"   • Synced {len(synced_global)} global commands.")
-            except discord.HTTPException as http_error:
-                if http_error.code == 50240:
-                    print("   ⚠️ Global sync rejected (50240): entry-point command removal is not allowed.")
-                    print("   ⚠️ Keeping entry-point commands global and continuing startup.")
-                    print("   ⚠️ Remove the entry-point command from DEV_ONLY_COMMANDS to avoid this.")
-                else:
-                    raise
-
-            for guild in dev_guild_objs:
+            print(f"🔧 DEV_GUILD_ID detected - splitting commands")
+            guild_ids = [g.strip() for g in dev_guilds_raw.split(',') if g.strip()]
+            
+            # Save references to dev-only commands before removing
+            dev_commands = {}
+            for cmd_name in DEV_ONLY_COMMANDS:
+                cmd = bot.tree.get_command(cmd_name)
+                if cmd:
+                    dev_commands[cmd_name] = cmd
+                    bot.tree.remove_command(cmd_name)
+                    print(f"  📌 Saved {cmd_name} for dev guild only")
+            
+            # Sync global commands (without dev-only)
+            print(f"\n🌍 Syncing global commands...")
+            synced_global = await bot.tree.sync()
+            print(f"✅ Synced {len(synced_global)} commands globally")
+            if len(synced_global) <= 20:
+                for cmd in synced_global:
+                    print(f"   • /{cmd.name}")
+            else:
+                print(f"   (Too many to list - {len(synced_global)} total)")
+            
+            # Sync dev-only commands to guild
+            for dev_gid in guild_ids:
                 try:
-                    print(f"\n🏰 Syncing commands to guild {guild.id}...")
-                    synced_dev = await bot.tree.sync(guild=guild)
-                    print(f"   • Synced {len(synced_dev)} commands to {guild.id}.")
-                except Exception as sync_error:
-                    print(f"   ❌ Error syncing commands to guild {guild.id}: {sync_error}")
+                    guild_obj = discord.Object(id=int(dev_gid))
+                    bot.tree.clear_commands(guild=guild_obj)
+                    
+                    # Add saved dev commands to guild tree
+                    for cmd_name, cmd in dev_commands.items():
+                        bot.tree.add_command(cmd, guild=guild_obj)
+                        print(f"  📌 Added {cmd_name} to guild {dev_gid}")
+                    
+                    synced_guild = await bot.tree.sync(guild=guild_obj)
+                    print(f"✅ Synced {len(synced_guild)} dev commands to guild {dev_gid}")
+                    if len(synced_guild) <= 20:
+                        for cmd in synced_guild:
+                            print(f"   • /{cmd.name}")
+                except Exception as e:
+                    print(f"❌ Failed to sync to guild {dev_gid}: {e}")
                     traceback.print_exc()
         else:
-            # No dev guild, sync all commands globally
-            if DEV_ONLY_COMMANDS:
-                for cmd in bot.tree.get_commands():
-                    if cmd.extras.get('_dev_only_managed'):
-                        cmd._guild_ids = None
-            print("🌍 Syncing all commands globally...")
-            synced_commands = await bot.tree.sync()
-            print(f"   • Synced {len(synced_commands)} commands.")
-
+            print(f"\n🌍 Syncing all commands globally...")
+            synced = await bot.tree.sync()
+            print(f"✅ Synced {len(synced)} commands globally")
+            
+            if len(synced) <= 30:
+                # Show all commands with groups
+                for cmd in sorted(synced, key=lambda x: x.name):
+                    if hasattr(cmd, 'options') and cmd.options:
+                        # Check if it's a group (has subcommands)
+                        has_subcommands = any(opt.type == 1 for opt in cmd.options if hasattr(opt, 'type'))
+                        if has_subcommands:
+                            print(f"   • /{cmd.name} [GROUP with subcommands]")
+                        else:
+                            print(f"   • /{cmd.name}")
+                    else:
+                        print(f"   • /{cmd.name}")
+            elif len(synced) <= 100:
+                # Just show names
+                cmd_names = sorted([cmd.name for cmd in synced])
+                for i in range(0, len(cmd_names), 5):
+                    batch = cmd_names[i:i+5]
+                    print(f"   • {', '.join(batch)}")
+            else:
+                print(f"   (Too many to list - {len(synced)} total)")
+                # Show first 20
+                for cmd in sorted(synced, key=lambda x: x.name)[:20]:
+                    print(f"   • /{cmd.name}")
+                print(f"   ... and {len(synced) - 20} more")
+        
+        print("="*50 + "\n")
     except Exception as e:
-        print(f"❌ Error in command sync logic: {e}")
+        print(f"❌ Error syncing commands: {e}")
         traceback.print_exc()
         try:
-            ludus_logging.log_exception(e, message="Failed during command sync")
+            ludus_logging.log_exception(e, message="Error syncing commands")
         except Exception:
             pass
 
