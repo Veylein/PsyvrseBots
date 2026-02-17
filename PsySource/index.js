@@ -119,6 +119,7 @@ client.once('ready', () => {
   console.log(`Discord client ready: ${client.user.tag} (${client.user.id})`)
 })
 
+
 // Prefix command handler (simple, for a private server)
 const PREFIX = '$'
 const FEEDBACK_CHANNEL_ID = process.env.FEEDBACK_CHANNEL_ID || '1465194346784751827'
