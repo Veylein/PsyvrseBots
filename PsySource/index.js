@@ -21,28 +21,6 @@ import { exec } from 'child_process'
 
 dotenv.config()
 
-const {
-  PSYVERSE_TOKEN,
-  LOG_CHANNEL,
-  RENDER_WEBHOOK_SECRET,
-  DISCORD_WEBHOOK_URL,
-  RENDER_API_KEY,
-  PORT = 3000,
-  FAILURE_ROLE_ID,
-  SILENCE_SUCCESS = 'false',
-  PSY_OWNER_IDS = '1382187068373074001,1311394031640776716,1300838678280671264,1138720397567742014',
-} = process.env
-
-const SILENCE_OK = String(SILENCE_SUCCESS).toLowerCase() === 'true'
-
-// Validate important environment variables early to fail fast with clear messages
-function isPlaceholder(value) {
-  if (!value) return true
-  const s = String(value).toLowerCase()
-  return /your_|example|replace|xxx|changeme/.test(s)
-}
-
-// Runtime config persistence (allows updating LOG_CHANNEL without restarting)
 const RUNTIME_CONFIG_FILE = './runtime_config.json'
 function loadRuntimeConfig() {
   try {
