@@ -2177,11 +2177,21 @@ def get_user_ingredients(user_id: str) -> dict:
     return ingredients
 
 
-try:
-    with open(DATA_FILE, "r") as f:
-        chi_data = json.load(f)
-except FileNotFoundError:
-    chi_data = {}
+
+# --- User Data Persistence ---
+def load_chi_data():
+    try:
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save_chi_data():
+    with open(DATA_FILE, "w") as f:
+        json.dump(chi_data, f, indent=4)
+
+# Load chi_data on startup
+chi_data = load_chi_data()
 
 try:
     with open(TEAMS_DATA_FILE, "r") as f:
@@ -2381,10 +2391,10 @@ except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
 
 
 # Define save functions first (needed for migration)
+
 def save_data():
     """Save chi data to JSON file (database writes happen async)"""
-    with open(DATA_FILE, "w") as f:
-        json.dump(chi_data, f, indent=4)
+    save_chi_data()
 
 
 def save_quests():
@@ -2807,61 +2817,31 @@ def has_context_words(message):
     return False
 
 
-def update_chi(user_id, delta):
-    if str(user_id) not in chi_data:
-        chi_data[str(user_id)] = {
-            "chi": 0,
-            "milestones_claimed": [],
-            "mini_quests": [],
-            "rebirths": 0,
-            "purchased_items": [],
-        }
-    if "mini_quests" not in chi_data[str(user_id)]:
-        chi_data[str(user_id)]["mini_quests"] = []
-    if "rebirths" not in chi_data[str(user_id)]:
-        old_positive = chi_data[str(user_id)].get("positive_rebirths", 0)
-        old_negative = chi_data[str(user_id)].get("negative_rebirths", 0)
-        chi_data[str(user_id)]["rebirths"] = old_positive + old_negative
-    if "purchased_items" not in chi_data[str(user_id)]:
-        chi_data[str(user_id)]["purchased_items"] = []
 
-    chi_data[str(user_id)]["chi"] += delta
+def update_chi(user_id, delta):
+    user_id_str = str(user_id)
+    if user_id_str not in chi_data:
+        chi_data[user_id_str] = initialize_user_data(user_id_str)
+    if "mini_quests" not in chi_data[user_id_str]:
+        chi_data[user_id_str]["mini_quests"] = []
+    if "rebirths" not in chi_data[user_id_str]:
+        old_positive = chi_data[user_id_str].get("positive_rebirths", 0)
+        old_negative = chi_data[user_id_str].get("negative_rebirths", 0)
+        chi_data[user_id_str]["rebirths"] = old_positive + old_negative
+    if "purchased_items" not in chi_data[user_id_str]:
+        chi_data[user_id_str]["purchased_items"] = []
+
+    chi_data[user_id_str]["chi"] += delta
 
     # Update team chi if user is in a team (only for positive delta)
-    user_id_str = str(user_id)
-    if delta > 0 and user_id_str in teams_data["user_teams"]:
+    if delta > 0 and user_id_str in teams_data.get("user_teams", {}):
         team_id = teams_data["user_teams"][user_id_str]
-        if team_id in teams_data["teams"]:
+        if team_id in teams_data.get("teams", {}):
             teams_data["teams"][team_id]["team_chi"] += delta
             save_teams()
 
-    # AUTO REBIRTH DISABLED - Users must manually rebirth with P!rebirth command
-    # rebirth_msg = None
-    # if chi_data[str(user_id)]["chi"] >= CHI_REBIRTH_THRESHOLD:
-    #     chi_data[str(user_id)]["rebirths"] += 1
-    #     chi_data[str(user_id)]["chi"] = 0
-    #     total_rebirths = chi_data[str(user_id)]["rebirths"]
-    #     rebirth_msg = f"✨🐼 REBIRTH! Chi reset to 0. Total Rebirths: {total_rebirths}"
-    #     # Log rebirth
-    #     asyncio.create_task(log_event(
-    #         "User Rebirth",
-    #         f"**User ID:** {user_id}\n**Type:** Positive Rebirth\n**Total Rebirths:** {total_rebirths}",
-    #         discord.Color.gold()
-    #     ))
-    # elif chi_data[str(user_id)]["chi"] <= -CHI_REBIRTH_THRESHOLD:
-    #     chi_data[str(user_id)]["rebirths"] += 1
-    #     chi_data[str(user_id)]["chi"] = 0
-    #     total_rebirths = chi_data[str(user_id)]["rebirths"]
-    #     rebirth_msg = f"💀🐼 REBIRTH! Chi reset to 0. Total Rebirths: {total_rebirths}"
-    #     # Log rebirth
-    #     asyncio.create_task(log_event(
-    #         "User Rebirth",
-    #         f"**User ID:** {user_id}\n**Type:** Negative Rebirth\n**Total Rebirths:** {total_rebirths}",
-    #         discord.Color.dark_red()
-    #     ))
-
     save_data()
-    return None  # No auto-rebirth messages anymore
+    return None
 
 
 async def auto_complete_tutorial_quest(user_id, quest_index, channel=None):
