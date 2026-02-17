@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from googletrans import Translator
 
 load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
+TOKEN = os.getenv('PSYVRSE_TOKEN')
 
 intents = discord.Intents.default()
 intents.members = True
