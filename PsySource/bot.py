@@ -96,11 +96,32 @@ async def on_message(message):
 async def translate(interaction: discord.Interaction, text: str, src: str = None, dest: str = "en"):
     """
     Translate text from src language to dest language using googletrans.
-    Example: /translate text:Hola src:es dest:en
+    Example: /translate text:Hola src:es dest:en or /translate text:Hello dest:spanish
     """
+    from googletrans import LANGUAGES
+    lang_code = dest.lower()
+    # Accept language names as well as codes
+    if lang_code not in LANGUAGES and lang_code not in LANGUAGES.values():
+        # Try to match by name
+        for code, name in LANGUAGES.items():
+            if name.lower() == lang_code:
+                lang_code = code
+                break
+        else:
+            await interaction.response.send_message(f"❌ Language '{dest}' not recognized!", ephemeral=True)
+            return
+    elif lang_code in LANGUAGES.values():
+        # Convert name to code
+        for code, name in LANGUAGES.items():
+            if name.lower() == lang_code:
+                lang_code = code
+                break
     try:
-        result = translator.translate(text, src=src if src else 'auto', dest=dest)
-        await interaction.response.send_message(f"**Translated ({result.src} → {result.dest}):**\n{result.text}")
+        # Run translation in a thread to avoid coroutine issues
+        result = await interaction.client.loop.run_in_executor(None, lambda: translator.translate(text, src=src if src else 'auto', dest=lang_code))
+        src_lang = LANGUAGES.get(result.src, result.src).title() if result.src in LANGUAGES else result.src
+        tgt_lang = LANGUAGES.get(result.dest, result.dest).title() if result.dest in LANGUAGES else result.dest
+        await interaction.response.send_message(f"🌐 **{src_lang} → {tgt_lang}:** {result.text}", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"Translation failed: {e}", ephemeral=True)
 
