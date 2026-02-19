@@ -1,12 +1,17 @@
+
+
 import os
 import discord
 from discord.ext import commands
 from discord import app_commands
 from dotenv import load_dotenv
+from discord.ui import View, Button
+from discord import Interaction, TextChannel, Thread
 from googletrans import Translator
 
 load_dotenv()
 TOKEN = os.getenv('PSYVRSE_TOKEN')
+
 
 intents = discord.Intents.default()
 intents.members = True
@@ -17,17 +22,43 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 
 log_channel_id = None
 welcome_channel_id = None
-
 translator = Translator()
 
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
-    try:
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} commands.")
-    except Exception as e:
-        print(f"Failed to sync commands: {e}")
+# --- Ticket Panel Command ---
+class TicketPanelView(View):
+    def __init__(self, log_channel_id=None):
+        super().__init__(timeout=None)
+        self.log_channel_id = log_channel_id
+        self.add_item(TicketButton(log_channel_id))
+
+class TicketButton(Button):
+    def __init__(self, log_channel_id=None):
+        super().__init__(label="Create Ticket", style=discord.ButtonStyle.primary)
+        self.log_channel_id = log_channel_id
+
+    async def callback(self, interaction: Interaction):
+        user = interaction.user
+        guild = interaction.guild
+        channel = interaction.channel
+        # Create a private thread for the ticket
+        thread = await channel.create_thread(name=f"ticket-{user.name}", type=discord.ChannelType.private_thread, invitable=False)
+        await thread.add_user(user)
+        await thread.send(f"{user.mention}, your ticket has been created. Please describe your issue.")
+        # Log ticket creation
+        if self.log_channel_id:
+            log_channel = guild.get_channel(self.log_channel_id)
+            if log_channel:
+                await log_channel.send(f"🎟️ Ticket created by {user.mention} in {thread.mention}")
+        await interaction.response.send_message(f"Ticket created: {thread.mention}", ephemeral=True)
+
+@bot.tree.command(name="ticketpanel", description="Send a ticket panel for users to create tickets.")
+@app_commands.describe(channel="Channel to send the ticket panel in")
+async def ticketpanel(interaction: discord.Interaction, channel: discord.TextChannel):
+    view = TicketPanelView(log_channel_id=log_channel_id)
+    await channel.send("Need help? Click below to open a private ticket.", view=view)
+    await interaction.response.send_message(f"Ticket panel sent in {channel.mention}", ephemeral=True)
+import os
+import discord
 
 @bot.tree.command(name="ban", description="Ban a user from the server.")
 @app_commands.describe(user="User to ban", reason="Reason for ban")
@@ -69,12 +100,84 @@ async def log_action(guild, message):
         if channel:
             await channel.send(message)
 
+
+# --- Moderation: Welcome, Logging, Punishments, Edits ---
 @bot.event
 async def on_member_join(member):
     if welcome_channel_id:
         channel = member.guild.get_channel(welcome_channel_id)
         if channel:
             await channel.send(f"Welcome to the server, {member.mention}!")
+    # Log join
+    await log_action(member.guild, f"{member} joined the server.")
+
+@bot.event
+async def on_message_delete(message):
+    if message.guild and log_channel_id:
+        channel = message.guild.get_channel(log_channel_id)
+        if channel:
+            author = getattr(message.author, 'mention', str(message.author))
+            content = message.content or '[no content]'
+            await channel.send(f"🗑️ Message deleted in {message.channel.mention} by {author}: {content}")
+
+@bot.event
+async def on_message_edit(before, after):
+    if before.guild and log_channel_id:
+        channel = before.guild.get_channel(log_channel_id)
+        if channel and before.content != after.content:
+            author = getattr(before.author, 'mention', str(before.author))
+            await channel.send(f"✏️ Message edited in {before.channel.mention} by {author}:\nBefore: {before.content}\nAfter: {after.content}")
+
+# --- Moderation: Mute, Timeout, Warn, Custom ---
+from datetime import timedelta
+
+@bot.tree.command(name="mute", description="Mute a user (timeout)")
+@app_commands.describe(user="User to mute", duration="Duration in minutes", reason="Reason for mute")
+async def mute(interaction: discord.Interaction, user: discord.Member, duration: int = 10, reason: str = None):
+    if not interaction.user.guild_permissions.moderate_members:
+        await interaction.response.send_message("You do not have permission to mute members.", ephemeral=True)
+        return
+    try:
+        await user.timeout(timedelta(minutes=duration), reason=reason)
+        await interaction.response.send_message(f"{user} has been muted for {duration} minutes. Reason: {reason}")
+        await log_action(interaction.guild, f"{user} was muted by {interaction.user} for {duration} minutes. Reason: {reason}")
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to mute: {e}", ephemeral=True)
+
+@bot.tree.command(name="unmute", description="Unmute a user (remove timeout)")
+@app_commands.describe(user="User to unmute")
+async def unmute(interaction: discord.Interaction, user: discord.Member):
+    if not interaction.user.guild_permissions.moderate_members:
+        await interaction.response.send_message("You do not have permission to unmute members.", ephemeral=True)
+        return
+    try:
+        await user.timeout(None)
+        await interaction.response.send_message(f"{user} has been unmuted.")
+        await log_action(interaction.guild, f"{user} was unmuted by {interaction.user}.")
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to unmute: {e}", ephemeral=True)
+
+@bot.tree.command(name="warn", description="Warn a user")
+@app_commands.describe(user="User to warn", reason="Reason for warning")
+async def warn(interaction: discord.Interaction, user: discord.Member, reason: str = None):
+    if not interaction.user.guild_permissions.kick_members:
+        await interaction.response.send_message("You do not have permission to warn members.", ephemeral=True)
+        return
+    await interaction.response.send_message(f"{user.mention} has been warned. Reason: {reason}")
+    await log_action(interaction.guild, f"{user} was warned by {interaction.user}. Reason: {reason}")
+
+@bot.tree.command(name="timeout", description="Timeout a user (mute for seconds)")
+@app_commands.describe(user="User to timeout", seconds="Timeout duration in seconds", reason="Reason for timeout")
+async def timeout(interaction: discord.Interaction, user: discord.Member, seconds: int = 60, reason: str = None):
+    if not interaction.user.guild_permissions.moderate_members:
+        await interaction.response.send_message("You do not have permission to timeout members.", ephemeral=True)
+        return
+    try:
+        await user.timeout(timedelta(seconds=seconds), reason=reason)
+        await interaction.response.send_message(f"{user} has been timed out for {seconds} seconds. Reason: {reason}")
+        await log_action(interaction.guild, f"{user} was timed out by {interaction.user} for {seconds} seconds. Reason: {reason}")
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to timeout: {e}", ephemeral=True)
 
 @bot.event
 async def on_message(message):
