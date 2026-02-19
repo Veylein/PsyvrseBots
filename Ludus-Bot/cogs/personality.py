@@ -741,6 +741,9 @@ class LudusPersonality(commands.Cog):
                 "taught_at": datetime.utcnow().isoformat()
             }
             self._save_knowledge()
+        # Immediately flush to disk for persistence
+        await asyncio.sleep(0.1)
+        self._save_knowledge()
 
     async def _handle_learning_question(self, message, question_text):
         answer = self._get_known_answer(question_text)
@@ -855,6 +858,11 @@ class LudusPersonality(commands.Cog):
                         ids.append(str(cid))
                     except Exception:
                         continue
+                elif p.startswith('#'):
+                    # Try to resolve channel name
+                    found = discord.utils.get(interaction.guild.channels, name=p[1:])
+                    if found:
+                        ids.append(str(found.id))
                 else:
                     try:
                         cid = int(p)
@@ -862,6 +870,9 @@ class LudusPersonality(commands.Cog):
                     except Exception:
                         continue
             server_config["personality_channels"] = ids
+            if not ids:
+                await interaction.response.send_message("❌ No valid channels found. Please use #channel mentions or channel IDs.", ephemeral=True)
+                return
         self._save_server_config(interaction.guild.id, server_config)
         # Always update in-memory cache
         self.server_personality[interaction.guild.id] = server_config.get("personality_type", "default")
@@ -893,6 +904,8 @@ class LudusPersonality(commands.Cog):
             personality = server_config.get("personality_type", "default")
         else:
             personality = "default"
+        # Always refresh knowledge before responding
+        self._refresh_knowledge_if_needed()
         if not self._check_cooldown(message.author.id):
             return
         content = message.content.lower()

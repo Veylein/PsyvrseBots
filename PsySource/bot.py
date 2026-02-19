@@ -108,7 +108,7 @@ async def translate(interaction: discord.Interaction, text: str, src: str = None
                 lang_code = code
                 break
         else:
-            await interaction.response.send_message(f"❌ Language '{dest}' not recognized!", ephemeral=True)
+            await interaction.response.send_message(f"❌ Language '{dest}' not recognized!\n\nTry: english, spanish, french, german, japanese, etc.", ephemeral=True)
             return
     elif lang_code in LANGUAGES.values():
         # Convert name to code
@@ -118,12 +118,23 @@ async def translate(interaction: discord.Interaction, text: str, src: str = None
                 break
     try:
         # Run translation in a thread to avoid coroutine issues
-        result = await interaction.client.loop.run_in_executor(None, lambda: translator.translate(text, src=src if src else 'auto', dest=lang_code))
-        src_lang = LANGUAGES.get(result.src, result.src).title() if result.src in LANGUAGES else result.src
-        tgt_lang = LANGUAGES.get(result.dest, result.dest).title() if result.dest in LANGUAGES else result.dest
-        await interaction.response.send_message(f"🌐 **{src_lang} → {tgt_lang}:** {result.text}", ephemeral=True)
+        import asyncio
+        loop = asyncio.get_running_loop()
+        def do_translate():
+            translator = __import__('googletrans').Translator()
+            return translator.translate(text, src=src if src else 'auto', dest=lang_code)
+        result = await loop.run_in_executor(None, do_translate)
+        src_lang = LANGUAGES.get(getattr(result, 'src', 'auto'), getattr(result, 'src', 'auto')).title() if getattr(result, 'src', 'auto') in LANGUAGES else getattr(result, 'src', 'auto')
+        tgt_lang = LANGUAGES.get(lang_code, lang_code).title() if lang_code in LANGUAGES else lang_code
+        await interaction.response.send_message(
+            f"🌐 **Translated from {src_lang} to {tgt_lang}:**\n{result.text}\n\n*To translate, use language names like 'english', 'spanish', 'japanese', or codes like 'en', 'es', 'ja'.*",
+            ephemeral=True
+        )
     except Exception as e:
-        await interaction.response.send_message(f"Translation failed: {e}", ephemeral=True)
+        await interaction.response.send_message(
+            f"Translation failed: {e}\n\n*Tip: Use language names like 'english', 'spanish', 'japanese', or codes like 'en', 'es', 'ja'.*",
+            ephemeral=True
+        )
 
 if __name__ == "__main__":
     bot.run(TOKEN)
