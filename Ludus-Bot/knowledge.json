@@ -115,9 +115,9 @@
       "card_suit": "Spades",
       "dice": "D20",
       "superpower": "Teleportation",
-      "dream_job": "AI companion (living the dream!)"
-    },
-    "favorite_quote": "Imagination is more important than knowledge. - Einstein"
+      "dream_job": "AI companion (living the dream!)",
+      "favorite_quote": "Imagination is more important than knowledge. - Einstein"
+    }
   },
   "faq": {
     "What creature has one voice, but has four feet in the morning, two feet in the afternoon, and three feet at night?": "The answer is a human! As a baby (morning), they crawl on all fours. As an adult (afternoon), they walk on two feet. In old age (night), they use a cane, which counts as a third foot.",
@@ -146,6 +146,12 @@
     "can you help me focus": "Try the Pomodoro technique: 25 minutes of work, 5 minutes of break. Want a timer?",
     "can you help me make friends": "Be kind, listen, and share your interests! Want some conversation starters?",
     "can you help me with Discord": "Yes! I can explain roles, channels, bots, and more. Just ask!",
+    "can you explain roles in discord": "Roles in Discord are used to manage permissions and organize users. They can control who can see channels, send messages, manage the server, and more. You can create roles for different groups like moderators, members, or even fun ones like 'Gamer' or 'Artist'!",
+    "can you explain channels in discord": "Channels in Discord are where conversations happen. There are text channels for chatting and voice channels for talking. You can have channels for different topics, like #general, #gaming, or #art. You can also set permissions for who can access each channel!",
+    "can you explain bots in discord": "Bots in Discord are automated programs that can perform various tasks, like moderating, playing music, or providing fun commands. They can be added to your server to enhance functionality and make things more enjoyable!",
+    "can you explain emojis in discord": "Emojis in Discord are small images or icons used to express emotions, reactions, or ideas. You can use standard emojis or custom ones created for your server. They can be added to messages, reactions, and even nicknames!",
+    "can you explain how to make a bot for discord": "To make a bot for Discord, you'll need to create an application on the Discord Developer Portal, add a bot to it, and then write code to define its behavior. You can use libraries like discord.py for Python or discord.js for JavaScript. Once your bot is coded, you can invite it to your server using the generated OAuth2 URL!",
+    "can you help me with coding": "I can explain concepts, debug code, and give examples in Python, JavaScript, and more!",
     "can you help me with server moderation": "I can give tips on moderation, setting up rules, and keeping your server safe.",
     "can you help me with art": "I can suggest drawing prompts, critique, or even generate ASCII art!",
     "can you help me with math": "Of course! Ask me any math question, from basic arithmetic to calculus.",
@@ -444,8 +450,14 @@
     "What is the largest organ in the human body?": "Skin",
     "What is the smallest organ in the human body?": "Pineal gland",
     "What is the most common blood type?": "O+",
+    "What is the difference between DNA and RNA, and how is that important to scientists?": "DNA (deoxyribonucleic acid) is the molecule that carries genetic information in most living organisms, while RNA (ribonucleic acid) is involved in protein synthesis and gene regulation. Understanding the differences between DNA and RNA is crucial for scientists studying genetics, molecular biology, and biotechnology, as it helps them understand how genetic information is stored, transmitted, and expressed in living organisms.",
+    "What is the central dogma of molecular biology?": "The central dogma of molecular biology describes the flow of genetic information within a biological system. It states that DNA is transcribed into RNA, which is then translated into proteins. This process is fundamental to understanding how genes are expressed and how traits are inherited.",
+    "What is the difference between a prokaryotic and eukaryotic cell?": "Prokaryotic cells are simpler, lack a nucleus, and are typically smaller (e.g., bacteria), while eukaryotic cells have a nucleus, membrane-bound organelles, and are found in plants, animals, fungi, and protists.",
+    "What is the difference between a virus and a bacteria?": "Viruses are non-living infectious agents that require a host cell to replicate, while bacteria are living single-celled organisms that can reproduce on their own and can be beneficial or harmful.",
+    "What is the difference between a plant and an animal cell?": "Plant cells have a cell wall, chloroplasts for photosynthesis, and a large central vacuole, while animal cells do not have these structures and instead have centrioles and lysosomes.",
     "What is DNA?": "Deoxyribonucleic acid, the molecule that carries genetic information.",
     "What is RNA?": "Ribonucleic acid, involved in protein synthesis and gene regulation.",
+    "What is evolution?": "The process by which different kinds of living organisms are thought to have developed and diversified from earlier forms during the history of the earth.",
     "What is photosynthesis?": "The process by which plants use sunlight to make food from carbon dioxide and water.",
     "What is mitosis?": "Cell division that results in two identical daughter cells.",
     "What is meiosis?": "Cell division that produces reproductive cells (gametes).",
