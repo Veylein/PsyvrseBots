@@ -704,11 +704,38 @@ class LudusPersonality(commands.Cog):
         normalized_question = self._normalize_question_text(question_text)
         knowledge = self.knowledge_data or {}
 
+        # 1. Check for favorite questions
+        favorites = knowledge.get("identity", {}).get("favorites", {})
+        fav_patterns = [
+            r"what('?s| is)? your favorite ([a-zA-Z0-9_\- ]+)",
+            r"what('?s| is)? ludus'?s favorite ([a-zA-Z0-9_\- ]+)",
+            r"favorite ([a-zA-Z0-9_\- ]+)\??",
+        ]
+        for pat in fav_patterns:
+            match = re.search(pat, question_text, re.IGNORECASE)
+            if match:
+                fav_key = match.group(2).strip().replace(" ", "_").replace("'s", "").lower()
+                # Try direct match
+                if fav_key in favorites:
+                    return favorites[fav_key]
+                # Try fuzzy match
+                fuzzy = self._fuzzy_key(fav_key, favorites.keys())
+                if fuzzy:
+                    return favorites[fuzzy]
+                # Try partial match
+                for k in favorites:
+                    if fav_key in k or k in fav_key:
+                        return favorites[k]
+                # If not found, say so
+                return "I'm not sure I have a favorite for that yet!"
+
+        # 2. User-taught answers
         user_taught = knowledge.get("user_taught", {})
         answer = self._match_from_dict(normalized_question, user_taught)
         if answer:
             return answer
 
+        # 3. FAQ
         faq_lookup = {
             self._normalize_question_text(key): value
             for key, value in knowledge.get("faq", {}).items()
@@ -717,11 +744,13 @@ class LudusPersonality(commands.Cog):
         if answer:
             return answer
 
+        # 4. Identity
         for key, value in knowledge.get("identity", {}).items():
             key_norm = self._normalize_question_text(key)
             if key_norm and key_norm in normalized_question:
                 return value
 
+        # 5. General knowledge
         for key, value in knowledge.get("general_knowledge", {}).items():
             key_norm = self._normalize_question_text(key)
             if key_norm and key_norm in normalized_question:
@@ -737,7 +766,8 @@ class LudusPersonality(commands.Cog):
             self.knowledge_data["user_taught"][normalized_question] = {
                 "question": question_text.strip(),
                 "answer": answer_text.strip(),
-                "taught_by": user_id,
+                # Never store or post user ID
+                "taught_by": None,
                 "taught_at": datetime.utcnow().isoformat()
             }
             self._save_knowledge()
@@ -771,7 +801,8 @@ class LudusPersonality(commands.Cog):
             await message.channel.send("I can't learn that answer. Maybe try phrasing it differently.")
             return True
 
-        await self._store_learned_answer(question_text, user_answer, message.author.id)
+        # Store learned answer without posting user ID
+        await self._store_learned_answer(question_text, user_answer, None)
         await message.channel.send("Thanks! I'll remember that for next time.")
         return True
     
@@ -878,8 +909,8 @@ class LudusPersonality(commands.Cog):
         self.server_personality[interaction.guild.id] = server_config.get("personality_type", "default")
         msg = f"Ludus personality set to: **{server_config.get('personality_type', 'default')}**\n"
         if server_config.get("personality_channels"):
-            ch_mentions = ", ".join(f"<#{c}>" for c in server_config["personality_channels"])
-            msg += f"Personality messages enabled in: {ch_mentions}"
+            # Never post channel mentions or IDs
+            msg += "Personality messages enabled in configured channels."
         else:
             msg += "Personality messages enabled in all channels."
         await interaction.response.send_message(msg)
@@ -978,16 +1009,15 @@ class LudusPersonality(commands.Cog):
 
 
     def _is_math_question(self, content):
-        # Detects math questions like "what is 2+2", "2 plus 2", "calculate 5 times 3", etc.
+        # Enhanced: Detects math questions with more natural language, parentheses, powers, modulo, decimals
         import re
         math_patterns = [
-            r"what\s+is\s+([\d\s+\-*/xX.,]+)",
-            r"calculate\s+([\d\s+\-*/xX.,]+)",
-            r"([\d\s+\-*/xX.,]+)\s*\?",
-            r"([\d\s+\-*/xX.,]+)\s*(plus|minus|times|divided by|\+|-|x|\*|/)\s*([\d\s+\-*/xX.,]+)",
+            r"what\s+is\s+([\d\s+\-*/xX.,^()%modMOD]+)",
+            r"calculate\s+([\d\s+\-*/xX.,^()%modMOD]+)",
+            r"([\d\s+\-*/xX.,^()%modMOD]+)\s*\?",
+            r"([\d\s+\-*/xX.,^()%modMOD]+)\s*(plus|minus|times|divided by|modulo|mod|power|to the power of|\+|-|x|\*|/|\^|%)\s*([\d\s+\-*/xX.,^()%modMOD]+)",
         ]
-        # Also check for math keywords
-        math_keywords = ["plus", "minus", "times", "divided by", "+", "-", "*", "/", "x", "add", "subtract", "multiply", "divide"]
+        math_keywords = ["plus", "minus", "times", "divided by", "modulo", "mod", "power", "to the power of", "+", "-", "*", "/", "x", "^", "%", "add", "subtract", "multiply", "divide"]
         for pat in math_patterns:
             if re.search(pat, content):
                 return True
@@ -997,7 +1027,7 @@ class LudusPersonality(commands.Cog):
         return False
 
     def _solve_math(self, content):
-        # Extract and solve math expressions
+        # Enhanced: Extract and solve math expressions with more features and safety
         import re
         expr = content.lower()
         # Replace words with symbols
@@ -1006,22 +1036,57 @@ class LudusPersonality(commands.Cog):
         expr = expr.replace('subtract', '-')
         expr = expr.replace('times', '*').replace('multiply', '*').replace('x', '*')
         expr = expr.replace('divided by', '/').replace('divide', '/').replace('÷', '/')
+        expr = expr.replace('modulo', '%').replace('mod', '%')
+        expr = expr.replace('power', '**').replace('to the power of', '**').replace('^', '**')
         # Remove question phrases
         expr = re.sub(r"what is ", "", expr)
         expr = re.sub(r"calculate ", "", expr)
         expr = re.sub(r"\?", "", expr)
-        # Find numbers and operators
-        match = re.search(r"([0-9+\-*/. ]+)", expr)
-        if not match:
+        # Only allow safe characters
+        expr = re.sub(r"[^0-9+\-*/.%()eE]", "", expr)
+        # Prevent empty or unsafe
+        if not expr or not re.match(r"^[0-9+\-*/.%()eE]+$", expr):
             return None
-        expr = match.group(1)
-        expr = expr.replace(' ', '')
         try:
-            # Only allow safe characters
-            if not re.match(r"^[0-9+\-*/.]+$", expr):
-                return None
-            result = eval(expr)
-            return f"{result}"
+            # Use ast for safe evaluation
+            import ast, operator
+            allowed_operators = {
+                ast.Add: operator.add,
+                ast.Sub: operator.sub,
+                ast.Mult: operator.mul,
+                ast.Div: operator.truediv,
+                ast.Pow: operator.pow,
+                ast.Mod: operator.mod,
+                ast.USub: operator.neg,
+                ast.UAdd: operator.pos,
+            }
+            def eval_node(node):
+                if isinstance(node, ast.Num):
+                    return node.n
+                elif isinstance(node, ast.BinOp):
+                    if type(node.op) not in allowed_operators:
+                        raise ValueError("Operator not allowed")
+                    return allowed_operators[type(node.op)](eval_node(node.left), eval_node(node.right))
+                elif isinstance(node, ast.UnaryOp):
+                    if type(node.op) not in allowed_operators:
+                        raise ValueError("Operator not allowed")
+                    return allowed_operators[type(node.op)](eval_node(node.operand))
+                else:
+                    raise ValueError("Unsupported expression")
+            tree = ast.parse(expr, mode='eval')
+            result = eval_node(tree.body)
+            # Fun responses for special numbers
+            if result == 42:
+                return "42 (the answer to life, the universe, and everything!)"
+            if result == 69:
+                return "69. Nice."
+            if result == 0:
+                return "Zero!"
+            if abs(result) > 1e12:
+                return f"{result} (That's a huge number!)"
+            if abs(result) < 1e-6 and result != 0:
+                return f"{result} (That's tiny!)"
+            return str(result)
         except Exception:
             return None
 

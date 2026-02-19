@@ -200,10 +200,10 @@ class About(commands.Cog):
             for page in pages:
                 await ctx.author.send(embed=page)
             
-            await ctx.send(f"📬 Check your DMs, {ctx.author.mention}! I sent you the full guide (8 pages)! 🎮")
+            await ctx.send(f"📬 Check your DMs! I sent you the full guide (8 pages)! 🎮")
         
         except discord.Forbidden:
-            await ctx.send(f"❌ {ctx.author.mention}, I couldn't DM you! Please enable DMs from server members.")
+            await ctx.send(f"❌ I couldn't DM you! Please enable DMs from server members.")
 
 async def setup(bot):
     await bot.add_cog(About(bot))

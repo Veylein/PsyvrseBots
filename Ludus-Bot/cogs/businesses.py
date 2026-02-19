@@ -199,7 +199,8 @@ class PassiveBusinesses(commands.Cog):
         )
         embed.add_field(name="Cost", value=f"{cost:,} coins", inline=True)
         embed.add_field(name="Income", value=f"{income} coins/hour", inline=True)
-        embed.add_field(name="Business ID", value=business_id, inline=True)
+        # Do not display business_id (may contain user/guild ID), only show business type
+        embed.add_field(name="Business", value=business_type.capitalize(), inline=True)
         embed.set_footer(text="Collect income with: L!business collect")
         await ctx.send(embed=embed)
     
@@ -210,7 +211,7 @@ class PassiveBusinesses(commands.Cog):
         user_businesses = self.get_user_businesses(target.id)
         
         if not user_businesses["businesses"]:
-            await ctx.send(f"🏢 {target.mention} doesn't own any businesses yet!")
+            await ctx.send(f"🏢 This user doesn't own any businesses yet!")
             return
         
         embed = EmbedBuilder.create(
@@ -234,8 +235,7 @@ class PassiveBusinesses(commands.Cog):
             
             embed.add_field(
                 name=f"{biz_info['name']} (Lv. {level})",
-                value=f"**ID:** {biz_id}\n"
-                      f"**Income:** {income}/hour\n"
+                value=f"**Income:** {income}/hour\n"
                       f"**Pending:** {pending:,} coins\n"
                       f"**Total Earned:** {biz_data['total_earned']:,}",
                 inline=True

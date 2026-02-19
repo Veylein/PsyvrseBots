@@ -147,7 +147,7 @@ class Utilities(commands.Cog):
 
         embed = discord.Embed(title="New Feedback", description=text, color=Colors.SECONDARY)
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
-        embed.set_footer(text=f"User ID: {ctx.author.id}")
+        # Do NOT include any user ID or snowflake in the footer or anywhere
         await feedback_channel.send(embed=embed)
         await ctx.send("✅ Thank you! Your feedback has been sent.")
 

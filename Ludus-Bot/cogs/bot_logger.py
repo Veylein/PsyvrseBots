@@ -208,8 +208,8 @@ class BotLogger(commands.Cog):
             color=color,
             fields=[
                 {"name": "Command", "value": f"`{ctx.command.name if ctx.command else 'Unknown'}`", "inline": True},
-                {"name": "User", "value": f"{ctx.author} ({ctx.author.id})", "inline": True},
-                {"name": "Server", "value": f"{ctx.guild.name if ctx.guild else 'DM'} ({ctx.guild.id if ctx.guild else 'N/A'})", "inline": True},
+                {"name": "User", "value": f"{ctx.author}", "inline": True},
+                {"name": "Server", "value": f"{ctx.guild.name if ctx.guild else 'DM'}", "inline": True},
                 {"name": "Channel", "value": f"#{ctx.channel.name if hasattr(ctx.channel, 'name') else 'DM'}", "inline": True},
                 {"name": "Traceback", "value": f"```python\n{full_traceback}\n```", "inline": False}
             ]
@@ -248,8 +248,8 @@ class BotLogger(commands.Cog):
             color=color,
             fields=[
                 {"name": "Command", "value": f"`/{interaction.command.name if interaction.command else 'Unknown'}`", "inline": True},
-                {"name": "User", "value": f"{interaction.user} ({interaction.user.id})", "inline": True},
-                {"name": "Server", "value": f"{interaction.guild.name if interaction.guild else 'DM'} ({interaction.guild.id if interaction.guild else 'N/A'})", "inline": True},
+                {"name": "User", "value": f"{interaction.user}", "inline": True},
+                {"name": "Server", "value": f"{interaction.guild.name if interaction.guild else 'DM'}", "inline": True},
                 {"name": "Traceback", "value": f"```python\n{full_traceback}\n```", "inline": False}
             ]
         )
@@ -261,8 +261,8 @@ class BotLogger(commands.Cog):
             description=f"**Command:** `{command_name}`\n{details}",
             color=discord.Color.purple(),
             fields=[
-                {"name": "User", "value": f"{ctx.author} ({ctx.author.id})", "inline": True},
-                {"name": "Server", "value": f"{ctx.guild.name if ctx.guild else 'DM'} ({ctx.guild.id if ctx.guild else 'N/A'})", "inline": True},
+                {"name": "User", "value": f"{ctx.author}", "inline": True},
+                {"name": "Server", "value": f"{ctx.guild.name if ctx.guild else 'DM'}", "inline": True},
                 {"name": "Channel", "value": f"#{ctx.channel.name if hasattr(ctx.channel, 'name') else 'DM'}", "inline": True}
             ]
         )
@@ -274,7 +274,7 @@ class BotLogger(commands.Cog):
             description=f"**Command:** `{command_name}`\n{details}",
             color=discord.Color.blue(),
             fields=[
-                {"name": "User", "value": f"{ctx.author} ({ctx.author.id})", "inline": True},
+                {"name": "User", "value": f"{ctx.author}", "inline": True},
                 {"name": "Server", "value": f"{ctx.guild.name if ctx.guild else 'DM'}", "inline": True},
                 {"name": "Channel", "value": f"#{ctx.channel.name if hasattr(ctx.channel, 'name') else 'DM'}", "inline": True}
             ]
@@ -291,8 +291,8 @@ class BotLogger(commands.Cog):
                 description=f"**Event Type:** {event_type}\n{details}",
                 color=discord.Color.gold(),
                 fields=[
-                    {"name": "Spawned By", "value": f"{spawner} ({spawner_id})", "inline": True},
-                    {"name": "Server", "value": f"{guild.name if guild else 'Unknown'} ({guild_id})", "inline": True}
+                    {"name": "Spawned By", "value": f"{spawner}", "inline": True},
+                    {"name": "Server", "value": f"{guild.name if guild else 'Unknown'}", "inline": True}
                 ]
             )
         except():
@@ -318,8 +318,8 @@ class BotLogger(commands.Cog):
                 description=f"**Action:** {action}\n**Reason:** {reason or 'No reason provided'}",
                 color=discord.Color.red(),
                 fields=[
-                    {"name": "Moderator", "value": f"{moderator} ({moderator_id})", "inline": True},
-                    {"name": "Target", "value": f"{target} ({target_id})", "inline": True},
+                    {"name": "Moderator", "value": f"{moderator}", "inline": True},
+                    {"name": "Target", "value": f"{target}", "inline": True},
                     {"name": "Server", "value": f"{guild.name if guild else 'Unknown'}", "inline": True}
                 ]
             )
@@ -339,7 +339,7 @@ class BotLogger(commands.Cog):
                 description=f"**Type:** {transaction_type}\n**Amount:** {amount:,} PsyCoins\n**Reason:** {reason}",
                 color=discord.Color.green(),
                 fields=[
-                    {"name": "User", "value": f"{user} ({user_id})", "inline": True}
+                    {"name": "User", "value": f"{user}", "inline": True}
                 ]
             )
         except():
