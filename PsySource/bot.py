@@ -297,9 +297,9 @@ def is_allowed_guild(guild: Optional[discord.Guild]) -> bool:
     return True
 
     @bot.check
-def mention_channel(channel_id: Optional[int]) -> str:
-    if not channel_id:
-        return "Not set"
+    def mention_channel(channel_id: Optional[int]) -> str:
+        if not channel_id:
+            return "Not set"
     return f"<#{channel_id}>"
 
 
