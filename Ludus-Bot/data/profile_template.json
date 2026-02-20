@@ -1,0 +1,148 @@
+{
+  "_comment": "Default values for new user stats — all keys here are copied into data/users/{id}.json#stats",
+  "energy": 100,
+  "max_energy": 100,
+  "level": 1,
+  "xp": 0,
+  "messages_sent": 0,
+  "commands_used": 0,
+  "minigames_played": 0,
+  "minigames_won": 0,
+
+  "tictactoe_wins": 0,
+  "tictactoe_losses": 0,
+  "tictactoe_draws": 0,
+
+  "connect4_wins": 0,
+  "connect4_losses": 0,
+  "connect4_played": 0,
+
+  "wordle_wins": 0,
+  "wordle_losses": 0,
+  "wordle_played": 0,
+
+  "hangman_wins": 0,
+  "hangman_losses": 0,
+  "hangman_played": 0,
+
+  "trivia_wins": 0,
+  "trivia_losses": 0,
+  "trivia_played": 0,
+
+  "blackjack_wins": 0,
+  "blackjack_losses": 0,
+  "blackjack_draws": 0,
+  "blackjack_played": 0,
+  "blackjack_coins_won": 0,
+
+  "poker_wins": 0,
+  "poker_losses": 0,
+  "poker_played": 0,
+  "poker_coins_won": 0,
+
+  "slots_wins": 0,
+  "slots_losses": 0,
+  "slots_coins_won": 0,
+
+  "uno_wins": 0,
+  "uno_losses": 0,
+  "uno_played": 0,
+
+  "chess_wins": 0,
+  "chess_losses": 0,
+  "chess_draws": 0,
+
+  "checkers_wins": 0,
+  "checkers_losses": 0,
+
+  "fishing_total_caught": 0,
+  "fishing_rare_caught": 0,
+  "fishing_coins_earned": 0,
+
+  "mining_total_mined": 0,
+  "mining_rare_found": 0,
+  "mining_coins_earned": 0,
+
+  "farming_total_harvested": 0,
+  "farming_coins_earned": 0,
+
+  "heist_participated": 0,
+  "heist_successful": 0,
+  "heist_coins_earned": 0,
+
+  "daily_streak": 0,
+  "daily_longest_streak": 0,
+  "daily_total_claimed": 0,
+
+  "reputation_given": 0,
+  "reputation_received": 0,
+
+  "marriages": 0,
+  "divorces": 0,
+
+  "pets_owned": 0,
+  "pets_fed": 0,
+  "pets_played_with": 0,
+
+  "achievements_unlocked": 0,
+  "quests_completed": 0,
+  "duels_won": 0,
+  "duels_lost": 0,
+  "duels_coins_won": 0,
+
+  "total_coins_earned": 0,
+  "total_coins_spent": 0,
+
+  "war_wins": 0,
+  "war_losses": 0,
+  "war_played": 0,
+  "war_coins_won": 0,
+
+  "snake_high_score": 0,
+  "snake_played": 0,
+
+  "minesweeper_wins": 0,
+  "minesweeper_losses": 0,
+
+  "memory_wins": 0,
+  "memory_losses": 0,
+
+  "rps_wins": 0,
+  "rps_losses": 0,
+  "rps_draws": 0,
+
+  "coinflip_wins": 0,
+  "coinflip_losses": 0,
+
+  "dice_wins": 0,
+  "dice_losses": 0,
+
+  "8ball_uses": 0,
+  "akinator_games": 0,
+  "akinator_wins": 0,
+
+  "typing_best_wpm": 0,
+  "typing_games_played": 0,
+
+  "math_correct": 0,
+  "math_played": 0,
+
+  "riddle_solved": 0,
+  "riddle_played": 0,
+
+  "wizard_wars_wins": 0,
+  "wizard_wars_losses": 0,
+
+  "monopoly_wins": 0,
+  "monopoly_games": 0,
+
+  "mafia_wins": 0,
+  "mafia_games": 0,
+
+  "tcg_cards_collected": 0,
+  "tcg_battles_won": 0,
+  "tcg_battles_lost": 0,
+
+  "arcade_wins": 0,
+  "arcade_played": 0
+}

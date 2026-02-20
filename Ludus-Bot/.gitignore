@@ -9,3 +9,4 @@ venv/
 !config.json
 !data/minesweeper_emoji_mapping.json
 !data/user_template.json
+!data/profile_template.json

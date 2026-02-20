@@ -182,6 +182,15 @@ class Social(commands.Cog):
                 profile_cog.profile_manager.increment_stat(author.id, 'roasts_given', 1)
                 if target and target.id != author.id:
                     profile_cog.profile_manager.increment_stat(target.id, 'roasts_received', 1)
+                # Unlock roast achievements
+                ach_cog = self.bot.get_cog("Achievements")
+                if ach_cog:
+                    p = profile_cog.profile_manager.get_profile(author.id)
+                    roasts = p.get('roasts_given', 0)
+                    if roasts >= 50:
+                        ach_cog.manager.unlock_achievement(author.id, 'roaster')
+                    if roasts >= 200:
+                        ach_cog.manager.unlock_achievement(author.id, 'savage')
             except Exception:
                 pass
         
@@ -218,6 +227,17 @@ class Social(commands.Cog):
                 profile_cog.profile_manager.increment_stat(author.id, 'compliments_given', 1)
                 if target and target.id != author.id:
                     profile_cog.profile_manager.increment_stat(target.id, 'compliments_received', 1)
+                # Unlock compliment achievements
+                ach_cog = self.bot.get_cog("Achievements")
+                if ach_cog:
+                    p = profile_cog.profile_manager.get_profile(author.id)
+                    comps = p.get('compliments_given', 0)
+                    if comps >= 10:
+                        ach_cog.manager.unlock_achievement(author.id, 'friendly')
+                    if comps >= 100:
+                        ach_cog.manager.unlock_achievement(author.id, 'kind_soul')
+                    if comps >= 500:
+                        ach_cog.manager.unlock_achievement(author.id, 'angel')
             except Exception:
                 pass
         

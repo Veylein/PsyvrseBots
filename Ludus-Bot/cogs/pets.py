@@ -11,6 +11,10 @@ from discord import app_commands
 from discord.ui import View, Button
 from cogs.minigames import PaginatedHelpView
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
+try:
+    from utils.stat_hooks import us_inc as _pet_inc
+except Exception:
+    _pet_inc = None
 
 class Pets(commands.Cog):
     """Adopt, feed, and play with pets!"""
@@ -148,6 +152,13 @@ class Pets(commands.Cog):
                 econ.add_coins(user.id, 50, "pet_adopt")
         except Exception:
             pass
+        # Track pet adoption in profile
+        try:
+            profile_cog = self.bot.get_cog("Profile")
+            if profile_cog and hasattr(profile_cog, "profile_manager"):
+                profile_cog.profile_manager.increment_stat(user.id, 'pets_owned')
+        except Exception:
+            pass
 
     @pet.command(name="feed")
     async def feed(self, ctx):
@@ -193,6 +204,18 @@ class Pets(commands.Cog):
                 econ.add_coins(user.id, 5, "pet_feed")
         except Exception:
             pass
+        # Track pet feeding in profile
+        try:
+            profile_cog = self.bot.get_cog("Profile")
+            if profile_cog and hasattr(profile_cog, "profile_manager"):
+                profile_cog.profile_manager.increment_stat(user.id, 'pet_fed_count')
+        except Exception:
+            pass
+        if _pet_inc:
+            try:
+                _pet_inc(user.id, 'pets_fed')
+            except Exception:
+                pass
 
     @pet.command(name="play")
     async def play(self, ctx):
@@ -240,6 +263,18 @@ class Pets(commands.Cog):
                 econ.add_coins(user.id, 15, "pet_play")
         except Exception:
             pass
+        # Track pet play in profile
+        try:
+            profile_cog = self.bot.get_cog("Profile")
+            if profile_cog and hasattr(profile_cog, "profile_manager"):
+                profile_cog.profile_manager.increment_stat(user.id, 'pet_played_count')
+        except Exception:
+            pass
+        if _pet_inc:
+            try:
+                _pet_inc(user.id, 'pets_played_with')
+            except Exception:
+                pass
 
     @pet.command(name="walk")
     async def walk(self, ctx):
@@ -285,6 +320,13 @@ class Pets(commands.Cog):
             econ = self.bot.get_cog("Economy")
             if econ:
                 econ.add_coins(user.id, 10, "pet_walk")
+        except Exception:
+            pass
+        # Track pet walk in profile
+        try:
+            profile_cog = self.bot.get_cog("Profile")
+            if profile_cog and hasattr(profile_cog, "profile_manager"):
+                profile_cog.profile_manager.increment_stat(user.id, 'pet_walked_count')
         except Exception:
             pass
 

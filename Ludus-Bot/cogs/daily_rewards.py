@@ -5,6 +5,10 @@ import json
 import os
 from datetime import datetime, timedelta
 from typing import Optional
+try:
+    from utils.stat_hooks import us_inc as _dr_inc, us_set as _dr_set
+except Exception:
+    _dr_inc = _dr_set = None
 
 class DailyRewards(commands.Cog):
     """Enhanced daily login rewards with milestones"""
@@ -134,6 +138,15 @@ class DailyRewards(commands.Cog):
         # Give coins
         economy_cog.add_coins(ctx.author.id, total_reward, "daily_reward")
         user_data["total_earned"] += total_reward
+        
+        if _dr_inc:
+            try:
+                _dr_inc(ctx.author.id, 'daily_total_claimed')
+                _dr_set(ctx.author.id, 'daily_streak', current_streak)
+                if user_data["current_streak"] > user_data.get("best_streak", 0):
+                    _dr_set(ctx.author.id, 'daily_longest_streak', user_data["current_streak"])
+            except Exception:
+                pass
         
         # Check for milestone rewards
         milestone_reached = None

@@ -8,6 +8,10 @@ import asyncio
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 import io
+try:
+    from utils.stat_hooks import us_inc as _m_inc
+except Exception:
+    _m_inc = None
 
 class MiningGame:
     """Represents a single mining game session"""
@@ -540,6 +544,11 @@ class MiningGame:
         
         # Update stats
         self.stats["blocks_mined"] += 1
+        if _m_inc is not None:
+            try:
+                _m_inc(int(self.user_id), 'mining_total_mined')
+            except Exception:
+                pass
         if y > self.stats["max_depth"]:
             self.stats["max_depth"] = y
         
@@ -745,6 +754,11 @@ class MiningGame:
         
         self.coins += total_value
         self.stats["coins_earned"] += total_value
+        if _m_inc is not None and total_value > 0:
+            try:
+                _m_inc(int(self.user_id), 'mining_coins_earned', int(total_value))
+            except Exception:
+                pass
         self.inventory.clear()
         
         # Check achievement

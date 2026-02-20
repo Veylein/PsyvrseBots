@@ -9,6 +9,10 @@ from . import uno_logic
 from .flip import UnoFlipHandler
 from .no_mercy import UnoNoMercyHandler
 from .no_mercy_plus import UnoNoMercyPlusHandler
+try:
+    from utils.stat_hooks import us_inc as _uno_inc, us_mg as _uno_mg
+except Exception:
+    _uno_inc = _uno_mg = None
 
 class UnoCog(commands.Cog):
     # List of random names for bots
@@ -276,7 +280,28 @@ class UnoCog(commands.Cog):
                         duration = int(time.time() - game.get('start_time', time.time()))
                         guild_id = game.get('guild_id')
                         game_stats_cog.record_game(int(winner), "uno", won=True, coins_earned=30, playtime_seconds=duration, category="strategy_games", guild_id=guild_id)
-            
+                # Update profile stats for UNO (eliminate_player path)
+                profile_cog = self.bot.get_cog("Profile")
+                if profile_cog and not winner.startswith('BOT_'):
+                    pm = profile_cog.profile_manager
+                    for pid in game.get('original_players', game.get('players', [])):
+                        if not str(pid).startswith('BOT_'):
+                            pm.increment_stat(int(pid), 'uno_played')
+                    pm.increment_stat(int(winner), 'uno_wins')
+                    ach_cog = self.bot.get_cog("Achievements")
+                    if ach_cog:
+                        p = pm.get_profile(int(winner))
+                        if p.get('uno_wins', 0) >= 25:
+                            ach_cog.manager.unlock_achievement(int(winner), 'uno_champion')
+                if _uno_mg:
+                    try:
+                        _uno_mg(int(winner), 'uno', 'win', 30)
+                        _uno_inc(int(winner), 'uno_wins')
+                        for pid in game.get('original_players', game.get('players', [])):
+                            if not str(pid).startswith('BOT_'):
+                                _uno_inc(int(pid), 'uno_played')
+                    except Exception:
+                        pass
             lang = self.get_lang(game)
             embed = discord.Embed(
                 title=f"{uno_back} {self.t('messages.game_over', lang=lang)}",
@@ -352,7 +377,29 @@ class UnoCog(commands.Cog):
                     duration = int(time.time() - game.get('start_time', time.time()))
                     guild_id = game.get('guild_id')
                     game_stats_cog.record_game(int(player_id), "uno", won=True, coins_earned=30, playtime_seconds=duration, category="strategy_games", guild_id=guild_id)
-            #await check_achievements(player_id, channel)
+            # Update profile stats for UNO (first_win path)
+            if not player_id.startswith('BOT_'):
+                profile_cog = self.bot.get_cog("Profile")
+                if profile_cog:
+                    pm = profile_cog.profile_manager
+                    for pid in game.get('original_players', game.get('players', [])):
+                        if not str(pid).startswith('BOT_'):
+                            pm.increment_stat(int(pid), 'uno_played')
+                    pm.increment_stat(int(player_id), 'uno_wins')
+                    ach_cog = self.bot.get_cog("Achievements")
+                    if ach_cog:
+                        p = pm.get_profile(int(player_id))
+                        if p.get('uno_wins', 0) >= 25:
+                            ach_cog.manager.unlock_achievement(int(player_id), 'uno_champion')
+                if _uno_mg:
+                    try:
+                        _uno_mg(int(player_id), 'uno', 'win', 30)
+                        _uno_inc(int(player_id), 'uno_wins')
+                        for pid in game.get('original_players', game.get('players', [])):
+                            if not str(pid).startswith('BOT_'):
+                                _uno_inc(int(pid), 'uno_played')
+                    except Exception:
+                        pass
             
             # Create win embed
             winner_display = f"<@{player_id}>"
@@ -419,7 +466,31 @@ class UnoCog(commands.Cog):
                             duration = int(time.time() - game.get('start_time', time.time()))
                             guild_id = game.get('guild_id')
                             game_stats_cog.record_game(int(winner), "uno", won=True, coins_earned=30, playtime_seconds=duration, category="strategy_games", guild_id=guild_id)
-                    #await check_achievements(winner, channel)
+                    # Update profile stats for UNO (last_standing path)
+                    if not winner.startswith('BOT_'):
+                        profile_cog = self.bot.get_cog("Profile")
+                        if profile_cog:
+                            pm = profile_cog.profile_manager
+                            all_players = game.get('podium', []) + game.get('players', [])
+                            for pid in all_players:
+                                if not str(pid).startswith('BOT_'):
+                                    pm.increment_stat(int(pid), 'uno_played')
+                            pm.increment_stat(int(winner), 'uno_wins')
+                            ach_cog = self.bot.get_cog("Achievements")
+                            if ach_cog:
+                                p = pm.get_profile(int(winner))
+                                if p.get('uno_wins', 0) >= 25:
+                                    ach_cog.manager.unlock_achievement(int(winner), 'uno_champion')
+                        if _uno_mg:
+                            try:
+                                _uno_mg(int(winner), 'uno', 'win', 30)
+                                _uno_inc(int(winner), 'uno_wins')
+                                all_players = game.get('podium', []) + game.get('players', [])
+                                for pid in all_players:
+                                    if not str(pid).startswith('BOT_'):
+                                        _uno_inc(int(pid), 'uno_played')
+                            except Exception:
+                                pass
                 
                 # Create podium display
                 podium_medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
@@ -2237,6 +2308,14 @@ class UnoCog(commands.Cog):
     # INTERACTION HANDLER
     # ═══════════════════════════════════════════════════════════════════════════
     
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if interaction.type != discord.InteractionType.component:
+            return
+        cid = (interaction.data or {}).get("custom_id", "")
+        if cid.startswith("uno_"):
+            await self.handle_uno_interaction(interaction, cid)
+
     async def handle_uno_interaction(self, interaction, cid):
         """Główny handler dla wszystkich interakcji UNO"""
         uid = str(interaction.user.id)
@@ -2258,19 +2337,16 @@ class UnoCog(commands.Cog):
             lobby = self.bot.active_lobbies.get(lobby_id)
             if not lobby:
                 return await interaction.response.send_message("Lobby inactive.", ephemeral=True)
-            
-            try:
-                host = await self.bot.fetch_user(int(lobby['hostId']))
-            except (discord.errors.DiscordServerError, discord.errors.HTTPException):
-                # Discord API tymczasowo niedostępne - użyj cache lub pomiń
-                host = self.bot.get_user(int(lobby['hostId']))
-                if not host:
-                    # If not in cache, create a replacement object
-                    class FakeUser:
-                        def __init__(self, user_id):
-                            self.id = int(user_id)
-                            self.mention = f"<@{user_id}>"
-                    host = FakeUser(lobby['hostId'])
+
+            # Use cache only — avoids an HTTP round-trip before defer() which
+            # would burn the 3-second interaction window and cause error 10062.
+            host = self.bot.get_user(int(lobby['hostId']))
+            if not host:
+                class FakeUser:
+                    def __init__(self, user_id):
+                        self.id = int(user_id)
+                        self.mention = f"<@{user_id}>"
+                host = FakeUser(lobby['hostId'])
             
             if action == 'join':
                 if uid in lobby['players']:
@@ -2422,7 +2498,10 @@ class UnoCog(commands.Cog):
                     return await interaction.response.send_message("Only the host can start the game!", ephemeral=True)
                 if len(lobby['players']) < lobby['minPlayers']:
                     return await interaction.response.send_message(f"Need at least {lobby['minPlayers']} players!", ephemeral=True)
-                
+
+                # Defer immediately — deck building + image generation can exceed 3s
+                await interaction.response.defer()
+
                 del self.bot.active_lobbies[lobby_id]
                 game_id = f"uno_game_{interaction.channel_id}_{lobby['hostId']}_{int(time.time())}"
                 
@@ -2549,7 +2628,7 @@ class UnoCog(commands.Cog):
                 view = self.create_uno_legacy_game_view(game_id, game_state, current_player)
                 
                 files = [card_file] if card_file else []
-                await interaction.response.edit_message(embed=embed, view=view, attachments=files)
+                await interaction.edit_original_response(embed=embed, view=view, attachments=files)
                 
                 if current_player.startswith('BOT_'):
                     await asyncio.sleep(2)

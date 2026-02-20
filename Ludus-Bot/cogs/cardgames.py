@@ -16,6 +16,10 @@ from utils.card_visuals import (
     create_comparison_image,
     parse_card
 )
+try:
+    from utils.stat_hooks import us_inc as _cg_inc, us_mg as _cg_mg
+except Exception:
+    _cg_inc = _cg_mg = None
 
 class CardGames(commands.Cog):
     """🎴 Card games with beautiful graphics: Go Fish, Blackjack, War"""
@@ -696,6 +700,30 @@ class CardGames(commands.Cog):
         else:
             result = "😔 Dealer wins"
             color = discord.Color.red()
+
+        # Track Blackjack stats
+        try:
+            profile_cog = self.bot.get_cog("Profile")
+            if profile_cog and hasattr(profile_cog, "profile_manager"):
+                pm = profile_cog.profile_manager
+                pm.increment_stat(author.id, 'blackjack_played')
+                if result == "🎉 You win!":
+                    pm.increment_stat(author.id, 'blackjack_wins')
+        except Exception:
+            pass
+        if _cg_mg:
+            try:
+                if result == "🎉 You win!":
+                    _cg_mg(author.id, 'blackjack', 'win', 0)
+                    _cg_inc(author.id, 'blackjack_wins')
+                elif result == "🤝 Push (tie)":
+                    _cg_mg(author.id, 'blackjack', 'draw', 0)
+                else:
+                    _cg_mg(author.id, 'blackjack', 'loss', 0)
+                    _cg_inc(author.id, 'blackjack_losses')
+                _cg_inc(author.id, 'blackjack_played')
+            except Exception:
+                pass
             
         try:
             embed = discord.Embed(title="🃏 Blackjack — Result", color=color)
@@ -829,6 +857,42 @@ class CardGames(commands.Cog):
             result = "It's a WAR (tie)!"
             color = discord.Color.gold()
             result_text = "TIE - WAR"
+
+        # Track War stats
+        try:
+            profile_cog = self.bot.get_cog("Profile")
+            if profile_cog and hasattr(profile_cog, "profile_manager"):
+                pm = profile_cog.profile_manager
+                pm.increment_stat(author.id, 'war_played')
+                if result == f"🎉 {author.mention} wins!":
+                    pm.increment_stat(author.id, 'war_wins')
+                if opponent:
+                    pm.increment_stat(opponent.id, 'war_played')
+        except Exception:
+            pass
+        if _cg_mg:
+            try:
+                if result == f"🎉 {author.mention} wins!":
+                    _cg_mg(author.id, 'war', 'win', 0)
+                    _cg_inc(author.id, 'war_wins')
+                    if opponent:
+                        _cg_mg(opponent.id, 'war', 'loss', 0)
+                        _cg_inc(opponent.id, 'war_losses')
+                elif result == "It's a WAR (tie)!":
+                    _cg_mg(author.id, 'war', 'draw', 0)
+                    if opponent:
+                        _cg_mg(opponent.id, 'war', 'draw', 0)
+                else:
+                    _cg_mg(author.id, 'war', 'loss', 0)
+                    _cg_inc(author.id, 'war_losses')
+                    if opponent:
+                        _cg_mg(opponent.id, 'war', 'win', 0)
+                        _cg_inc(opponent.id, 'war_wins')
+                _cg_inc(author.id, 'war_played')
+                if opponent:
+                    _cg_inc(opponent.id, 'war_played')
+            except Exception:
+                pass
         
         # Create visual comparison
         user_visual = self.format_card_for_display(user_card)

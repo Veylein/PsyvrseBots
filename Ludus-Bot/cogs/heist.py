@@ -6,6 +6,10 @@ import random
 import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
+try:
+    from utils.stat_hooks import us_inc as _h_inc, us_mg as _h_mg
+except Exception:
+    _h_inc = _h_mg = None
 
 class Heist(commands.Cog):
     """Team up for heists and rob banks or players"""
@@ -368,6 +372,14 @@ class Heist(commands.Cog):
                     stats["successful"] += 1
                     stats["total_stolen"] += reward_per_person
                     stats["last_heist"] = datetime.utcnow().isoformat()
+                    if _h_mg:
+                        try:
+                            _h_mg(uid, 'heist', 'win', reward_per_person)
+                            _h_inc(uid, 'heist_participated')
+                            _h_inc(uid, 'heist_successful')
+                            _h_inc(uid, 'heist_coins_earned', reward_per_person)
+                        except Exception:
+                            pass
                     
                     user = await self.bot.fetch_user(uid)
                     crew_mentions.append(user.mention)
@@ -420,6 +432,14 @@ class Heist(commands.Cog):
                     stats["successful"] += 1
                     stats["total_stolen"] += reward_per_person
                     stats["last_heist"] = datetime.utcnow().isoformat()
+                    if _h_mg:
+                        try:
+                            _h_mg(uid, 'heist', 'win', reward_per_person)
+                            _h_inc(uid, 'heist_participated')
+                            _h_inc(uid, 'heist_successful')
+                            _h_inc(uid, 'heist_coins_earned', reward_per_person)
+                        except Exception:
+                            pass
                     
                     user = await self.bot.fetch_user(uid)
                     crew_mentions.append(user.mention)
@@ -449,6 +469,12 @@ class Heist(commands.Cog):
                 stats["failed"] += 1
                 stats["total_lost"] += heist["crew"][user_id]
                 stats["last_heist"] = datetime.utcnow().isoformat()
+                if _h_mg:
+                    try:
+                        _h_mg(uid, 'heist', 'loss', 0)
+                        _h_inc(uid, 'heist_participated')
+                    except Exception:
+                        pass
                 
                 user = await self.bot.fetch_user(uid)
                 crew_mentions.append(user.mention)

@@ -14,6 +14,10 @@ try:
 except Exception:
     tcg_manager = None
     CARD_DATABASE = {}
+try:
+    from utils.stat_hooks import us_inc as _farm_inc
+except Exception:
+    _farm_inc = None
 
 class FarmingManager:
     """Manages farming system with crops, harvesting, and seasons"""
@@ -452,6 +456,13 @@ class FarmView(View):
                 econ.add_coins(self.ctx.author.id, total_value, "farming")
         except Exception:
             pass
+        if _farm_inc:
+            try:
+                total_qty = sum(h.get('quantity', 1) for h in harvested)
+                _farm_inc(self.ctx.author.id, 'farming_total_harvested', total_qty)
+                _farm_inc(self.ctx.author.id, 'farming_coins_earned', total_value)
+            except Exception:
+                pass
 
 class Farming(commands.Cog):
     def __init__(self, bot):
@@ -615,6 +626,12 @@ class Farming(commands.Cog):
         if economy_cog:
             try:
                 economy_cog.add_coins(ctx.author.id, value, "farming")
+            except Exception:
+                pass
+        if _farm_inc:
+            try:
+                _farm_inc(ctx.author.id, 'farming_total_harvested', result['quantity'])
+                _farm_inc(ctx.author.id, 'farming_coins_earned', value)
             except Exception:
                 pass
 

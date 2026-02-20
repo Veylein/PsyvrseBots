@@ -7,6 +7,10 @@ import random
 import asyncio
 from datetime import datetime
 from typing import Optional
+try:
+    from utils.stat_hooks import us_inc as _d_inc
+except Exception:
+    _d_inc = None
 
 class Dueling(commands.Cog):
     """Challenge other players to duels with coin bets"""
@@ -318,6 +322,14 @@ class Dueling(commands.Cog):
             economy_cog.remove_coins(duel.challenger.id, duel.bet_amount, "duel_bet")
             economy_cog.remove_coins(duel.opponent.id, duel.bet_amount, "duel_bet")
             economy_cog.add_coins(winner.id, duel.bet_amount * 2, "duel_win")
+            # Track in data/users/{id}.json
+            if _d_inc is not None:
+                try:
+                    _d_inc(int(winner.id), 'duels_won')
+                    _d_inc(int(winner.id), 'duels_coins_won', int(duel.bet_amount * 2))
+                    _d_inc(int(loser.id), 'duels_lost')
+                except Exception:
+                    pass
             
             # Process spectator bets
             total_spectator_winnings = 0

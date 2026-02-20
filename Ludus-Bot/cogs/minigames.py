@@ -42,6 +42,16 @@ class Minigames(commands.Cog):
         except Exception:
             pass
 
+        # Track minigame stats in profile
+        try:
+            profile_cog = self.bot.get_cog("Profile")
+            if profile_cog and hasattr(profile_cog, "profile_manager"):
+                pm = profile_cog.profile_manager
+                pm.increment_stat(ctx.author.id, 'minigames_played')
+                pm.increment_stat(ctx.author.id, 'minigames_won')
+        except Exception:
+            pass
+
         # Record the win in persistent user storage if available.
         try:
             # try common import paths; prefer non-blocking execution
@@ -64,6 +74,114 @@ class Minigames(commands.Cog):
                     pass
         except Exception:
             pass
+
+    # ------------------------------------------------------------------ #
+    # Dispatch table used by every auto-registered minigame command.       #
+    # Each entry maps a game name → (kind_id, difficulty_offset).          #
+    # kind_id is passed as (kind_id + 1) so that _micro_play's             #
+    # `(idx-1) % 10 == kind_id` mapping is satisfied.                      #
+    # ------------------------------------------------------------------ #
+    _NAMED_GAME_KINDS: dict = {
+        # kind 0 = parity / even-odd
+        "guess_number":       (0, 0),
+        "higher_lower":       (0, 1),
+        "binary_guess":       (0, 2),
+        "stones":             (0, 3),
+        # kind 1 = dice sum
+        "roll":               (1, 0),
+        "coinflip":           (1, 0),
+        # kind 2 = mental math
+        "quick_math":         (2, 0),
+        "count_vowels":       (2, 1),
+        "math_race":          (2, 2),
+        # kind 3 = reverse word
+        "reverse_word":       (3, 0),
+        "palindrome":         (3, 1),
+        "mimic":              (3, 2),
+        "word_chain":         (3, 3),
+        # kind 4 = emoji memory
+        "memory":             (4, 0),
+        "emoji_memory":       (4, 0),
+        "emoji_quiz":         (4, 1),
+        "guess_the_emoji":    (4, 2),
+        # kind 5 = color pick
+        "rps":                (5, 0),
+        "match_colors":       (5, 1),
+        "predict":            (5, 2),
+        # kind 6 = fast type
+        "reaction_time":      (6, 0),
+        "typing_race":        (6, 1),
+        "quick_draw":         (6, 0),
+        # kind 7 = unscramble
+        "hangman":            (7, 0),
+        "unscramble":         (7, 0),
+        "spelling_bee":       (7, 1),
+        "scramble_sentence":  (7, 2),
+        "text_twist":         (7, 3),
+        "first_letter":       (7, 4),
+        "last_letter":        (7, 5),
+        # kind 8 = yes/no trivia
+        "trivia":             (8, 0),
+        "capitals":           (8, 1),
+        "synonym":            (8, 2),
+        "antonym":            (8, 3),
+        "month_quiz":         (8, 4),
+        "weekday_quiz":       (8, 5),
+        "short_story":        (8, 6),
+        # kind 9 = pick item from list
+        "choose":             (9, 0),
+        "treasure_hunt":      (9, 1),
+        "labelling":          (9, 2),
+        # kind 10 = find pair
+        "find_pair":          (10, 0),
+        # kind 11 = odd one out
+        "odd_one_out":        (11, 0),
+        # kind 12 = sequence complete
+        "sequence_complete":  (12, 0),
+        # kind 13 = tap count
+        "tap_count":          (13, 0),
+        # kind 14 = bubble pop
+        "bubble_pop":         (14, 0),
+        # kind 15 = quick draw char
+        "pick_a_card":        (15, 0),
+        # kind 16 = number chain
+        "number_chain":       (16, 0),
+        # kind 17 = color guess
+        "color_guess":        (17, 0),
+        # kind 18 = flip words
+        "flip_words":         (18, 0),
+    }
+
+    async def _handle_game(self, ctx, internal: str) -> None:
+        """
+        Entry point for every auto-registered minigame command.
+
+        Routes the call to the correct game implementation:
+        - internal names like "micro_42" → `_micro_play(ctx, 42, ...)`
+        - named games like "hangman", "coinflip" → mapped via _NAMED_GAME_KINDS
+        - anything unknown → fallback generic micro_1
+        """
+        # Ensure user file exists / touch last_active
+        try:
+            from utils.user_storage import touch_user as _touch
+            asyncio.create_task(_touch(int(ctx.author.id), getattr(ctx.author, "name", None)))
+        except Exception:
+            pass
+
+        # micro_N  ──────────────────────────────────────────────────────
+        if internal.startswith("micro_"):
+            try:
+                idx = int(internal.split("_", 1)[1])
+            except Exception:
+                idx = 1
+            await self._micro_play(ctx, idx, 0, False, internal)
+            return
+
+        # named game ─────────────────────────────────────────────────────
+        kind_id, _variant = self._NAMED_GAME_KINDS.get(internal, (0, 0))
+        # _micro_play maps (idx-1) % 10 → kind_id, so idx = kind_id + 1
+        idx = kind_id + 1
+        await self._micro_play(ctx, idx, _variant, False, internal)
 
     async def _micro_play(self, ctx, kind: int, variant: int, is_advanced: bool, name: str):
         """Handle micro games by index.

@@ -15,6 +15,10 @@ import os
 import json
 import requests
 from io import BytesIO
+try:
+    from utils.stat_hooks import us_inc as _pk_inc, us_mg as _pk_mg
+except Exception:
+    _pk_inc = _pk_mg = None
 
 
 # Cache
@@ -1282,9 +1286,23 @@ class PokerCog(commands.Cog):
         
         # End - return stacks only in paid mode
         if game.settings['game_mode'] == 'paid':
+            buy_in = game.settings.get('buy_in', 0)
             for p in game.players:
                 if p['stack'] > 0 and not p['is_bot']:
                     game.economy_cog.add_coins(p['user'].id, p['stack'], "poker_winnings")
+            if _pk_mg:
+                try:
+                    for p in game.players:
+                        if not p['is_bot']:
+                            if p['stack'] > buy_in:
+                                _pk_mg(p['user'].id, 'poker', 'win', p['stack'] - buy_in)
+                                _pk_inc(p['user'].id, 'poker_wins')
+                            else:
+                                _pk_mg(p['user'].id, 'poker', 'loss', 0)
+                                _pk_inc(p['user'].id, 'poker_losses')
+                            _pk_inc(p['user'].id, 'poker_played')
+                except Exception:
+                    pass
         
         if channel.id in active_games:
             del active_games[channel.id]
@@ -1381,13 +1399,33 @@ class PokerCog(commands.Cog):
             economy_cog.add_coins(interaction.user.id, winnings, "fast_poker_win")
             result_text = f"**You win!**\n+{winnings - bet_amount} coins"
             color = discord.Color.gold()
+            if _pk_mg:
+                try:
+                    _pk_mg(interaction.user.id, 'poker', 'win', winnings - bet_amount)
+                    _pk_inc(interaction.user.id, 'poker_wins')
+                    _pk_inc(interaction.user.id, 'poker_played')
+                except Exception:
+                    pass
         elif result == -1:
             result_text = f"**Dealer wins!**\n-{bet_amount} coins"
             color = discord.Color.red()
+            if _pk_mg:
+                try:
+                    _pk_mg(interaction.user.id, 'poker', 'loss', 0)
+                    _pk_inc(interaction.user.id, 'poker_losses')
+                    _pk_inc(interaction.user.id, 'poker_played')
+                except Exception:
+                    pass
         else:
             economy_cog.add_coins(interaction.user.id, bet_amount, "fast_poker_tie")
             result_text = "**Draw!**\nBet returned"
             color = discord.Color.blue()
+            if _pk_mg:
+                try:
+                    _pk_mg(interaction.user.id, 'poker', 'draw', 0)
+                    _pk_inc(interaction.user.id, 'poker_played')
+                except Exception:
+                    pass
         
         # Create embed
         embed = discord.Embed(

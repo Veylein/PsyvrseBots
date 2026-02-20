@@ -14,6 +14,10 @@ try:
 except Exception:
     tcg_manager = None
     CARD_DATABASE = {}
+try:
+    from utils.stat_hooks import us_inc as _arc_inc, us_mg as _arc_mg
+except Exception:
+    _arc_inc = _arc_mg = None
 
 class ArcadeGames(commands.Cog):
     """Arcade-style games"""
@@ -158,6 +162,11 @@ class ArcadeGames(commands.Cog):
                         color=discord.Color.red()
                     )
                     await msg.edit(embed=embed)
+                    if _arc_mg:
+                        try:
+                            _arc_mg(interaction.user.id, 'pacman', 'loss', 0)
+                        except Exception:
+                            pass
                     # Chance to award a difficult TCG card for arcade win
                     if tcg_manager:
                         try:
@@ -179,6 +188,12 @@ class ArcadeGames(commands.Cog):
                         color=discord.Color.gold()
                     )
                     await msg.edit(embed=embed)
+                    if _arc_mg:
+                        try:
+                            _arc_mg(interaction.user.id, 'pacman', 'win', reward)
+                            _arc_inc(interaction.user.id, 'arcade_wins')
+                        except Exception:
+                            pass
                     del self.active_games[game_id]
                     break
                 
@@ -287,6 +302,12 @@ class ArcadeGames(commands.Cog):
             color=discord.Color.gold()
         )
         await interaction.edit_original_response(embed=embed)
+        if _arc_mg:
+            try:
+                _arc_mg(interaction.user.id, 'mathgame', 'win', reward)
+                _arc_inc(interaction.user.id, 'arcade_wins')
+            except Exception:
+                pass
         # Chance to award a difficult TCG card for math-game completion
         if tcg_manager:
             try:
@@ -383,6 +404,12 @@ class ArcadeGames(commands.Cog):
                                     color=discord.Color.green()
                                 )
                                 await result.reply(embed=embed)
+                                if _arc_mg:
+                                    try:
+                                        _arc_mg(interaction.user.id, 'bombdefuse', 'win', reward)
+                                        _arc_inc(interaction.user.id, 'arcade_wins')
+                                    except Exception:
+                                        pass
                                 # Chance to award a difficult TCG card for bomb defuse win
                                 if tcg_manager:
                                     try:
@@ -404,6 +431,11 @@ class ArcadeGames(commands.Cog):
                                         color=discord.Color.dark_red()
                                     )
                                     await result.reply(embed=embed)
+                                    if _arc_mg:
+                                        try:
+                                            _arc_mg(interaction.user.id, 'bombdefuse', 'loss', 0)
+                                        except Exception:
+                                            pass
                                     del self.active_games[game_id]
                                     break
                                 else:

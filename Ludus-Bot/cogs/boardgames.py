@@ -9,6 +9,31 @@ import time
 from discord.ui import View, Button
 from cogs.minigames import PaginatedHelpView
 
+# User stats persistence
+try:
+    from utils.user_storage import record_minigame_result as _us_record, increment_stat as _us_inc
+except Exception:
+    _us_record = None
+    _us_inc = None
+
+def _record_game(user_id, game, result, coins=0, username=None):
+    """Fire-and-forget: record a game result into data/users/{id}.json"""
+    if _us_record is None:
+        return
+    try:
+        asyncio.create_task(_us_record(int(user_id), game, result, coins, username))
+    except Exception:
+        pass
+
+def _inc_stat(user_id, stat, username=None):
+    """Fire-and-forget: increment a stat in data/users/{id}.json"""
+    if _us_inc is None:
+        return
+    try:
+        asyncio.create_task(_us_inc(int(user_id), stat, 1, username))
+    except Exception:
+        pass
+
 # Import TCG system for card rewards
 try:
     from cogs.psyvrse_tcg import inventory as tcg_inventory, generate_card_from_seed
@@ -357,12 +382,63 @@ async def process_move(bot, interaction, game_id, game, idx):
                             pass
                     except Exception:
                         pass
+
+                # Update profile stats (TTT)
+                profile_cog = bot.get_cog("Profile")
+                if profile_cog:
+                    pm = profile_cog.profile_manager
+                    pm.increment_stat(int(win_id), 'tictactoe_played')
+                    pm.increment_stat(int(win_id), 'tictactoe_wins')
+                    pm.increment_stat(int(win_id), 'minigames_played')
+                    pm.increment_stat(int(win_id), 'minigames_won')
+                    if lose_id != 'BOT_AI':
+                        pm.increment_stat(int(lose_id), 'tictactoe_played')
+                        pm.increment_stat(int(lose_id), 'minigames_played')
+                    # Check TTT achievements
+                    ach_cog = bot.get_cog("Achievements")
+                    if ach_cog:
+                        p = pm.get_profile(int(win_id))
+                        if p.get('tictactoe_played', 0) >= 25:
+                            ach_cog.manager.unlock_achievement(int(win_id), 'ttt_player')
+                        if p.get('tictactoe_wins', 0) >= 50:
+                            ach_cog.manager.unlock_achievement(int(win_id), 'ttt_master')
+                # Update user_storage stats (data/users/{id}.json)
+                _record_game(win_id, 'tictactoe', 'win', 50)
+                _inc_stat(win_id, 'tictactoe_wins')
+                _inc_stat(win_id, 'tictactoe_played')
+                _inc_stat(win_id, 'minigames_played')
+                _inc_stat(win_id, 'minigames_won')
+                if lose_id != 'BOT_AI':
+                    _record_game(lose_id, 'tictactoe', 'loss', 0)
+                    _inc_stat(lose_id, 'tictactoe_losses')
+                    _inc_stat(lose_id, 'tictactoe_played')
+                    _inc_stat(lose_id, 'minigames_played')
+            elif lose_id != 'BOT_AI':  # bot won — still track the human loser
+                _record_game(lose_id, 'tictactoe', 'loss', 0)
+                _inc_stat(lose_id, 'tictactoe_losses')
+                _inc_stat(lose_id, 'tictactoe_played')
+                _inc_stat(lose_id, 'minigames_played')
             
             winner_mention = "🤖 BOT" if win_id == 'BOT_AI' else f"<@{win_id}>"
             embed = discord.Embed(title="Game Over!", description=f"{winner_mention} won!", color=discord.Color.green())
         else:
             # Draw - no coins awarded
             p1, p2 = game['players']['1'], game['players']['2']
+            # Update played stats for draw
+            profile_cog = bot.get_cog("Profile")
+            if profile_cog:
+                pm = profile_cog.profile_manager
+                for pid in [p1, p2]:
+                    if pid != 'BOT_AI':
+                        pm.increment_stat(int(pid), 'tictactoe_played')
+                        pm.increment_stat(int(pid), 'minigames_played')
+            # Update user_storage stats for draw
+            for pid in [p1, p2]:
+                if pid != 'BOT_AI':
+                    _record_game(pid, 'tictactoe', 'draw', 0)
+                    _inc_stat(pid, 'tictactoe_draws')
+                    _inc_stat(pid, 'tictactoe_played')
+                    _inc_stat(pid, 'minigames_played')
             embed = discord.Embed(title="Draw!", color=discord.Color.orange())
 
         view = generate_board_view(game_id, game['board'], size, disabled=True, symbols=symbols)
@@ -523,6 +599,14 @@ class BoardGames(commands.Cog):
 
     # TTT INTERACTION HANDLERS
 
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if interaction.type != discord.InteractionType.component:
+            return
+        cid = (interaction.data or {}).get("custom_id", "")
+        if cid.startswith("ttt_"):
+            await self.handle_ttt_interaction(interaction, cid)
+
     async def handle_ttt_interaction(self, interaction: discord.Interaction, cid: str):
         """Main router for all TTT-related interactions"""
         if cid.startswith('ttt_set_'):
@@ -571,7 +655,7 @@ class BoardGames(commands.Cog):
         else:
             return await interaction.response.edit_message(content="Unknown setting.", view=None)
 
-        host = await self.bot.fetch_user(int(lobby['hostId']))
+        host = self.bot.get_user(int(lobby['hostId']))
         main_lobby_msg = interaction.channel.get_partial_message(lobby['messageId'])
         await main_lobby_msg.edit(
             embed=generate_lobby_embed(lobby, host), 
@@ -595,7 +679,7 @@ class BoardGames(commands.Cog):
             return await interaction.response.send_message("Lobby doesn't exist.", ephemeral=True)
 
         uid = str(interaction.user.id)
-        host = await self.bot.fetch_user(int(lobby['hostId']))
+        host = self.bot.get_user(int(lobby['hostId']))
 
         if action == 'join':
             await self.handle_lobby_join(interaction, lobby, lobby_id, uid, host)
@@ -1043,7 +1127,28 @@ class BoardGames(commands.Cog):
             if economy_cog:
                 economy_cog.add_coins(player.id, 75, "c4_win")
                 embed.add_field(name="Reward", value="+75 PsyCoins", inline=False)
-            
+
+            # Track Connect4 stats
+            try:
+                profile_cog = self.bot.get_cog("Profile")
+                if profile_cog and hasattr(profile_cog, "profile_manager"):
+                    pm = profile_cog.profile_manager
+                    pm.increment_stat(player.id, 'connect4_played')
+                    pm.increment_stat(player.id, 'connect4_wins')
+                    for p_id in game_state["players"]:
+                        if p_id != "AI" and p_id != player.id:
+                            pm.increment_stat(p_id, 'connect4_played')
+            except Exception:
+                pass
+            _record_game(player.id, 'connect4', 'win', 75)
+            _inc_stat(player.id, 'connect4_wins')
+            _inc_stat(player.id, 'connect4_played')
+            for p_id in game_state["players"]:
+                if p_id != "AI" and p_id != player.id:
+                    _record_game(p_id, 'connect4', 'loss', 0)
+                    _inc_stat(p_id, 'connect4_losses')
+                    _inc_stat(p_id, 'connect4_played')
+
             # Clean up game
             for p_id in game_state["players"]:
                 if p_id != "AI" and p_id in self.player_games:
@@ -1067,6 +1172,17 @@ class BoardGames(commands.Cog):
                 if p_id != "AI" and p_id in self.player_games:
                     del self.player_games[p_id]
             del self.active_games[game_id]
+
+            # Track Connect4 draw stats
+            try:
+                profile_cog = self.bot.get_cog("Profile")
+                if profile_cog and hasattr(profile_cog, "profile_manager"):
+                    pm = profile_cog.profile_manager
+                    for p_id in list(game_state["players"]):
+                        if p_id != "AI":
+                            pm.increment_stat(p_id, 'connect4_played')
+            except Exception:
+                pass
             
             if interaction:
                 await interaction.followup.send(embed=embed)
@@ -1087,7 +1203,10 @@ class BoardGames(commands.Cog):
                         embed = self._create_c4_embed(game_state, player, "AI")
                         embed.title = "🤖 AI wins!"
                         embed.color = discord.Color.red()
-                        
+                        # Track human player's loss against AI
+                        _record_game(player.id, 'connect4', 'loss', 0)
+                        _inc_stat(player.id, 'connect4_losses')
+                        _inc_stat(player.id, 'connect4_played')
                         del self.player_games[player.id]
                         del self.active_games[game_id]
                         
@@ -1356,6 +1475,19 @@ class BoardGames(commands.Cog):
                 
                 del self.player_games[message.author.id]
                 del self.active_games[game_id]
+
+                # Track Hangman win stats
+                try:
+                    profile_cog = self.bot.get_cog("Profile")
+                    if profile_cog and hasattr(profile_cog, "profile_manager"):
+                        pm = profile_cog.profile_manager
+                        pm.increment_stat(message.author.id, 'hangman_played')
+                        pm.increment_stat(message.author.id, 'hangman_wins')
+                except Exception:
+                    pass
+                _record_game(message.author.id, 'hangman', 'win', reward if economy_cog else 0)
+                _inc_stat(message.author.id, 'hangman_wins')
+                _inc_stat(message.author.id, 'hangman_played')
             else:
                 embed = self._create_hangman_embed(game_state, message.author)
                 await message.channel.send(f"✅ **{guess}** is in the word!", embed=embed)
@@ -1374,6 +1506,18 @@ class BoardGames(commands.Cog):
                 
                 del self.player_games[message.author.id]
                 del self.active_games[game_id]
+
+                # Track Hangman loss stats
+                try:
+                    profile_cog = self.bot.get_cog("Profile")
+                    if profile_cog and hasattr(profile_cog, "profile_manager"):
+                        pm = profile_cog.profile_manager
+                        pm.increment_stat(message.author.id, 'hangman_played')
+                except Exception:
+                    pass
+                _record_game(message.author.id, 'hangman', 'loss', 0)
+                _inc_stat(message.author.id, 'hangman_losses')
+                _inc_stat(message.author.id, 'hangman_played')
             else:
                 embed = self._create_hangman_embed(game_state, message.author)
                 await message.channel.send(f"❌ **{guess}** is not in the word!", embed=embed)

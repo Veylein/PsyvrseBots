@@ -25,6 +25,11 @@ from poker import (
     CARD_SPACING, TABLE_WIDTH, TABLE_HEIGHT, CARD_WHITE, draw_card_back
 )
 
+try:
+    from utils.stat_hooks import us_inc as _bj_inc, us_mg as _bj_mg
+except Exception:
+    _bj_inc = _bj_mg = None
+
 # Active games
 active_blackjack_games = {}
 
@@ -1332,7 +1337,32 @@ class BlackjackGame:
         )
         
         summary_lines = []
-        
+
+        # ── Record stats into data/users/{id}.json ──────────────────
+        if _bj_inc is not None and _bj_mg is not None:
+            try:
+                for _p in self.players:
+                    if _p.get('is_bot') or _p.get('result') is None:
+                        continue
+                    _uid   = _p['user'].id
+                    _uname = getattr(_p['user'], 'name', None)
+                    _r     = _p['result']
+                    _coins = (int(_p['bet'] * 1.5) if _r == 'blackjack'
+                              else (_p['bet'] * 2  if _r == 'win' else 0))
+                    _bj_mg(_uid, 'blackjack',
+                           'win' if _r in ('win', 'blackjack') else
+                           ('draw' if _r == 'push' else 'loss'),
+                           _coins, _uname)
+                    if _r in ('win', 'blackjack'):
+                        _bj_inc(_uid, 'blackjack_wins',      1,      _uname)
+                        _bj_inc(_uid, 'blackjack_coins_won', _coins, _uname)
+                    elif _r == 'lose':
+                        _bj_inc(_uid, 'blackjack_losses', 1, _uname)
+                    elif _r == 'push':
+                        _bj_inc(_uid, 'blackjack_draws', 1, _uname)
+            except Exception:
+                pass
+
         if not is_pvp:
             summary_lines.append(f"**Dealer:** {dealer_value} {'BLACKJACK! 🎰' if dealer_blackjack else 'BUST!' if dealer_value > 21 else ''}")
             summary_lines.append("")

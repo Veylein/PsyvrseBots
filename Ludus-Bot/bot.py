@@ -17,28 +17,6 @@ import aiofiles
 from googletrans import Translator
 import difflib
 
-file_path = os.path.join(os.path.dirname(__file__), 'data', 'user_template.json')
-dir_path = os.path.dirname(file_path)
-os.makedirs(dir_path, exist_ok=True)
-
-# Ensure directory exists before file operations
-dir_path = os.path.dirname(file_path)
-os.makedirs(dir_path, exist_ok=True)
-
-# load
-try:
-    with open(file_path, "r") as f:
-        data = json.load(f)
-except FileNotFoundError:
-    data = {}
-
-# update data
-data["123456789"] = {"coins": 100}
-
-# save
-with open(file_path, "w") as f:
-    json.dump(data, f, indent=4)
-
 # Load Ludus Q&A and user memory
 LUDUS_QA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'ludus_qa.json')
 def load_ludus_qa():
@@ -288,11 +266,41 @@ def _record_user_activity(user_id, username, interaction_type, name, extra=None)
 async def on_command_completion(ctx):
     cmd_name = getattr(ctx.command, "qualified_name", "unknown")
     _record_user_activity(ctx.author.id, getattr(ctx.author, "name", None), "command", cmd_name)
+    # Create/update data/users/{id}.json on every successful prefix command
+    try:
+        asyncio.create_task(
+            user_storage.record_activity(
+                ctx.author.id,
+                getattr(ctx.author, "name", None),
+                "command",
+                cmd_name,
+            )
+        )
+    except Exception:
+        pass
+    try:
+        profile_cog = bot.get_cog("Profile")
+        if profile_cog and hasattr(profile_cog, "profile_manager"):
+            profile_cog.profile_manager.increment_stat(ctx.author.id, 'commands_used')
+    except Exception:
+        pass
 
 @bot.event
 async def on_app_command_completion(interaction: discord.Interaction, command):
     cmd_name = getattr(command, "qualified_name", None) or getattr(command, "name", None) or "app_command"
     _record_user_activity(interaction.user.id, getattr(interaction.user, "name", None), "app_command", cmd_name)
+    # Create/update data/users/{id}.json on every successful slash command
+    try:
+        asyncio.create_task(
+            user_storage.record_activity(
+                interaction.user.id,
+                getattr(interaction.user, "name", None),
+                "app_command",
+                cmd_name,
+            )
+        )
+    except Exception:
+        pass
 
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
@@ -612,6 +620,13 @@ async def on_ready():
 async def on_message(message):
     if message.author == bot.user:
         return
+    # Create/update data/users/{id}.json for every real user message
+    try:
+        asyncio.create_task(
+            user_storage.touch_user(message.author.id, getattr(message.author, 'name', None))
+        )
+    except Exception:
+        pass
     # If LudusPersonality cog is loaded, let it handle all messages
     personality_cog = bot.get_cog("LudusPersonality")
     if personality_cog:

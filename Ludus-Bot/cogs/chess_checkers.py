@@ -7,6 +7,10 @@ import chess
 import random
 from PIL import Image, ImageDraw, ImageFont
 import io
+try:
+    from utils.stat_hooks import us_inc as _cc_inc, us_mg as _cc_mg
+except Exception:
+    _cc_inc = _cc_mg = None
 
 
 class CheckersMoveModal(discord.ui.Modal, title="Make Your Move"):
@@ -76,6 +80,7 @@ class CheckersMoveModal(discord.ui.Modal, title="Make Your Move"):
             if "Winner" in status_text:
                 winner_player = 1 if "Red" in status_text else 2
                 winner_id = self.game['red_player'] if winner_player == 1 else self.game['black_player']
+                loser_id = self.game['black_player'] if winner_player == 1 else self.game['red_player']
                 if winner_id != 'BOT_AI':
                     economy_cog = self.cog.bot.get_cog("Economy")
                     if economy_cog:
@@ -85,6 +90,22 @@ class CheckersMoveModal(discord.ui.Modal, title="Make Your Move"):
                     if game_stats_cog:
                         duration = int(time.time() - self.game['start_time'])
                         game_stats_cog.record_game(int(winner_id), "checkers", won=True, coins_earned=25, playtime_seconds=duration, category="board_games")
+                    if _cc_mg:
+                        try:
+                            _cc_mg(int(winner_id), 'checkers', 'win', 25)
+                            _cc_inc(int(winner_id), 'checkers_wins')
+                            if loser_id != 'BOT_AI':
+                                _cc_mg(int(loser_id), 'checkers', 'loss', 0)
+                                _cc_inc(int(loser_id), 'checkers_losses')
+                        except Exception:
+                            pass
+                else:  # bot won — track the human loser
+                    if loser_id != 'BOT_AI' and _cc_mg:
+                        try:
+                            _cc_mg(int(loser_id), 'checkers', 'loss', 0)
+                            _cc_inc(int(loser_id), 'checkers_losses')
+                        except Exception:
+                            pass
             
             self.cog.bot.active_games.pop(self.game_id, None)
         else:
@@ -203,6 +224,24 @@ class ChessMoveModal(discord.ui.Modal, title="Make Your Move"):
                             playtime_seconds=duration//1000,
                             category="board_games"
                         )
+                    if _cc_mg:
+                        try:
+                            loser = self.game['black_player'] if "White" in status_text else self.game['white_player']
+                            _cc_mg(int(winner), 'chess', 'win', 30)
+                            _cc_inc(int(winner), 'chess_wins')
+                            if loser != 'BOT_AI':
+                                _cc_mg(int(loser), 'chess', 'loss', 0)
+                                _cc_inc(int(loser), 'chess_losses')
+                        except Exception:
+                            pass
+                else:  # bot won — track the human loser
+                    loser = self.game['black_player'] if "White" in status_text else self.game['white_player']
+                    if loser != 'BOT_AI' and _cc_mg:
+                        try:
+                            _cc_mg(int(loser), 'chess', 'loss', 0)
+                            _cc_inc(int(loser), 'chess_losses')
+                        except Exception:
+                            pass
             
             self.cog.bot.active_games.pop(self.game_id, None)
         else:
@@ -831,6 +870,16 @@ class ChessCog(commands.Cog):
                             playtime_seconds=duration//1000,
                             category="board_games"
                         )
+                    if _cc_mg:
+                        try:
+                            loser = game['black_player'] if "White" in status_text else game['white_player']
+                            _cc_mg(int(winner), 'chess', 'win', 30)
+                            _cc_inc(int(winner), 'chess_wins')
+                            if loser != 'BOT_AI':
+                                _cc_mg(int(loser), 'chess', 'loss', 0)
+                                _cc_inc(int(loser), 'chess_losses')
+                        except Exception:
+                            pass
             
             self.bot.active_games.pop(game_id, None)
         else:
@@ -932,6 +981,16 @@ class ChessCog(commands.Cog):
                             playtime_seconds=duration//1000,
                             category="board_games"
                         )
+                    if _cc_mg:
+                        try:
+                            loser = game['black_player'] if "White" in status_text else game['white_player']
+                            _cc_mg(int(winner), 'chess', 'win', 30)
+                            _cc_inc(int(winner), 'chess_wins')
+                            if loser != 'BOT_AI':
+                                _cc_mg(int(loser), 'chess', 'loss', 0)
+                                _cc_inc(int(loser), 'chess_losses')
+                        except Exception:
+                            pass
             
             self.bot.active_games.pop(game_id, None)
         else:

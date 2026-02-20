@@ -14,6 +14,10 @@ from cogs.minigames import PaginatedHelpView
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
 import traceback
 try:
+    from utils.stat_hooks import us_inc as _f_inc
+except Exception:
+    _f_inc = None
+try:
     from .tcg import manager as tcg_manager
     from .psyvrse_tcg import CARD_DATABASE
 except Exception:
@@ -354,6 +358,16 @@ class FishingMinigameView(discord.ui.View):
         user_data["total_catches"] += 1
         user_data["total_value"] += fish_data["value"]
         self.cog.save_fishing_data()
+        # Track in data/users/{id}.json
+        if _f_inc is not None:
+            try:
+                _f_inc(int(self.user.id), 'fishing_total_caught')
+                if fish_data.get('rarity') in ('Rare', 'Epic', 'Legendary', 'Mythic'):
+                    _f_inc(int(self.user.id), 'fishing_rare_caught')
+                if fish_data.get('value', 0) > 0:
+                    _f_inc(int(self.user.id), 'fishing_coins_earned', int(fish_data['value']))
+            except Exception:
+                pass
         
         # Award coins
         economy_cog = self.cog.bot.get_cog("Economy")

@@ -11,6 +11,10 @@ import sys
 # Add utils to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.card_visuals import create_comparison_image, parse_card
+try:
+    from utils.stat_hooks import us_inc as _g_inc, us_mg as _g_mg
+except Exception:
+    _g_inc = _g_mg = None
 
 
 # ==================== GAMBLING AWARENESS ====================
@@ -565,6 +569,23 @@ class Gambling(commands.Cog):
             stats["games"][game]["lost"] += 1
 
         self.save_stats()
+        # Mirror into data/users/{id}.json
+        if _g_mg is not None:
+            try:
+                _g_mg(int(user_id), game, 'win' if won else 'loss', payout if won else 0)
+            except Exception:
+                pass
+        if _g_inc is not None:
+            try:
+                stat_prefix = game  # e.g. 'slots', 'crash', 'roulette'
+                if won:
+                    _g_inc(int(user_id), f'{stat_prefix}_wins')
+                    if payout > 0:
+                        _g_inc(int(user_id), f'{stat_prefix}_coins_won', int(payout))
+                else:
+                    _g_inc(int(user_id), f'{stat_prefix}_losses')
+            except Exception:
+                pass
     
     # ==================== POKER ====================
     
