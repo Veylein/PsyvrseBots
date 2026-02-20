@@ -243,14 +243,21 @@ class ModerationStore:
         return None
 
 
-load_dotenv()
+
+# Load .env from the same directory as this script
+env_path = Path(__file__).parent / ".env"
+load_dotenv(env_path)
+
 TOKEN = (
     os.getenv("PSYVRSE_TOKEN")
     or os.getenv("DISCORD_TOKEN")
     or os.getenv("PSYVERSE_TOKEN")
 )
 if not TOKEN:
-    raise RuntimeError("Missing PSYVRSE_TOKEN/DISCORD_TOKEN/PSYVERSE_TOKEN in .env")
+    raise RuntimeError(f"Missing PSYVRSE_TOKEN/DISCORD_TOKEN in {env_path}")
+
+TOKEN = TOKEN.strip()
+
 
 allowed_guild_raw = os.getenv("PSYVRSE_GUILD_ID") or os.getenv("ALLOWED_GUILD_ID")
 if allowed_guild_raw and allowed_guild_raw.isdigit():
@@ -566,13 +573,14 @@ async def prefix_scope_check(ctx: commands.Context) -> bool:
     return True
 
 
-@bot.tree.check
 async def slash_scope_check(interaction: discord.Interaction) -> bool:
     if interaction.guild is None:
         raise app_commands.CheckFailure("This command only works in servers.")
     if ALLOWED_GUILD_ID and interaction.guild_id != ALLOWED_GUILD_ID:
         raise app_commands.CheckFailure("This bot is locked to Psyvrse.")
     return True
+
+bot.tree.interaction_check = slash_scope_check
 
 
 @bot.event
