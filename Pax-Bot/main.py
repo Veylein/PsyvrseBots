@@ -3930,11 +3930,11 @@ async def help_command(ctx, category: str = None):
             if (not user_data) or (user_data.get("chi", 0) == 0 and not user_data.get("help_given", False)):
                 if not user_data:
                     chi_data[user_id_str] = {"chi": 0, "rebirths": 0}
-                chi_data[user_id_str]["chi"] = chi_data[user_id_str].get("chi", 0) + 150
+                chi_data[user_id_str]["chi"] = chi_data[user_id_str].get("chi", 0) + 500
                 chi_data[user_id_str]["help_given"] = True
                 save_data()
                 try:
-                    await ctx.send(f"🎁 Welcome! You've been granted **150 chi** to get started, {ctx.author.mention}!")
+                    await ctx.send(f"🎁 Welcome! You've been granted **500 chi** to get started, {ctx.author.mention}!")
                 except Exception:
                     pass
     except Exception:
