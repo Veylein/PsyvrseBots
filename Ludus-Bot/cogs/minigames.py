@@ -3,8 +3,7 @@ from discord.ext import commands
 import random
 import asyncio
 import time
-from typing import List
-
+from typing import Any, cast
 
 class Minigames(commands.Cog):
     """A large collection of small prefix minigames (first 50).
@@ -23,11 +22,8 @@ class Minigames(commands.Cog):
 
     async def _award_win(self, ctx, game_name: str, amount: int = 5):
         """Best-effort: award `amount` PsyCoins using the Economy cog."""
-        eco = None
-        try:
-            eco = self.bot.get_cog("Economy")
-        except Exception:
-            eco = None
+
+        eco = cast(Any, self.bot.get_cog("Economy"))
         if eco and hasattr(eco, "add_coins"):
             try:
                 res = eco.add_coins(ctx.author.id, amount, f"Win: {game_name}")
@@ -335,28 +331,27 @@ class Minigames(commands.Cog):
             message = await ctx.send("Start tapping! 🖱️")
             await message.add_reaction("🖱️")
 
-            def check(reaction, user):
+            def reaction_check(reaction, user):
                 return user == ctx.author and str(reaction.emoji) == "🖱️"
 
+            reaction_count = 0
             try:
-                reaction_count = 0
                 while True:
-                    reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=10.0)
+                    reaction, user = await self.bot.wait_for("reaction_add", check=reaction_check, timeout=10.0)
                     reaction_count += 1
             except asyncio.TimeoutError:
                 await ctx.send(f"Time's up! You tapped {reaction_count} times.")
-                await self._award_win(ctx, "tap_count")
 
         # KIND 14: bubble pop
         if kind_id == 14:
             bubbles = ["🟢", "🔵", "🟡", "🔴"]
             await ctx.send(f"Pop the bubbles by typing their colors: {', '.join(bubbles)}")
 
-            def check(m):
+            def color_check(m):
                 return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() in ["green", "blue", "yellow", "red"]
 
             try:
-                msg = await self.bot.wait_for("message", check=check, timeout=15.0)
+                msg = await self.bot.wait_for("message", check=color_check, timeout=15.0)
                 await ctx.send("Pop! You popped a bubble.")
                 await self._award_win(ctx, "bubble_pop")
             except asyncio.TimeoutError:
@@ -399,11 +394,11 @@ class Minigames(commands.Cog):
             correct_color = random.choice(colors)
             await ctx.send(f"Guess the color I'm thinking of: {', '.join(colors)}")
 
-            def check(m):
+            def author_check(m):
                 return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() in colors
 
             try:
-                msg = await self.bot.wait_for("message", check=check, timeout=15.0)
+                msg = await self.bot.wait_for("message", check=author_check, timeout=15.0)
                 if msg.content.lower() == correct_color:
                     await ctx.send("Correct! You guessed the color.")
                     await self._award_win(ctx, "color_guess")
@@ -436,7 +431,7 @@ class Minigames(commands.Cog):
             suits = ["Hearts", "Diamonds", "Clubs", "Spades"]
             ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace"]
             card = f"{random.choice(ranks)} of {random.choice(suits)}"
-            await ctx.send(f"I picked a card. Guess what it is!")
+            await ctx.send("I picked a card. Guess what it is!")
 
             def check(m):
                 return m.author == ctx.author and m.channel == ctx.channel
@@ -837,7 +832,8 @@ async def setup(bot: commands.Bot):
             @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
             async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
                 try:
-                    await interaction.message.delete()
+                    if interaction.message:
+                        await interaction.message.delete()
                 except Exception:
                     await interaction.response.defer()
 
@@ -860,13 +856,7 @@ async def setup(bot: commands.Bot):
         pass
 
     await bot.add_cog(cog)
-import discord
-from discord.ext import commands
-import random
-import asyncio
-import time
-
-
+    
 # Lightweight PaginatedHelpView for external imports that expect it.
 class PaginatedHelpView(discord.ui.View):
     """Compatibility paginator for other cogs.
@@ -920,7 +910,8 @@ class PaginatedHelpView(discord.ui.View):
             except Exception:
                 # last resort: send in channel if available
                 if self.interaction.channel:
-                    self.message = await self.interaction.channel.send(embed=self._make_embed(), view=self)
+                    channel = cast(discord.abc.Messageable, self.interaction.channel)
+                    self.message = await channel.send(embed=self._make_embed(), view=self)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.author.id
@@ -945,10 +936,10 @@ class PaginatedHelpView(discord.ui.View):
     async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             if self.message:
-                await self.message.delete()
+                if self.message:
+                    await self.message.delete()
             else:
-                await interaction.message.delete()
+                if interaction.message:
+                    await interaction.message.delete()
         except Exception:
             await interaction.response.defer()
-
-
