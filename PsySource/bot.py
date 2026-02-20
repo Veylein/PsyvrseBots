@@ -245,12 +245,12 @@ class ModerationStore:
 
 load_dotenv()
 TOKEN = (
-    os.getenv("DISCORD_TOKEN")
+    os.getenv("PSYVRSE_TOKEN")
+    or os.getenv("DISCORD_TOKEN")
     or os.getenv("PSYVERSE_TOKEN")
-    or os.getenv("PSYVRSE_TOKEN")
 )
 if not TOKEN:
-    raise RuntimeError("Missing DISCORD_TOKEN/PSYVERSE_TOKEN/PSYVRSE_TOKEN in .env")
+    raise RuntimeError("Missing PSYVRSE_TOKEN/DISCORD_TOKEN/PSYVERSE_TOKEN in .env")
 
 allowed_guild_raw = os.getenv("PSYVRSE_GUILD_ID") or os.getenv("ALLOWED_GUILD_ID")
 if allowed_guild_raw and allowed_guild_raw.isdigit():
@@ -296,10 +296,10 @@ def is_allowed_guild(guild: Optional[discord.Guild]) -> bool:
         return False
     return True
 
-    @bot.check
-    def mention_channel(channel_id: Optional[int]) -> str:
-        if not channel_id:
-            return "Not set"
+
+def mention_channel(channel_id: Optional[int]) -> str:
+    if not channel_id:
+        return "Not set"
     return f"<#{channel_id}>"
 
 
