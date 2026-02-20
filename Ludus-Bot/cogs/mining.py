@@ -22,23 +22,68 @@ class MiningGame:
     }
     
     BLOCK_VALUES = {
-        "dirt": 1, "stone": 2, "coal": 5, "iron": 15, "gold": 50,
+        "dirt": 1, "stone": 2, "stone": 2, "coal": 5, "iron": 15, "gold": 50,
         "redstone": 30, "diamond": 200, "emerald": 300, "deepslate": 10,
         "netherite": 1000, "ancient_debris": 500, "bedrock": 0, "grass": 1,
         "mineshaft_wood": 2, "mineshaft_support": 3, "mineshaft_rail": 5, "mineshaft_entrance": 0,
         "chest": 0
     }
     
+    # Ore modifiers
+    ORE_STATES = {
+        "cracked": {"multiplier": 0.5, "emoji": "🪨", "color_mod": (50, 50, 50)},  # 50% yield
+        "irradiated": {"energy_cost": "half", "emoji": "☢️", "color_mod": (-30, 100, -30)}  # Takes half of current energy, greenish tint
+    }
+    
+    # Creature types
+    CREATURE_TYPES = {
+        "zombie": {"emoji": "🧟", "health": 3, "damage": 2, "drops": {"coal": (2, 5), "iron": (1, 2)}, "tunnel": False, "speed": 1, "color": (60, 90, 60)},
+        "skeleton": {"emoji": "💀", "health": 2, "damage": 1, "drops": {"stone": (3, 6)}, "tunnel": False, "speed": 2, "color": (200, 200, 200)},
+        "spider": {"emoji": "🕷️", "health": 2, "damage": 2, "drops": {"redstone": (1, 3)}, "tunnel": False, "speed": 3, "color": (100, 40, 40)},
+        "creeper": {"emoji": "💥", "health": 2, "damage": 5, "drops": {}, "penalty": "explosion", "tunnel": True, "speed": 1, "color": (50, 200, 50)},  # Explodes and damages area
+        "enderman": {"emoji": "👾", "health": 4, "damage": 3, "drops": {"emerald": (1, 1)}, "tunnel": False, "speed": 4, "color": (100, 0, 100)},
+        "mole": {"emoji": "🦫", "health": 1, "damage": 0, "drops": {"dirt": (5, 10)}, "tunnel": True, "speed": 1, "color": (90, 60, 40)},  # Creates tunnels, harmless
+        "worm": {"emoji": "🪱", "health": 5, "damage": 4, "drops": {"gold": (2, 5), "diamond": (1, 2)}, "tunnel": True, "speed": 1, "color": (150, 100, 150)},  # Large tunnel digger
+    }
+    
+    # Mining achievements
+    MINING_ACHIEVEMENTS = {
+        "first_mine": {"name": "First Steps", "desc": "Mine your first block", "emoji": "⛏️", "reward": 50},
+        "depth_10": {"name": "Going Deeper", "desc": "Reach depth 10", "emoji": "🕳️", "reward": 100},
+        "depth_50": {"name": "Deep Diver", "desc": "Reach depth 50", "emoji": "🌊", "reward": 500},
+        "depth_100": {"name": "Abyss Walker", "desc": "Reach the Abyss (depth 100)", "emoji": "🌑", "reward": 1000},
+        "diamond_find": {"name": "Diamonds!", "desc": "Find your first diamond", "emoji": "💎", "reward": 200},
+        "emerald_find": {"name": "Emerald Hunter", "desc": "Find your first emerald", "emoji": "💚", "reward": 300},
+        "netherite_find": {"name": "Netherite", "desc": "Find netherite", "emoji": "⬛", "reward": 1000},
+        "rich_miner": {"name": "Rich Miner", "desc": "Earn 10,000 coins from mining", "emoji": "💰", "reward": 500},
+        "explosion_expert": {"name": "Demolitionist", "desc": "Use 10 dynamites", "emoji": "💣", "reward": 300},
+        "creature_hunter": {"name": "Monster Hunter", "desc": "Defeat 10 creatures", "emoji": "🗡️", "reward": 400},
+        "tunnel_rat": {"name": "Tunnel Rat", "desc": "Mine 1000 blocks", "emoji": "🐀", "reward": 600},
+        "chest_finder": {"name": "Treasure Hunter", "desc": "Find 5 chests", "emoji": "📦", "reward": 250},
+    }
+    
     BLOCK_COLORS = {
-        "dirt": (139, 90, 43), "stone": (128, 128, 128), "coal": (50, 50, 50),
-        "iron": (192, 192, 192), "gold": (255, 215, 0), "redstone": (255, 0, 0),
-        "diamond": (0, 191, 255), "emerald": (0, 201, 87), "deepslate": (64, 64, 64),
-        "netherite": (50, 35, 35), "ancient_debris": (101, 67, 33), "bedrock": (32, 32, 32),
+        "dirt": (139, 90, 43), "stone2": (111, 111, 117), "stone": (111, 111, 117), "coal": (40, 40, 45),
+        "iron": (205, 127, 50), "gold": (255, 215, 0), "redstone": (220, 20, 60),
+        "diamond": (0, 200, 255), "emerald": (0, 230, 118), "deepslate": (80, 80, 85),
+        "netherite": (70, 40, 50), "ancient_debris": (120, 85, 60), "bedrock": (25, 25, 28),
         "air": (135, 206, 235), "shop": (139, 69, 19), "player": (255, 255, 0),
         "ladder": (139, 90, 0), "portal": (128, 0, 128), "torch": (255, 200, 0),
         "mineshaft_wood": (101, 67, 33), "mineshaft_support": (139, 69, 19),
         "mineshaft_rail": (160, 160, 160), "mineshaft_entrance": (90, 60, 30),
-        "chest": (139, 69, 19)
+        "chest": (139, 69, 19), "grass": (34, 139, 34), "lapis": (70, 100, 200)
+    }
+    
+    # Minimum pickaxe level required to mine each block
+    BLOCK_REQUIREMENTS = {
+        "dirt": 1, "grass": 1, "coal": 1,
+        "stone": 2, "stone2": 2, "iron": 2, "redstone": 2,
+        "gold": 3, "deepslate": 3,
+        "diamond": 4, "emerald": 4,
+        "netherite": 5, "ancient_debris": 5,
+        "lapis": 2, "bedrock": 999,  # Cannot be mined
+        "mineshaft_wood": 1, "mineshaft_support": 1, "mineshaft_rail": 1,
+        "chest": 1
     }
     
     def __init__(self, user_id: int, seed: int = None, guild_id: int = None, is_shared: bool = False):
@@ -68,10 +113,24 @@ class MiningGame:
         self.coins = 100
         
         # Items inventory (tools/utilities)
-        self.items = {
-            "ladder": 5,    # Temporary: 5 ladders to start
-            "portal": 2,    # Temporary: 2 portals to start
-            "torch": 10     # Temporary: 10 torches to start
+        self.items = {}
+        
+        # Ore states: {(x, y): "cracked" or "irradiated"}
+        self.ore_states = {}
+        
+        # Creatures: {id: {type, x, y, path, path_index, health}}
+        self.creatures = {}
+        self.creature_counter = 0
+        
+        # Mining achievements
+        self.achievements = {}
+        self.stats = {
+            "blocks_mined": 0,
+            "coins_earned": 0,
+            "dynamites_used": 0,
+            "creatures_killed": 0,
+            "chests_found": 0,
+            "max_depth": 0
         }
         
         # Developer mode flags
@@ -104,11 +163,20 @@ class MiningGame:
         
     def generate_world(self, regenerate=False):
         """Generate procedural world"""
-        # If regenerating, clear structures and torches for fresh generation
+        # If regenerating, clear EVERYTHING for fresh start
         if regenerate:
             self.structures = {}
             self.structure_counter = 0
             self.torches = {}
+            self.ladders = {}
+            self.portals = {}
+            self.portal_counter = 0
+            self.map_data = {}  # Clear all blocks including mined areas
+            self.other_players = {}  # Reset player positions
+            # Reset player to spawn point
+            self.x = 1
+            self.y = -1
+            # DON'T reset inventory - player keeps collected ores
         
         # Generate shop at y=-1 (above grass surface)
         for x in range(-50, 50):
@@ -119,18 +187,14 @@ class MiningGame:
             else:
                 self.map_data[(x, -1)] = "air"
         
-        # Generate surface (y=0) with grass - never overwrite existing blocks (especially air from mining)
+        # Generate surface (y=0) with grass
         for x in range(-50, 50):
-            if (x, 0) not in self.map_data:
-                self.map_data[(x, 0)] = "grass"  # Only add grass if position doesn't exist yet
+            self.map_data[(x, 0)] = "grass"
         
         # Generate underground layers starting from y=1
         for y in range(1, 150):
             biome = self.get_biome(y)
             for x in range(-50, 50):
-                # Skip if already exists and we're regenerating (preserve mined areas)
-                if regenerate and (x, y) in self.map_data and self.map_data[(x, y)] == "air":
-                    continue
                 
                 # Stable procedural generation - deterministic seed per position
                 seed_value = (x * 73856093) ^ (y * 19349663) ^ self.seed
@@ -138,7 +202,26 @@ class MiningGame:
                 noise = pos_rng.random()
                 blocks = biome["blocks"]
                 
-                # Weight distribution (common blocks more frequent)
+                # From depth 10+, use the second-layer palette (stone2/coal2/iron) with rare biome ores
+                if y >= 10:
+                    # Probabilities: 60% stone2, 25% coal2, 10% iron, 5% rare biome ore
+                    if noise < 0.60:
+                        block = "stone2"
+                    elif noise < 0.85:
+                        block = "coal2"
+                    elif noise < 0.95:
+                        block = "iron"
+                    else:
+                        # Select ore from biome blocks (excluding stone/deepslate)
+                        ores = [b for b in blocks if b not in ["stone", "deepslate"]]
+                        if ores:
+                            block = pos_rng.choice(ores)
+                        else:
+                            block = "stone2"
+                    self.map_data[(x, y)] = block
+                    continue
+                
+                # Weight distribution (common blocks more frequent) for shallow depths (<10)
                 if noise < 0.6:
                     block = blocks[0]  # Most common
                 elif noise < 0.85:
@@ -150,8 +233,23 @@ class MiningGame:
                 
                 self.map_data[(x, y)] = block
         
+        # Ensure 'coal' does not appear below depth 10 (use 'coal2' there)
+        for (mx, my), mblock in list(self.map_data.items()):
+            if mblock == "coal" and my >= 10:
+                self.map_data[(mx, my)] = "coal2"
+        # Add ore states (cracked/irradiated) - 10% of ores get a state
+        valuable_ores = ["coal", "coal2", "iron", "gold", "redstone", "diamond", "emerald", "netherite", "ancient_debris"]
+        for (ox, oy), block_type in list(self.map_data.items()):
+            if block_type in valuable_ores:
+                if self.rng.random() < 0.10:  # 10% chance
+                    state = self.rng.choice(["cracked", "irradiated"])
+                    self.ore_states[(ox, oy)] = state
+        
         # Generate structures on both first generation and regeneration
         self.generate_structures()
+        
+        # Spawn creatures
+        self.spawn_creatures()
     
     def generate_structures(self):
         """Generate world structures like mineshafts"""
@@ -254,6 +352,12 @@ class MiningGame:
         if abs(x - self.x) + abs(y - self.y) != 1:
             return False, "**❌ Too far! Can only mine adjacent blocks.**"
         
+        # Check if there's a creature at this position
+        for creature_id, creature in list(self.creatures.items()):
+            if creature["x"] == x and creature["y"] == y:
+                killed, msg, drops = self.attack_creature(creature_id)
+                return True, msg, (x, y)
+        
         block = self.get_block(x, y)
         if block == "air":
             return False, "**❌ Nothing to mine here!**"
@@ -261,10 +365,24 @@ class MiningGame:
         if block == "bedrock":
             return False, "**❌ Bedrock is unbreakable!**"
         
+        # Check pickaxe level requirement
+        required_level = self.BLOCK_REQUIREMENTS.get(block, 1)
+        if self.pickaxe_level < required_level:
+            return False, f"⛏️ You need a level {required_level} pickaxe to mine {block}! (Current: Lv.{self.pickaxe_level})"
+        
         # Energy cost based on biome hardness and pickaxe level
         biome = self.get_biome(y)
         speed_bonus = 1 + (self.pickaxe_level * 0.15)
         energy_cost = max(1, int(biome["hardness"] / speed_bonus))
+        
+        # Check for irradiated ore (takes half of current energy)
+        ore_state = self.ore_states.get((x, y))
+        ore_state_msg = ""
+        if ore_state == "irradiated":
+            # Take half of current energy (minimum 1)
+            irradiated_cost = max(1, self.energy // 2)
+            energy_cost = irradiated_cost
+            ore_state_msg = f" ☢️ **Irradiated ore!** ({irradiated_cost} energy - half your current)"
         
         # Check energy (skip if infinite)
         if not self.infinite_energy and self.energy < energy_cost:
@@ -285,6 +403,10 @@ class MiningGame:
             # Remove chest
             self.map_data[(x, y)] = "air"
             
+            # Update stats
+            self.stats["chests_found"] += 1
+            self.check_achievement("chest_finder")
+            
             # Loot table (40% nothing, 60% loot)
             import random
             loot_roll = random.random()
@@ -292,6 +414,35 @@ class MiningGame:
             if loot_roll < 0.40:
                 # 40% - Nothing
                 return True, "📦 **Chest opened... but it's empty!**", (x, y)
+            
+            # 15% chance: creature jumps out of the chest!
+            if loot_roll < 0.55:
+                creature_types_list = list(self.CREATURE_TYPES.keys())
+                creature_type = random.choice(creature_types_list)
+                creature_data_c = self.CREATURE_TYPES[creature_type]
+                creature_id = f"creature_{self.creature_counter}"
+                self.creature_counter += 1
+                spawn_x, spawn_y = x, y
+                # Generate short patrol path around spawn
+                path_length = self.rng.randint(8, 20)
+                path = [(spawn_x, spawn_y)]
+                cur_x, cur_y = spawn_x, spawn_y
+                for _ in range(path_length - 1):
+                    ddx, ddy = self.rng.choice([(-1, 0), (1, 0), (0, -1), (0, 1)])
+                    cur_x = max(-45, min(45, cur_x + ddx))
+                    cur_y = max(0, min(100, cur_y + ddy))
+                    path.append((cur_x, cur_y))
+                self.creatures[creature_id] = {
+                    "type": creature_type,
+                    "x": spawn_x,
+                    "y": spawn_y,
+                    "path": path,
+                    "path_index": 0,
+                    "health": creature_data_c["health"],
+                    "idle_refreshes": 0,
+                }
+                emoji_c = creature_data_c.get("emoji", "🧟")
+                return True, f"📦 **Chest opened... {emoji_c} {creature_type.title()} jumped out!** Watch out!", (x, y)
             else:
                 # 60% - Get loot (blocks OR items)
                 # First decide: blocks (70%) or items (30%)
@@ -332,11 +483,12 @@ class MiningGame:
                     return True, f"📦 **Chest opened! Found {selected_count}x {selected_loot}!** (+${value})", (x, y)
                 
                 else:
-                    # 30% - Item loot (ladder, torch, portal)
+                    # 30% - Item loot (ladder, torch, portal, dynamite)
                     item_options = [
-                        ("ladder", 3, 0.50),   # 50% - 3x ladder
-                        ("torch", 5, 0.40),    # 40% - 5x torch
-                        ("portal", 1, 0.10)    # 10% - 1x portal
+                        ("ladder", 3, 0.40),   # 40% - 3x ladder
+                        ("torch", 5, 0.35),    # 35% - 5x torch
+                        ("portal", 1, 0.10),   # 10% - 1x portal
+                        ("dynamite", 2, 0.15)  # 15% - 2x dynamite
                     ]
                     
                     # Weighted random selection
@@ -356,7 +508,7 @@ class MiningGame:
                     
                     # Add item to items
                     self.items[selected_item] = self.items.get(selected_item, 0) + selected_count
-                    emoji = {"ladder": "🪜", "torch": "🔦", "portal": "🌀"}.get(selected_item, "📦")
+                    emoji = {"ladder": "🪜", "torch": "🔦", "portal": "🌀", "dynamite": "💣"}.get(selected_item, "📦")
                     
                     return True, f"📦 **Chest opened! Found {selected_count}x {emoji} {selected_item}!**", (x, y)
         
@@ -371,14 +523,49 @@ class MiningGame:
             self.energy -= energy_cost
         old_block = self.map_data.get((x, y), "unknown")
         self.map_data[(x, y)] = "air"
-        self.inventory[block] = self.inventory.get(block, 0) + 1
+        
+        # Handle cracked ore (50% yield)
+        count_mined = 1
+        if ore_state == "cracked":
+            if self.rng.random() < 0.5:
+                count_mined = 0
+                ore_state_msg = " 🪨 **Cracked ore!** It crumbled to dust..."
+        
+        if count_mined > 0:
+            self.inventory[block] = self.inventory.get(block, 0) + count_mined
+        
+        # Clear ore state
+        if (x, y) in self.ore_states:
+            del self.ore_states[(x, y)]
+        
+        # Update stats
+        self.stats["blocks_mined"] += 1
+        if y > self.stats["max_depth"]:
+            self.stats["max_depth"] = y
         
         # Update max depth
         if y > self.depth:
             self.depth = y
         
-        value = self.BLOCK_VALUES.get(block, 0)
-        return True, f"⛏️ Mined {block}! (+{value} value)", (x, y)
+        # Check for achievements
+        self.check_achievement("first_mine")
+        if y >= 10:
+            self.check_achievement("depth_10")
+        if y >= 50:
+            self.check_achievement("depth_50")
+        if y >= 100:
+            self.check_achievement("depth_100")
+        if block == "diamond":
+            self.check_achievement("diamond_find")
+        if block == "emerald":
+            self.check_achievement("emerald_find")
+        if block == "netherite":
+            self.check_achievement("netherite_find")
+        if self.stats["blocks_mined"] >= 1000:
+            self.check_achievement("tunnel_rat")
+        
+        value = self.BLOCK_VALUES.get(block, 0) * count_mined
+        return True, f"⛏️ Mined {block}! (+{value} value){ore_state_msg}", (x, y)
     
     def move_player(self, dx: int, dy: int) -> tuple[bool, str]:
         """Move player by delta (no energy cost for movement)"""
@@ -475,6 +662,58 @@ class MiningGame:
         self.items["torch"] -= 1
         return True, f"🔦 Torch placed! ({self.items['torch']} left)"
     
+    def use_dynamite(self) -> tuple[bool, str]:
+        """Use dynamite to explode blocks around player (3x3 area)"""
+        if self.items.get("dynamite", 0) <= 0:
+            return False, "❌ No dynamite in inventory!"
+        
+        # Explode 3x3 area around player
+        blocks_destroyed = 0
+        blocks_collected = {}
+        
+        for dx in range(-1, 2):
+            for dy in range(-1, 2):
+                target_x = self.x + dx
+                target_y = self.y + dy
+                
+                # Skip player's position and air
+                if (dx == 0 and dy == 0) or target_y < 0:
+                    continue
+                
+                block = self.get_block(target_x, target_y)
+                if block in ["air", "bedrock", "shop_left", "shop_right"]:
+                    continue
+                
+                # Don't destroy ladders, portals, torches
+                if (target_x, target_y) in self.ladders or (target_x, target_y) in self.torches:
+                    continue
+                
+                portal_here = any(p["x"] == target_x and p["y"] == target_y for p in self.portals.values())
+                if portal_here:
+                    continue
+                
+                # Collect block if backpack has space
+                if not self.infinite_backpack:
+                    total_items = sum(self.inventory.values())
+                    if total_items >= self.backpack_capacity:
+                        continue
+                
+                # Destroy block and add to inventory
+                self.map_data[(target_x, target_y)] = "air"
+                blocks_collected[block] = blocks_collected.get(block, 0) + 1
+                self.inventory[block] = self.inventory.get(block, 0) + 1
+                blocks_destroyed += 1
+        
+        self.items["dynamite"] -= 1
+        self.stats["dynamites_used"] += 1
+        self.check_achievement("explosion_expert")
+        
+        if blocks_destroyed == 0:
+            return True, f"💥 Dynamite exploded but nothing was destroyed! ({self.items['dynamite']} left)"
+        
+        blocks_text = ", ".join([f"{count}x {block}" for block, count in blocks_collected.items()])
+        return True, f"💥 Dynamite! Destroyed {blocks_destroyed} blocks: {blocks_text} ({self.items['dynamite']} left)"
+    
     def discover_nearby_structures(self, radius: int = 10):
         """Discover structures within radius of player"""
         for structure_id, structure_data in self.structures.items():
@@ -505,9 +744,231 @@ class MiningGame:
                 economy_cog.add_coins(self.user_id, total_value, "mining_sales")
         
         self.coins += total_value
+        self.stats["coins_earned"] += total_value
         self.inventory.clear()
         
+        # Check achievement
+        self.check_achievement("rich_miner", bot)
+        
         return total_value, "\n".join(items_sold)
+    
+    def spawn_creatures(self):
+        """Spawn creatures with random patrol paths"""
+        # Clear existing creatures on regeneration
+        self.creatures = {}
+        self.creature_counter = 0
+        
+        # Spawn 3-8 creatures
+        num_creatures = self.rng.randint(3, 8)
+        for i in range(num_creatures):
+            creature_type = self.rng.choice(list(self.CREATURE_TYPES.keys()))
+            creature_data = self.CREATURE_TYPES[creature_type]
+            
+            # Random spawn position (underground, away from spawn)
+            spawn_x = self.rng.randint(-40, 40)
+            spawn_y = self.rng.randint(10, 80)  # Underground only
+            
+            # Generate random patrol path (5-30 waypoints) using cardinal moves (L/R/U/D)
+            path_length = self.rng.randint(5, 30)
+            path = [(spawn_x, spawn_y)]  # Start at spawn
+
+            current_x, current_y = spawn_x, spawn_y
+            for _ in range(path_length - 1):
+                # Move one step in a cardinal direction or stay
+                step = self.rng.choice([(-1, 0), (1, 0), (0, -1), (0, 1), (0, 0)])
+                dx, dy = step
+                current_x += dx
+                current_y += dy
+                # Keep within bounds
+                current_x = max(-45, min(45, current_x))
+                current_y = max(5, min(100, current_y))
+                path.append((current_x, current_y))
+            
+            # NOTE: Tunnel carving happens step by step in move_creatures, not upfront
+            
+            creature_id = f"creature_{self.creature_counter}"
+            self.creature_counter += 1
+            
+            self.creatures[creature_id] = {
+                "type": creature_type,
+                "x": spawn_x,
+                "y": spawn_y,
+                "path": path,
+                "path_index": 0,
+                "health": creature_data["health"],
+                "idle_refreshes": 0
+            }
+    
+    def move_creatures(self):
+        """Move all creatures along their patrol paths"""
+        for creature_id, creature in list(self.creatures.items()):
+            path = creature.get("path") or []
+            if not path:
+                continue
+
+            # --- idle (counts per refresh/player action) ---
+            idle = creature.get("idle_refreshes", 0)
+            if idle > 0:
+                creature["idle_refreshes"] = idle - 1
+                continue
+
+            # Determine next waypoint index
+            current_idx = creature.get("path_index", 0)
+            next_idx = (current_idx + 1) % len(path)
+            target_x, target_y = path[next_idx]
+
+            cx, cy = creature["x"], creature["y"]
+
+            # If already at target, advance to next waypoint
+            if cx == target_x and cy == target_y:
+                creature["path_index"] = next_idx
+                # Random stop upon reaching the waypoint (30% chance, 2-6 refreshes)
+                if self.rng.random() < 0.30:
+                    creature["idle_refreshes"] = self.rng.randint(2, 6)
+                continue
+
+            # Move one tile toward the target (cardinal only)
+            step_x = 0
+            step_y = 0
+            if target_x != cx:
+                step_x = 1 if target_x > cx else -1
+            elif target_y != cy:
+                step_y = 1 if target_y > cy else -1
+
+            new_x = cx + step_x
+            new_y = cy + step_y
+
+            # Keep within bounds
+            new_x = max(-45, min(45, new_x))
+            new_y = max(0, min(100, new_y))
+
+            # Tunnel creatures carve blocks as they move (step by step, not upfront)
+            creature_type = creature.get("type", "")
+            creature_data = self.CREATURE_TYPES.get(creature_type, {})
+            if creature_data.get("tunnel"):
+                # Carve current position
+                if (new_x, new_y) in self.map_data and self.map_data[(new_x, new_y)] not in ("air", "bedrock"):
+                    self.map_data[(new_x, new_y)] = "air"
+                if creature_type == "worm":
+                    # Worm: carve 2-tall tunnel in direction of movement
+                    if step_x != 0:
+                        # Moving horizontally: carve block above
+                        above = (new_x, new_y - 1)
+                        if above in self.map_data and self.map_data[above] not in ("air", "bedrock"):
+                            self.map_data[above] = "air"
+                    else:
+                        # Moving vertically: carve one block to the side
+                        side = (new_x + 1, new_y)
+                        if side in self.map_data and self.map_data[side] not in ("air", "bedrock"):
+                            self.map_data[side] = "air"
+
+            creature["x"], creature["y"] = new_x, new_y
+
+            # Random stop during movement (10% chance on each refresh, 1-4 refreshes)
+            if self.rng.random() < 0.10:
+                creature["idle_refreshes"] = self.rng.randint(1, 4)
+
+            # If we reached the waypoint, advance index
+            if new_x == target_x and new_y == target_y:
+                creature["path_index"] = next_idx
+
+        # Developer auto-respawn: if enabled and all creatures are dead, respawn
+        if getattr(self, "dev_mode", False) and not self.creatures:
+            self.spawn_creatures()
+    
+    def attack_creature(self, creature_id: str, bot=None) -> tuple[bool, str, dict]:
+        """Attack/mine a creature - returns (killed, message, drops)"""
+        if creature_id not in self.creatures:
+            return False, "Creature not found!", {}
+        
+        creature = self.creatures[creature_id]
+        creature_data = self.CREATURE_TYPES[creature["type"]]
+        
+        # Deal damage (1 hit per mine)
+        creature["health"] -= 1
+        
+        if creature["health"] <= 0:
+            # Creature killed
+            drops = {}
+            
+            # Handle special penalties
+            if creature_data.get("penalty") == "explosion":
+                # Creeper explodes! Damage 3x3 area
+                cx, cy = creature["x"], creature["y"]
+                for dx in range(-1, 2):
+                    for dy in range(-1, 2):
+                        target_x = cx + dx
+                        target_y = cy + dy
+                        if (target_x, target_y) not in self.ladders and (target_x, target_y) not in self.torches:
+                            self.map_data[(target_x, target_y)] = "air"
+                
+                del self.creatures[creature_id]
+                self.stats["creatures_killed"] += 1
+                self.check_achievement("creature_hunter", bot)
+                return True, f"💥 {creature_data['emoji']} Creeper exploded! Destroyed 3x3 area!", {}
+            
+            # Normal drops
+            for drop_type, (min_count, max_count) in creature_data.get("drops", {}).items():
+                count = self.rng.randint(min_count, max_count)
+                drops[drop_type] = count
+                self.inventory[drop_type] = self.inventory.get(drop_type, 0) + count
+            
+            drops_text = ", ".join([f"{count}x {item}" for item, count in drops.items()]) if drops else "nothing"
+            
+            del self.creatures[creature_id]
+            self.stats["creatures_killed"] += 1
+            self.check_achievement("creature_hunter", bot)
+            return True, f"⚔️ Killed {creature_data['emoji']} {creature['type']}! Dropped: {drops_text}", drops
+        else:
+            # Still alive
+            return False, f"⚔️ Hit {creature_data['emoji']} {creature['type']}! ({creature['health']} HP left)", {}
+    
+    def check_achievement(self, achievement_key: str, bot=None):
+        """Check and grant achievement if not already earned"""
+        if achievement_key in self.achievements:
+            return  # Already earned
+        
+        achievement = self.MINING_ACHIEVEMENTS.get(achievement_key)
+        if not achievement:
+            return
+        
+        # Check conditions
+        earned = False
+        if achievement_key == "first_mine":
+            earned = self.stats["blocks_mined"] >= 1
+        elif achievement_key == "depth_10":
+            earned = self.stats["max_depth"] >= 10
+        elif achievement_key == "depth_50":
+            earned = self.stats["max_depth"] >= 50
+        elif achievement_key == "depth_100":
+            earned = self.stats["max_depth"] >= 100
+        elif achievement_key == "diamond_find":
+            earned = self.inventory.get("diamond", 0) > 0 or self.stats.get("diamonds_found", 0) > 0
+        elif achievement_key == "emerald_find":
+            earned = self.inventory.get("emerald", 0) > 0 or self.stats.get("emeralds_found", 0) > 0
+        elif achievement_key == "netherite_find":
+            earned = self.inventory.get("netherite", 0) > 0 or self.stats.get("netherite_found", 0) > 0
+        elif achievement_key == "rich_miner":
+            earned = self.stats["coins_earned"] >= 10000
+        elif achievement_key == "explosion_expert":
+            earned = self.stats["dynamites_used"] >= 10
+        elif achievement_key == "creature_hunter":
+            earned = self.stats["creatures_killed"] >= 10
+        elif achievement_key == "tunnel_rat":
+            earned = self.stats["blocks_mined"] >= 1000
+        elif achievement_key == "chest_finder":
+            earned = self.stats["chests_found"] >= 5
+        
+        if earned:
+            self.achievements[achievement_key] = datetime.utcnow().isoformat()
+            
+            # Grant reward
+            if bot:
+                economy_cog = bot.get_cog("Economy")
+                if economy_cog:
+                    economy_cog.add_coins(self.user_id, achievement["reward"], f"mining_achievement_{achievement_key}")
+            
+            self.coins += achievement["reward"]
     
     def render_map(self, bot=None) -> io.BytesIO:
         """Render current view as image"""
@@ -525,32 +986,46 @@ class MiningGame:
             if block_type in texture_cache:
                 return texture_cache[block_type]
             
-            # Map block types to asset files
+            # Map block types to asset files - use None for colored fallback
             asset_map = {
+                #layer1
                 "air": "assets/mining/blocks/layer1/air.png",
                 "dirt": "assets/mining/blocks/layer1/dirt.png",
                 "grass": "assets/mining/blocks/layer1/grass.png",
-                "stone": "assets/mining/blocks/layer1/dirt.png",  # Fallback to dirt
+                "stone": "assets/mining/blocks/layer1/stone.png",
                 "coal": "assets/mining/blocks/layer1/coal.png",
-                "iron": "assets/mining/blocks/layer1/iron.png",
-                "gold": "assets/mining/blocks/layer1/iron.png",  # Fallback
-                "redstone": "assets/mining/blocks/layer1/coal.png",  # Fallback
-                "diamond": "assets/mining/blocks/layer1/iron.png",  # Fallback
-                "emerald": "assets/mining/blocks/layer1/iron.png",  # Fallback
-                "deepslate": "assets/mining/blocks/layer1/dirt.png",  # Fallback
-                "netherite": "assets/mining/blocks/layer1/coal.png",  # Fallback
-                "ancient_debris": "assets/mining/blocks/layer1/coal.png",  # Fallback
-                "bedrock": "assets/mining/blocks/layer1/coal.png",  # Fallback
+                #layer2
+                "stone2": "assets/mining/blocks/layer2/stone.png",
+                "coal2": "assets/mining/blocks/layer2/coal.png",
+                
+                "iron": None,  # Use color fallback for orange iron
+                "gold": None,  # Use color fallback for golden
+                "redstone": None,  # Use color fallback for red
+                "diamond": None,  # Use color fallback for cyan
+                "emerald": None,  # Use color fallback for green
+                "deepslate": None,  # Use color fallback
+                "netherite": None,  # Use color fallback
+                "ancient_debris": None,  # Use color fallback
+                "bedrock": None,  # Use color fallback
+                # Shop
                 "shop_left": "assets/mining/shop/shop1_left.png",
                 "shop_right": "assets/mining/shop/shop1_right.png",
+                # Structures
                 "mineshaft_wood": "assets/mining/structures/mineshaft/wood.png",
                 "mineshaft_support": "assets/mining/structures/mineshaft/support.png",
                 "mineshaft_rail": "assets/mining/structures/mineshaft/rail.png",
                 "mineshaft_entrance": "assets/mining/structures/mineshaft/entrance.png",
             }
             
+            asset_path = asset_map.get(block_type)
+            
+            # If no asset path or file doesn't exist, use colored fallback
+            if asset_path is None:
+                fallback = Image.new('RGBA', (block_size, block_size), self.BLOCK_COLORS.get(block_type, (0, 0, 0)))
+                texture_cache[block_type] = fallback
+                return fallback
+            
             try:
-                asset_path = asset_map.get(block_type, "assets/mining/blocks/layer1/dirt.png")
                 texture = Image.open(asset_path).convert("RGBA")
                 texture = texture.resize((block_size, block_size), Image.LANCZOS)
                 texture_cache[block_type] = texture
@@ -579,6 +1054,30 @@ class MiningGame:
                 y1 = dy * block_size
                 texture = load_texture(block)
                 img.paste(texture, (x1, y1), texture if texture.mode == 'RGBA' else None)
+                
+                # Draw ore state overlay if present
+                if (world_x, world_y) in self.ore_states:
+                    ore_state = self.ore_states[(world_x, world_y)]
+                    state_data = self.ORE_STATES.get(ore_state)
+                    if state_data:
+                        # Apply color modification
+                        try:
+                            # Create a semi-transparent overlay
+                            overlay = Image.new('RGBA', (block_size, block_size), (0, 0, 0, 0))
+                            overlay_draw = ImageDraw.Draw(overlay)
+                            
+                            if ore_state == "cracked":
+                                # Draw cracks across the block
+                                overlay_draw.line([(0, block_size//3), (block_size, block_size//2)], fill=(0, 0, 0, 150), width=2)
+                                overlay_draw.line([(0, 2*block_size//3), (block_size, block_size//2)], fill=(0, 0, 0, 150), width=2)
+                            elif ore_state == "irradiated":
+                                # Draw radioactive green tint
+                                overlay_draw.rectangle([0, 0, block_size, block_size], fill=(0, 255, 0, 60))
+                                # Draw radiation symbol
+                                center_x, center_y = block_size // 2, block_size // 2
+                            img.paste(overlay, (x1, y1), overlay)
+                        except:
+                            pass
                 
                 # Draw ladder overlay if placed here
                 if (world_x, world_y) in self.ladders:
@@ -773,6 +1272,71 @@ class MiningGame:
                     img_rgba_draw.text((text_x, text_y), username, fill=(255, 255, 255, 255), font=name_font)
             
             img = img_rgba.convert('RGB')
+        
+        # Draw creatures
+        img_rgba = img.convert('RGBA')
+        for creature_id, creature in self.creatures.items():
+            creature_x = creature["x"]
+            creature_y = creature["y"]
+            
+            # Check if creature is in current view
+            view_dx = creature_x - start_x
+            view_dy = creature_y - start_y
+            
+            if 0 <= view_dx < self.width and 0 <= view_dy < self.height:
+                creature_type = creature["type"]
+                creature_data = self.CREATURE_TYPES[creature_type]
+                
+                # Draw creature as colored circle with emoji-like appearance
+                marker_size = block_size
+                marker = Image.new('RGBA', (marker_size, marker_size), (0, 0, 0, 0))
+                marker_draw = ImageDraw.Draw(marker)
+                
+                center = marker_size // 2
+                radius = marker_size // 3
+                
+                # Draw creature colored circle
+                creature_color = creature_data["color"]
+                marker_draw.ellipse([center - radius, center - radius,
+                                   center + radius, center + radius],
+                                  fill=creature_color + (220,),
+                                  outline=(0, 0, 0, 255),
+                                  width=2)
+                
+                # Paste marker on map
+                paste_x = view_dx * block_size
+                paste_y = view_dy * block_size
+                img_rgba.paste(marker, (paste_x, paste_y), marker)
+                
+                # Draw creature type emoji/name above
+                creature_label = f"{creature_data['emoji']} {creature_type[:4]}"
+                try:
+                    creature_font = ImageFont.truetype("Arial.ttf", 8)
+                except:
+                    creature_font = ImageFont.load_default()
+                
+                img_rgba_draw = ImageDraw.Draw(img_rgba)
+                text_bbox = img_rgba_draw.textbbox((0, 0), creature_label, font=creature_font)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+                
+                # Draw health bar
+                hp_width = block_size - 4
+                hp_height = 3
+                hp_x = paste_x + 2
+                hp_y = paste_y - 8
+                
+                # Health bar background
+                marker_draw_img = ImageDraw.Draw(img_rgba)
+                marker_draw_img.rectangle([hp_x, hp_y, hp_x + hp_width, hp_y + hp_height], fill=(100, 0, 0, 200))
+                
+                # Health bar fill
+                max_hp = self.CREATURE_TYPES[creature_type]["health"]
+                current_hp = creature["health"]
+                hp_fill_width = int((current_hp / max_hp) * hp_width)
+                marker_draw_img.rectangle([hp_x, hp_y, hp_x + hp_fill_width, hp_y + hp_height], fill=(0, 255, 0, 255))
+        
+        img = img_rgba.convert('RGB')
         
         # Draw player overlay
         player_x = self.width // 2
@@ -1002,10 +1566,18 @@ class MiningGame:
     
     def get_stats_text(self) -> str:
         """Get stats display text"""
-        biome = self.get_biome(self.y)
-        inventory_size = sum(self.inventory.values())
         
-        return (f"**Position:** ({self.x}, {self.y})\n")
+        stats_text = (
+            f"**Position:** {self.x}, {self.y}"
+        )
+        
+        # Add achievements count
+        if self.achievements:
+            achievement_count = len(self.achievements)
+            total_achievements = len(self.MINING_ACHIEVEMENTS)
+            stats_text += f" | **Achievements:** {achievement_count}/{total_achievements} 🏆"
+        
+        return stats_text
     
     def to_dict(self) -> dict:
         """Serialize game state to dictionary"""
@@ -1039,7 +1611,12 @@ class MiningGame:
             "torches": {f"{x},{y}": True for (x, y) in self.torches.keys()},
             "portal_counter": self.portal_counter,
             "structures": self.structures,
-            "structure_counter": self.structure_counter
+            "structure_counter": self.structure_counter,
+            "ore_states": {f"{x},{y}": state for (x, y), state in self.ore_states.items()},
+            "creatures": self.creatures,
+            "creature_counter": self.creature_counter,
+            "achievements": self.achievements,
+            "stats": self.stats
         }
     
     @classmethod
@@ -1071,10 +1648,31 @@ class MiningGame:
         game.auto_reset_enabled = data.get("auto_reset_enabled", True)
         
         # Deserialize items and structures
-        game.items = data.get("items", {"ladder": 5, "portal": 2, "torch": 10})
+        game.items = data.get("items", {"ladder": 5, "portal": 2, "torch": 10, "dynamite": 3})
         game.portal_counter = data.get("portal_counter", 0)
         game.structures = data.get("structures", {})
         game.structure_counter = data.get("structure_counter", 0)
+        
+        # Deserialize ore states
+        game.ore_states = {}
+        for key, state in data.get("ore_states", {}).items():
+            x, y = map(int, key.split(","))
+            game.ore_states[(x, y)] = state
+        
+        # Deserialize creatures
+        game.creatures = data.get("creatures", {})
+        game.creature_counter = data.get("creature_counter", 0)
+        
+        # Deserialize achievements and stats
+        game.achievements = data.get("achievements", {})
+        game.stats = data.get("stats", {
+            "blocks_mined": 0,
+            "coins_earned": 0,
+            "dynamites_used": 0,
+            "creatures_killed": 0,
+            "chests_found": 0,
+            "max_depth": 0
+        })
         
         # Deserialize ladders
         game.ladders = {}
@@ -1175,17 +1773,24 @@ class MiningView(discord.ui.LayoutView):
             container_items.append(discord.ui.ActionRow(shop_select))
             container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
-        # Add inventory dropdown (always visible)
+        # Add inventory dropdown (always visible) - dynamic based on items owned
+        inventory_options = [
+            discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
+        ]
+        
+        # Add items player actually has (count > 0)
+        if self.game.items.get('ladder', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items['ladder']} left)", value="ladder", description="Climb back up easily"))
+        if self.game.items.get('torch', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🔦 Place Torch ({self.game.items['torch']} left)", value="torch", description="Light up dark caves"))
+        if self.game.items.get('portal', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🌀 Place Portal ({self.game.items['portal']} left)", value="portal", description="Teleport waystone"))
+        if self.game.items.get('dynamite', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"💣 Use Dynamite ({self.game.items['dynamite']} left)", value="dynamite", description="Explode 3x3 area"))
+        
         inventory_select = discord.ui.Select(
             placeholder="🎒 Inventory & Items",
-            options=[
-                discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
-                discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items.get('ladder', 0)} left)", value="ladder", description="Climb back up easily"),
-                discord.SelectOption(label=f"🔦 Place Torch ({self.game.items.get('torch', 0)} left)", value="torch", description="Light up dark caves"),
-                discord.SelectOption(label=f"🌀 Place Portal ({self.game.items.get('portal', 0)} left)", value="portal", description="Teleport waystone"),
-                discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
-                discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
-            ]
+            options=inventory_options
         )
         inventory_select.callback = self.inventory_callback
         
@@ -1322,7 +1927,7 @@ class MiningView(discord.ui.LayoutView):
             if any(self.game.items.values()):
                 inv_text += "\n**Items:**\n"
                 for item, count in self.game.items.items():
-                    emoji = {"ladder": "🪜", "portal": "🌀", "torch": "🔦"}.get(item, "📦")
+                    emoji = {"ladder": "🪜", "portal": "🌀", "torch": "🔦", "dynamite": "💣"}.get(item, "📦")
                     inv_text += f"• {emoji} {count}x {item}\n"
             
             await interaction.response.send_message(inv_text, ephemeral=True)
@@ -1347,8 +1952,13 @@ class MiningView(discord.ui.LayoutView):
             # Show modal for portal placement
             await self.show_portal_modal(interaction)
         
-        elif action in ["compass", "detector"]:
-            await interaction.response.send_message("⚠️ This item is coming soon!", ephemeral=True)
+        elif action == "dynamite":
+            success, msg = self.game.use_dynamite()
+            if success:
+                cog = interaction.client.get_cog("Mining")
+                if cog:
+                    cog.save_data()
+            await self.refresh(interaction, msg)
     
     async def toggle_reset_callback(self, interaction: discord.Interaction):
         """Toggle auto-reset for singleplayer"""
@@ -1528,12 +2138,15 @@ class MiningView(discord.ui.LayoutView):
         """Refresh the game view"""
         self.game.regenerate_energy()
         
+        # Move creatures along their patrol paths
+        self.game.move_creatures()
+        
         # Check for map regeneration
         if self.game.check_map_regeneration(bot=interaction.client, guild_id=self.game.guild_id):
             if message:
-                message += "\n\n🔄 **Map regenerated after 12 hours!**"
+                message += "\n\n🔄 **Full map reset! (Ladders, portals, torches cleared. Inventory saved!)**"
             else:
-                message = "🔄 **Map regenerated after 12 hours!**"
+                message = "🔄 **Full map reset! (Ladders, portals, torches cleared. Inventory saved!)**"
         
         # Render new map image in executor (prevents blocking)
         loop = asyncio.get_event_loop()
@@ -1649,17 +2262,24 @@ class MiningView(discord.ui.LayoutView):
                 container_items.append(discord.ui.ActionRow(portal_select))
                 container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
-        # Add inventory dropdown (always visible)
+        # Add inventory dropdown (always visible) - dynamic based on items owned
+        inventory_options = [
+            discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
+        ]
+        
+        # Add items player actually has (count > 0)
+        if self.game.items.get('ladder', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items['ladder']} left)", value="ladder", description="Climb back up easily"))
+        if self.game.items.get('torch', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🔦 Place Torch ({self.game.items['torch']} left)", value="torch", description="Light up dark caves"))
+        if self.game.items.get('portal', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🌀 Place Portal ({self.game.items['portal']} left)", value="portal", description="Teleport waystone"))
+        if self.game.items.get('dynamite', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"💣 Use Dynamite ({self.game.items['dynamite']} left)", value="dynamite", description="Explode 3x3 area"))
+        
         inventory_select = discord.ui.Select(
             placeholder="🎒 Inventory & Items",
-            options=[
-                discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
-                discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items.get('ladder', 0)} left)", value="ladder", description="Climb back up easily"),
-                discord.SelectOption(label=f"🔦 Place Torch ({self.game.items.get('torch', 0)} left)", value="torch", description="Light up dark caves"),
-                discord.SelectOption(label=f"🌀 Place Portal ({self.game.items.get('portal', 0)} left)", value="portal", description="Teleport waystone"),
-                discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
-                discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
-            ]
+            options=inventory_options
         )
         inventory_select.callback = self.inventory_callback
         
@@ -1822,6 +2442,7 @@ class OwnerMiningView(discord.ui.LayoutView):
         ]
         
         # Add developer menu (changes based on state)
+        dev_select = None
         if self.dev_menu_state == "main":
             dev_select = discord.ui.Select(
                 placeholder="🔧 Developer Menu",
@@ -1832,11 +2453,13 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="📍 Teleport Menu", value="teleport_menu", description="Teleport to depths or players"),
                     discord.SelectOption(label="🧱 Place Blocks Menu", value="place_menu", description="Place any block type"),
                     discord.SelectOption(label="📦 Items Menu", value="items_menu", description="Spawn items (ladder/torch/portal)"),
-                    discord.SelectOption(label="🏗️ Generate Structures", value="structures_menu", description="Generate mineshafts and structures"),
-                    discord.SelectOption(label="📥 Force Map Reset", value="forcereset", description="Regenerate entire map now"),
+                    discord.SelectOption(label="🏗️ Structures Menu", value="structures_menu", description="Generate mineshafts and discover structures"),
+                    discord.SelectOption(label="🔄 Force Map Reset", value="forcereset", description="Regenerate entire map now"),
                     discord.SelectOption(label="🌱 Change Seed", value="customseed", description="Enter custom world seed"),
                     discord.SelectOption(label="💎 Spawn Rare Items", value="spawnitems", description="Add valuable items"),
+                    discord.SelectOption(label="🧟 Spawn Creatures", value="spawn_menu", description="Open creature spawn menu"),
                     discord.SelectOption(label="💰 Max All Upgrades", value="maxupgrades", description="Max pickaxe/backpack/energy"),
+                    discord.SelectOption(label="🗺️ World Info", value="mapinfo", description="View map details"),
                 ]
             )
         elif self.dev_menu_state == "structures":
@@ -1926,20 +2549,29 @@ class OwnerMiningView(discord.ui.LayoutView):
                 placeholder="🧱 Place Block",
                 options=[
                     discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
-                    discord.SelectOption(label="🏪 Shop", value="place_shop", description="Place a shop block"),
+                    discord.SelectOption(label="🟩 Grass", value="place_grass", description="Place grass block"),
+                    discord.SelectOption(label="🟫 Dirt", value="place_dirt", description="Place dirt"),
                     discord.SelectOption(label="🪨 Stone", value="place_stone", description="Place stone"),
-                    discord.SelectOption(label="💎 Diamond", value="place_diamond", description="Place diamond ore"),
-                    discord.SelectOption(label="💚 Emerald", value="place_emerald", description="Place emerald ore"),
-                    discord.SelectOption(label="🟡 Gold", value="place_gold", description="Place gold ore"),
-                    discord.SelectOption(label="⬛ Netherite", value="place_netherite", description="Place netherite"),
-                    discord.SelectOption(label="🟫 Ancient Debris", value="place_ancient_debris", description="Place ancient debris"),
-                    discord.SelectOption(label="🔷 Lapis", value="place_lapis", description="Place lapis ore"),
-                    discord.SelectOption(label="🔴 Redstone", value="place_redstone", description="Place redstone ore"),
+                    discord.SelectOption(label="🟤 Deepslate", value="place_deepslate", description="Place deepslate"),
+                    discord.SelectOption(label="🌑 Bedrock", value="place_bedrock", description="Place bedrock"),
+                    discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                    discord.SelectOption(label="🟩 Grass", value="place_grass", description="Place grass block"),
+                    discord.SelectOption(label="🟫 Dirt", value="place_dirt", description="Place dirt"),
+                    discord.SelectOption(label="🪧 Rock", value="place_stone", description="Place rock"),
+                    discord.SelectOption(label="🪨 Stone", value="place_stone2", description="Place stone (stone2, deep layer)"),
+                    discord.SelectOption(label="🟤 Deepslate", value="place_deepslate", description="Place deepslate"),
+                    discord.SelectOption(label="🌑 Bedrock", value="place_bedrock", description="Place bedrock"),
                     discord.SelectOption(label="⚫ Coal", value="place_coal", description="Place coal ore"),
                     discord.SelectOption(label="⚪ Iron", value="place_iron", description="Place iron ore"),
-                    discord.SelectOption(label="🟤 Deepslate", value="place_deepslate", description="Place deepslate"),
-                    discord.SelectOption(label="🟫 Dirt", value="place_dirt", description="Place dirt"),
+                    discord.SelectOption(label="🟡 Gold", value="place_gold", description="Place gold ore"),
+                    discord.SelectOption(label="🔴 Redstone", value="place_redstone", description="Place redstone ore"),
+                    discord.SelectOption(label="🔷 Lapis", value="place_lapis", description="Place lapis ore"),
+                    discord.SelectOption(label="💎 Diamond", value="place_diamond", description="Place diamond ore"),
+                    discord.SelectOption(label="💚 Emerald", value="place_emerald", description="Place emerald ore"),
+                    discord.SelectOption(label="⬛ Netherite", value="place_netherite", description="Place netherite"),
+                    discord.SelectOption(label="🟫 Ancient Debris", value="place_ancient_debris", description="Place ancient debris"),
                     discord.SelectOption(label="📦 Chest", value="place_chest", description="Loot chest"),
+                    discord.SelectOption(label="🏪 Shop", value="place_shop", description="Place a shop block"),
                     discord.SelectOption(label="🪵 M.Wood", value="place_mineshaft_wood", description="Mineshaft wood"),
                     discord.SelectOption(label="🏗️ M.Support", value="place_mineshaft_support", description="Support beam"),
                     discord.SelectOption(label="🛤️ M.Rail", value="place_mineshaft_rail", description="Rail"),
@@ -1947,10 +2579,26 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="🌫️ Air", value="place_air", description="Remove block"),
                 ]
             )
+        elif self.dev_menu_state == "spawn_creatures":
+            # Creature spawn submenu - spawns at player position like a block
+            dev_select = discord.ui.Select(
+                placeholder="🧟 Select a creature to spawn",
+                options=[
+                    discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                    discord.SelectOption(label="🧟 Zombie", value="spawn_creature_zombie", description=f"HP: {self.game.CREATURE_TYPES['zombie']['health']} | DMG: {self.game.CREATURE_TYPES['zombie']['damage']}"),
+                    discord.SelectOption(label="💀 Skeleton", value="spawn_creature_skeleton", description=f"HP: {self.game.CREATURE_TYPES['skeleton']['health']} | DMG: {self.game.CREATURE_TYPES['skeleton']['damage']}"),
+                    discord.SelectOption(label="🕷️ Spider", value="spawn_creature_spider", description=f"HP: {self.game.CREATURE_TYPES['spider']['health']} | DMG: {self.game.CREATURE_TYPES['spider']['damage']}"),
+                    discord.SelectOption(label="💥 Creeper", value="spawn_creature_creeper", description=f"HP: {self.game.CREATURE_TYPES['creeper']['health']} | DMG: {self.game.CREATURE_TYPES['creeper']['damage']}"),
+                    discord.SelectOption(label="👾 Enderman", value="spawn_creature_enderman", description=f"HP: {self.game.CREATURE_TYPES['enderman']['health']} | DMG: {self.game.CREATURE_TYPES['enderman']['damage']}"),
+                    discord.SelectOption(label="🦫 Mole", value="spawn_creature_mole", description=f"HP: {self.game.CREATURE_TYPES['mole']['health']} | Harmless tunneler"),
+                    discord.SelectOption(label="🪱 Worm", value="spawn_creature_worm", description=f"HP: {self.game.CREATURE_TYPES['worm']['health']} | DMG: {self.game.CREATURE_TYPES['worm']['damage']}"),
+                ]
+            )
         
-        dev_select.callback = self.dev_menu_callback
-        container_items.append(discord.ui.ActionRow(dev_select))
-        container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        if dev_select is not None:
+            dev_select.callback = self.dev_menu_callback
+            container_items.append(discord.ui.ActionRow(dev_select))
+            container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
         # Add shop dropdown if at shop
         if self.game.y == -1 and self.game.x in [4, 5]:
@@ -1967,17 +2615,24 @@ class OwnerMiningView(discord.ui.LayoutView):
             container_items.append(discord.ui.ActionRow(shop_select))
             container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
-        # Add inventory dropdown (always visible)
+        # Add inventory dropdown (always visible) - dynamic based on items owned
+        inventory_options = [
+            discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
+        ]
+        
+        # Add items player actually has (count > 0)
+        if self.game.items.get('ladder', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items['ladder']} left)", value="ladder", description="Climb back up easily"))
+        if self.game.items.get('torch', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🔦 Place Torch ({self.game.items['torch']} left)", value="torch", description="Light up dark caves"))
+        if self.game.items.get('portal', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🌀 Place Portal ({self.game.items['portal']} left)", value="portal", description="Teleport waystone"))
+        if self.game.items.get('dynamite', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"💣 Use Dynamite ({self.game.items['dynamite']} left)", value="dynamite", description="Explode 3x3 area"))
+        
         inventory_select = discord.ui.Select(
             placeholder="🎒 Inventory & Items",
-            options=[
-                discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
-                discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items.get('ladder', 0)} left)", value="ladder", description="Climb back up easily"),
-                discord.SelectOption(label=f"🔦 Place Torch ({self.game.items.get('torch', 0)} left)", value="torch", description="Light up dark caves"),
-                discord.SelectOption(label=f"🌀 Place Portal ({self.game.items.get('portal', 0)} left)", value="portal", description="Teleport waystone"),
-                discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
-                discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
-            ]
+            options=inventory_options
         )
         inventory_select.callback = self.inventory_callback
         
@@ -2120,7 +2775,7 @@ class OwnerMiningView(discord.ui.LayoutView):
             if any(self.game.items.values()):
                 inv_text += "\n**Items:**\n"
                 for item, count in self.game.items.items():
-                    emoji = {"ladder": "🪜", "portal": "🌀", "torch": "🔦"}.get(item, "📦")
+                    emoji = {"ladder": "🪜", "portal": "🌀", "torch": "🔦", "dynamite": "💣"}.get(item, "📦")
                     inv_text += f"• {emoji} {count}x {item}\n"
             
             await interaction.response.send_message(inv_text, ephemeral=True)
@@ -2145,8 +2800,13 @@ class OwnerMiningView(discord.ui.LayoutView):
             # Show modal for portal placement
             await self.show_portal_modal(interaction)
         
-        elif action in ["compass", "detector"]:
-            await interaction.response.send_message("⚠️ This item is coming soon!", ephemeral=True)
+        elif action == "dynamite":
+            success, msg = self.game.use_dynamite()
+            if success:
+                cog = interaction.client.get_cog("Mining")
+                if cog:
+                    cog.save_data()
+            await self.refresh(interaction, msg)
     
     async def dev_menu_callback(self, interaction: discord.Interaction):
         """Handle developer menu selection"""
@@ -2176,6 +2836,11 @@ class OwnerMiningView(discord.ui.LayoutView):
         elif action == "items_menu":
             self.dev_menu_state = "items"
             await self.refresh(interaction, "📦 **Items Menu** - Select item to spawn")
+            return
+
+        elif action == "spawn_menu":
+            self.dev_menu_state = "spawn_creatures"
+            await self.refresh(interaction, "🧟 **Spawn Menu** - Select a creature to spawn")
             return
         
         elif action == "structures_menu":
@@ -2246,6 +2911,44 @@ class OwnerMiningView(discord.ui.LayoutView):
             await interaction.response.send_modal(modal)
             return
         
+        # Creature spawning - prawdziwy spawn z ścieżką patrolu
+        elif action.startswith("spawn_creature_"):
+            creature_type = action.replace("spawn_creature_", "")
+            if creature_type in self.game.CREATURE_TYPES:
+                creature_data = self.game.CREATURE_TYPES[creature_type]
+                creature_id = f"creature_{self.game.creature_counter}"
+                self.game.creature_counter += 1
+                spawn_x = self.game.x
+                # Wymuś spawn pod ziemią (y >= 5) żeby patrol działał prawidłowo
+                spawn_y = max(5, self.game.y)
+                # Generuj losową ścieżkę patrolu (identycznie jak spawn_creatures)
+                path_length = self.game.rng.randint(15, 40)
+                path = [(spawn_x, spawn_y)]
+                cur_x, cur_y = spawn_x, spawn_y
+                for _ in range(path_length - 1):
+                    dx, dy = self.game.rng.choice([(-1, 0), (1, 0), (0, -1), (0, 1)])
+                    cur_x = max(-45, min(45, cur_x + dx))
+                    cur_y = max(0, min(100, cur_y + dy))
+                    path.append((cur_x, cur_y))
+                # NOTE: Tunnel carving happens step by step in move_creatures, not upfront
+                self.game.creatures[creature_id] = {
+                    "type": creature_type,
+                    "x": spawn_x,
+                    "y": spawn_y,
+                    "path": path,
+                    "path_index": 0,
+                    "health": creature_data["health"],
+                    "idle_refreshes": 0
+                }
+                emoji = creature_data.get("emoji", "🧟")
+                cog = interaction.client.get_cog("Mining")
+                if cog:
+                    cog.save_data()
+                await self.refresh(interaction, f"{emoji} Spawned **{creature_type.title()}** at ({spawn_x}, {spawn_y})! HP: {creature_data['health']} | Patrol: {len(path)} waypoints")
+            else:
+                await self.refresh(interaction, f"❌ Unknown creature type: {creature_type}")
+            return
+
         # Items spawning actions
         elif action.startswith("spawn_"):
             item_type = action.replace("spawn_", "")
@@ -2343,6 +3046,10 @@ class OwnerMiningView(discord.ui.LayoutView):
             block_names = {
                 "shop": "🏪 Shop",
                 "stone": "🪨 Stone",
+                "stone2": "🪧 Rock",
+                "grass": "🟩 Grass",
+                "bedrock": "🌑 Bedrock",
+                "lapis": "🔷 Lapis Ore",
                 "diamond": "💎 Diamond Ore",
                 "emerald": "💚 Emerald Ore",
                 "gold": "🟡 Gold Ore",
@@ -2378,7 +3085,18 @@ class OwnerMiningView(discord.ui.LayoutView):
             self.game.max_energy = 200
             self.game.energy = self.game.max_energy
             await self.refresh(interaction, "🚀 **Maxed Upgrades:** Pickaxe Lv.10, Backpack 200, Energy 200!")
-        
+
+        elif action == "respawn_creatures":
+            # Force immediate respawn of creatures
+            self.game.spawn_creatures()
+            await self.refresh(interaction, f"🔁 Respawned {len(self.game.creatures)} creatures!")
+
+        elif action == "toggle_devrespawn":
+            # Toggle developer auto-respawn flag on game
+            self.game.dev_mode = not getattr(self.game, "dev_mode", False)
+            status = "ENABLED" if self.game.dev_mode else "DISABLED"
+            await self.refresh(interaction, f"🤖 Dev auto-respawn {status} (game.dev_mode={self.game.dev_mode})")
+
         elif action == "mapinfo":
             biome = self.game.get_biome(self.game.y)
             info = (
@@ -2633,11 +3351,14 @@ class OwnerMiningView(discord.ui.LayoutView):
         """Refresh the game view"""
         self.game.regenerate_energy()
         
+        # Move creatures along their patrol paths
+        self.game.move_creatures()
+        
         if self.game.check_map_regeneration(bot=interaction.client, guild_id=self.game.guild_id):
             if message:
-                message += "\n\n🔄 **Map regenerated after 12 hours!**"
+                message += "\n\n🔄 **Full map reset! (Ladders, portals, torches cleared. Inventory saved!)**"
             else:
-                message = "🔄 **Map regenerated after 12 hours!**"
+                message = "🔄 **Full map reset! (Ladders, portals, torches cleared. Inventory saved!)**"
         
         loop = asyncio.get_event_loop()
         map_image = await loop.run_in_executor(None, self.game.render_map, interaction.client)
@@ -2677,6 +3398,7 @@ class OwnerMiningView(discord.ui.LayoutView):
         ]
         
         # Add developer menu (changes based on state)
+        dev_select = None
         if self.dev_menu_state == "main":
             dev_select = discord.ui.Select(
                 placeholder="🔧 Developer Menu",
@@ -2691,6 +3413,7 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="🔄 Force Map Reset", value="forcereset", description="Regenerate entire map now"),
                     discord.SelectOption(label="🌱 Change Seed", value="customseed", description="Enter custom world seed"),
                     discord.SelectOption(label="💎 Spawn Rare Items", value="spawnitems", description="Add valuable items"),
+                    discord.SelectOption(label="🧟 Spawn Creatures", value="spawn_menu", description="Open creature spawn menu"),
                     discord.SelectOption(label="💰 Max All Upgrades", value="maxupgrades", description="Max pickaxe/backpack/energy"),
                     discord.SelectOption(label="🗺️ World Info", value="mapinfo", description="View map details"),
                 ]
@@ -2782,20 +3505,23 @@ class OwnerMiningView(discord.ui.LayoutView):
                 placeholder="🧱 Place Block",
                 options=[
                     discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
-                    discord.SelectOption(label="🏪 Shop", value="place_shop", description="Place a shop block"),
-                    discord.SelectOption(label="🪨 Stone", value="place_stone", description="Place stone"),
-                    discord.SelectOption(label="💎 Diamond", value="place_diamond", description="Place diamond ore"),
-                    discord.SelectOption(label="💚 Emerald", value="place_emerald", description="Place emerald ore"),
-                    discord.SelectOption(label="🟡 Gold", value="place_gold", description="Place gold ore"),
-                    discord.SelectOption(label="⬛ Netherite", value="place_netherite", description="Place netherite"),
-                    discord.SelectOption(label="🟫 Ancient Debris", value="place_ancient_debris", description="Place ancient debris"),
-                    discord.SelectOption(label="🔷 Lapis", value="place_lapis", description="Place lapis ore"),
-                    discord.SelectOption(label="🔴 Redstone", value="place_redstone", description="Place redstone ore"),
+                    discord.SelectOption(label="🟩 Grass", value="place_grass", description="Place grass block"),
+                    discord.SelectOption(label="🟫 Dirt", value="place_dirt", description="Place dirt"),
+                    discord.SelectOption(label="🪧 Rock", value="place_stone", description="Place rock"),
+                    discord.SelectOption(label="🪨 Stone", value="place_stone2", description="Place stone (stone2, deep layer)"),
+                    discord.SelectOption(label="🟤 Deepslate", value="place_deepslate", description="Place deepslate"),
+                    discord.SelectOption(label="🌑 Bedrock", value="place_bedrock", description="Place bedrock"),
                     discord.SelectOption(label="⚫ Coal", value="place_coal", description="Place coal ore"),
                     discord.SelectOption(label="⚪ Iron", value="place_iron", description="Place iron ore"),
-                    discord.SelectOption(label="🟤 Deepslate", value="place_deepslate", description="Place deepslate"),
-                    discord.SelectOption(label="🟫 Dirt", value="place_dirt", description="Place dirt"),
+                    discord.SelectOption(label="🟡 Gold", value="place_gold", description="Place gold ore"),
+                    discord.SelectOption(label="🔴 Redstone", value="place_redstone", description="Place redstone ore"),
+                    discord.SelectOption(label="🔷 Lapis", value="place_lapis", description="Place lapis ore"),
+                    discord.SelectOption(label="💎 Diamond", value="place_diamond", description="Place diamond ore"),
+                    discord.SelectOption(label="💚 Emerald", value="place_emerald", description="Place emerald ore"),
+                    discord.SelectOption(label="⬛ Netherite", value="place_netherite", description="Place netherite"),
+                    discord.SelectOption(label="🟫 Ancient Debris", value="place_ancient_debris", description="Place ancient debris"),
                     discord.SelectOption(label="📦 Chest", value="place_chest", description="Loot chest"),
+                    discord.SelectOption(label="🏪 Shop", value="place_shop", description="Place a shop block"),
                     discord.SelectOption(label="🪵 M.Wood", value="place_mineshaft_wood", description="Mineshaft wood"),
                     discord.SelectOption(label="🏗️ M.Support", value="place_mineshaft_support", description="Support beam"),
                     discord.SelectOption(label="🛤️ M.Rail", value="place_mineshaft_rail", description="Rail"),
@@ -2803,10 +3529,26 @@ class OwnerMiningView(discord.ui.LayoutView):
                     discord.SelectOption(label="🌫️ Air", value="place_air", description="Remove block"),
                 ]
             )
+        elif self.dev_menu_state == "spawn_creatures":
+            # Creature spawn submenu - spawns at player position like a block
+            dev_select = discord.ui.Select(
+                placeholder="🧟 Wybierz stwora do spawnu",
+                options=[
+                    discord.SelectOption(label="⬅️ Back to Main Menu", value="back_main", description="Return to main dev menu"),
+                    discord.SelectOption(label="🧟 Zombie", value="spawn_creature_zombie", description=f"HP: {self.game.CREATURE_TYPES['zombie']['health']} | DMG: {self.game.CREATURE_TYPES['zombie']['damage']}"),
+                    discord.SelectOption(label="💀 Skeleton", value="spawn_creature_skeleton", description=f"HP: {self.game.CREATURE_TYPES['skeleton']['health']} | DMG: {self.game.CREATURE_TYPES['skeleton']['damage']}"),
+                    discord.SelectOption(label="🕷️ Spider", value="spawn_creature_spider", description=f"HP: {self.game.CREATURE_TYPES['spider']['health']} | DMG: {self.game.CREATURE_TYPES['spider']['damage']}"),
+                    discord.SelectOption(label="💥 Creeper", value="spawn_creature_creeper", description=f"HP: {self.game.CREATURE_TYPES['creeper']['health']} | DMG: {self.game.CREATURE_TYPES['creeper']['damage']}"),
+                    discord.SelectOption(label="👾 Enderman", value="spawn_creature_enderman", description=f"HP: {self.game.CREATURE_TYPES['enderman']['health']} | DMG: {self.game.CREATURE_TYPES['enderman']['damage']}"),
+                    discord.SelectOption(label="🦫 Mole", value="spawn_creature_mole", description=f"HP: {self.game.CREATURE_TYPES['mole']['health']} | Harmless tunneler"),
+                    discord.SelectOption(label="🪱 Worm", value="spawn_creature_worm", description=f"HP: {self.game.CREATURE_TYPES['worm']['health']} | DMG: {self.game.CREATURE_TYPES['worm']['damage']}"),
+                ]
+            )
         
-        dev_select.callback = self.dev_menu_callback
-        container_items.append(discord.ui.ActionRow(dev_select))
-        container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        if dev_select is not None:
+            dev_select.callback = self.dev_menu_callback
+            container_items.append(discord.ui.ActionRow(dev_select))
+            container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
         if self.game.y == -1 and self.game.x in [4, 5]:
             shop_select = discord.ui.Select(
@@ -2879,17 +3621,24 @@ class OwnerMiningView(discord.ui.LayoutView):
                 container_items.append(discord.ui.ActionRow(portal_select))
                 container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
         
-        # Add inventory dropdown (always visible)
+        # Add inventory dropdown (always visible) - dynamic based on items owned
+        inventory_options = [
+            discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
+        ]
+        
+        # Add items player actually has (count > 0)
+        if self.game.items.get('ladder', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items['ladder']} left)", value="ladder", description="Climb back up easily"))
+        if self.game.items.get('torch', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🔦 Place Torch ({self.game.items['torch']} left)", value="torch", description="Light up dark caves"))
+        if self.game.items.get('portal', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"🌀 Place Portal ({self.game.items['portal']} left)", value="portal", description="Teleport waystone"))
+        if self.game.items.get('dynamite', 0) > 0:
+            inventory_options.append(discord.SelectOption(label=f"💣 Use Dynamite ({self.game.items['dynamite']} left)", value="dynamite", description="Explode 3x3 area"))
+        
         inventory_select = discord.ui.Select(
             placeholder="🎒 Inventory & Items",
-            options=[
-                discord.SelectOption(label="🎒 View Inventory", value="view_inv", description="See what you're carrying"),
-                discord.SelectOption(label=f"🪜 Place Ladder ({self.game.items.get('ladder', 0)} left)", value="ladder", description="Climb back up easily"),
-                discord.SelectOption(label=f"🔦 Place Torch ({self.game.items.get('torch', 0)} left)", value="torch", description="Light up dark caves"),
-                discord.SelectOption(label=f"🌀 Place Portal ({self.game.items.get('portal', 0)} left)", value="portal", description="Teleport waystone"),
-                discord.SelectOption(label="🧭 Compass (Coming Soon)", value="compass", description="Find your way back"),
-                discord.SelectOption(label="💎 Gem Detector (Coming Soon)", value="detector", description="Find rare ores"),
-            ]
+            options=inventory_options
         )
         inventory_select.callback = self.inventory_callback
         
@@ -3207,7 +3956,7 @@ class Mining(commands.Cog):
         
         # Check for map regeneration
         if game.check_map_regeneration(bot=bot, guild_id=guild_id):
-            message += "\n\n🔄 **Map regenerated after 12 hours!**"
+            message += "\n\n🔄 **Full map reset! (Ladders, portals, torches cleared. Inventory saved!)**"
         
         # Use OwnerMiningView if in developer mode, otherwise regular MiningView
         if dev_mode:

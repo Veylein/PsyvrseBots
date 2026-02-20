@@ -175,6 +175,15 @@ class Social(commands.Cog):
         economy_cog = self.bot.get_cog("Economy")
         if economy_cog:
             economy_cog.add_coins(author.id, 10, "social_interaction")
+        # Update profile stats
+        profile_cog = self.bot.get_cog("Profile")
+        if profile_cog and hasattr(profile_cog, "profile_manager"):
+            try:
+                profile_cog.profile_manager.increment_stat(author.id, 'roasts_given', 1)
+                if target and target.id != author.id:
+                    profile_cog.profile_manager.increment_stat(target.id, 'roasts_received', 1)
+            except Exception:
+                pass
         
         if interaction:
             await interaction.followup.send(embed=embed)
@@ -202,6 +211,15 @@ class Social(commands.Cog):
             economy_cog.add_coins(author.id, 15, "social_interaction")
             if target.id != author.id:
                 economy_cog.add_coins(target.id, 10, "received_compliment")
+        # Update profile stats
+        profile_cog = self.bot.get_cog("Profile")
+        if profile_cog and hasattr(profile_cog, "profile_manager"):
+            try:
+                profile_cog.profile_manager.increment_stat(author.id, 'compliments_given', 1)
+                if target and target.id != author.id:
+                    profile_cog.profile_manager.increment_stat(target.id, 'compliments_received', 1)
+            except Exception:
+                pass
         
         if interaction:
             await interaction.followup.send(embed=embed)

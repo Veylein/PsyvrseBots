@@ -1081,30 +1081,6 @@ class Economy(commands.Cog):
         )
         
         await interaction.response.send_message(embed=embed)
-    
-    @app_commands.command(name="mydecks", description="View your owned card decks")
-    async def mydecks_slash(self, interaction: discord.Interaction):
-        owned_decks = self.get_owned_decks(interaction.user.id)
-        current_deck = self.get_user_card_deck(interaction.user.id)
-        
-        embed = EmbedBuilder.create(
-            title="🎴 Your Card Decks",
-            description=f"Currently equipped: **{current_deck.title()}**",
-            color=Colors.PRIMARY
-        )
-        
-        for deck_name in owned_decks:
-            deck_info = self.card_decks.get(deck_name, {"name": deck_name.title(), "rarity": "Common"})
-            equipped = " ✅ (Equipped)" if deck_name == current_deck else ""
-            embed.add_field(
-                name=f"{deck_info['name']}{equipped}",
-                value=f"Rarity: {deck_info.get('rarity', 'Common')}",
-                inline=True
-            )
-        
-        embed.set_footer(text="Use /equipdeck to change your active deck!")
-        
-        await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Economy(bot))

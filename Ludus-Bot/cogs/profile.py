@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-from discord.ui import View, Button
 import json
 import os
 from datetime import datetime
@@ -11,11 +10,17 @@ from utils.embed_styles import EmbedBuilder, Colors, Emojis
 
 class ProfileManager:
     """Manages comprehensive user profiles tracking ALL activities"""
-    
+
     def __init__(self, data_dir):
         self.data_dir = data_dir
         self.profiles_file = os.path.join(data_dir, "profiles.json")
         self.profiles = self.load_profiles()
+        self.fishing_data_file = os.path.join(data_dir, "fishing_data.json")
+        self.gambling_stats_file = os.path.join(data_dir, "gambling_stats.json")
+        # Paths to external stats files
+        self.fishing_data_file = os.path.join(data_dir, "fishing_data.json")
+        self.gambling_stats_file = os.path.join(data_dir, "gambling_stats.json")
+        self.farming_profile_file = os.path.join(data_dir, "profiles.json")  # farming uses same file
     
     def load_profiles(self):
         """Load profiles from JSON"""
@@ -34,6 +39,83 @@ class ProfileManager:
                 json.dump(self.profiles, f, indent=4)
         except Exception as e:
             print(f"Error saving profiles: {e}")
+
+    def _load_fishing_data(self):
+        if os.path.exists(self.fishing_data_file):
+            try:
+                with open(self.fishing_data_file, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def _load_gambling_stats(self):
+        if os.path.exists(self.gambling_stats_file):
+            try:
+                with open(self.gambling_stats_file, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def get_user_stats(self, user_id):
+        """Return a profile merged with external stats (fishing, gambling, farming files)."""
+        user_id = str(user_id)
+        profile = self.get_profile(user_id).copy()
+
+        # Merge fishing data
+        fishing_data = self._load_fishing_data()
+        if user_id in fishing_data:
+            user_fishing = fishing_data[user_id]
+            profile['fish_caught'] = user_fishing.get('total_catches', 0)
+            profile['fishing_trips'] = user_fishing.get('total_catches', 0)
+            rare_count = 0
+            legendary_count = 0
+            biggest_weight = 0
+            for fish_id, fish_info in user_fishing.get('fish_caught', {}).items():
+                count = fish_info.get('count', 0) if isinstance(fish_info, dict) else 0
+                if fish_id == 'kraken':
+                    legendary_count += count
+                elif count > 0:
+                    rare_count += count
+                if isinstance(fish_info, dict):
+                    biggest = fish_info.get('biggest', 0)
+                    if biggest > biggest_weight:
+                        biggest_weight = biggest
+            profile['rare_fish_caught'] = rare_count
+            profile['legendary_fish_caught'] = legendary_count
+            profile['biggest_fish_weight'] = biggest_weight
+
+        # Merge gambling data
+        gambling_data = self._load_gambling_stats()
+        if user_id in gambling_data:
+            user_gambling = gambling_data[user_id]
+            profile['gambling_count'] = user_gambling.get('total_games', 0)
+            profile['gambling_wins'] = sum(g.get('won', 0) for g in user_gambling.get('games', {}).values())
+            profile['gambling_losses'] = sum(g.get('lost', 0) for g in user_gambling.get('games', {}).values())
+            profile['gambling_total_wagered'] = user_gambling.get('total_wagered', 0)
+            profile['gambling_total_won'] = user_gambling.get('total_won', 0)
+            profile['total_earned'] = user_gambling.get('total_won', 0)
+            profile['total_spent'] = user_gambling.get('total_wagered', 0)
+            biggest_win = 0
+            biggest_loss = 0
+            for game_data in user_gambling.get('games', {}).values():
+                if isinstance(game_data, dict):
+                    won = game_data.get('won', 0)
+                    lost = game_data.get('lost', 0)
+                    if won > biggest_win:
+                        biggest_win = won
+                    if lost > biggest_loss:
+                        biggest_loss = lost
+            profile['biggest_win'] = biggest_win
+            profile['biggest_loss'] = biggest_loss
+
+        # Farming stats already stored inside profile under 'farming_stats'
+        farming_stats = profile.get('farming_stats', {})
+        profile['crops_planted'] = farming_stats.get('crops_planted', 0)
+        profile['crops_harvested'] = farming_stats.get('crops_harvested', 0)
+
+        return profile
     
     def get_profile(self, user_id):
         """Get or create user profile"""
@@ -43,6 +125,11 @@ class ProfileManager:
             self.save_profiles()
         # Ensure new fields for cross-cog stats
         profile = self.profiles[user_id]
+        # Merge any missing keys from default profile to avoid KeyErrors in views
+        default = self._create_default_profile()
+        for k, v in default.items():
+            if k not in profile:
+                profile[k] = v
         if "most_played_games" not in profile:
             profile["most_played_games"] = {}
         if "most_played_with" not in profile:
@@ -55,52 +142,123 @@ class ProfileManager:
             profile["farming_stats"] = {"crops_planted": 0, "crops_harvested": 0, "level": 1}
         self.save_profiles()
         return profile
-        def record_game_played(self, user_id, game_name, with_users=None):
-            """Track most played games and most played with (friends/rivals)"""
-            profile = self.get_profile(user_id)
-            # Most played games
-            mpg = profile.setdefault("most_played_games", {})
-            mpg[game_name] = mpg.get(game_name, 0) + 1
-            # Most played with
-            if with_users:
-                mpw = profile.setdefault("most_played_with", {})
-                for uid in with_users:
-                    mpw[str(uid)] = mpw.get(str(uid), 0) + 1
-            self.save_profiles()
+    def record_game_played(self, user_id, game_name, with_users=None):
+        """Track most played games and most played with (friends/rivals)"""
+        profile = self.get_profile(user_id)
+        mpg = profile.setdefault("most_played_games", {})
+        mpg[game_name] = mpg.get(game_name, 0) + 1
+        if with_users:
+            mpw = profile.setdefault("most_played_with", {})
+            for uid in with_users:
+                mpw[str(uid)] = mpw.get(str(uid), 0) + 1
+        self.save_profiles()
 
-        def update_fishing(self, user_id, fish_type, weight=0):
-            """Update fishing stats in profile"""
-            profile = self.get_profile(user_id)
-            stats = profile.setdefault("fishing_stats", {"fish_caught": 0, "rare_fish": 0, "legendary_fish": 0, "biggest_fish": 0})
-            if fish_type == "normal":
-                stats["fish_caught"] += 1
-            elif fish_type == "rare":
-                stats["rare_fish"] += 1
-            elif fish_type == "legendary":
-                stats["legendary_fish"] += 1
-            if weight > stats.get("biggest_fish", 0):
-                stats["biggest_fish"] = weight
-            self.save_profiles()
+    def update_fishing(self, user_id, fish_type, weight=0):
+        """Update fishing stats in profile"""
+        profile = self.get_profile(user_id)
+        stats = profile.setdefault("fishing_stats", {"fish_caught": 0, "rare_fish": 0, "legendary_fish": 0, "biggest_fish": 0})
+        if fish_type == "normal":
+            stats["fish_caught"] += 1
+        elif fish_type == "rare":
+            stats["rare_fish"] += 1
+        elif fish_type == "legendary":
+            stats["legendary_fish"] += 1
+        if weight > stats.get("biggest_fish", 0):
+            stats["biggest_fish"] = weight
+        self.save_profiles()
 
-        def update_farming(self, user_id, planted=0, harvested=0, level=None):
-            """Update farming stats in profile"""
-            profile = self.get_profile(user_id)
-            stats = profile.setdefault("farming_stats", {"crops_planted": 0, "crops_harvested": 0, "level": 1})
-            stats["crops_planted"] += planted
-            stats["crops_harvested"] += harvested
-            if level is not None:
-                stats["level"] = max(stats["level"], level)
-            self.save_profiles()
+    def update_farming(self, user_id, planted=0, harvested=0, level=None):
+        """Update farming stats in profile"""
+        profile = self.get_profile(user_id)
+        stats = profile.setdefault("farming_stats", {"crops_planted": 0, "crops_harvested": 0, "level": 1})
+        stats["crops_planted"] += planted
+        stats["crops_harvested"] += harvested
+        if level is not None:
+            stats["level"] = max(stats["level"], level)
+        self.save_profiles()
 
-        def update_inventory(self, user_id, item, amount):
-            """Update inventory in profile"""
-            profile = self.get_profile(user_id)
-            inv = profile.setdefault("inventory", {})
-            inv[item] = inv.get(item, 0) + amount
-            if inv[item] <= 0:
-                del inv[item]
-            self.save_profiles()
-    
+    def update_inventory(self, user_id, item, amount):
+        """Update inventory in profile"""
+        profile = self.get_profile(user_id)
+        inv = profile.setdefault("inventory", {})
+        inv[item] = inv.get(item, 0) + amount
+        if inv[item] <= 0:
+            del inv[item]
+        self.save_profiles()
+
+    def get_user_stats(self, user_id):
+        """Get comprehensive user stats from all data files"""
+        user_id = str(user_id)
+        profile = self.get_profile(user_id).copy()
+
+        # Load and merge fishing stats from fishing_data.json
+        fishing_data = self._load_fishing_data()
+        if user_id in fishing_data:
+            user_fishing = fishing_data[user_id]
+            profile["fish_caught"] = user_fishing.get("total_catches", 0)
+            profile["fishing_trips"] = user_fishing.get("total_catches", 0)
+            # Calculate rare/legendary from fish_caught dict
+            rare_count = 0
+            legendary_count = 0
+            biggest_weight = 0
+            for fish_id, fish_info in user_fishing.get("fish_caught", {}).items():
+                count = fish_info.get("count", 0) if isinstance(fish_info, dict) else 0
+                if fish_id == "kraken":
+                    legendary_count += count
+                elif count > 0:
+                    # Check rarity from fishing_cog if available
+                    rare_count += count
+                if isinstance(fish_info, dict):
+                    biggest = fish_info.get("biggest", 0)
+                    if biggest > biggest_weight:
+                        biggest_weight = biggest
+            profile["rare_fish_caught"] = rare_count
+            profile["legendary_fish_caught"] = legendary_count
+            profile["biggest_fish_weight"] = biggest_weight
+
+        # Load and merge gambling stats from gambling_stats.json
+        gambling_data = self._load_gambling_stats()
+        if user_id in gambling_data:
+            user_gambling = gambling_data[user_id]
+            profile["gambling_count"] = user_gambling.get("total_games", 0)
+            profile["gambling_wins"] = sum(g.get("won", 0) for g in user_gambling.get("games", {}).values())
+            profile["gambling_losses"] = sum(g.get("lost", 0) for g in user_gambling.get("games", {}).values())
+            profile["gambling_total_wagered"] = user_gambling.get("total_wagered", 0)
+            profile["gambling_total_won"] = user_gambling.get("total_won", 0)
+            # Calculate total_earned and total_spent from gambling
+            profile["total_earned"] = user_gambling.get("total_won", 0)
+            profile["total_spent"] = user_gambling.get("total_wagered", 0)
+            profile["biggest_win"] = user_gambling.get("biggest_win", 0)
+            profile["biggest_loss"] = user_gambling.get("biggest_loss", 0)
+
+        # Load and merge farming stats from profiles.json (farming uses same file)
+        farming_stats = profile.get("farming_stats", {})
+        profile["crops_planted"] = farming_stats.get("crops_planted", 0)
+        profile["crops_harvested"] = farming_stats.get("crops_harvested", 0)
+        profile["farming_level"] = farming_stats.get("level", 1)
+
+        return profile
+
+    def _load_fishing_data(self):
+        """Load fishing data from fishing_data.json"""
+        if os.path.exists(self.fishing_data_file):
+            try:
+                with open(self.fishing_data_file, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def _load_gambling_stats(self):
+        """Load gambling stats from gambling_stats.json"""
+        if os.path.exists(self.gambling_stats_file):
+            try:
+                with open(self.gambling_stats_file, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
     def _create_default_profile(self):
         """Create default profile structure"""
         return {
@@ -249,9 +407,11 @@ class ProfileManager:
         profile = self.get_profile(user_id)
         if stat_name in profile:
             profile[stat_name] += amount
-            self.save_profiles()
-            return True
-        return False
+        else:
+            # Create missing stat keys on demand
+            profile[stat_name] = amount
+        self.save_profiles()
+        return True
     
     def set_stat(self, user_id, stat_name, value):
         """Set a specific stat value"""
@@ -296,77 +456,154 @@ class ProfileManager:
         top = sorted(activities.items(), key=lambda x: x[1], reverse=True)[:5]
         return top
 
-class ProfileView(View):
-    def __init__(self, ctx, profile_data, user):
+class ProfileView(discord.ui.LayoutView):
+    def __init__(self, bot, profile_data, user, viewer_id):
         super().__init__(timeout=60)
-        self.ctx = ctx
-        self.profile_data = profile_data
+        self.bot = bot
+        # Use profile_data if it's a dict (already loaded stats) or use profile_manager.get_profile()
+        if isinstance(profile_data, dict):
+            self.profile_data = profile_data
+        else:
+            # profile_data is likely user_id, load from manager
+            profile_cog = self.bot.get_cog("Profile")
+            if profile_cog and hasattr(profile_cog, "manager"):
+                # Use manager.get_user_stats to include merged fishing/gambling data
+                if hasattr(profile_cog.manager, 'get_user_stats'):
+                    self.profile_data = profile_cog.manager.get_user_stats(profile_data)
+                else:
+                    self.profile_data = profile_cog.manager.get_profile(profile_data)
+            else:
+                self.profile_data = {"energy": 100, "max_energy": 100, "level": 1, "xp": 0}
         self.user = user
+        self.viewer_id = viewer_id
         self.current_page = "overview"
+        self._build_ui()
     
-    @discord.ui.button(label="Overview", style=discord.ButtonStyle.primary, emoji="📊")
-    async def overview_button(self, interaction: discord.Interaction, button: Button):
-        if interaction.user != self.ctx.author:
-            await interaction.response.send_message("This profile isn't for you!", ephemeral=True)
-            return
+    def _build_ui(self):
+        """Build the UI with Components v2"""
+        container_items = []
         
-        self.current_page = "overview"
-        embed = self._create_overview_embed()
-        await interaction.response.edit_message(embed=embed)
-    
-    @discord.ui.button(label="Gaming", style=discord.ButtonStyle.success, emoji="🎮")
-    async def gaming_button(self, interaction: discord.Interaction, button: Button):
-        if interaction.user != self.ctx.author:
-            await interaction.response.send_message("This profile isn't for you!", ephemeral=True)
-            return
-        
-        self.current_page = "gaming"
-        embed = self._create_gaming_embed()
-        await interaction.response.edit_message(embed=embed)
-    
-    @discord.ui.button(label="Economy", style=discord.ButtonStyle.success, emoji="💰")
-    async def economy_button(self, interaction: discord.Interaction, button: Button):
-        if interaction.user != self.ctx.author:
-            await interaction.response.send_message("This profile isn't for you!", ephemeral=True)
-            return
-        
-        self.current_page = "economy"
-        embed = self._create_economy_embed()
-        await interaction.response.edit_message(embed=embed)
-    
-    @discord.ui.button(label="Social", style=discord.ButtonStyle.primary, emoji="👥")
-    async def social_button(self, interaction: discord.Interaction, button: Button):
-        if interaction.user != self.ctx.author:
-            await interaction.response.send_message("This profile isn't for you!", ephemeral=True)
-            return
-        
-        self.current_page = "social"
-        embed = self._create_social_embed()
-        await interaction.response.edit_message(embed=embed)
-    
-    def _create_overview_embed(self):
-        """Create overview page"""
-        p = self.profile_data
-        # Energy bar
-        energy_percentage = (p['energy'] / p['max_energy']) * 100
-        energy_bar = EmbedBuilder.progress_bar(energy_percentage, 10)
-        # Calculate stats
-        gambling_winrate = (p['gambling_wins'] / p['gambling_count'] * 100) if p['gambling_count'] > 0 else 0
-        minigame_winrate = (p['minigames_won'] / p['minigames_played'] * 100) if p['minigames_played'] > 0 else 0
-        # Badges
-        badge_display = ""
-        if p.get("badges"):
-            badge_display = "\n🏅 **Badges:** " + " ".join([f"`{b}`" for b in p["badges"]])
-        embed = EmbedBuilder.create(
-            title=f"{Emojis.CROWN} {self.user.display_name}'s Profile",
-            description=f"**Level {p['level']}** • {p['xp']} XP\n"
-                       f"⚡ **Energy:** {energy_bar} {p['energy']}/{p['max_energy']}\n"
-                       f"━━━━━━━━━━━━━━━━━━━━━━━━"
-                       f"{badge_display}",
-            color=Colors.PRIMARY
+        # Add the current page content as TextDisplay
+        page_content = self._get_page_content()
+        container_items.append(discord.ui.TextDisplay(content=page_content))
+        container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        # Get economy cog for deck info (show deck selector first)
+        economy_cog = self.bot.get_cog("Economy")
+        if economy_cog:
+            owned_decks = economy_cog.get_owned_decks(self.user.id)
+            current_deck = economy_cog.get_user_card_deck(self.user.id)
+
+            # Only show deck dropdown if user owns decks
+            if owned_decks:
+                deck_options = []
+                for deck_name in owned_decks:
+                    deck_info = economy_cog.card_decks.get(deck_name, {"name": deck_name.title(), "rarity": "Common"})
+                    equipped = " ✅" if deck_name == current_deck else ""
+                    deck_options.append(
+                        discord.SelectOption(
+                            label=f"{deck_info['name']}{equipped}",
+                            value=deck_name,
+                            description=f"{deck_info.get('rarity', 'Common')} • {'Equipped' if deck_name == current_deck else 'Unequipped'}",
+                            emoji="🃏"
+                        )
+                    )
+
+                deck_select = discord.ui.Select(
+                    placeholder="🎴 Card Decks",
+                    options=deck_options
+                )
+                deck_select.callback = self.deck_callback
+                container_items.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+                container_items.append(discord.ui.ActionRow(deck_select))
+
+        # Page selector dropdown (after deck selector)
+        page_select = discord.ui.Select(
+            placeholder="📊 Select Page",
+            options=[
+                discord.SelectOption(label="Overview", value="overview", emoji="📊", description="Profile overview and quick stats"),
+                discord.SelectOption(label="Gaming", value="gaming", emoji="🎮", description="Gaming stats and achievements"),
+                discord.SelectOption(label="Economy", value="economy", emoji="💰", description="Financial stats and business"),
+                discord.SelectOption(label="Social", value="social", emoji="👥", description="Social interactions and activity"),
+            ]
         )
+        page_select.callback = self.page_callback
+        container_items.append(discord.ui.ActionRow(page_select))
+        
+        self.container = discord.ui.Container(
+            *container_items,
+            accent_colour=discord.Colour(0x5865F2),
+        )
+        
+        self.add_item(self.container)
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only allow the viewer to interact"""
+        if interaction.user.id != self.viewer_id:
+            await interaction.response.send_message("**❌ This profile isn't for you!**", ephemeral=True)
+            return False
+        return True
+    
+    async def page_callback(self, interaction: discord.Interaction):
+        """Handle page selection"""
+        selected = interaction.data.get('values', [])
+        if not selected:
+            await interaction.response.defer()
+            return
+        
+        self.current_page = selected[0]
+        
+        # Rebuild UI with new page content
+        self.clear_items()
+        self._build_ui()
+        
+        await interaction.response.edit_message(view=self)
+    
+    async def deck_callback(self, interaction: discord.Interaction):
+        """Handle deck equipment"""
+        selected = interaction.data.get('values', [])
+        if not selected:
+            await interaction.response.defer()
+            return
+        
+        deck_name = selected[0]
+        
+        # Equip the deck
+        economy_cog = self.bot.get_cog("Economy")
+        if economy_cog:
+            economy_cog.set_user_card_deck(self.user.id, deck_name)
+            deck_info = economy_cog.card_decks.get(deck_name, {"name": deck_name.title(), "rarity": "Unknown"})
+            
+            # Rebuild UI to reflect new equipped deck
+            self.clear_items()
+            self._build_ui()
+            
+            # Update message with confirmation
+            await interaction.response.edit_message(view=self)
+        else:
+            await interaction.response.send_message("❌ Economy system not available!", ephemeral=True)
+    
+    def _get_page_content(self):
+        """Get markdown content for current page"""
+        if self.current_page == "overview":
+            return self._create_overview_content()
+        elif self.current_page == "gaming":
+            return self._create_gaming_content()
+        elif self.current_page == "economy":
+            return self._create_economy_content()
+        elif self.current_page == "social":
+            return self._create_social_content()
+        else:
+            return self._create_overview_content()
+    
+    def _create_overview_content(self):
+        """Create overview page as markdown text"""
+        p = self.profile_data
+        energy_percentage = (p['energy'] / p['max_energy']) * 100
+        energy_blocks = int(energy_percentage / 10)
+        energy_bar = "█" * energy_blocks + "░" * (10 - energy_blocks)
+        gambling_winrate = (p['gambling_wins'] / p['gambling_count'] * 100) if p['gambling_count'] > 0 else 0
+        
         # Top Activities
-        top_stats = []
         activities = [
             ("🎲 Gambling", p['gambling_count']),
             ("🎮 Minigames", p['minigames_played']),
@@ -374,273 +611,166 @@ class ProfileView(View):
             ("🎣 Fish Caught", p['fish_caught']),
             ("📜 Quests Done", p['quests_completed']),
         ]
+        top_stats = [f"{name}: **{count}**" for name, count in sorted(activities, key=lambda x: x[1], reverse=True)[:5] if count > 0]
         
-        for name, count in sorted(activities, key=lambda x: x[1], reverse=True)[:5]:
-            if count > 0:
-                top_stats.append(f"{name}: **{count}**")
+        badges = ""
+        if p.get("badges"):
+            badges = "\n🏅 **Badges:** " + " ".join([f"`{b}`" for b in p["badges"]]) + "\n"
         
-        embed.add_field(
-            name=f"{Emojis.TROPHY} Top Activities",
-            value="\n".join(top_stats) if top_stats else "*No activity yet*",
-            inline=False
-        )
+        top_activities_text = "\n".join(top_stats) if top_stats else '*No activity yet*'
         
-        # Quick Stats Grid
-        embed.add_field(
-            name=f"{Emojis.DICE} Gambling",
-            value=f"**{p['gambling_count']}** games\n"
-                  f"**{gambling_winrate:.1f}%** winrate",
-            inline=True
-        )
-        
-        embed.add_field(
-            name=f"🎮 Minigames",
-            value=f"**{p['minigames_played']}** played\n"
-                  f"**{p['minigames_won']}** won",
-            inline=True
-        )
-        
-        embed.add_field(
-            name=f"{Emojis.HEART} Social",
-            value=f"**{p['compliments_given']}** compliments\n"
-                  f"**{p['events_participated']}** events",
-            inline=True
-        )
-        
-        embed.set_footer(text="Use buttons to see detailed stats • Energy restores over time")
-        embed.set_thumbnail(url=self.user.display_avatar.url)
-        
-        return embed
+        return f"""# 👑 {self.user.display_name}'s Profile
+
+**Level {p['level']}** • {p['xp']} XP
+⚡ **Energy:** {energy_bar} {p['energy']}/{p['max_energy']}{badges}
+
+## 🏆 Top Activities
+{top_activities_text}
+
+**🎲 Gambling:** {p['gambling_count']} games • {gambling_winrate:.1f}% winrate
+**🎮 Minigames:** {p['minigames_played']} played • {p['minigames_won']} won
+**💬 Social:** {p['compliments_given']} compliments • {p['events_participated']} events
+
+*Use dropdown to see detailed stats*"""
     
-    def _create_gaming_embed(self):
-        """Create gaming stats page"""
+    def _create_gaming_content(self):
+        """Create gaming page as markdown text"""
         p = self.profile_data
-        
-        embed = EmbedBuilder.create(
-            title=f"🎮 {self.user.display_name}'s Gaming Stats",
-            description="Complete overview of all gaming activities!",
-            color=Colors.SUCCESS
-        )
-        
-        # Minigames
-        embed.add_field(
-            name="🎮 Minigames",
-            value=f"**Total:** {p['minigames_played']} played, {p['minigames_won']} won\n"
-                  f"**Wordle:** {p['wordle_wins']}/{p['wordle_attempts']}\n"
-                  f"**Riddles:** {p['riddles_solved']} solved\n"
-                  f"**Trivia:** {p['trivia_correct']}/{p['trivia_attempted']}",
-            inline=False
-        )
-        
-        # Board Games
-        embed.add_field(
-            name="🎯 Board Games",
-            value=f"**Tic-Tac-Toe:** {p['tictactoe_wins']}/{p['tictactoe_played']}\n"
-                  f"**Connect4:** {p['connect4_wins']}/{p['connect4_played']}\n"
-                  f"**Hangman:** {p['hangman_wins']}/{p['hangman_played']}",
-            inline=True
-        )
-        
-        # Card Games
-        embed.add_field(
-            name="🃏 Card Games",
-            value=f"**UNO:** {p['uno_wins']}/{p['uno_played']}\n"
-                  f"**Blackjack:** {p['blackjack_wins']}/{p['blackjack_played']}\n"
-                  f"**War:** {p['war_played']} games",
-            inline=True
-        )
-        
-        # TCG
         tcg_winrate = (p['tcg_wins'] / p['tcg_battles'] * 100) if p['tcg_battles'] > 0 else 0
-        embed.add_field(
-            name="⚔️ Psyvrse TCG",
-            value=f"**Battles:** {p['tcg_battles']} ({tcg_winrate:.1f}% WR)\n"
-                  f"**Ranked:** {p['tcg_ranked_matches']} matches\n"
-                  f"**Tournaments:** {p['tcg_tournaments_won']}/{p['tcg_tournaments_entered']}\n"
-                  f"**Collection:** {p['tcg_cards_owned']} cards",
-            inline=False
-        )
         
-        # Fishing
-        embed.add_field(
-            name="🎣 Fishing",
-            value=f"**Total:** {p['fish_caught']} fish\n"
-                  f"**Rare:** {p['rare_fish_caught']}\n"
-                  f"**Legendary:** {p['legendary_fish_caught']}\n"
-                  f"**Record:** {p['biggest_fish_weight']}kg",
-            inline=True
-        )
-        
-        # Battles
-        embed.add_field(
-            name="⚔️ Combat",
-            value=f"**PvP:** {p['pvp_wins']}/{p['pvp_battles']}\n"
-                  f"**Bosses:** {p['boss_wins']}/{p['boss_battles']}\n"
-                  f"**Dungeons:** {p['dungeons_completed']}",
-            inline=True
-        )
-        
-        embed.set_thumbnail(url=self.user.display_avatar.url)
-        return embed
+        return f"""# 🎮 {self.user.display_name}'s Gaming Stats
+
+## 🎮 Minigames
+**Total:** {p['minigames_played']} played, {p['minigames_won']} won
+**Wordle:** {p['wordle_wins']}/{p['wordle_attempts']}
+**Riddles:** {p['riddles_solved']} solved
+**Trivia:** {p['trivia_correct']}/{p['trivia_attempted']}
+
+## 🎯 Board Games
+**Tic-Tac-Toe:** {p['tictactoe_wins']}/{p['tictactoe_played']}
+**Connect4:** {p['connect4_wins']}/{p['connect4_played']}
+**Hangman:** {p['hangman_wins']}/{p['hangman_played']}
+
+## 🃏 Card Games
+**UNO:** {p['uno_wins']}/{p['uno_played']}
+**Blackjack:** {p['blackjack_wins']}/{p['blackjack_played']}
+**War:** {p['war_played']} games
+
+## ⚔️ Psyvrse TCG
+**Battles:** {p['tcg_battles']} ({tcg_winrate:.1f}% WR)
+**Ranked:** {p['tcg_ranked_matches']} matches
+**Tournaments:** {p['tcg_tournaments_won']}/{p['tcg_tournaments_entered']}
+**Collection:** {p['tcg_cards_owned']} cards
+
+## 🎣 Fishing & Combat
+**Fish Caught:** {p['fish_caught']} (Rare: {p['rare_fish_caught']}, Legendary: {p['legendary_fish_caught']})
+**Record:** {p['biggest_fish_weight']}kg
+**PvP:** {p['pvp_wins']}/{p['pvp_battles']}
+**Bosses:** {p['boss_wins']}/{p['boss_battles']}
+**Dungeons:** {p['dungeons_completed']}"""
     
-    def _create_economy_embed(self):
-        """Create economy stats page"""
+    def _create_economy_content(self):
+        """Create economy page as markdown text"""
         p = self.profile_data
-        
-        embed = EmbedBuilder.create(
-            title=f"{Emojis.COIN} {self.user.display_name}'s Economy Stats",
-            description="Financial overview and business stats!",
-            color=Colors.WARNING
-        )
-        
-        # Earnings & Spending
         net_profit = p['total_earned'] - p['total_spent']
-        embed.add_field(
-            name="💰 Finances",
-            value=f"**Earned:** {EmbedBuilder.format_number(p['total_earned'])} coins\n"
-                  f"**Spent:** {EmbedBuilder.format_number(p['total_spent'])} coins\n"
-                  f"**Net Profit:** {EmbedBuilder.format_number(net_profit)} coins\n"
-                  f"**Biggest Win:** {EmbedBuilder.format_number(p['biggest_win'])} coins\n"
-                  f"**Biggest Loss:** {EmbedBuilder.format_number(p['biggest_loss'])} coins",
-            inline=False
-        )
-        
-        # Gambling
         gambling_roi = ((p['gambling_total_won'] - p['gambling_total_wagered']) / p['gambling_total_wagered'] * 100) if p['gambling_total_wagered'] > 0 else 0
-        embed.add_field(
-            name="🎰 Gambling",
-            value=f"**Games:** {p['gambling_count']}\n"
-                  f"**Win Rate:** {(p['gambling_wins']/p['gambling_count']*100):.1f}%" if p['gambling_count'] > 0 else "0%\n"
-                  f"**Wagered:** {EmbedBuilder.format_number(p['gambling_total_wagered'])}\n"
-                  f"**Won:** {EmbedBuilder.format_number(p['gambling_total_won'])}\n"
-                  f"**ROI:** {gambling_roi:+.1f}%",
-            inline=True
-        )
-        
-        # Business
         business_status = "✅ Active" if p['business_owned'] else "❌ None"
-        embed.add_field(
-            name="🏪 Business",
-            value=f"**Status:** {business_status}\n"
-                  f"**Sales:** {p['business_sales']} items\n"
-                  f"**Revenue:** {EmbedBuilder.format_number(p['business_revenue'])}\n"
-                  f"**Items Sold:** {p['items_sold']}\n"
-                  f"**Items Bought:** {p['items_bought']}",
-            inline=True
-        )
+        win_rate = (p['gambling_wins']/p['gambling_count']*100) if p['gambling_count'] > 0 else 0.0
         
-        # Streaks & Quests
-        embed.add_field(
-            name="📜 Quests & Rewards",
-            value=f"**Daily Streak:** {p['daily_streak']} days\n"
-                  f"**Longest Streak:** {p['longest_streak']} days\n"
-                  f"**Quests Done:** {p['quests_completed']}\n"
-                  f"**Achievements:** {p['achievements_unlocked']}",
-            inline=False
-        )
-        
-        embed.set_thumbnail(url=self.user.display_avatar.url)
-        return embed
+        return f"""# 💰 {self.user.display_name}'s Economy Stats
+
+## 💰 Finances
+**Earned:** {p['total_earned']:,} coins
+**Spent:** {p['total_spent']:,} coins
+**Net Profit:** {net_profit:+,} coins
+**Biggest Win:** {p['biggest_win']:,} coins
+**Biggest Loss:** {p['biggest_loss']:,} coins
+
+## 🎰 Gambling
+**Games:** {p['gambling_count']}
+**Win Rate:** {win_rate:.1f}%
+**Wagered:** {p['gambling_total_wagered']:,}
+**Won:** {p['gambling_total_won']:,}
+**ROI:** {gambling_roi:+.1f}%
+
+## 🏪 Business
+**Status:** {business_status}
+**Sales:** {p['business_sales']} items
+**Revenue:** {p['business_revenue']:,}
+**Items Sold:** {p['items_sold']}
+**Items Bought:** {p['items_bought']}
+
+## 📜 Quests & Rewards
+**Daily Streak:** {p['daily_streak']} days (Longest: {p['longest_streak']})
+**Quests Done:** {p['quests_completed']}
+**Achievements:** {p['achievements_unlocked']}"""
     
-    def _create_social_embed(self):
-        """Create social stats page"""
+    def _create_social_content(self):
+        """Create social page as markdown text"""
         p = self.profile_data
-        
-        embed = EmbedBuilder.create(
-            title=f"{Emojis.HEART} {self.user.display_name}'s Social Stats",
-            description="Community engagement and interactions!",
-            color=Colors.PRIMARY
-        )
-        
-        # Social Interactions
-        embed.add_field(
-            name="💬 Interactions",
-            value=f"**Compliments Given:** {p['compliments_given']}\n"
-                  f"**Compliments Received:** {p['compliments_received']}\n"
-                  f"**Roasts Given:** {p['roasts_given']}\n"
-                  f"**High-Fives:** {p['highfives']}\n"
-                  f"**Story Contributions:** {p['stories_contributed']}",
-            inline=True
-        )
-        
-        # Pet Care
-        embed.add_field(
-            name="🐾 Pet Care",
-            value=f"**Pets Owned:** {p['pets_owned']}\n"
-                  f"**Fed:** {p['pet_fed_count']} times\n"
-                  f"**Played:** {p['pet_played_count']} times\n"
-                  f"**Walked:** {p['pet_walked_count']} times\n"
-                  f"**Total Happiness:** {p['pet_total_happiness']}",
-            inline=True
-        )
-        
-        # Events
-        embed.add_field(
-            name="🎉 Events",
-            value=f"**Participated:** {p['events_participated']}\n"
-                  f"**Won:** {p['events_won']}\n"
-                  f"**Seasonal Points:** {p['seasonal_points']}",
-            inline=True
-        )
-        
-        # Activity
-        embed.add_field(
-            name="📊 Activity",
-            value=f"**Commands Used:** {p['commands_used']}\n"
-                  f"**Messages Sent:** {p['messages_sent']}\n"
-                  f"**Active Servers:** {p['servers_active_in']}\n"
-                  f"**Reactions Added:** {p['reactions_added']}",
-            inline=True
-        )
-        
-        # Music
         listen_hours = p['total_listen_time'] / 3600
-        embed.add_field(
-            name="🎵 Music",
-            value=f"**Songs Played:** {p['songs_played']}\n"
-                  f"**Listen Time:** {listen_hours:.1f} hours\n"
-                  f"**Favorite Genre:** {p['favorite_genre'] or 'None'}",
-            inline=True
-        )
         
-        embed.set_thumbnail(url=self.user.display_avatar.url)
-        return embed
+        return f"""# 👥 {self.user.display_name}'s Social Stats
+
+## 💬 Interactions
+**Compliments Given:** {p['compliments_given']}
+**Compliments Received:** {p['compliments_received']}
+**Roasts Given:** {p['roasts_given']}
+**High-Fives:** {p['highfives']}
+**Story Contributions:** {p['stories_contributed']}
+
+## 🐾 Pet Care
+**Pets Owned:** {p['pets_owned']}
+**Fed:** {p['pet_fed_count']} times
+**Played:** {p['pet_played_count']} times
+**Walked:** {p['pet_walked_count']} times
+**Total Happiness:** {p['pet_total_happiness']}
+
+## 🎉 Events
+**Participated:** {p['events_participated']}
+**Won:** {p['events_won']}
+**Seasonal Points:** {p['seasonal_points']}
+
+## 📊 Activity
+**Commands Used:** {p['commands_used']}
+**Messages Sent:** {p['messages_sent']}
+**Active Servers:** {p['servers_active_in']}
+**Reactions Added:** {p['reactions_added']}
+
+## 🎵 Music
+**Songs Played:** {p['songs_played']}
+**Listen Time:** {listen_hours:.1f} hours
+**Favorite Genre:** {p['favorite_genre'] or 'None'}"""
 
 class Profile(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        data_dir = os.getenv("RENDER_DISK_PATH", "./data")
+        # Ensure data directory exists
+        os.makedirs(data_dir, exist_ok=True)
         self.manager = ProfileManager(data_dir)
+        # Compatibility alias used by other cogs
+        self.profile_manager = self.manager
     
     @commands.command(name="profile", aliases=["p", "me"])
     async def profile_command(self, ctx, user: discord.User = None):
         """View your comprehensive profile"""
         target = user or ctx.author
-        profile = self.manager.get_profile(target.id)
-        
-        view = ProfileView(ctx, profile, target)
-        embed = view._create_overview_embed()
-        
-        await ctx.send(embed=embed, view=view)
-    
+        view = ProfileView(self.bot, target.id, target, ctx.author.id)
+
+        await ctx.send(view=view)
+
     @app_commands.command(name="profile", description="View your comprehensive profile")
     async def profile_slash(self, interaction: discord.Interaction, user: discord.User = None):
         """Slash command for profile"""
         await interaction.response.defer()
-        
+
         target = user or interaction.user
-        profile = self.manager.get_profile(target.id)
-        
-        # Create fake context for view
-        class FakeContext:
-            def __init__(self, interaction):
-                self.author = interaction.user
-        
-        fake_ctx = FakeContext(interaction)
-        view = ProfileView(fake_ctx, profile, target)
-        embed = view._create_overview_embed()
-        
-        await interaction.followup.send(embed=embed, view=view)
+        # Pass the bot and the viewer_id (interaction user) to match ProfileView signature
+        view = ProfileView(self.bot, target.id, target, interaction.user.id)
+
+        # Send the view directly (Components v2 TextDisplay is used inside the view)
+        await interaction.followup.send(view=view)
     
     @commands.command(name="energy")
     async def energy_command(self, ctx):

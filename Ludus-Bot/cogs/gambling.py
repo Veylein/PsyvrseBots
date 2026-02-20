@@ -537,27 +537,33 @@ class Gambling(commands.Cog):
                 "total_wagered": 0,
                 "total_won": 0,
                 "total_lost": 0,
+                "biggest_win": 0,
+                "biggest_loss": 0,
                 "games": {}
             }
-        
+
         stats = self.gambling_stats[user_key]
         stats["total_games"] += 1
         stats["total_wagered"] += bet
-        
+
         if won:
             stats["total_won"] += payout
+            if payout > stats.get("biggest_win", 0):
+                stats["biggest_win"] = payout
         else:
             stats["total_lost"] += bet
-        
+            if bet > stats.get("biggest_loss", 0):
+                stats["biggest_loss"] = bet
+
         if game not in stats["games"]:
             stats["games"][game] = {"played": 0, "won": 0, "lost": 0}
-        
+
         stats["games"][game]["played"] += 1
         if won:
             stats["games"][game]["won"] += 1
         else:
             stats["games"][game]["lost"] += 1
-        
+
         self.save_stats()
     
     # ==================== POKER ====================
