@@ -628,11 +628,27 @@ class ProfileView(discord.ui.LayoutView):
             badges = "\n🏅 **Badges:** " + " ".join([f"`{b}`" for b in p["badges"]]) + "\n"
         
         top_activities_text = "\n".join(top_stats) if top_stats else '*No activity yet*'
-        
+
+        # ─ pet inline ───────────────────────────────────────────────────
+        pet_line = ""
+        try:
+            pets_cog = self.bot.get_cog("Pets")
+            if pets_cog and hasattr(pets_cog, "pets_data"):
+                pet = pets_cog.pets_data.get(str(self.user.id))
+                if pet:
+                    from cogs.pets import _pet_template, _rarity_stars
+                    tmpl   = _pet_template(pet)
+                    rarity = tmpl.get("rarity", "Common")
+                    star   = _rarity_stars(rarity)
+                    pet_line = f"\n🐾 **Pet:** {pet['emoji']} {pet['name']} — {star} {rarity}"
+        except Exception:
+            pass
+        # ─────────────────────────────────────────────────────────
+
         return f"""# 👑 {self.user.display_name}'s Profile
 
 **Level {p.get('level', 1)}** • {p.get('xp', 0)} XP
-⚡ **Energy:** {energy_bar} {energy}/{max_energy}{badges}
+⚡ **Energy:** {energy_bar} {energy}/{max_energy}{pet_line}{badges}
 
 ## 🏆 Top Activities
 {top_activities_text}
@@ -756,7 +772,30 @@ class ProfileView(discord.ui.LayoutView):
                 last_active = raw_ts[:16]
         else:
             last_active = 'Unknown'
-        
+
+        # ── current pet ────────────────────────────────────────────────────
+        pet_block = "*None*"
+        try:
+            pets_cog = self.bot.get_cog("Pets")
+            if pets_cog and hasattr(pets_cog, "pets_data"):
+                pet = pets_cog.pets_data.get(str(self.user.id))
+                if pet:
+                    from cogs.pets import _pet_template, _rarity_stars
+                    tmpl      = _pet_template(pet)
+                    rarity    = tmpl.get("rarity", "Common")
+                    perk_lbl  = tmpl.get("perk_label", "")
+                    perk_desc = tmpl.get("perk_desc", "")
+                    star      = _rarity_stars(rarity)
+                    pet_block = (
+                        f"{pet['emoji']} **{pet['name']}** — {star} {rarity}\n"
+                        f"🍖 Hunger {pet.get('hunger',0)}/100 · 😊 Happiness {pet.get('happiness',0)}/100\n"
+                        f"✨ *{perk_lbl}*"
+                        + (f"\n-# {perk_desc}" if perk_desc else "")
+                    )
+        except Exception:
+            pass
+        # ───────────────────────────────────────────────────────────────────
+
         return f"""# 👥 {self.user.display_name}'s Social Stats
 
 ## 💬 Interactions
@@ -767,7 +806,10 @@ class ProfileView(discord.ui.LayoutView):
 **Story Contributions:** {p.get('stories_contributed', 0)}
 
 ## 🐾 Pet Care
-**Pets Owned:** {p.get('pets_owned', 0)}
+**Current Pet:**
+{pet_block}
+
+**Pets Adopted:** {p.get('pets_owned', 0)}
 **Fed:** {p.get('pet_fed_count', p.get('pets_fed', 0))} times
 **Played:** {p.get('pet_played_count', p.get('pets_played_with', 0))} times
 **Walked:** {p.get('pet_walked_count', 0)} times

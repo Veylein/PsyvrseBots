@@ -15,7 +15,7 @@ class Help(commands.Cog):
                 "desc": "Currency system and trading",
                 "commands": [
                     ("balance", "Check your PsyCoin balance"),
-                    ("daily", "Claim daily reward (100-500 coins + streaks)"),
+                    ("daily", "Claim daily reward (300–2000+ coins + streaks + pet bonus)"),
                     ("shop", "Browse items for purchase"),
                     ("buy <item>", "Purchase an item"),
                     ("inventory", "View your items"),
@@ -111,16 +111,19 @@ class Help(commands.Cog):
                     ("/akinator start", "Mind-reading game"),
                 ]
             },
-            "🎪 Extra": {
-                "key": "extra",
-                "desc": "Extra entertainment",
+            "🧡 Social": {
+                "key": "social",
+                "desc": "Social interactions & reactions",
                 "commands": [
-                    ("/animal", "Random animal images"),
-                    ("/fact <category>", "Interesting facts"),
-                    ("/meme", "Browse meme templates"),
-                    ("/guessthesong", "Music quiz game"),
-                    ("/joke", "Random jokes"),
-                    ("/eightball <question>", "Magic 8-ball"),
+                    ("/ship @user", "Ship two people with GIF & compatibility score"),
+                    ("/hug @user", "Hug someone with anime GIF"),
+                    ("/kiss @user", "Kiss someone with anime GIF"),
+                    ("/slap @user", "Slap someone with anime GIF"),
+                    ("/petpet @user", "Petpet someone\u2019s avatar as animated GIF"),
+                    ("roast @user", "Roast someone with a savage line"),
+                    ("compliment @user", "Compliment someone nicely"),
+                    ("pray @user", "Pray for someone (+coins blessing)"),
+                    ("curse @user", "Curse someone (may backfire!)"),
                 ]
             },
             "🌍 Global Events": {

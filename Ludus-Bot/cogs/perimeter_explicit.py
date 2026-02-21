@@ -61,81 +61,9 @@ class PerimeterExplicit(commands.Cog):
         return matches[:25]
 
 
-# Define category commands (exclude 'minigame' — handled separately)
-CATEGORIES = [
-    'economy', 'gambling', 'boardgame', 'cards', 'puzzle', 'arcade', 'fishing', 'farming',
-    'social', 'pets', 'quests', 'progression', 'business', 'premium', 'fun', 'music', 'utility', 'admin', 'events'
-]
-
-
-for cat in CATEGORIES:
-    # create a function and autocomplete function per category
-    async def _cmd(self, interaction: discord.Interaction, subcommand: str = ""):
-        await self._invoke(interaction, subcommand)
-
-    async def _ac(self, interaction: discord.Interaction, current: str):
-        return self._autocomplete_for(interaction, current, keyword=cat)
-
-    # assign names and docstrings
-    _cmd.__name__ = cat
-    _cmd.__doc__ = f"Run a {cat} category command (pass subcommand and args)."
-    _ac.__name__ = f"{cat}_autocomplete"
-
-    # attach to Cog class
-    setattr(PerimeterExplicit, cat, app_commands.command(name=cat, description=f"Run a {cat} category command")( _cmd ))
-    # attach autocomplete decorator
-    getattr(PerimeterExplicit, cat).autocomplete('subcommand')(_ac)
+# Define category commands — empty, actual commands live in their own cogs
+CATEGORIES: list = []
 
 
 async def setup(bot: commands.Bot):
-    cog = PerimeterExplicit(bot)
-    await bot.add_cog(cog)
-
-    # Defer registering slash-category bridge commands until after all cogs
-    # have been loaded to avoid CommandAlreadyRegistered during extension setup.
-    async def _deferred_register():
-        # wait until bot is ready and commands from other cogs have been injected
-        try:
-            await bot.wait_until_ready()
-        except Exception:
-            return
-
-        # Factory function to create wrapper without problematic closure
-        def make_wrapper(cog_instance):
-            async def _wrapper(interaction: discord.Interaction, subcommand: str = ""):
-                await cog_instance._invoke(interaction, subcommand)
-            return _wrapper
-        
-        def make_minigame_wrapper(cog_instance):
-            async def _minigame_wrapper(interaction: discord.Interaction, game: str, target: Optional[str] = None):
-                await cog_instance._invoke(interaction, f"{game} {target or ''}".strip())
-            return _minigame_wrapper
-
-        for cat in CATEGORIES:
-            if bot.tree.get_command(cat) is not None:
-                continue
-
-            wrapper = make_wrapper(cog)
-            cmd = app_commands.Command(name=cat, callback=wrapper, description=f"Run a {cat} category command")
-            try:
-                bot.tree.add_command(cmd)
-            except Exception:
-                continue
-
-        # Register /minigame if missing
-        if bot.tree.get_command('minigame') is None:
-            minigame_wrapper = make_minigame_wrapper(cog)
-            cmd = app_commands.Command(name='minigame', callback=minigame_wrapper, description='Play a selected minigame')
-            try:
-                bot.tree.add_command(cmd)
-            except Exception:
-                pass
-
-    try:
-        bot.loop.create_task(_deferred_register())
-    except Exception:
-        # If loop not available, schedule with add_listener fallback
-        try:
-            bot.add_listener(lambda: bot.loop.create_task(_deferred_register()), 'on_ready')
-        except Exception:
-            pass
+    await bot.add_cog(PerimeterExplicit(bot))

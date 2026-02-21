@@ -1,6 +1,9 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+import aiohttp
+import io
+from urllib.parse import quote as _url_quote
 import random
 import json
 import os
@@ -16,6 +19,7 @@ class Social(commands.Cog):
         self.story_file = os.path.join(data_dir, "stories.json")
         self.wyr_data = self.load_wyr()
         self.story_data = self.load_stories()
+        self._http_session: aiohttp.ClientSession | None = None
         
         self.roasts = [
     "You're like a TikTok trend… everyone forgets you after 24 hours.",
@@ -783,6 +787,211 @@ class Social(commands.Cog):
         embed.set_footer(text=f"Requested by {ctx.author.display_name}")
         
         await ctx.send(embed=embed)
+
+    # ==================== GIF REACTION COMMANDS ====================
+
+    _NEKOS_URL = "https://nekos.best/api/v2/{action}"
+    _SRA_URL   = "https://some-random-api.com/canvas/misc/petpet?avatar={url}"
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        if self._http_session is None or self._http_session.closed:
+            self._http_session = aiohttp.ClientSession(headers={"User-Agent": "LudusBot/1.0"})
+        return self._http_session
+
+    async def _fetch_gif(self, action: str) -> str | None:
+        try:
+            session = await self._get_session()
+            async with session.get(self._NEKOS_URL.format(action=action), timeout=aiohttp.ClientTimeout(total=5)) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    return data["results"][0]["url"]
+        except Exception:
+            pass
+        return None
+
+    async def cog_unload(self) -> None:
+        if self._http_session and not self._http_session.closed:
+            await self._http_session.close()
+
+    # /hug ─────────────────────────────────────────────────────────────────────
+    @app_commands.command(name="hug", description="Give someone a warm hug! 🤗")
+    @app_commands.describe(user="Who do you want to hug?")
+    async def hug(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        gif = await self._fetch_gif("hug")
+        embed = discord.Embed(
+            description=f"🤗 **{interaction.user.display_name}** hugs **{user.display_name}**!",
+            color=discord.Color.from_str("#ff9ff3"),
+        )
+        if gif:
+            embed.set_image(url=gif)
+        embed.set_footer(text="💕 Spread the love!")
+        await interaction.response.send_message(embed=embed)
+
+    # /kiss ────────────────────────────────────────────────────────────────────
+    @app_commands.command(name="kiss", description="Give someone a kiss! 😘")
+    @app_commands.describe(user="Who do you want to kiss?")
+    async def kiss(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        if user.id == interaction.user.id:
+            await interaction.response.send_message("😳 You can't kiss yourself!", ephemeral=True)
+            return
+        gif = await self._fetch_gif("kiss")
+        embed = discord.Embed(
+            description=f"😘 **{interaction.user.display_name}** kisses **{user.display_name}**!",
+            color=discord.Color.from_str("#ff6b81"),
+        )
+        if gif:
+            embed.set_image(url=gif)
+        embed.set_footer(text="💋 How sweet!")
+        await interaction.response.send_message(embed=embed)
+
+    # /slap ────────────────────────────────────────────────────────────────────
+    @app_commands.command(name="slap", description="Slap someone! 👋")
+    @app_commands.describe(user="Who deserves a slap?")
+    async def slap(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        if user.id == interaction.user.id:
+            await interaction.response.send_message("😬 Self-slap? That's just sad.", ephemeral=True)
+            return
+        gif = await self._fetch_gif("slap")
+        embed = discord.Embed(
+            description=f"👋 **{interaction.user.display_name}** slaps **{user.display_name}**!",
+            color=discord.Color.from_str("#ff4757"),
+        )
+        if gif:
+            embed.set_image(url=gif)
+        embed.set_footer(text="💥 Ouch!")
+        await interaction.response.send_message(embed=embed)
+
+    # /petpet ──────────────────────────────────────────────────────────────────
+    @app_commands.command(name="petpet", description="Petpet someone's avatar as an animated GIF! 🐾")
+    @app_commands.describe(user="Who do you want to petpet?")
+    async def petpet(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        await interaction.response.defer()
+        avatar_url = str(user.display_avatar.replace(format="png", size=256))
+        encoded    = _url_quote(avatar_url, safe="")
+        api_url    = f"https://api.some-random-api.com/premium/petpet?avatar={encoded}"
+
+        embed = discord.Embed(
+            description=f"🐾 **{interaction.user.display_name}** is petting **{user.display_name}**!",
+            color=discord.Color.from_str("#ffeaa7"),
+        )
+        embed.set_footer(text="Good boi/girl! 🐾")
+
+        try:
+            session = await self._get_session()
+            async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                if r.status == 200:
+                    gif_bytes = await r.read()
+                    gif_file  = discord.File(io.BytesIO(gif_bytes), filename="petpet.gif")
+                    embed.set_image(url="attachment://petpet.gif")
+                    await interaction.followup.send(embed=embed, file=gif_file)
+                    return
+                else:
+                    print(f"[petpet] API returned status {r.status} for {api_url}")
+        except Exception as e:
+            print(f"[petpet] Exception: {e}")
+
+        # fallback – no GIF available
+        embed.set_thumbnail(url=avatar_url)
+        embed.description += "\n-# *(petpet animation unavailable right now)*"
+        await interaction.followup.send(embed=embed)
+
+    # /ship ────────────────────────────────────────────────────────────────────
+    @app_commands.command(name="ship", description="Ship two people together and see their compatibility! 💞")
+    @app_commands.describe(user1="First person", user2="Second person (defaults to you)")
+    async def ship(
+        self,
+        interaction: discord.Interaction,
+        user1: discord.Member,
+        user2: Optional[discord.Member] = None,
+    ) -> None:
+        if user2 is None:
+            user2 = interaction.user
+
+        # Deterministic score so the same pair always gets the same result
+        score = (user1.id + user2.id) % 101
+
+        name1 = user1.display_name
+        name2 = user2.display_name
+        # Build ship name from first half of name1 + second half of name2
+        mid       = max(1, len(name1) // 2)
+        ship_name = name1[:mid] + name2[-(len(name2) - max(1, len(name2) // 2)):]
+
+        if score >= 90:
+            tier_emoji = "💖"
+            tier_name  = "SOULMATES"
+            tier_msg   = "It was written in the stars! You two are made for each other! 🌟"
+            colour     = discord.Color.from_str("#fd79a8")
+            action     = "kiss"
+        elif score >= 75:
+            tier_emoji = "❤️"
+            tier_name  = "Perfect Match"
+            tier_msg   = "Love is definitely in the air! Don't let this one go! 🌹"
+            colour     = discord.Color.red()
+            action     = "kiss"
+        elif score >= 60:
+            tier_emoji = "💛"
+            tier_name  = "Great Together"
+            tier_msg   = "Strong vibes! Give it a real shot! ✨"
+            colour     = discord.Color.gold()
+            action     = "cuddle"
+        elif score >= 45:
+            tier_emoji = "💙"
+            tier_name  = "Could Work Out"
+            tier_msg   = "Interesting combo... with a bit of effort this could bloom! 🌸"
+            colour     = discord.Color.blurple()
+            action     = "cuddle"
+        elif score >= 25:
+            tier_emoji = "🤍"
+            tier_name  = "Just Friends"
+            tier_msg   = "Better stick to being friends for now... 😅"
+            colour     = discord.Color.greyple()
+            action     = None
+        else:
+            tier_emoji = "💔"
+            tier_name  = "Total Disaster"
+            tier_msg   = "Run. Run as fast as you can. 😱"
+            colour     = discord.Color.from_str("#636e72")
+            action     = None
+
+        # Visual bar: hearts vs broken hearts
+        filled  = round(score / 10)
+        bar     = "❤️" * filled + "🖤" * (10 - filled)
+
+        # Tier badge row
+        tier_bar = ""
+        thresholds = [(90, "💖"), (75, "❤️"), (60, "💛"), (45, "💙"), (25, "🤍"), (0, "💔")]
+        for t, e in thresholds:
+            tier_bar += e if score >= t else "⬜"
+
+        embed = discord.Embed(
+            title=f"{tier_emoji}  {name1}  ×  {name2}  {tier_emoji}",
+            color=colour,
+        )
+        embed.set_author(
+            name=f"{name1}",
+            icon_url=user1.display_avatar.url,
+        )
+        embed.set_thumbnail(url=user2.display_avatar.url)
+
+        embed.description = (
+            f"### 🏷️ Ship Name:  `{ship_name}`\n\n"
+            f"{bar}\n"
+            f"**{score}%** — **{tier_name}**\n\n"
+            f"*{tier_msg}*"
+        )
+
+        embed.set_footer(
+            text=f"Requested by {interaction.user.display_name}  •  Ship responsibly! ❤️",
+            icon_url=interaction.user.display_avatar.url,
+        )
+
+        if action:
+            gif = await self._fetch_gif(action)
+            if gif:
+                embed.set_image(url=gif)
+
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot):
     await bot.add_cog(Social(bot))
