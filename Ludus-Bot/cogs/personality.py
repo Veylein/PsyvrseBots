@@ -767,6 +767,10 @@ class LudusPersonality(commands.Cog):
 
         # 5. General knowledge
         general_knowledge = knowledge.get("general_knowledge", {})
+        # Merge with generic "knowledge" key if present (legacy/flat structure)
+        if "knowledge" in knowledge and isinstance(knowledge["knowledge"], dict):
+            general_knowledge.update(knowledge["knowledge"])
+            
         answer = self._match_from_dict(normalized_question, general_knowledge)
         if answer:
             return answer
