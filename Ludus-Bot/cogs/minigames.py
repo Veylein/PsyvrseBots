@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import random
 import asyncio
 import time
@@ -71,100 +72,15 @@ class Minigames(commands.Cog):
         except Exception:
             pass
 
-    # ------------------------------------------------------------------ #
-    # Dispatch table used by every auto-registered minigame command.       #
-    # Each entry maps a game name → (kind_id, difficulty_offset).          #
-    # kind_id is passed as (kind_id + 1) so that _micro_play's             #
-    # `(idx-1) % 10 == kind_id` mapping is satisfied.                      #
-    # ------------------------------------------------------------------ #
-    _NAMED_GAME_KINDS: dict = {
-        # kind 0 = parity / even-odd
-        "guess_number":       (0, 0),
-        "higher_lower":       (0, 1),
-        "binary_guess":       (0, 2),
-        "stones":             (0, 3),
-        # kind 1 = dice sum
-        "roll":               (1, 0),
-        "coinflip":           (1, 0),
-        # kind 2 = mental math
-        "quick_math":         (2, 0),
-        "count_vowels":       (2, 1),
-        "math_race":          (2, 2),
-        # kind 3 = reverse word
-        "reverse_word":       (3, 0),
-        "palindrome":         (3, 1),
-        "mimic":              (3, 2),
-        "word_chain":         (3, 3),
-        # kind 4 = emoji memory
-        "memory":             (4, 0),
-        "emoji_memory":       (4, 0),
-        "emoji_quiz":         (4, 1),
-        "guess_the_emoji":    (4, 2),
-        # kind 5 = color pick
-        "rps":                (5, 0),
-        "match_colors":       (5, 1),
-        "predict":            (5, 2),
-        # kind 6 = fast type
-        "reaction_time":      (6, 0),
-        "typing_race":        (6, 1),
-        "quick_draw":         (6, 0),
-        # kind 7 = unscramble
-        "hangman":            (7, 0),
-        "unscramble":         (7, 0),
-        "spelling_bee":       (7, 1),
-        "scramble_sentence":  (7, 2),
-        "text_twist":         (7, 3),
-        "first_letter":       (7, 4),
-        "last_letter":        (7, 5),
-        # kind 8 = yes/no trivia
-        "trivia":             (8, 0),
-        "capitals":           (8, 1),
-        "synonym":            (8, 2),
-        "antonym":            (8, 3),
-        "month_quiz":         (8, 4),
-        "weekday_quiz":       (8, 5),
-        "short_story":        (8, 6),
-        # kind 9 = pick item from list
-        "choose":             (9, 0),
-        "treasure_hunt":      (9, 1),
-        "labelling":          (9, 2),
-        # kind 10 = find pair
-        "find_pair":          (10, 0),
-        # kind 11 = odd one out
-        "odd_one_out":        (11, 0),
-        # kind 12 = sequence complete
-        "sequence_complete":  (12, 0),
-        # kind 13 = tap count
-        "tap_count":          (13, 0),
-        # kind 14 = bubble pop
-        "bubble_pop":         (14, 0),
-        # kind 15 = quick draw char
-        "pick_a_card":        (15, 0),
-        # kind 16 = number chain
-        "number_chain":       (16, 0),
-        # kind 17 = color guess
-        "color_guess":        (17, 0),
-        # kind 18 = flip words
-        "flip_words":         (18, 0),
-    }
-
     async def _handle_game(self, ctx, internal: str) -> None:
-        """
-        Entry point for every auto-registered minigame command.
-
-        Routes the call to the correct game implementation:
-        - internal names like "micro_42" → `_micro_play(ctx, 42, ...)`
-        - named games like "hangman", "coinflip" → mapped via _NAMED_GAME_KINDS
-        - anything unknown → fallback generic micro_1
-        """
-        # Ensure user file exists / touch last_active
+        """Entry point for every named minigame command and hub-launched games."""
         try:
             from utils.user_storage import touch_user as _touch
             asyncio.create_task(_touch(int(ctx.author.id), getattr(ctx.author, "name", None)))
         except Exception:
             pass
 
-        # micro_N  ──────────────────────────────────────────────────────
+        # micro_N → delegate to _micro_play
         if internal.startswith("micro_"):
             try:
                 idx = int(internal.split("_", 1)[1])
@@ -173,11 +89,901 @@ class Minigames(commands.Cog):
             await self._micro_play(ctx, idx, 0, False, internal)
             return
 
-        # named game ─────────────────────────────────────────────────────
-        kind_id, _variant = self._NAMED_GAME_KINDS.get(internal, (0, 0))
-        # _micro_play maps (idx-1) % 10 → kind_id, so idx = kind_id + 1
-        idx = kind_id + 1
-        await self._micro_play(ctx, idx, _variant, False, internal)
+        # ── helpers ────────────────────────────────────────────────────
+        def check(m):
+            return m.author == ctx.author and m.channel == ctx.channel
+
+        async def wait(timeout=15.0):
+            try:
+                return await self.bot.wait_for("message", check=check, timeout=timeout)
+            except asyncio.TimeoutError:
+                return None
+
+        n = internal  # short alias for game name in _award_win calls
+
+        # ── GUESS NUMBER ───────────────────────────────────────────────
+        if internal == "guess_number":
+            secret = random.randint(1, 20)
+            await ctx.send("🔢 I'm thinking of a number between **1 and 20**. Guess it!")
+            msg = await wait(20.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Time's up! It was **{secret}**.")
+            try:
+                if int(msg.content.strip()) == secret:
+                    await ctx.send("✅ Correct!")
+                    await self._award_win(ctx, n)
+                else:
+                    await ctx.send(f"❌ Nope — it was **{secret}**.")
+            except ValueError:
+                await ctx.send("Send a number.")
+            return
+
+        # ── HIGHER / LOWER ─────────────────────────────────────────────
+        if internal == "higher_lower":
+            a = random.randint(1, 100)
+            b = random.randint(1, 100)
+            await ctx.send(f"🔢 First number: **{a}**. Will the next number be `higher` or `lower`?")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Time's up! Next was **{b}**.")
+            ans = msg.content.lower().strip()
+            correct = (b > a and ans in ("higher", "h")) or (b < a and ans in ("lower", "l")) or (b == a and ans in ("equal", "same"))
+            if b == a:
+                await ctx.send(f"They were equal! ({b})")
+            elif correct:
+                await ctx.send(f"✅ Correct! Next was **{b}**.")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Wrong! Next was **{b}**.")
+            return
+
+        # ── BINARY GUESS ───────────────────────────────────────────────
+        if internal == "binary_guess":
+            pick = random.choice([0, 1])
+            await ctx.send("🔢 I picked **0** or **1** — which is it?")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{pick}**.")
+            try:
+                if int(msg.content.strip()) == pick:
+                    await ctx.send("✅ Correct!")
+                    await self._award_win(ctx, n)
+                else:
+                    await ctx.send(f"❌ Nope — it was **{pick}**.")
+            except ValueError:
+                await ctx.send("Send 0 or 1.")
+            return
+
+        # ── STONES (Nim) ───────────────────────────────────────────────
+        if internal == "stones":
+            pile = random.randint(7, 15)
+            await ctx.send(f"🪨 There are **{pile}** stones. Take 1, 2, or 3. The one who takes the last stone **loses**. You go first!")
+            while pile > 0:
+                msg = await wait(15.0)
+                if not msg:
+                    return await ctx.send("⏱️ Time's up!")
+                try:
+                    take = int(msg.content.strip())
+                    if take not in (1, 2, 3) or take > pile:
+                        await ctx.send("Take 1, 2, or 3 stones.")
+                        continue
+                    pile -= take
+                    if pile == 0:
+                        await ctx.send("You took the last stone — you **lose**! 😈")
+                        return
+                    # Bot plays: avoid leaving multiples of 4
+                    bot_take = pile % 4 or random.randint(1, min(3, pile))
+                    bot_take = max(1, min(bot_take, min(3, pile)))
+                    pile -= bot_take
+                    if pile == 0:
+                        await ctx.send(f"Bot takes **{bot_take}**. No stones left — bot loses! 🎉")
+                        await self._award_win(ctx, n)
+                        return
+                    await ctx.send(f"Bot takes **{bot_take}**. Stones left: **{pile}**. Your turn (1-3):")
+                except ValueError:
+                    await ctx.send("Send a number.")
+            return
+
+        # ── ROLL ───────────────────────────────────────────────────────
+        if internal == "roll":
+            result = random.randint(1, 100)
+            await ctx.send("🎲 Guess my dice roll (1–100)!")
+            msg = await wait(12.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{result}**.")
+            try:
+                guess = int(msg.content.strip())
+                diff = abs(guess - result)
+                if diff == 0:
+                    await ctx.send(f"✅ Exact! It was **{result}**!")
+                    await self._award_win(ctx, n)
+                elif diff <= 5:
+                    await ctx.send(f"😮 So close! It was **{result}** (you guessed {guess}).")
+                else:
+                    await ctx.send(f"❌ It was **{result}** (you guessed {guess}).")
+            except ValueError:
+                await ctx.send("Send a number.")
+            return
+
+        # ── COINFLIP ───────────────────────────────────────────────────
+        if internal == "coinflip":
+            result = random.choice(["heads", "tails"])
+            await ctx.send("🪙 Heads or tails?")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{result}**.")
+            if msg.content.lower().strip() in (result, result[0]):
+                await ctx.send(f"✅ **{result.capitalize()}** — correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{result}**.")
+            return
+
+        # ── QUICK MATH ─────────────────────────────────────────────────
+        if internal == "quick_math":
+            a, b = random.randint(1, 20), random.randint(1, 20)
+            op = random.choice(["+", "-", "*"])
+            ans = eval(f"{a}{op}{b}")
+            await ctx.send(f"🧮 Solve: **{a} {op} {b}**")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Answer: **{ans}**.")
+            try:
+                if int(msg.content.strip()) == ans:
+                    await ctx.send("✅ Correct!")
+                    await self._award_win(ctx, n)
+                else:
+                    await ctx.send(f"❌ Answer was **{ans}**.")
+            except ValueError:
+                await ctx.send("Send a number.")
+            return
+
+        # ── COUNT VOWELS ───────────────────────────────────────────────
+        if internal == "count_vowels":
+            words = ["strawberry", "programming", "encyclopedia", "mystery", "beautiful", "rhythm"]
+            word = random.choice(words)
+            vowels = sum(1 for c in word if c in "aeiou")
+            await ctx.send(f"🔤 How many vowels are in **{word}**?")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It had **{vowels}** vowels.")
+            try:
+                if int(msg.content.strip()) == vowels:
+                    await ctx.send(f"✅ Correct — **{vowels}** vowels!")
+                    await self._award_win(ctx, n)
+                else:
+                    await ctx.send(f"❌ It had **{vowels}** vowels.")
+            except ValueError:
+                await ctx.send("Send a number.")
+            return
+
+        # ── MATH RACE ──────────────────────────────────────────────────
+        if internal == "math_race":
+            score = 0
+            await ctx.send("🏁 Math Race! Solve **3 problems** as fast as you can.")
+            for _ in range(3):
+                a, b = random.randint(1, 15), random.randint(1, 15)
+                op = random.choice(["+", "-"])
+                ans = eval(f"{a}{op}{b}")
+                await ctx.send(f"**{a} {op} {b} = ?**")
+                msg = await wait(7.0)
+                if not msg:
+                    await ctx.send(f"⏱️ Too slow! Answer was **{ans}**.")
+                    continue
+                try:
+                    if int(msg.content.strip()) == ans:
+                        score += 1
+                        await ctx.send("✅")
+                    else:
+                        await ctx.send(f"❌ ({ans})")
+                except ValueError:
+                    await ctx.send(f"❌ ({ans})")
+            await ctx.send(f"Race over! You got **{score}/3**.")
+            if score == 3:
+                await self._award_win(ctx, n)
+            return
+
+        # ── REVERSE WORD ───────────────────────────────────────────────
+        if internal == "reverse_word":
+            pool = ["python", "discord", "banana", "keyboard", "dragon", "puzzle", "castle"]
+            word = random.choice(pool)
+            await ctx.send(f"🔤 Type **{word}** backwards:")
+            msg = await wait(12.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Answer: **{word[::-1]}**.")
+            if msg.content.strip().lower() == word[::-1]:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{word[::-1]}**.")
+            return
+
+        # ── PALINDROME ─────────────────────────────────────────────────
+        if internal == "palindrome":
+            pool = [("racecar", True), ("hello", False), ("level", True), ("world", False), ("civic", True), ("python", False), ("madam", True)]
+            word, is_p = random.choice(pool)
+            await ctx.send(f"🔤 Is **{word}** a palindrome? (yes/no)")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It {'was' if is_p else 'was not'} a palindrome.")
+            ans = msg.content.lower().strip()
+            if (is_p and ans in ("yes", "y")) or (not is_p and ans in ("no", "n")):
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It {'was' if is_p else 'was not'} a palindrome.")
+            return
+
+        # ── MIMIC ──────────────────────────────────────────────────────
+        if internal == "mimic":
+            phrases = ["The quick brown fox", "Hello world!", "1 2 3 go", "Discord is fun", "Ludus Bot rocks"]
+            phrase = random.choice(phrases)
+            await ctx.send(f"🦜 Type this exactly:\n`{phrase}`")
+            msg = await wait(15.0)
+            if not msg:
+                return await ctx.send("⏱️ Time's up!")
+            if msg.content == phrase:
+                await ctx.send("✅ Perfect copy!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Expected exactly: `{phrase}`")
+            return
+
+        # ── WORD CHAIN ─────────────────────────────────────────────────
+        if internal == "word_chain":
+            start_words = ["apple", "eagle", "elephant", "orange", "umbrella"]
+            word = random.choice(start_words)
+            await ctx.send(f"🔗 Word Chain! I say **{word}**. Give a word starting with **{word[-1].upper()}** (10s).")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send("⏱️ Time's up!")
+            reply = msg.content.strip().lower()
+            if reply and reply[0] == word[-1]:
+                await ctx.send(f"✅ **{reply}** — good chain!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Must start with **{word[-1].upper()}**.")
+            return
+
+        # ── MEMORY / EMOJI MEMORY ──────────────────────────────────────
+        if internal in ("memory", "emoji_memory"):
+            emojis = ["🍎", "🍌", "🍒", "🍇", "🍉", "🍓", "🍍", "🍑", "🥝", "🍋"]
+            length = 4 if internal == "memory" else 6
+            seq = [random.choice(emojis) for _ in range(length)]
+            await ctx.send(f"🧠 Memorize this sequence ({length} emojis):")
+            await ctx.send(" ".join(seq))
+            await asyncio.sleep(3.0)
+            await ctx.send("Now type the sequence (space-separated, 15s):")
+            msg = await wait(15.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was: **{' '.join(seq)}**")
+            if msg.content.strip() == " ".join(seq):
+                await ctx.send("✅ Perfect memory!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Sequence was: **{' '.join(seq)}**")
+            return
+
+        # ── EMOJI QUIZ / GUESS THE EMOJI ───────────────────────────────
+        if internal in ("emoji_quiz", "guess_the_emoji"):
+            pool = [("🍕", "pizza"), ("🐶", "dog"), ("🚀", "rocket"), ("🌍", "earth"),
+                    ("🎸", "guitar"), ("⚽", "soccer"), ("🦁", "lion"), ("🌈", "rainbow")]
+            emoji, answer = random.choice(pool)
+            await ctx.send(f"🤔 What does {emoji} represent? (one word)")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{answer}**.")
+            if msg.content.lower().strip() == answer:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{answer}**.")
+            return
+
+        # ── RPS ────────────────────────────────────────────────────────
+        if internal == "rps":
+            choices = ["rock", "paper", "scissors"]
+            bot_pick = random.choice(choices)
+            await ctx.send("✂️ Rock, paper, or scissors?")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ I picked **{bot_pick}**.")
+            player = msg.content.lower().strip()
+            if player not in choices:
+                return await ctx.send(f"Pick rock, paper, or scissors. I had **{bot_pick}**.")
+            wins = {"rock": "scissors", "paper": "rock", "scissors": "paper"}
+            if player == bot_pick:
+                await ctx.send(f"🤝 Tie! We both picked **{bot_pick}**.")
+            elif wins[player] == bot_pick:
+                await ctx.send(f"✅ **{player}** beats **{bot_pick}** — you win!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ **{bot_pick}** beats **{player}** — you lose!")
+            return
+
+        # ── MATCH COLORS ───────────────────────────────────────────────
+        if internal == "match_colors":
+            colors = ["🔴 red", "🔵 blue", "🟢 green", "🟡 yellow", "🟣 purple"]
+            shown = random.sample(colors, 4)
+            target = random.choice(shown)
+            color_name = target.split()[1]
+            await ctx.send(f"🎨 Which emoji matches **{color_name}**?\n" + " | ".join(shown))
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was {target}.")
+            if color_name in msg.content.lower():
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{color_name}**.")
+            return
+
+        # ── PREDICT ────────────────────────────────────────────────────
+        if internal == "predict":
+            fortunes = ["🌟 Great things await you!", "⚡ Stay alert today.", "🍀 Luck is on your side.",
+                        "🌧️ Patience will be rewarded.", "🔥 Take a bold step forward.", "🌈 Good news is coming."]
+            await ctx.send(f"🔮 Your fortune: {random.choice(fortunes)}")
+            await self._award_win(ctx, n)
+            return
+
+        # ── REACTION TIME ──────────────────────────────────────────────
+        if internal == "reaction_time":
+            delay = random.uniform(2.0, 5.0)
+            await ctx.send("⚡ Wait for it…")
+            await asyncio.sleep(delay)
+            await ctx.send("**GO!** Type `go` as fast as you can!")
+            start = time.perf_counter()
+            msg = await wait(5.0)
+            if not msg:
+                return await ctx.send("⏱️ Too slow!")
+            elapsed = time.perf_counter() - start
+            if msg.content.lower().strip() == "go":
+                await ctx.send(f"⚡ Reaction time: **{elapsed:.3f}s**!")
+                if elapsed < 1.5:
+                    await self._award_win(ctx, n)
+            else:
+                await ctx.send("Type `go` not something else!")
+            return
+
+        # ── TYPING RACE ────────────────────────────────────────────────
+        if internal == "typing_race":
+            sentences = ["The quick brown fox jumps over the lazy dog",
+                         "Discord bots are fun to build",
+                         "Minigames are a great way to pass time",
+                         "Python is an amazing programming language"]
+            sentence = random.choice(sentences)
+            await ctx.send(f"⌨️ Type this exactly:\n`{sentence}`")
+            start = time.perf_counter()
+            msg = await wait(30.0)
+            if not msg:
+                return await ctx.send("⏱️ Time's up!")
+            elapsed = time.perf_counter() - start
+            if msg.content.strip() == sentence:
+                await ctx.send(f"✅ Done in **{elapsed:.2f}s**!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send("❌ That wasn't exact. Try again!")
+            return
+
+        # ── QUICK DRAW ─────────────────────────────────────────────────
+        if internal == "quick_draw":
+            char = random.choice("ASDFJKL")
+            await ctx.send(f"🔫 Type **{char}** as fast as you can!")
+            start = time.perf_counter()
+            msg = await wait(3.0)
+            if not msg:
+                return await ctx.send("⏱️ Too slow!")
+            elapsed = time.perf_counter() - start
+            if msg.content.strip().upper() == char:
+                await ctx.send(f"✅ {elapsed:.3f}s!")
+                if elapsed < 1.5:
+                    await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Wrong key! Needed **{char}**.")
+            return
+
+        # ── HANGMAN ────────────────────────────────────────────────────
+        if internal == "hangman":
+            pool = ["python", "discord", "hangman", "castle", "wizard", "dragon", "puzzle", "button"]
+            word = random.choice(pool)
+            guessed = set()
+            lives = 6
+            await ctx.send(f"🎯 Hangman! Guess letters. Word: `{''.join(c if c in guessed else '_' for c in word)}` — {lives} lives.")
+            while lives > 0:
+                msg = await wait(20.0)
+                if not msg:
+                    return await ctx.send(f"⏱️ Word was **{word}**.")
+                letter = msg.content.lower().strip()
+                if len(letter) != 1 or not letter.isalpha():
+                    await ctx.send("Single letter only.")
+                    continue
+                if letter in guessed:
+                    await ctx.send(f"Already guessed **{letter}**.")
+                    continue
+                guessed.add(letter)
+                if letter in word:
+                    display = ''.join(c if c in guessed else '_' for c in word)
+                    if '_' not in display:
+                        await ctx.send(f"✅ Solved: **{word}**!")
+                        await self._award_win(ctx, n)
+                        return
+                    await ctx.send(f"✅ `{display}` — {lives} lives left.")
+                else:
+                    lives -= 1
+                    await ctx.send(f"❌ No **{letter}**. `{''.join(c if c in guessed else '_' for c in word)}` — {lives} lives left.")
+            await ctx.send(f"💀 Game over! Word was **{word}**.")
+            return
+
+        # ── UNSCRAMBLE ─────────────────────────────────────────────────
+        if internal == "unscramble":
+            pool = ["python", "discord", "castle", "wizard", "dragon", "puzzle", "button", "frozen"]
+            word = random.choice(pool)
+            scrambled = word
+            while scrambled == word:
+                scrambled = ''.join(random.sample(word, len(word)))
+            await ctx.send(f"🔀 Unscramble: **{scrambled}**")
+            msg = await wait(15.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{word}**.")
+            if msg.content.lower().strip() == word:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{word}**.")
+            return
+
+        # ── SPELLING BEE ───────────────────────────────────────────────
+        if internal == "spelling_bee":
+            pool = [("necessary", "necessary"), ("rhythm", "rhythm"), ("occurrence", "occurrence"),
+                    ("accommodate", "accommodate"), ("embarrass", "embarrass"), ("liaison", "liaison")]
+            word, correct = random.choice(pool)
+            await ctx.send(f"🐝 Spell this word: **{word}**")
+            msg = await wait(15.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Correct spelling: **{correct}**.")
+            if msg.content.strip() == correct:
+                await ctx.send("✅ Correctly spelled!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Correct spelling: **{correct}**.")
+            return
+
+        # ── SCRAMBLE SENTENCE ──────────────────────────────────────────
+        if internal == "scramble_sentence":
+            sentences = ["cats love napping", "dogs chase their tails", "birds fly south in winter", "fish swim in schools"]
+            sentence = random.choice(sentences)
+            words = sentence.split()
+            shuffled = words[:]
+            while shuffled == words:
+                random.shuffle(shuffled)
+            await ctx.send(f"🔀 Unscramble: **{' '.join(shuffled)}**")
+            msg = await wait(20.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was: **{sentence}**.")
+            if msg.content.lower().strip() == sentence:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was: **{sentence}**.")
+            return
+
+        # ── TEXT TWIST ─────────────────────────────────────────────────
+        if internal == "text_twist":
+            pool = ["listen", "silent", "enlist", "tinsel", "inlets"]  # anagram groups
+            word = "listen"
+            anagrams = ["silent", "enlist", "tinsel", "inlets"]
+            letters = sorted(word)
+            random.shuffle(letters)
+            await ctx.send(f"🔤 Make a word using ALL these letters: **{' '.join(letters)}**")
+            msg = await wait(20.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Some valid words: **{', '.join(anagrams[:3])}**.")
+            guess = msg.content.lower().strip()
+            if sorted(guess) == sorted(word) and len(guess) == len(word):
+                await ctx.send(f"✅ **{guess}** — valid!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Must use all {len(word)} letters. E.g. **{anagrams[0]}**.")
+            return
+
+        # ── FIRST LETTER ───────────────────────────────────────────────
+        if internal == "first_letter":
+            pool = [("elephant", "e"), ("umbrella", "u"), ("dragon", "d"), ("python", "p"), ("castle", "c")]
+            word, letter = random.choice(pool)
+            await ctx.send(f"🔤 What is the **first letter** of `{word}`?")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{letter}**.")
+            if msg.content.lower().strip() == letter:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{letter}**.")
+            return
+
+        # ── LAST LETTER ────────────────────────────────────────────────
+        if internal == "last_letter":
+            pool = [("elephant", "t"), ("umbrella", "a"), ("dragon", "n"), ("python", "n"), ("castle", "e")]
+            word, letter = random.choice(pool)
+            await ctx.send(f"🔤 What is the **last letter** of `{word}`?")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{letter}**.")
+            if msg.content.lower().strip() == letter:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{letter}**.")
+            return
+
+        # ── TRIVIA ─────────────────────────────────────────────────────
+        if internal == "trivia":
+            pool = [
+                ("The sky is blue.", True), ("Fish can climb trees.", False),
+                ("Water freezes at 0°C.", True), ("The sun is a planet.", False),
+                ("Cats are mammals.", True), ("Diamonds are made of gold.", False),
+                ("Humans have 206 bones.", True), ("The moon is made of cheese.", False),
+            ]
+            statement, answer = random.choice(pool)
+            await ctx.send(f"❓ True or false: **{statement}** (yes/no)")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{'true' if answer else 'false'}**.")
+            ans = msg.content.lower().strip()
+            if (answer and ans in ("yes", "y", "true")) or (not answer and ans in ("no", "n", "false")):
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{'true' if answer else 'false'}**.")
+            return
+
+        # ── CAPITALS ───────────────────────────────────────────────────
+        if internal == "capitals":
+            pool = [("France", "Paris"), ("Japan", "Tokyo"), ("Brazil", "Brasília"),
+                    ("Australia", "Canberra"), ("Germany", "Berlin"), ("Canada", "Ottawa"),
+                    ("Egypt", "Cairo"), ("Argentina", "Buenos Aires")]
+            country, capital = random.choice(pool)
+            await ctx.send(f"🌍 What is the capital of **{country}**?")
+            msg = await wait(12.0)
+            if not msg:
+                return await ctx.send(f"⏱️ The capital is **{capital}**.")
+            if msg.content.strip().lower() == capital.lower():
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ The capital is **{capital}**.")
+            return
+
+        # ── SYNONYM ────────────────────────────────────────────────────
+        if internal == "synonym":
+            pool = [("happy", ["joyful", "glad", "cheerful", "pleased"]),
+                    ("fast", ["quick", "swift", "rapid", "speedy"]),
+                    ("big", ["large", "huge", "enormous", "giant"]),
+                    ("sad", ["unhappy", "miserable", "sorrowful", "gloomy"])]
+            word, synonyms = random.choice(pool)
+            await ctx.send(f"📖 Give a synonym for **{word}**:")
+            msg = await wait(12.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Some synonyms: **{', '.join(synonyms)}**.")
+            if msg.content.lower().strip() in synonyms:
+                await ctx.send("✅ Correct synonym!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Some synonyms: **{', '.join(synonyms)}**.")
+            return
+
+        # ── ANTONYM ────────────────────────────────────────────────────
+        if internal == "antonym":
+            pool = [("happy", ["sad", "unhappy", "miserable"]),
+                    ("fast", ["slow", "sluggish"]),
+                    ("big", ["small", "tiny", "little"]),
+                    ("hot", ["cold", "cool", "chilly"])]
+            word, antonyms = random.choice(pool)
+            await ctx.send(f"📖 Give an antonym (opposite) of **{word}**:")
+            msg = await wait(12.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Some antonyms: **{', '.join(antonyms)}**.")
+            if msg.content.lower().strip() in antonyms:
+                await ctx.send("✅ Correct antonym!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Some antonyms: **{', '.join(antonyms)}**.")
+            return
+
+        # ── MONTH QUIZ ─────────────────────────────────────────────────
+        if internal == "month_quiz":
+            pool = [("How many days does February have in a non-leap year?", "28"),
+                    ("Which month is the 7th month of the year?", "july"),
+                    ("How many months have 31 days?", "7"),
+                    ("Which month comes after March?", "april")]
+            q, a = random.choice(pool)
+            await ctx.send(f"📅 {q}")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Answer: **{a}**.")
+            if msg.content.lower().strip() == a:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Answer: **{a}**.")
+            return
+
+        # ── WEEKDAY QUIZ ───────────────────────────────────────────────
+        if internal == "weekday_quiz":
+            pool = [("How many days are in a week?", "7"),
+                    ("What day comes after Wednesday?", "thursday"),
+                    ("What is the first day of the week (US)?", "sunday"),
+                    ("What day comes before Friday?", "thursday")]
+            q, a = random.choice(pool)
+            await ctx.send(f"📅 {q}")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Answer: **{a}**.")
+            if msg.content.lower().strip() == a:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Answer: **{a}**.")
+            return
+
+        # ── SHORT STORY ────────────────────────────────────────────────
+        if internal == "short_story":
+            prompts = ["adventure", "mystery", "robot", "dragon", "space", "wizard"]
+            prompt_word = random.choice(prompts)
+            await ctx.send(f"📝 Write a **one-sentence** story using the word **{prompt_word}** (30s):")
+            msg = await wait(30.0)
+            if not msg:
+                return await ctx.send("⏱️ Time's up!")
+            if prompt_word in msg.content.lower():
+                await ctx.send(f"✅ Great story! Here it is:\n> {msg.content}")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Story must contain the word **{prompt_word}**.")
+            return
+
+        # ── CHOOSE ─────────────────────────────────────────────────────
+        if internal == "choose":
+            options = ["pizza", "tacos", "sushi", "burgers", "pasta"]
+            pick = random.choice(options)
+            await ctx.send(f"🎲 I'll pick from: {', '.join(options)}. Which one will I choose?")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ I picked **{pick}**.")
+            if msg.content.lower().strip() == pick:
+                await ctx.send(f"✅ Correct — **{pick}**!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ I picked **{pick}**.")
+            return
+
+        # ── TREASURE HUNT ──────────────────────────────────────────────
+        if internal == "treasure_hunt":
+            words = ["chest", "gold", "map", "island", "compass", "ship", "anchor"]
+            hidden = random.choice(words)
+            hints = [w for w in words if w != hidden]
+            random.shuffle(hints)
+            await ctx.send(f"🗺️ The treasure word is hidden among these: **{', '.join(hints[:4] + [hidden])}**. Which is the real treasure? (starts with `{hidden[0]}`)")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Treasure was **{hidden}**.")
+            if msg.content.lower().strip() == hidden:
+                await ctx.send("✅ Treasure found!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Treasure was **{hidden}**.")
+            return
+
+        # ── LABELLING ──────────────────────────────────────────────────
+        if internal == "labelling":
+            categories = [
+                ("🍎🍌🍒🍇", "fruits"),
+                ("🐶🐱🐭🐹", "animals"),
+                ("🚗🚕🚙🚌", "vehicles"),
+                ("⚽🏀🏈⚾", "sports balls"),
+            ]
+            emojis, label = random.choice(categories)
+            await ctx.send(f"🏷️ What category do these belong to?\n{emojis}")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Category: **{label}**.")
+            if label.lower() in msg.content.lower():
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Category: **{label}**.")
+            return
+
+        # ── FIND PAIR ──────────────────────────────────────────────────
+        if internal == "find_pair":
+            pool = ["apple", "banana", "cherry"]
+            items = pool * 2
+            random.shuffle(items)
+            displayed = [f"{i+1}:{v}" for i, v in enumerate(items)]
+            await ctx.send(f"🔍 Find a matching pair! Items: **{', '.join(displayed)}**\nType a word that appears twice:")
+            msg = await wait(15.0)
+            if not msg:
+                return await ctx.send("⏱️ Time's up! All words appear twice.")
+            guess = msg.content.lower().strip()
+            if guess in pool:
+                await ctx.send(f"✅ **{guess}** appears twice — correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Any of {', '.join(pool)} would work.")
+            return
+
+        # ── ODD ONE OUT ────────────────────────────────────────────────
+        if internal == "odd_one_out":
+            groups = [
+                (["cat", "dog", "fish", "car"], "car"),
+                (["red", "blue", "green", "piano"], "piano"),
+                (["apple", "banana", "laptop", "cherry"], "laptop"),
+                (["run", "jump", "swim", "table"], "table"),
+            ]
+            items, odd = random.choice(groups)
+            random.shuffle(items)
+            await ctx.send(f"🔍 Odd one out: **{', '.join(items)}**")
+            msg = await wait(10.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Odd one out was **{odd}**.")
+            if msg.content.lower().strip() == odd:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Odd one out was **{odd}**.")
+            return
+
+        # ── SEQUENCE COMPLETE ──────────────────────────────────────────
+        if internal == "sequence_complete":
+            start = random.randint(1, 10)
+            step = random.randint(2, 5)
+            seq = [start + step * i for i in range(4)]
+            nxt = seq[-1] + step
+            await ctx.send(f"🔢 Complete the sequence: **{', '.join(map(str, seq))}, ?**")
+            msg = await wait(12.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Next was **{nxt}** (step +{step}).")
+            try:
+                if int(msg.content.strip()) == nxt:
+                    await ctx.send(f"✅ Correct — step was +{step}!")
+                    await self._award_win(ctx, n)
+                else:
+                    await ctx.send(f"❌ Next was **{nxt}** (step +{step}).")
+            except ValueError:
+                await ctx.send("Send a number.")
+            return
+
+        # ── TAP COUNT ──────────────────────────────────────────────────
+        if internal == "tap_count":
+            target = random.randint(3, 7)
+            await ctx.send(f"👆 React with 👆 exactly **{target}** times on the next message!")
+            msg_obj = await ctx.send("React here! 👇")
+            await msg_obj.add_reaction("👆")
+            await asyncio.sleep(12.0)
+            try:
+                updated = await ctx.channel.fetch_message(msg_obj.id)
+                count = next((r.count - 1 for r in updated.reactions if str(r.emoji) == "👆"), 0)
+                if count == target:
+                    await ctx.send(f"✅ {count} taps — correct!")
+                    await self._award_win(ctx, n)
+                else:
+                    await ctx.send(f"❌ You tapped {count} times, needed {target}.")
+            except Exception:
+                await ctx.send("Could not count reactions.")
+            return
+
+        # ── BUBBLE POP ─────────────────────────────────────────────────
+        if internal == "bubble_pop":
+            colors = {"🟢": "green", "🔵": "blue", "🟡": "yellow", "🔴": "red"}
+            emoji, color = random.choice(list(colors.items()))
+            await ctx.send(f"💥 Pop the **{color}** bubble! Type its color:")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{color}**. {emoji} Pop!")
+            if msg.content.lower().strip() == color:
+                await ctx.send(f"💥 Pop! **{emoji}** popped!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{color}**. {emoji}")
+            return
+
+        # ── PICK A CARD ────────────────────────────────────────────────
+        if internal == "pick_a_card":
+            suits = ["♠️ Spades", "♥️ Hearts", "♦️ Diamonds", "♣️ Clubs"]
+            ranks = ["2","3","4","5","6","7","8","9","10","Jack","Queen","King","Ace"]
+            card = f"{random.choice(ranks)} of {random.choice(suits)}"
+            suit_options = [s.split()[1] for s in suits]
+            await ctx.send(f"🃏 I drew a card. What **suit** is it? ({' / '.join(suit_options)})")
+            msg = await wait(10.0)
+            actual_suit = card.split(" of ")[1].split()[1]
+            if not msg:
+                return await ctx.send(f"⏱️ Card was **{card}**.")
+            if msg.content.strip().lower() == actual_suit.lower():
+                await ctx.send(f"✅ Correct — it was **{card}**!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Card was **{card}**.")
+            return
+
+        # ── NUMBER CHAIN ───────────────────────────────────────────────
+        if internal == "number_chain":
+            await ctx.send("🔢 I'll say a number, you add the step and say the next. **Step is +3**. I start with **1** — what's next?")
+            current = 1
+            step = 3
+            for _ in range(5):
+                expected = current + step
+                msg = await wait(8.0)
+                if not msg:
+                    return await ctx.send(f"⏱️ Next was **{expected}**.")
+                try:
+                    if int(msg.content.strip()) == expected:
+                        current = expected
+                        if _ == 4:
+                            await ctx.send(f"✅ Full chain complete!")
+                            await self._award_win(ctx, n)
+                        else:
+                            await ctx.send(f"✅ Next (+{step}):")
+                    else:
+                        return await ctx.send(f"❌ Expected **{expected}** (you had {current}, +{step}).")
+                except ValueError:
+                    return await ctx.send("Send a number.")
+            return
+
+        # ── COLOR GUESS ────────────────────────────────────────────────
+        if internal == "color_guess":
+            colors = ["red", "blue", "green", "yellow", "purple", "orange"]
+            picked = random.choice(colors)
+            sample = random.sample(colors, 4)
+            if picked not in sample:
+                sample[0] = picked
+                random.shuffle(sample)
+            await ctx.send(f"🎨 I'm thinking of a color. Options: **{', '.join(sample)}**. Which is it?")
+            msg = await wait(8.0)
+            if not msg:
+                return await ctx.send(f"⏱️ It was **{picked}**.")
+            if msg.content.lower().strip() == picked:
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ It was **{picked}**.")
+            return
+
+        # ── FLIP WORDS ─────────────────────────────────────────────────
+        if internal == "flip_words":
+            sentences = ["the cat sat", "I love pizza", "sky is blue", "dogs are loyal", "code never lies"]
+            sentence = random.choice(sentences)
+            flipped = " ".join(reversed(sentence.split()))
+            await ctx.send(f"🔄 Reverse the word order: **{sentence}**")
+            msg = await wait(12.0)
+            if not msg:
+                return await ctx.send(f"⏱️ Answer: **{flipped}**.")
+            if msg.content.lower().strip() == flipped.lower():
+                await ctx.send("✅ Correct!")
+                await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Answer: **{flipped}**.")
+            return
+
+        # ── GUESS THE EMOJI (duplicate key handled above) ──────────────
+
+        # ── FAST TYPE MICRO (hub only) ─────────────────────────────────
+        if internal == "fast_type_micro":
+            char = random.choice("ASDFJKL;")
+            await ctx.send(f"⚡ Type **{char}** FAST!")
+            start = time.perf_counter()
+            msg = await wait(3.0)
+            if not msg:
+                return await ctx.send("⏱️ Too slow!")
+            elapsed = time.perf_counter() - start
+            if msg.content.strip().upper() == char.upper():
+                await ctx.send(f"⚡ {elapsed:.3f}s!")
+                if elapsed < 2.0:
+                    await self._award_win(ctx, n)
+            else:
+                await ctx.send(f"❌ Needed **{char}**.")
+            return
+
+        # ── Unknown named game → micro fallback ───────────────────────
+        await self._micro_play(ctx, 1, 0, False, internal)
 
     async def _micro_play(self, ctx, kind: int, variant: int, is_advanced: bool, name: str):
         """Handle micro games by index.
@@ -190,8 +996,8 @@ class Minigames(commands.Cog):
             idx = int(kind)
         except Exception:
             idx = 1
-        kind_id = (idx - 1) % 10
-        difficulty = (idx - 1) // 10  # 0..24
+        kind_id = (idx - 1) % 20
+        difficulty = (idx - 1) // 20  # 0..12
         adv = is_advanced or (difficulty > 0)
 
         async def wait_for_reply(timeout: float):
@@ -403,6 +1209,7 @@ class Minigames(commands.Cog):
                     await ctx.send("Wrong! No matching pair found.")
             except asyncio.TimeoutError:
                 await ctx.send("You ran out of time!")
+            return
 
         # KIND 11: odd one out
         if kind_id == 11:
@@ -423,6 +1230,7 @@ class Minigames(commands.Cog):
                     await ctx.send(f"Wrong! The odd one out was {odd_one}.")
             except asyncio.TimeoutError:
                 await ctx.send(f"You ran out of time! The odd one out was {odd_one}.")
+            return
 
         # KIND 12: sequence complete
         if kind_id == 12:
@@ -442,6 +1250,7 @@ class Minigames(commands.Cog):
                     await ctx.send(f"Wrong! The next number was {next_number}.")
             except asyncio.TimeoutError:
                 await ctx.send(f"You ran out of time! The next number was {next_number}.")
+            return
 
         # KIND 13: tap count
         if kind_id == 13:
@@ -459,6 +1268,7 @@ class Minigames(commands.Cog):
                     reaction_count += 1
             except asyncio.TimeoutError:
                 await ctx.send(f"Time's up! You tapped {reaction_count} times.")
+            return
 
         # KIND 14: bubble pop
         if kind_id == 14:
@@ -474,6 +1284,7 @@ class Minigames(commands.Cog):
                 await self._award_win(ctx, "bubble_pop")
             except asyncio.TimeoutError:
                 await ctx.send("You ran out of time! The bubbles floated away.")
+            return
 
         # KIND 15: quick draw
         if kind_id == 15:
@@ -491,6 +1302,7 @@ class Minigames(commands.Cog):
                 await self._award_win(ctx, "quick_draw")
             except asyncio.TimeoutError:
                 await ctx.send("You didn't type the character in time!")
+            return
 
         # KIND 16: number chain
         if kind_id == 16:
@@ -505,6 +1317,7 @@ class Minigames(commands.Cog):
                 await ctx.send(f"Great! Now say the next number: {next_number}.")
             except asyncio.TimeoutError:
                 await ctx.send("You took too long to respond!")
+            return
 
         # KIND 17: color guess
         if kind_id == 17:
@@ -524,6 +1337,7 @@ class Minigames(commands.Cog):
                     await ctx.send(f"Wrong! The correct color was {correct_color}.")
             except asyncio.TimeoutError:
                 await ctx.send(f"You ran out of time! The correct color was {correct_color}.")
+            return
 
         # KIND 18: flip words
         if kind_id == 18:
@@ -543,6 +1357,7 @@ class Minigames(commands.Cog):
                     await ctx.send(f"Wrong! The correct order was: {flipped}.")
             except asyncio.TimeoutError:
                 await ctx.send(f"You ran out of time! The correct order was: {flipped}")
+            return
 
         # KIND 19: pick a card
         if kind_id == 19:
@@ -563,18 +1378,332 @@ class Minigames(commands.Cog):
                     await ctx.send(f"Wrong! The card was {card}.")
             except asyncio.TimeoutError:
                 await ctx.send(f"You ran out of time! The card was {card}.")
-        # fallback generic: simple fortune
-        await ctx.send(random.choice(["Nice!", "Try again.", "Nope."]))
-
-        # micro_ prefixed games: delegate to a dedicated micro handler
-        if name.startswith("micro_"):
-            try:
-                idx = int(name.split("_")[1])
-            except Exception:
-                idx = 0
-            await self._micro_play(ctx, idx, 0, False, name)
             return
 
+        # Unknown kind — silent fallback
+        await ctx.send("🎮 Game not found. Try another one!")
+
+    # ------------------------------------------------------------------ #
+    #  /minigames slash command — interactive hub                          #
+    # ------------------------------------------------------------------ #
+
+    @app_commands.command(name="minigames", description="🎮 Open the Minigames Hub and pick a game to play!")
+    async def minigames_slash(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        view = MinigamesHubView(self, interaction.user)
+        await interaction.followup.send(view=view)
+
+    async def _hub_play(self, interaction: discord.Interaction, game_key: str):
+        """Run a minigame from the hub using a fake ctx-like object."""
+        try:
+            from utils.user_storage import touch_user as _touch
+            asyncio.create_task(_touch(int(interaction.user.id), str(interaction.user)))
+        except Exception:
+            pass
+
+        # Build a lightweight ctx proxy so existing _award_win / wait_for logic works
+        ctx = _HubCtx(self.bot, interaction)
+        await self._handle_game(ctx, game_key)
+
+
+# ======================================================================
+# Hub Views — used by the /minigames slash command
+# ======================================================================
+
+# All named base games grouped by category.
+# Each entry: (command_key, display_name, short_description)
+# Views page through them 4 at a time (leaving room for nav buttons).
+_HUB_CATEGORIES: dict[str, list[tuple[str, str, str]]] = {
+    "🧠 Knowledge": [
+        ("trivia",        "Trivia",        "Answer a yes/no trivia question."),
+        ("emoji_quiz",    "Emoji Quiz",    "Guess what the emoji means."),
+        ("capitals",      "Capitals",      "Name the capital of a country."),
+        ("month_quiz",    "Month Quiz",    "Which month has X?"),
+        ("weekday_quiz",  "Weekday Quiz",  "Which weekday is X?"),
+        ("first_letter",  "First Letter",  "Give the first letter of a word."),
+        ("last_letter",   "Last Letter",   "Give the last letter of a word."),
+        ("guess_the_emoji","Guess Emoji",  "Guess the meaning of an emoji sequence."),
+    ],
+    "🔢 Numbers": [
+        ("quick_math",        "Quick Math",     "Solve a quick arithmetic problem."),
+        ("sequence_complete", "Sequence",       "Complete the number sequence."),
+        ("math_race",         "Math Race",      "Answer several math problems fast."),
+        ("binary_guess",      "Binary Guess",   "Guess 0 or 1 — binary challenge."),
+        ("number_chain",      "Number Chain",   "Continue the counting chain."),
+        ("stones",            "Stones",         "Remove stones (mini Nim game)."),
+    ],
+    "📝 Words": [
+        ("hangman",          "Hangman",          "Classic hangman."),
+        ("unscramble",       "Unscramble",       "Unscramble a jumbled word."),
+        ("spelling_bee",     "Spelling Bee",     "Spell the given word correctly."),
+        ("scramble_sentence","Scramble Sentence","Unscramble the mixed-up sentence."),
+        ("text_twist",       "Text Twist",       "Make a new word from the given letters."),
+        ("word_chain",       "Word Chain",       "Add a word starting with the last letter."),
+    ],
+    "✍️ Language": [
+        ("reverse_word", "Reverse Word", "Type the word backwards."),
+        ("flip_words",   "Flip Words",   "Reverse the word order in a sentence."),
+        ("palindrome",   "Palindrome",   "Is the word a palindrome?"),
+        ("count_vowels", "Count Vowels", "Count the vowels in a word."),
+        ("synonym",      "Synonym",      "Give a synonym for the shown word."),
+        ("antonym",      "Antonym",      "Give an antonym for the shown word."),
+    ],
+    "⚡ Speed": [
+        ("reaction_time", "Reaction",   "Test your reaction speed."),
+        ("quick_draw",    "Quick Draw", "Type a character as fast as you can."),
+        ("typing_race",   "Type Race",  "Type a sentence quickly."),
+        ("tap_count",     "Tap Count",  "Count taps quickly."),
+        ("bubble_pop",    "Bubble Pop", "Pop virtual bubbles."),
+        ("fast_type_micro","Fast Type", "Type the shown character as fast as possible."),
+    ],
+    "🎲 Luck": [
+        ("coinflip",     "Coin Flip",    "Heads or tails — 50/50 chance."),
+        ("roll",         "Dice Roll",    "Guess the dice total."),
+        ("guess_number", "Guess Number", "Guess the secret number 1–20."),
+        ("pick_a_card",  "Pick a Card",  "Guess the randomly drawn card."),
+        ("higher_lower", "Higher/Lower", "Predict whether next number is higher or lower."),
+        ("predict",      "Predict",      "Let the bot tell your fortune."),
+    ],
+    "🖼️ Memory": [
+        ("memory",       "Memory",       "Remember and repeat the emoji sequence."),
+        ("emoji_memory", "Emoji Memory", "Recall a longer emoji sequence."),
+        ("match_colors", "Match Colors", "Quickly pick the matching color."),
+        ("color_guess",  "Color Guess",  "Guess which color was secretly picked."),
+    ],
+    "🧩 Puzzle": [
+        ("find_pair",     "Find Pair",     "Spot the matching pair in a list."),
+        ("odd_one_out",   "Odd One Out",   "Identify the item that doesn't belong."),
+        ("treasure_hunt", "Treasure Hunt", "Find the hidden treasure word."),
+        ("labelling",     "Labelling",     "Label items correctly under time pressure."),
+        ("choose",        "Choose",        "Have the bot pick an option for you."),
+        ("binary_guess",  "Binary Guess",  "0 or 1 — which did the bot pick?"),
+    ],
+    "🎭 Fun": [
+        ("rps",         "Rock Paper Scissors", "Classic RPS against the bot."),
+        ("mimic",       "Mimic",               "Repeat back exactly what you send."),
+        ("short_story", "Short Story",         "Create a mini story from a word."),
+    ],
+}
+
+
+class _HubCtx:
+    """Lightweight ctx proxy routing ctx.send() to the interaction channel."""
+
+    def __init__(self, bot: commands.Bot, interaction: discord.Interaction):
+        self.bot = bot
+        self._interaction = interaction
+        self.author = interaction.user
+        self.channel = interaction.channel
+        self.guild = interaction.guild
+
+    async def send(self, content=None, **kwargs):
+        kwargs.pop("reference", None)
+        kwargs.pop("embed", None)
+        kwargs.pop("view", None)
+        try:
+            ch = self._interaction.channel
+            if ch:
+                return await ch.send(content or "", **kwargs)
+        except Exception:
+            pass
+
+
+class MinigamesHubView(discord.ui.LayoutView):
+    """Main hub — Components V2."""
+
+    def __init__(self, cog: "Minigames", user: discord.User | discord.Member):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.user = user
+        self._build()
+
+    def _build(self):
+        self.clear_items()
+        cats = list(_HUB_CATEGORIES.keys())
+        summary_lines = []
+        for cat, games in _HUB_CATEGORIES.items():
+            names = " • ".join(g[1] for g in games)
+            summary_lines.append(f"**{cat}** — {names}")
+        header = discord.ui.TextDisplay(
+            "## 🎮 Minigames Hub\n"
+            "Pick a **category** to browse, then press **▶ Play** to start!\n"
+            "Every win rewards **PsyCoins**.\n\n"
+            + "\n".join(summary_lines)
+        )
+        btn_rows = []
+        for row_i in range(0, len(cats), 3):
+            row_cats = cats[row_i : row_i + 3]
+            btns = []
+            for j, cat in enumerate(row_cats):
+                btn = discord.ui.Button(
+                    label=cat,
+                    style=discord.ButtonStyle.primary,
+                    custom_id=f"hub_cat_{row_i + j}",
+                )
+                btn.callback = self._make_cat_callback(cat)
+                btns.append(btn)
+            btn_rows.append(discord.ui.ActionRow(*btns))
+        self.add_item(discord.ui.Container(
+            header, discord.ui.Separator(), *btn_rows,
+            accent_colour=discord.Colour.blurple(),
+        ))
+
+    def _make_cat_callback(self, cat: str):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.user.id:
+                return await interaction.response.send_message(
+                    "❌ This panel isn't yours!", ephemeral=True)
+            view = MinigamesCategoryView(self.cog, self.user, cat)
+            await interaction.response.edit_message(view=view)
+        return callback
+
+    async def on_timeout(self): self.clear_items()
+
+
+class MinigamesCategoryView(discord.ui.LayoutView):
+    """Games in one category — paginated 4/page. Components V2."""
+    _PAGE_SIZE = 4
+
+    def __init__(self, cog, user, category: str, page: int = 0):
+        super().__init__(timeout=120)
+        self.cog = cog; self.user = user
+        self.category = category; self.page = page
+        self._games = _HUB_CATEGORIES[category]
+        self._build()
+
+    def _page_games(self): return self._games[self.page*self._PAGE_SIZE:(self.page+1)*self._PAGE_SIZE]
+
+    @property
+    def _total_pages(self):
+        import math; return max(1, math.ceil(len(self._games)/self._PAGE_SIZE))
+
+    def _build(self):
+        self.clear_items()
+        games = self._page_games()
+        lines = [f"**{name}** — {desc}" for _, name, desc in games]
+        hdr = (
+            f"## {self.category}\n"
+            f"Page **{self.page+1}/{self._total_pages}** — press **▶ Play** to start!\n\n"
+            + "\n".join(lines)
+        )
+        game_rows = []
+        for i in range(0, len(games), 2):
+            btns = []
+            for key, name, _ in games[i:i+2]:
+                btn = discord.ui.Button(
+                    label=f"▶ {name}", style=discord.ButtonStyle.success,
+                    custom_id=f"hub_play_{key}_{self.page}_{i}",
+                )
+                btn.callback = self._make_play_callback(key, name)
+                btns.append(btn)
+            game_rows.append(discord.ui.ActionRow(*btns))
+        nav: list[discord.ui.Button] = []
+        if self.page > 0:
+            p = discord.ui.Button(label="◄ Prev", style=discord.ButtonStyle.secondary, custom_id="hub_prev")
+            p.callback = self._prev_callback; nav.append(p)
+        if self.page < self._total_pages - 1:
+            n = discord.ui.Button(label="Next ▶", style=discord.ButtonStyle.secondary, custom_id="hub_next")
+            n.callback = self._next_callback; nav.append(n)
+        b = discord.ui.Button(label="🔙 Back to Hub", style=discord.ButtonStyle.primary, custom_id="hub_back")
+        b.callback = self._back_callback; nav.append(b)
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(hdr), discord.ui.Separator(),
+            *game_rows, discord.ui.ActionRow(*nav),
+            accent_colour=discord.Colour.green(),
+        ))
+
+    def _make_play_callback(self, key: str, name: str):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.user.id:
+                return await interaction.response.send_message(
+                    "❌ This panel isn't yours!", ephemeral=True)
+            rv = _PlayingView(self.cog, self.user, key, name, self.category, self.page)
+            await interaction.response.edit_message(view=rv)
+            asyncio.create_task(self._run_game(interaction, key, name, rv))
+        return callback
+
+    async def _prev_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            return await interaction.response.send_message("❌ Not yours!", ephemeral=True)
+        await interaction.response.edit_message(
+            view=MinigamesCategoryView(self.cog, self.user, self.category, self.page-1))
+
+    async def _next_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            return await interaction.response.send_message("❌ Not yours!", ephemeral=True)
+        await interaction.response.edit_message(
+            view=MinigamesCategoryView(self.cog, self.user, self.category, self.page+1))
+
+    async def _run_game(self, interaction, key, name, view):
+        await self.cog._hub_play(interaction, key)
+        try:
+            dv = _PlayingView(self.cog, self.user, key, name, self.category, self.page)
+            dv.enable_buttons()
+            await interaction.edit_original_response(view=dv)
+        except Exception: pass
+
+    async def _back_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            return await interaction.response.send_message("❌ Not yours!", ephemeral=True)
+        await interaction.response.edit_message(view=MinigamesHubView(self.cog, self.user))
+
+
+class _PlayingView(discord.ui.LayoutView):
+    """While/after a game. Components V2."""
+
+    def __init__(self, cog, user, key, name, category, page=0):
+        super().__init__(timeout=180)
+        self.cog = cog; self.user = user
+        self.key = key; self.name = name
+        self.category = category; self.page = page
+        self._finished = False; self._build()
+
+    def enable_buttons(self): self._finished = True; self._build()
+
+    def _build(self):
+        self.clear_items()
+        if self._finished:
+            txt = discord.ui.TextDisplay(f"## ✅ {self.name} — Finished!\nGame complete! What next?")
+            col = discord.Colour.blurple()
+        else:
+            txt = discord.ui.TextDisplay(
+                f"## 🎮 Playing: {self.name}\n**Starting…**\n\n"
+                "Reply with your answer when prompted!\n*Buttons activate when done.*"
+            )
+            col = discord.Colour.gold()
+        pa = discord.ui.Button(label='🔄 Play Again',style=discord.ButtonStyle.success,custom_id='play_again',disabled=not self._finished)
+        pa.callback = self._play_again_callback
+        bk = discord.ui.Button(label='◄ Back',style=discord.ButtonStyle.secondary,custom_id='back_to_cat',disabled=not self._finished)
+        bk.callback = self._back_callback
+        hb = discord.ui.Button(label='🏠 Hub',style=discord.ButtonStyle.primary,custom_id='go_hub',disabled=not self._finished)
+        hb.callback = self._hub_callback
+        self.add_item(discord.ui.Container(
+            txt, discord.ui.Separator(), discord.ui.ActionRow(pa, bk, hb),
+            accent_colour=col,
+        ))
+
+    async def _play_again_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            return await interaction.response.send_message("❌ Not your game!", ephemeral=True)
+        nv = _PlayingView(self.cog, self.user, self.key, self.name, self.category, self.page)
+        await interaction.response.edit_message(view=nv)
+        asyncio.create_task(MinigamesCategoryView(self.cog, self.user, self.category, self.page)._run_game(interaction, self.key, self.name, nv))
+
+    async def _back_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            return await interaction.response.send_message("❌ Not your game!", ephemeral=True)
+        await interaction.response.edit_message(view=MinigamesCategoryView(self.cog, self.user, self.category, self.page))
+
+    async def _hub_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            return await interaction.response.send_message("❌ Not your game!", ephemeral=True)
+        await interaction.response.edit_message(view=MinigamesHubView(self.cog, self.user))
+
+
+
+# ======================================================================
+# Cog setup
+# ======================================================================
 
 async def setup(bot: commands.Bot):
     cog = Minigames(bot)

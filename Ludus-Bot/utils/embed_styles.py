@@ -61,6 +61,7 @@ class Emojis:
     DIAMOND = "💎"
     
     # Games
+    GAME = "🎮"
     DICE = "🎲"
     CARDS = "🎴"
     TROPHY = "🏆"
