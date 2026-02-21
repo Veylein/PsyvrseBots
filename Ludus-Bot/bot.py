@@ -393,12 +393,12 @@ async def on_resume():
 @bot.event
 async def on_ready():
     # Initialize Database Schema
-    try:
-        from utils.database import db
-        await asyncio.to_thread(db.initialize_schema)
-        print("🗄️ Database schema initialized.")
-    except Exception as e:
-        print(f"⚠️ Database initialization WARNING: {e}")
+    # try:
+    #     from utils.database import db
+    #     await asyncio.to_thread(db.initialize_schema)
+    #     print("🗄️ Database schema initialized.")
+    # except Exception as e:
+    #     print(f"⚠️ Database initialization WARNING: {e}")
 
     print("\n" + "="*50)
     print("🚀 BOT IS READY!")
