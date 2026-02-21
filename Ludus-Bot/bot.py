@@ -576,6 +576,17 @@ async def on_ready():
                 else:
                     raise
 
+            # Always also sync globally so stale global commands (old names etc.) get removed
+            print("\n🌍 Syncing global command list (removes stale/renamed commands)...")
+            try:
+                synced_global = await bot.tree.sync()
+                print(f"   • Global: synced {len(synced_global)} commands.")
+            except discord.HTTPException as he:
+                if he.code == 50240:
+                    print("   ⚠️ Global sync skipped (50240 — Activity entry-point protected). Stale commands may linger up to 1h.")
+                else:
+                    print(f"   ❌ Global sync failed: {he}")
+
             # Sync dev-only commands to each dev guild
             if restricted:
                 print(f"\n🏰 Syncing dev-only commands to {len(dev_guild_objs)} dev guild(s)...")
