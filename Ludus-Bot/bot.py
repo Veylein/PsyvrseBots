@@ -517,6 +517,18 @@ async def on_ready():
     print("🔄 SYNCING SLASH COMMANDS...")
     print("="*50)
 
+    # ── Delete Activity entry-point so global sync works cleanly ──────────────
+    try:
+        app_id = bot.application_id
+        global_cmds = await bot.http.get_global_commands(app_id)
+        for gc in global_cmds:
+            if gc.get("type") == 4:  # 4 = PRIMARY_ENTRY_POINT
+                await bot.http.delete_global_command(app_id, gc["id"])
+                print(f"   🗑️  Deleted Activity entry-point: '{gc['name']}' (id {gc['id']})")
+    except Exception as ep_err:
+        print(f"   ⚠️  Could not remove entry-point: {ep_err}")
+    # ──────────────────────────────────────────────────────────────────────────
+
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
     # Do NOT include entry point commands (like 'start') in DEV_ONLY_COMMANDS!
