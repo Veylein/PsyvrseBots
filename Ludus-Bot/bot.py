@@ -510,12 +510,21 @@ async def on_ready():
                 cog_name = cmd.binding.__cog_name__ if hasattr(cmd, 'binding') and cmd.binding else "Unknown"
                 print(f"   • /{cmd.qualified_name} ({cog_name}){guild_ids_str}")
     
-    print("="*50)
     
-    # ===== DEV GUILD COMMAND SYNC SYSTEM =====
+  # ===== DEV GUILD COMMAND SYNC SYSTEM =====
     print("\n" + "="*50)
     print("🔄 SYNCING SLASH COMMANDS...")
     print("="*50)
+
+    try:
+        app_id = bot.application_id
+        global_cmds = await bot.http.get_global_commands(app_id)
+        for gc in global_cmds:
+            if gc.get("type") == 4:  # 4 = PRIMARY_ENTRY_POINT
+                await bot.http.delete_global_command(app_id, gc["id"])
+                print(f"   🗑️  Deleted Activity entry-point: '{gc['name']}' (id {gc['id']})")
+    except Exception as ep_err:
+        print(f"   ⚠️  Could not remove entry-point: {ep_err}")
 
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
@@ -563,11 +572,8 @@ async def on_ready():
 
             print("\n🌍 Syncing global commands (dev-only ones remain guild-scoped)...")
             try:
-                # copy_global_to avoids the 50240 entry-point removal error
-                for guild_obj in dev_guild_objs:
-                    bot.tree.copy_global_to(guild=guild_obj)
-                    synced_guild = await bot.tree.sync(guild=guild_obj)
-                    print(f"   • Guild {guild_obj.id}: synced {len(synced_guild)} commands.")
+                synced_global = await bot.tree.sync()
+                print(f"   • Synced {len(synced_global)} global commands.")
             except discord.HTTPException as http_error:
                 if http_error.code == 50240:
                     print("   ⚠️ Global sync rejected (50240): entry-point command removal is not allowed.")
@@ -632,7 +638,10 @@ async def on_message(message):
     # If LudusPersonality cog is loaded, let it handle all messages
     personality_cog = bot.get_cog("LudusPersonality")
     if personality_cog:
-        await personality_cog.on_message(message)
+        try:
+            await personality_cog.on_message(message)
+        except discord.Forbidden:
+            pass
     # Always process prefix commands
     await bot.process_commands(message)
 
