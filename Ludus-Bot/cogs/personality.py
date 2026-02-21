@@ -936,6 +936,12 @@ class LudusPersonality(commands.Cog):
     
     @commands.Cog.listener()
     async def on_message(self, message):
+        try:
+            await self._on_message_inner(message)
+        except discord.Forbidden:
+            pass  # Bot lacks send/react permissions in that channel
+
+    async def _on_message_inner(self, message):
         # Ignore bots
         if message.author.bot:
             return

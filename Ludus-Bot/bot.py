@@ -632,7 +632,10 @@ async def on_message(message):
     # If LudusPersonality cog is loaded, let it handle all messages
     personality_cog = bot.get_cog("LudusPersonality")
     if personality_cog:
-        await personality_cog.on_message(message)
+        try:
+            await personality_cog.on_message(message)
+        except discord.Forbidden:
+            pass
     # Always process prefix commands
     await bot.process_commands(message)
 
