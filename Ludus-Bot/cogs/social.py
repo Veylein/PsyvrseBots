@@ -878,17 +878,23 @@ class Social(commands.Cog):
 
         try:
             session = await self._get_session()
-            async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=8)) as r:
+            print(f"[petpet] Requesting: {api_url}")
+            async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+                print(f"[petpet] Response status: {r.status}, content-type: {r.headers.get('content-type', 'unknown')}")
                 if r.status == 200:
                     gif_bytes = await r.read()
+                    print(f"[petpet] Received {len(gif_bytes)} bytes")
                     gif_file  = discord.File(io.BytesIO(gif_bytes), filename="petpet.gif")
                     embed.set_image(url="attachment://petpet.gif")
                     await interaction.followup.send(embed=embed, file=gif_file)
                     return
                 else:
-                    print(f"[petpet] API returned status {r.status} for {api_url}")
+                    body = await r.text()
+                    print(f"[petpet] API error {r.status}: {body[:200]}")
         except Exception as e:
-            print(f"[petpet] Exception: {e}")
+            import traceback
+            print(f"[petpet] Exception: {type(e).__name__}: {e}")
+            traceback.print_exc()
 
         # fallback – no GIF available
         embed.set_thumbnail(url=avatar_url)
