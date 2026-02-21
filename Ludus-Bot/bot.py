@@ -563,8 +563,11 @@ async def on_ready():
 
             print("\n🌍 Syncing global commands (dev-only ones remain guild-scoped)...")
             try:
-                synced_global = await bot.tree.sync()
-                print(f"   • Synced {len(synced_global)} global commands.")
+                # copy_global_to avoids the 50240 entry-point removal error
+                for guild_obj in dev_guild_objs:
+                    bot.tree.copy_global_to(guild=guild_obj)
+                    synced_guild = await bot.tree.sync(guild=guild_obj)
+                    print(f"   • Guild {guild_obj.id}: synced {len(synced_guild)} commands.")
             except discord.HTTPException as http_error:
                 if http_error.code == 50240:
                     print("   ⚠️ Global sync rejected (50240): entry-point command removal is not allowed.")
