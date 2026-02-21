@@ -627,7 +627,8 @@ class LudusPersonality(commands.Cog):
     def _normalize_question_text(self, text):
         cleaned = text.lower()
         cleaned = re.sub(r"<@!?\\d+>", " ", cleaned)
-        cleaned = re.sub(r"[^a-z0-9\s]", " ", cleaned)
+        # Keep apostrophes for things like "what's" or possessives, but remove other punctuation
+        cleaned = re.sub(r"[^a-z0-9\s']", " ", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         return cleaned
 
@@ -689,14 +690,28 @@ class LudusPersonality(commands.Cog):
     def _match_from_dict(self, normalized_question, data):
         if not isinstance(data, dict):
             return None
+        
+        # Original simple check (unlikely to work with normalized question vs raw keys)
         if normalized_question in data:
             return self._resolve_answer_entry(data[normalized_question])
+            
+        # BETTER CHECK: normalize keys as we iterate
         for key, value in data.items():
-            if key in normalized_question or normalized_question in key:
+            key_norm = self._normalize_question_text(key)
+            # Check for exact match of normalized versions
+            if key_norm == normalized_question:
                 return self._resolve_answer_entry(value)
+            # Check for containment (question inside key or key inside question)
+            if key_norm in normalized_question or normalized_question in key_norm:
+                return self._resolve_answer_entry(value)
+                
+        # Fuzzy match currently uses raw keys, which might fail if casing differs a lot
+        # But get_close_matches is somewhat robust. Let's try iterating with normalized keys for fuzzy too if needed.
+        # But for now, let's stick to the existing fuzzy logic but maybe lower the cutoff?
         fuzzy_key = self._fuzzy_key(normalized_question, data.keys())
         if fuzzy_key:
             return self._resolve_answer_entry(data[fuzzy_key])
+            
         return None
 
     def _get_known_answer(self, question_text):
@@ -751,10 +766,10 @@ class LudusPersonality(commands.Cog):
                 return value
 
         # 5. General knowledge
-        for key, value in knowledge.get("general_knowledge", {}).items():
-            key_norm = self._normalize_question_text(key)
-            if key_norm and key_norm in normalized_question:
-                return value
+        general_knowledge = knowledge.get("general_knowledge", {})
+        answer = self._match_from_dict(normalized_question, general_knowledge)
+        if answer:
+            return answer
 
         return None
 
