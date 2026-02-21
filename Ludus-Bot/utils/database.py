@@ -3,8 +3,8 @@ import os
 import datetime
 import logging
 from typing import Optional, Dict, List, Any
-import psycopg2
-from psycopg2.extras import RealDictCursor
+# import psycopg2
+# from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
 from dotenv import load_dotenv
 
@@ -34,27 +34,9 @@ class DatabaseManager:
     @contextmanager
     def get_connection(self):
         """Context manager for database connections to ensure they are closed properly."""
-        if not self.host or not self.database or not self.user or not self.password:
-             logger.warning("Database credentials missing in environment variables.")
-             yield None
-             return
-
-        conn = None
-        try:
-            conn = psycopg2.connect(
-                host=self.host,
-                database=self.database,
-                user=self.user,
-                password=self.password,
-                port=self.port
-            )
-            yield conn
-        except psycopg2.Error as e:
-            logger.error(f"Database connection error: {e}")
-            raise
-        finally:
-            if conn:
-                conn.close()
+        # Database paused
+        yield None
+        return
 
     @contextmanager
     def get_cursor(self, commit: bool = False):
