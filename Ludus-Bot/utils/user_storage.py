@@ -267,12 +267,47 @@ async def record_minigame_result(user_id: int, game_name: str, result: str,
     Record a minigame play.
     result: 'win' | 'loss' | 'draw'
     """
+    # Map game_name → which stats.* fields to increment (win_field, loss_field, played_field)
+    # None means no dedicated stats field for that outcome
+    _GAME_STAT_MAP: dict[str, tuple] = {
+        "trivia":        ("trivia_wins",    "trivia_losses",    "trivia_played"),
+        "wordle":        ("wordle_wins",     "wordle_losses",    "wordle_played"),
+        "hangman":       ("hangman_wins",    "hangman_losses",   "hangman_played"),
+        "memory":        ("memory_wins",     "memory_losses",    None),
+        "rps":           ("rps_wins",        "rps_losses",       None),
+        "coinflip":      ("coinflip_wins",   "coinflip_losses",  None),
+        "dice":          ("dice_wins",       "dice_losses",      None),
+        "minesweeper":   ("minesweeper_wins","minesweeper_losses",None),
+        "riddle":        ("riddles_solved",  None,               "riddle_played"),
+        "quick_math":    ("math_correct",    None,               "math_played"),
+        "typing_race":   (None,              None,               "typing_games_played"),
+        "uno_gofish":    ("uno_wins",        "uno_losses",       "uno_played"),
+        "flood":         ("flood_wins",      "flood_losses",     "flood_played"),
+        "lights_out":    ("lights_out_wins", "lights_out_losses","lights_out_played"),
+        "sliding_puzzle":("sliding_wins",    "sliding_losses",   "sliding_played"),
+    }
+
     def _do():
         data = _sync_load(int(user_id), username)
         stats = data.setdefault("stats", {})
         stats["minigames_played"] = stats.get("minigames_played", 0) + 1
         if result == "win":
             stats["minigames_won"] = stats.get("minigames_won", 0) + 1
+
+        # Also update game-specific stats fields (what profile page reads)
+        _sm = _GAME_STAT_MAP.get(game_name)
+        if _sm:
+            win_f, loss_f, played_f = _sm
+            if played_f:
+                stats[played_f] = stats.get(played_f, 0) + 1
+            if result == "win" and win_f:
+                stats[win_f] = stats.get(win_f, 0) + 1
+            elif result == "loss" and loss_f:
+                stats[loss_f] = stats.get(loss_f, 0) + 1
+            elif result == "draw":
+                # e.g. rps draws
+                draw_f = game_name + "_draws"
+                stats[draw_f] = stats.get(draw_f, 0) + 1
 
         mg = data.setdefault("minigames", {"by_game": {}, "recent_plays": []})
         by = mg.setdefault("by_game", {})

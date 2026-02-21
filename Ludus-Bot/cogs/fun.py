@@ -227,5 +227,148 @@ class Fun(commands.Cog):
             else:
                 await ctx_or_interaction.send(msg)
 
+    @app_commands.command(name="8ball", description="Ask the magic 8-ball a yes/no question")
+    @app_commands.describe(question="Your yes/no question")
+    async def eightball_slash(self, interaction: discord.Interaction, question: str):
+        responses = [
+            "🎱 It is certain.", "🎱 It is decidedly so.", "🎱 Without a doubt.",
+            "🎱 Yes, definitely.", "🎱 You may rely on it.", "🎱 As I see it, yes.",
+            "🎱 Most likely.", "🎱 Outlook good.", "🎱 Yes.", "🎱 Signs point to yes.",
+            "🎱 Reply hazy, try again.", "🎱 Ask again later.",
+            "🎱 Better not tell you now.", "🎱 Cannot predict now.",
+            "🎱 Concentrate and ask again.", "🎱 Don't count on it.",
+            "🎱 My reply is no.", "🎱 My sources say no.",
+            "🎱 Outlook not so good.", "🎱 Very doubtful.",
+        ]
+        answer = random.choice(responses)
+        embed = discord.Embed(
+            title="🎱 Magic 8-Ball",
+            description=f"**Q:** {question}\n\n**A:** {answer}",
+            color=discord.Color.dark_gray(),
+        )
+        ask_again = discord.ui.Button(label="🎱 Ask Again", style=discord.ButtonStyle.primary)
+
+        class AskAgainView(discord.ui.View):
+            def __init__(self):
+                super().__init__(timeout=120)
+
+            @discord.ui.button(label="🎱 Ask Again", style=discord.ButtonStyle.primary)
+            async def ask_again_btn(self, inter: discord.Interaction, button: discord.ui.Button):
+                await inter.response.send_modal(_8BallFollowModal(inter))
+
+        class _8BallFollowModal(discord.ui.Modal, title="🎱 Magic 8-Ball"):
+            def __init__(self, orig: discord.Interaction):
+                super().__init__()
+                self._orig = orig
+                self.question_input = discord.ui.TextInput(
+                    label="Your question", placeholder="Will I pass my exam?", max_length=200
+                )
+                self.add_item(self.question_input)
+
+            async def on_submit(self, inter: discord.Interaction):
+                ans = random.choice(responses)
+                em = discord.Embed(
+                    title="🎱 Magic 8-Ball",
+                    description=f"**Q:** {self.question_input.value.strip()}\n\n**A:** {ans}",
+                    color=discord.Color.dark_gray(),
+                )
+                await inter.response.send_message(embed=em, view=AskAgainView())
+
+        await interaction.response.send_message(embed=embed, view=AskAgainView())
+
+    @app_commands.command(name="tarot", description="Draw 3 tarot cards for a past/present/future reading")
+    async def tarot_slash(self, interaction: discord.Interaction):
+        cards = [
+            ("0 — The Fool", "🌬️", "New beginnings, innocence, spontaneity."),
+            ("I — The Magician", "✨", "Manifestation, resourcefulness, power."),
+            ("II — The High Priestess", "🌙", "Intuition, sacred knowledge, the subconscious."),
+            ("III — The Empress", "🌿", "Femininity, beauty, nurturing, abundance."),
+            ("IV — The Emperor", "🏰", "Authority, establishment, structure."),
+            ("V — The Hierophant", "⛪", "Spiritual wisdom, tradition, conformity."),
+            ("VI — The Lovers", "💞", "Love, harmony, relationships, choices."),
+            ("VII — The Chariot", "⚔️", "Control, willpower, success, determination."),
+            ("VIII — Strength", "🦁", "Strength, courage, compassion."),
+            ("IX — The Hermit", "🕯️", "Soul-searching, introspection, inner guidance."),
+            ("X — Wheel of Fortune", "☸️", "Good luck, karma, destiny, a turning point."),
+            ("XI — Justice", "⚖️", "Justice, fairness, truth, cause and effect."),
+            ("XII — The Hanged Man", "🌀", "Pause, surrender, new perspectives."),
+            ("XIII — Death", "🌑", "Endings, change, transformation, transition."),
+            ("XIV — Temperance", "🌊", "Balance, moderation, patience, purpose."),
+            ("XVI — The Tower", "⚡", "Sudden change, upheaval, revelation."),
+            ("XVII — The Star", "⭐", "Hope, faith, renewal, spirituality."),
+            ("XVIII — The Moon", "🌛", "Illusion, fear, intuition, the unconscious."),
+            ("XIX — The Sun", "☀️", "Positivity, warmth, success, vitality."),
+            ("XXI — The World", "🌍", "Completion, accomplishment, travel."),
+            ("Ace of Wands", "🔥", "Inspiration, new opportunities, growth."),
+            ("Two of Wands", "🌟", "Planning, decisions, discovery."),
+            ("Three of Wands", "🚢", "Progress, expansion, foresight."),
+            ("Four of Wands", "🏡", "Celebration, harmony, home, community."),
+            ("Five of Wands", "⚔️", "Conflict, competition, tension."),
+            ("Six of Wands", "🏆", "Victory, success, public recognition."),
+            ("Seven of Wands", "🛡️", "Challenge, competition, perseverance."),
+            ("Eight of Wands", "💨", "Movement, fast-paced change, action."),
+            ("Nine of Wands", "🧱", "Resilience, courage, persistence."),
+            ("Ten of Wands", "🌪️", "Burden, responsibility, hard work."),
+            ("Page of Wands", "📜", "Exploration, excitement, freedom."),
+            ("Knight of Wands", "🏇", "Energy, passion, adventure."),
+            ("King of Wands", "👑", "Natural leader, vision, entrepreneur."),
+            ("Queen of Wands", "🌻", "Courage, confidence, independence."),
+            ("Ace of Cups", "💧", "Love, new relationships, compassion."),
+            ("Two of Cups", "💕", "Unified love, partnership, mutual attraction."),
+            ("Three of Cups", "🥂", "Celebration, friendship, creativity."),
+            ("Four of Cups", "☁️", "Apathy, contemplation, disconnectedness."),
+            ("Five of Cups", "😢", "Loss, regret, disappointment, despair."),
+            ("Six of Cups", "🌸", "Reunion, nostalgia, childhood memories."),
+            ("Seven of Cups", "🍭", "Opportunities, choices, wishful thinking."),
+            ("Eight of Cups", "🚶", "Disappointment, abandonment, withdrawal."),
+            ("Nine of Cups", "🍷", "Contentment, satisfaction, gratitude."),
+            ("Ten of Cups", "🌈", "Divine love, blissful relationships, harmony."),
+            ("Page of Cups", "📖", "Creative opportunities, curiosity, possibility."),
+            ("Knight of Cups", "🏹", "Romance, charm, 'knight in shining armor'."),
+            ("Queen of Cups", "🌊", "Emotional balance, intuition, compassion."),
+            ("King of Cups", "🌊", "Emotional balance, generosity, compassion."),
+            ("Ace of Swords", "⚔️", "Breakthroughs, new ideas, mental clarity."),
+            ("Two of Swords", "⚔️", "Difficult decisions, weighing options, stalemate."),
+            ("Three of Swords", "💔", "Heartbreak, emotional pain, sorrow."),
+            ("Four of Swords", "🛌", "Rest, recovery, contemplation."),
+            ("Five of Swords", "⚔️", "Conflict, tension, loss, defeat."),
+            ("Six of Swords", "🛶", "Transition, change, rite of passage."),
+            ("Seven of Swords", "🗡️", "Deception, trickery, strategy, tactics."),
+            ("Eight of Swords", "🔒", "Imprisonment, entrapment, self-victimization."),
+            ("Nine of Swords", "😱", "Anxiety, worry, fear, nightmares."),
+            ("Ten of Swords", "⚔️", "Betrayal, backstabbing, defeat, crisis."),
+            ("Page of Swords", "📜", "New ideas, curiosity, thirst for knowledge."),
+            ("Knight of Swords", "🏇", "Action, impulsiveness, defending beliefs."),
+            ("King of Swords", "👑", "Mental clarity, intellectual power, authority."),
+            ("Queen of Swords", "🗡️", "Clarity, truth, directness, independence."),
+            ("Ace of Pentacles", "🪙", "New beginnings, prosperity, opportunity."),
+            ("Two of Pentacles", "⚖️", "Balance, adaptability, time management."),
+            ("Three of Pentacles", "🔨", "Collaboration, skill, teamwork."),
+            ("Four of Pentacles", "💰", "Control, stability, security."),
+            ("Five of Pentacles", "❄️", "Hardship, financial loss, isolation."),
+            ("Six of Pentacles", "⚖️", "Generosity, charity, giving and receiving."),
+            ("Seven of Pentacles", "🌱", "Patience, assessment, long-term view."),
+            ("Eight of Pentacles", "🔨", "Apprenticeship, mastery, skill."),
+            ("Nine of Pentacles", "🌿", "Luxury, self-sufficiency, financial gain."),
+            ("Ten of Pentacles", "🏰", "Wealth, inheritance, family legacy."),
+            ("Page of Pentacles", "📜", "New opportunities, study, manifestation."),
+            ("Knight of Pentacles", "🪙", "Hard work, routine, dependability."),
+            ("Queen of Pentacles", "👑", "Nurturing, practicality, financial security."),
+            ("King of Pentacles", "👑", "Wealth, stability, leadership."),
+        ]
+        drawn = random.sample(cards, 3)
+        past, present, future = drawn
+        embed = discord.Embed(
+            title="🔮 Tarot Reading — Past · Present · Future",
+            description=(
+                f"**🕰️ Past** — {past[1]} **{past[0]}**\n*{past[2]}*\n\n"
+                f"**⚡ Present** — {present[1]} **{present[0]}**\n*{present[2]}*\n\n"
+                f"**🌟 Future** — {future[1]} **{future[0]}**\n*{future[2]}*"
+            ),
+            color=discord.Color.dark_purple(),
+        )
+        await interaction.response.send_message(embed=embed)
+
+
 async def setup(bot):
     await bot.add_cog(Fun(bot))

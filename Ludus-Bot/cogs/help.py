@@ -63,18 +63,7 @@ class Help(commands.Cog):
                 "key": "mini",
                 "desc": "Quick games and challenges",
                 "commands": [
-                    ("wordle", "5-letter word puzzle (50-200 coins)"),
-                    ("riddle", "Brain-teasing riddles"),
-                    ("typerace", "Speed typing (WPM rewards)"),
-                    ("gtn", "Guess the Number (50-150 coins)"),
-                    ("/trivia", "Trivia questions (50-150 coins)"),
-                    ("/memory", "Memory pattern game"),
-                    ("tod <choice>", "Truth or Dare"),
-                    ("rps <choice>", "Rock Paper Scissors"),
-                    ("coinflip", "Flip a coin"),
-                    ("roll [sides]", "Roll dice (d6-d25)"),
-                    ("8ball <question>", "Magic 8-ball"),
-                    ("tarot", "Tarot card reading"),
+                    ("/minigames", "Panel of all minigames"),
                 ]
             },
             "🧩 Puzzle Games": {
@@ -190,6 +179,8 @@ class Help(commands.Cog):
                     ("panda", "Panda images"),
                     ("gif <search>", "Search GIFs"),
                     ("poll <question>", "Create poll"),
+                    ("8ball <question>", "Magic 8-ball"),
+                    ("tarot", "Tarot card reading"),
                 ]
             },
             "⚙️ Utility": {
@@ -406,93 +397,6 @@ class Help(commands.Cog):
                 await ctx.send(msg)
             return
         
-        # Special-case the minigames category: list all registered minigame
-        # prefix commands dynamically (these are created by the Minigames cog).
-        if category_data.get('key') == 'mini':
-            # collect commands from the Minigames cog directly (robust)
-            mg_cog = self.bot.get_cog('Minigames')
-            entries = []
-            if mg_cog:
-                cmds = [c for c in mg_cog.get_commands() if isinstance(c, commands.Command)]
-                # exclude the gamelist helper command (may be renamed on collisions)
-                cmds = [c for c in cmds if 'gamelist' not in c.name]
-                if cmds:
-                    entries = [(f"L!{c.name}", c.help or "-") for c in sorted(cmds, key=lambda x: x.name)]
-                else:
-                    # fallback to any pre-recorded registered list on the cog
-                    reg = getattr(mg_cog, '_registered_games', None)
-                    if reg:
-                        entries = list(reg)
-            else:
-                # last-resort: scan bot.commands for anything tagged with the Minigames cog
-                cmds = [c for c in self.bot.commands if getattr(c, 'cog_name', None) == 'Minigames' and isinstance(c, commands.Command)]
-                cmds = [c for c in cmds if 'gamelist' not in c.name]
-                if cmds:
-                    entries = [(f"L!{c.name}", c.help or "-") for c in sorted(cmds, key=lambda x: x.name)]
-
-            if not entries:
-                msg = "No minigames available."
-                if is_slash:
-                    await ctx.response.send_message(msg, ephemeral=True)
-                else:
-                    await ctx.send(msg)
-                return
-            per_page = 10
-            pages = [entries[i:i+per_page] for i in range(0, len(entries), per_page)]
-
-            def make_embed(page_index: int):
-                page = pages[page_index]
-                desc_text = category_data.get('desc', '')
-                if desc_text:
-                    desc_text += "\n\n"
-                desc_text += "🔘 Use the interactive buttons below to navigate!"
-                embed = discord.Embed(title=f"🎮 Minigames (page {page_index+1}/{len(pages)})",
-                                      description=desc_text,
-                                      color=discord.Color.blue())
-                for name_, brief in page:
-                    embed.add_field(name=name_, value=brief, inline=False)
-                embed.set_footer(text="💡 Buttons are fully functional - click to interact! Prefix: L! or /")
-                return embed
-
-            class MiniPaginator(discord.ui.View):
-                def __init__(self, author, timeout: int = 120):
-                    super().__init__(timeout=timeout)
-                    self.page = 0
-                    self.author = author
-
-                async def interaction_check(self, interaction: discord.Interaction) -> bool:
-                    return interaction.user.id == self.author.id
-
-                @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
-                async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
-                    if self.page > 0:
-                        self.page -= 1
-                        await interaction.response.edit_message(embed=make_embed(self.page), view=self)
-                    else:
-                        await interaction.response.defer()
-
-                @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
-                async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
-                    if self.page < len(pages) - 1:
-                        self.page += 1
-                        await interaction.response.edit_message(embed=make_embed(self.page), view=self)
-                    else:
-                        await interaction.response.defer()
-
-                @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
-                async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
-                    try:
-                        await interaction.message.delete()
-                    except Exception:
-                        await interaction.response.defer()
-
-            view = MiniPaginator(ctx.user if is_slash else ctx.author)
-            if is_slash:
-                await ctx.response.send_message(embed=make_embed(0), view=view)
-            else:
-                await ctx.send(embed=make_embed(0), view=view)
-            return
-
         # Create embed for normal categories
         embed = discord.Embed(
             title=f"{category_name} Commands",

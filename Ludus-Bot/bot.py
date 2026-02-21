@@ -512,7 +512,7 @@ async def on_ready():
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
     # Do NOT include entry point commands (like 'start') in DEV_ONLY_COMMANDS!
-    DEV_ONLY_COMMANDS = []  # Only non-entry-point commands for dev guild testing
+    DEV_ONLY_COMMANDS = ['minigames']  # Only non-entry-point commands for dev guild testing
 
     try:
         import os

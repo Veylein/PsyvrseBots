@@ -669,7 +669,7 @@ class ProfileView(discord.ui.LayoutView):
         return f"""# 🎮 {self.user.display_name}'s Gaming Stats
 
 ## 🎮 Minigames
-**Total:** W {mg_w} / L {mg_p - mg_w} ({wr(mg_w, mg_p)})
+**Total:** {mg_p}
 **Wordle:** W {wrd_w} correct out of {wrd_w + wrd_l} ({wr(wrd_w, wrd_w + wrd_l)})
 **Trivia:** {trv_w} correct out of {trv_w + trv_l} ({wr(trv_w, trv_w + trv_l)})
 **Riddles:** {p.get('riddles_solved', 0)} solved

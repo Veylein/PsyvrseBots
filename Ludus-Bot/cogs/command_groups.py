@@ -175,39 +175,6 @@ class GamblingView(View):
         await interaction.followup.send(f"Playing crash! Use `L!crash <amount>` to gamble!")
         self.stop()
 
-class PuzzleView(View):
-    def __init__(self, ctx, bot):
-        super().__init__(timeout=60)
-        self.ctx = ctx
-        self.bot = bot
-        
-    @discord.ui.button(label="Wordle", style=discord.ButtonStyle.primary, emoji="📝")
-    async def wordle_button(self, interaction: discord.Interaction, button: Button):
-        if interaction.user != self.ctx.user:
-            await interaction.response.send_message("This menu isn't for you!", ephemeral=True)
-            return
-        await interaction.response.defer()
-        await interaction.followup.send(f"Starting Wordle! Use `L!wordle` to play!")
-        self.stop()
-    
-    @discord.ui.button(label="Riddles", style=discord.ButtonStyle.primary, emoji="🧩")
-    async def riddle_button(self, interaction: discord.Interaction, button: Button):
-        if interaction.user != self.ctx.user:
-            await interaction.response.send_message("This menu isn't for you!", ephemeral=True)
-            return
-        await interaction.response.defer()
-        await interaction.followup.send(f"Starting riddle game! Use `L!riddle` to play!")
-        self.stop()
-    
-    @discord.ui.button(label="Anagrams", style=discord.ButtonStyle.primary, emoji="🔤")
-    async def anagram_button(self, interaction: discord.Interaction, button: Button):
-        if interaction.user != self.ctx.user:
-            await interaction.response.send_message("This menu isn't for you!", ephemeral=True)
-            return
-        await interaction.response.defer()
-        await interaction.followup.send(f"Starting anagram game! Use `L!anagram` to play!")
-        self.stop()
-
 class FunView(View):
     def __init__(self, ctx, bot):
         super().__init__(timeout=60)
@@ -413,19 +380,6 @@ class CommandGroups(commands.Cog):
         view = GamblingView(interaction, self.bot)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
-    @app_commands.command(name="puzzle", description="Play brain-teasing puzzle games!")
-    async def puzzle_slash(self, interaction: discord.Interaction):
-        embed = EmbedBuilder.create(
-            title=f"{Emojis.TROPHY} Puzzle Games Menu",
-            description="Challenge your brain!\n\n"
-                       "🧩 **Games:**\n"
-                       "📝 Wordle - Guess the word\n"
-                       "🧩 Riddles - Solve riddles\n"
-                       "🔤 Anagrams - Unscramble letters",
-            color=Colors.PRIMARY
-        )
-        view = PuzzleView(interaction, self.bot)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
     @app_commands.command(name="fun", description="Enjoy fun and entertaining commands!")
     async def fun_slash(self, interaction: discord.Interaction):

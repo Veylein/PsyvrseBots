@@ -393,19 +393,6 @@ class MinesweeperView(discord.ui.LayoutView):
 
 class PuzzleGames(commands.Cog):
     """Puzzle and mystery games"""
-
-    @app_commands.command(name="puzzleshelp", description="View all puzzle game commands and info (paginated)")
-    async def puzzleshelp_slash(self, interaction: discord.Interaction):
-        commands_list = []
-        for cmd in self.get_commands():
-            if not cmd.hidden:
-                name = f"/{cmd.name}" if hasattr(cmd, 'app_command') else f"L!{cmd.name}"
-                desc = cmd.help or cmd.short_doc or "No description."
-                commands_list.append((name, desc))
-        category_name = "Puzzles"
-        category_desc = "Solve challenging puzzles! Use the buttons below to see all commands."
-        view = PaginatedHelpView(interaction, commands_list, category_name, category_desc)
-        await view.send()
     
     def __init__(self, bot):
         self.bot = bot
