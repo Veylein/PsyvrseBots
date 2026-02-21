@@ -1197,6 +1197,478 @@ async def serverconfig(interaction: discord.Interaction) -> None:
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
+@bot.command(name="setlog")
+@commands.has_permissions(manage_guild=True)
+async def prefix_setlog(ctx: commands.Context, channel: discord.TextChannel) -> None:
+    cfg = store.guild(ctx.guild.id)
+    cfg["log_channel_id"] = channel.id
+    store.save()
+    await ctx.send(f"Log channel set to {channel.mention}.")
+
+
+@bot.command(name="setwelcome")
+@commands.has_permissions(manage_guild=True)
+async def prefix_setwelcome(ctx: commands.Context, channel: discord.TextChannel) -> None:
+    cfg = store.guild(ctx.guild.id)
+    cfg["welcome_channel_id"] = channel.id
+    store.save()
+    await ctx.send(f"Welcome channel set to {channel.mention}.")
+
+
+@bot.command(name="setgoodbye")
+@commands.has_permissions(manage_guild=True)
+async def prefix_setgoodbye(ctx: commands.Context, channel: discord.TextChannel) -> None:
+    cfg = store.guild(ctx.guild.id)
+    cfg["goodbye_channel_id"] = channel.id
+    store.save()
+    await ctx.send(f"Goodbye channel set to {channel.mention}.")
+
+
+@bot.command(name="setwelcomemsg")
+@commands.has_permissions(manage_guild=True)
+async def prefix_setwelcomemsg(ctx: commands.Context, *, message: str) -> None:
+    cfg = store.guild(ctx.guild.id)
+    cfg["welcome_message"] = message
+    store.save()
+    await ctx.send("Welcome message template updated.")
+
+
+@bot.command(name="setgoodbyemsg")
+@commands.has_permissions(manage_guild=True)
+async def prefix_setgoodbyemsg(ctx: commands.Context, *, message: str) -> None:
+    cfg = store.guild(ctx.guild.id)
+    cfg["goodbye_message"] = message
+    store.save()
+    await ctx.send("Goodbye message template updated.")
+
+
+@bot.command(name="setticketcategory")
+@commands.has_permissions(manage_channels=True)
+async def prefix_setticketcategory(
+    ctx: commands.Context,
+    category: Optional[discord.CategoryChannel] = None,
+) -> None:
+    cfg = store.guild(ctx.guild.id)
+    cfg["ticket_category_id"] = category.id if category else None
+    store.save()
+    if category:
+        await ctx.send(f"Ticket category set to **{category.name}**.")
+    else:
+        await ctx.send("Ticket category cleared.")
+
+
+@bot.command(name="setticketstaff")
+@commands.has_permissions(manage_channels=True)
+async def prefix_setticketstaff(
+    ctx: commands.Context,
+    role: Optional[discord.Role] = None,
+) -> None:
+    cfg = store.guild(ctx.guild.id)
+    cfg["ticket_staff_role_id"] = role.id if role else None
+    store.save()
+    if role:
+        await ctx.send(f"Ticket staff role set to {role.mention}.")
+    else:
+        await ctx.send("Ticket staff role cleared.")
+
+
+@bot.command(name="ticketpanel")
+@commands.has_permissions(manage_channels=True)
+async def prefix_ticketpanel(
+    ctx: commands.Context,
+    channel: discord.TextChannel,
+    *,
+    message: str = "Need help? Click the button below to open a private ticket.",
+) -> None:
+    embed = discord.Embed(
+        title="Support Tickets",
+        description=message,
+        color=discord.Color.blurple(),
+    )
+    await channel.send(embed=embed, view=TicketPanelView())
+    await ctx.send(f"Ticket panel sent in {channel.mention}.")
+    await send_log(
+        ctx.guild,
+        "Ticket Panel Posted",
+        f"{ctx.author.mention} posted a ticket panel in {channel.mention}.",
+        discord.Color.blurple(),
+    )
+
+
+@bot.command(name="close_ticket")
+async def prefix_close_ticket(ctx: commands.Context, *, reason: str = "Closed by command") -> None:
+    guild = ctx.guild
+    if guild is None or not isinstance(ctx.channel, discord.TextChannel):
+        await ctx.send("This action can only be used in a ticket channel.")
+        return
+
+    ticket = store.get_ticket(guild.id, ctx.channel.id)
+    if ticket is None:
+        await ctx.send("This channel is not an open ticket.")
+        return
+
+    member = ctx.author
+    cfg = store.guild(guild.id)
+    owner_id = int(ticket.get("owner_id", 0))
+    staff_role_id = cfg.get("ticket_staff_role_id")
+    can_close = (
+        member.id == owner_id
+        or member.guild_permissions.manage_channels
+        or has_role(member, staff_role_id)
+    )
+
+    if not can_close:
+        await ctx.send("Only the ticket owner or staff can close this ticket.")
+        return
+
+    store.close_ticket(guild.id, ctx.channel.id)
+    await ctx.send("Closing ticket in 3 seconds...")
+    await send_log(
+        guild,
+        "Ticket Closed",
+        f"{member.mention} closed {ctx.channel.mention}. Reason: {reason}",
+        discord.Color.orange(),
+    )
+    await asyncio.sleep(3)
+    try:
+        await ctx.channel.delete(reason=f"Ticket closed by {member} ({member.id})")
+    except discord.HTTPException:
+        pass
+
+
+@bot.command(name="modhelp")
+@commands.has_permissions(moderate_members=True)
+async def prefix_modhelp(ctx: commands.Context) -> None:
+    embed = discord.Embed(
+        title="Moderation Commands (Prefix)",
+        description=f"Prefix: `{PREFIX}`",
+        color=discord.Color.blurple(),
+        timestamp=discord.utils.utcnow()
+    )
+    lines = [
+        f"`{PREFIX}ban <user> [reason]` - Ban a user",
+        f"`{PREFIX}kick <user> [reason]` - Kick a user",
+        f"`{PREFIX}warn <user> [reason]` - Warn a user",
+        f"`{PREFIX}warns <user>` - Check warnings",
+        f"`{PREFIX}removewarn <user> <warn_id>` - Remove a warning",
+        f"`{PREFIX}clearwarns <user>` - Clear all warnings",
+        f"`{PREFIX}mute <user> <duration> [reason]` - Timeout a user",
+        f"`{PREFIX}unmute <user> [reason]` - Remove timeout",
+        f"`{PREFIX}unban <user_id> [reason]` - Unban a user",
+        f"`{PREFIX}purge <amount> [user]` - Delete messages",
+        f"`{PREFIX}say <message>` - Bot says something",
+        f"`{PREFIX}embed <title>|<desc>|[#color]` - Bot sends embed",
+        f"`{PREFIX}setlog <channel>` - Set log channel",
+        f"`{PREFIX}setwelcome <channel>` - Set welcome channel",
+        f"`{PREFIX}setgoodbye <channel>` - Set goodbye channel",
+        f"`{PREFIX}setwelcomemsg <msg>` - Set welcome message",
+        f"`{PREFIX}setgoodbyemsg <msg>` - Set goodbye message",
+        f"`{PREFIX}setticketcategory [cat]` - Set ticket category",
+        f"`{PREFIX}setticketstaff [role]` - Set ticket staff",
+        f"`{PREFIX}ticketpanel <channel> [msg]` - Post ticket panel",
+        f"`{PREFIX}close_ticket [reason]` - Close ticket",
+    ]
+    embed.add_field(name="Commands", value="\n".join(lines), inline=False)
+    await ctx.send(embed=embed)
+
+
+@bot.command(name="ban")
+@commands.has_permissions(ban_members=True)
+async def prefix_ban(ctx: commands.Context, user: discord.Member, *, reason: str = None) -> None:
+    allowed, message = can_target(ctx.author, user, ctx.guild.me)
+    if not allowed:
+        await ctx.send(message)
+        return
+
+    reason_text = reason or "No reason provided."
+    try:
+        await user.ban(reason=f"{reason_text} | by {ctx.author} ({ctx.author.id})")
+    except discord.Forbidden:
+        await ctx.send("I do not have permission to ban that user.")
+        return
+    except discord.HTTPException as exc:
+        await ctx.send(f"Ban failed: {exc}")
+        return
+
+    await ctx.send(f"Banned **{user}**. Reason: {reason_text}")
+    await send_log(
+        ctx.guild,
+        "Member Banned",
+        f"{ctx.author.mention} banned **{user}** (`{user.id}`). Reason: {reason_text}",
+        discord.Color.red(),
+    )
+
+
+@bot.command(name="kick")
+@commands.has_permissions(kick_members=True)
+async def prefix_kick(ctx: commands.Context, user: discord.Member, *, reason: str = None) -> None:
+    allowed, message = can_target(ctx.author, user, ctx.guild.me)
+    if not allowed:
+        await ctx.send(message)
+        return
+
+    reason_text = reason or "No reason provided."
+    try:
+        await user.kick(reason=f"{reason_text} | by {ctx.author} ({ctx.author.id})")
+    except discord.Forbidden:
+        await ctx.send("I do not have permission to kick that user.")
+        return
+    except discord.HTTPException as exc:
+        await ctx.send(f"Kick failed: {exc}")
+        return
+
+    await ctx.send(f"Kicked **{user}**. Reason: {reason_text}")
+    await send_log(
+        ctx.guild,
+        "Member Kicked",
+        f"{ctx.author.mention} kicked **{user}** (`{user.id}`). Reason: {reason_text}",
+        discord.Color.orange(),
+    )
+
+
+@bot.command(name="warn")
+@commands.has_permissions(moderate_members=True)
+async def prefix_warn(ctx: commands.Context, user: discord.Member, *, reason: str = None) -> None:
+    allowed, message = can_target(ctx.author, user, ctx.guild.me)
+    if not allowed:
+        await ctx.send(message)
+        return
+
+    reason_text = reason or "No reason provided."
+    entry = store.add_warn(ctx.guild.id, user.id, ctx.author.id, reason_text)
+
+    try:
+        await user.send(
+            f"You were warned in **{ctx.guild.name}**.\n"
+            f"Reason: {reason_text}\n"
+            f"Warn ID: #{entry['id']}"
+        )
+    except discord.HTTPException:
+        pass
+
+    await ctx.send(f"Warned {user.mention}. Warn ID: **#{entry['id']}**. Reason: {reason_text}")
+    await send_log(
+        ctx.guild,
+        "Member Warned",
+        f"{ctx.author.mention} warned {user.mention} (`{user.id}`) as #{entry['id']}. Reason: {reason_text}",
+        discord.Color.gold(),
+    )
+
+
+@bot.command(name="warns")
+@commands.has_permissions(moderate_members=True)
+async def prefix_warns(ctx: commands.Context, user: discord.Member) -> None:
+    entries = store.get_warns(ctx.guild.id, user.id)
+    if not entries:
+        await ctx.send(f"{user.mention} has no warnings.")
+        return
+
+    embed = discord.Embed(
+        title=f"Warnings for {user}",
+        color=discord.Color.gold(),
+        timestamp=discord.utils.utcnow(),
+    )
+    lines = []
+    for item in entries[-10:]:
+        stamp = iso_to_unix(item.get("created_at"))
+        when = f"<t:{stamp}:R>" if stamp else "unknown time"
+        reason = truncate(item.get("reason", "No reason."), 120)
+        lines.append(
+            f"`#{item.get('id', '?')}` - {reason} | mod <@{item.get('moderator_id')}> | {when}"
+        )
+
+    embed.description = "\n".join(lines)
+    if len(entries) > 10:
+        embed.set_footer(text=f"Showing newest 10 of {len(entries)} warnings.")
+
+    await ctx.send(embed=embed)
+
+
+@bot.command(name="removewarn")
+@commands.has_permissions(moderate_members=True)
+async def prefix_removewarn(ctx: commands.Context, user: discord.Member, warn_id: int) -> None:
+    removed = store.remove_warn(ctx.guild.id, user.id, warn_id)
+    if removed is None:
+        await ctx.send(f"No warning #{warn_id} found for {user.mention}.")
+        return
+
+    await ctx.send(f"Removed warning #{warn_id} from {user.mention}.")
+    await send_log(
+        ctx.guild,
+        "Warning Removed",
+        f"{ctx.author.mention} removed warning #{warn_id} from {user.mention}.",
+        discord.Color.orange(),
+    )
+
+
+@bot.command(name="clearwarns")
+@commands.has_permissions(moderate_members=True)
+async def prefix_clearwarns(ctx: commands.Context, user: discord.Member) -> None:
+    count = store.clear_warns(ctx.guild.id, user.id)
+    await ctx.send(f"Removed **{count}** warning(s) from {user.mention}.")
+    await send_log(
+        ctx.guild,
+        "Warnings Cleared",
+        f"{ctx.author.mention} cleared {count} warning(s) for {user.mention}.",
+        discord.Color.orange(),
+    )
+
+
+@bot.command(name="mute")
+@commands.has_permissions(moderate_members=True)
+async def prefix_mute(ctx: commands.Context, user: discord.Member, duration: str, *, reason: str = None) -> None:
+    allowed, message = can_target(ctx.author, user, ctx.guild.me)
+    if not allowed:
+        await ctx.send(message)
+        return
+
+    delta = parse_duration(duration)
+    if delta is None:
+        await ctx.send("Invalid duration. Use values like `15m`, `2h`, `1d`, or `1h30m`.")
+        return
+    if delta > MAX_TIMEOUT:
+        await ctx.send("Mute duration cannot be more than 28 days.")
+        return
+
+    reason_text = reason or "No reason provided."
+    until = discord.utils.utcnow() + delta
+    try:
+        await user.timeout(until, reason=f"{reason_text} | by {ctx.author} ({ctx.author.id})")
+    except discord.Forbidden:
+        await ctx.send("I do not have permission to mute that user.")
+        return
+    except discord.HTTPException as exc:
+        await ctx.send(f"Mute failed: {exc}")
+        return
+
+    await ctx.send(f"Muted {user.mention} until <t:{int(until.timestamp())}:F>. Reason: {reason_text}")
+    await send_log(
+        ctx.guild,
+        "Member Muted",
+        (
+            f"{ctx.author.mention} muted {user.mention} (`{user.id}`) for `{duration}` "
+            f"(until <t:{int(until.timestamp())}:F>). Reason: {reason_text}"
+        ),
+        discord.Color.orange(),
+    )
+
+
+@bot.command(name="unmute")
+@commands.has_permissions(moderate_members=True)
+async def prefix_unmute(ctx: commands.Context, user: discord.Member, *, reason: str = None) -> None:
+    allowed, message = can_target(ctx.author, user, ctx.guild.me)
+    if not allowed:
+        await ctx.send(message)
+        return
+
+    reason_text = reason or "No reason provided."
+    try:
+        await user.timeout(None, reason=f"{reason_text} | by {ctx.author} ({ctx.author.id})")
+    except discord.Forbidden:
+        await ctx.send("I do not have permission to unmute that user.")
+        return
+    except discord.HTTPException as exc:
+        await ctx.send(f"Unmute failed: {exc}")
+        return
+
+    await ctx.send(f"Unmuted {user.mention}. Reason: {reason_text}")
+    await send_log(
+        ctx.guild,
+        "Member Unmuted",
+        f"{ctx.author.mention} unmuted {user.mention} (`{user.id}`). Reason: {reason_text}",
+        discord.Color.green(),
+    )
+
+
+@bot.command(name="unban")
+@commands.has_permissions(ban_members=True)
+async def prefix_unban(ctx: commands.Context, user_id: str, *, reason: str = None) -> None:
+    if not user_id.isdigit():
+        await ctx.send("User ID must be numeric.")
+        return
+
+    target_id = int(user_id)
+    try:
+        target_user = await bot.fetch_user(target_id)
+    except discord.HTTPException:
+        await ctx.send("Could not find that user.")
+        return
+
+    reason_text = reason or "No reason provided."
+    try:
+        await ctx.guild.unban(
+            target_user,
+            reason=f"{reason_text} | by {ctx.author} ({ctx.author.id})",
+        )
+    except discord.NotFound:
+        await ctx.send("That user is not currently banned.")
+        return
+    except discord.Forbidden:
+        await ctx.send("I do not have permission to unban users.")
+        return
+    except discord.HTTPException as exc:
+        await ctx.send(f"Unban failed: {exc}")
+        return
+
+    await ctx.send(f"Unbanned **{target_user}**. Reason: {reason_text}")
+    await send_log(
+        ctx.guild,
+        "Member Unbanned",
+        f"{ctx.author.mention} unbanned **{target_user}** (`{target_user.id}`). Reason: {reason_text}",
+        discord.Color.green(),
+    )
+
+
+@bot.command(name="purge")
+@commands.has_permissions(manage_messages=True)
+async def prefix_purge(ctx: commands.Context, amount: int, user: Optional[discord.Member] = None) -> None:
+    if not isinstance(ctx.channel, (discord.TextChannel, discord.Thread)):
+        await ctx.send("This command only works in text channels.")
+        return
+
+    if amount < 1:
+        await ctx.send("Amount must be at least 1.")
+        return
+    
+    try:
+        await ctx.message.delete()
+    except:
+        pass
+
+    def check(message: discord.Message) -> bool:
+        return user is None or message.author.id == user.id
+
+    try:
+        deleted = await ctx.channel.purge(
+            limit=amount,
+            check=check,
+            reason=f"Purge by {ctx.author} ({ctx.author.id})",
+        )
+    except discord.Forbidden:
+        await ctx.send("I do not have permission to delete messages.")
+        return
+    except discord.HTTPException as exc:
+        await ctx.send(f"Purge failed: {exc}")
+        return
+    
+    target_note = f" for {user.mention}" if user else ""
+    msg = await ctx.send(f"Deleted {len(deleted)} message(s){target_note}.")
+    try:
+        await msg.delete(delay=5)
+    except:
+        pass
+
+    await send_log(
+        ctx.guild,
+        "Messages Purged",
+        (
+            f"{ctx.author.mention} purged {len(deleted)} message(s){target_note} "
+            f"in {ctx.channel.mention}."
+        ),
+        discord.Color.orange(),
+    )
+
+
 @bot.command(name="say")
 @commands.has_permissions(manage_messages=True)
 async def prefix_say(ctx: commands.Context, *, message: str) -> None:
