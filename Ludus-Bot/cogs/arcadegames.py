@@ -388,7 +388,6 @@ class ArcadeGames(commands.Cog):
     @app_commands.command(name="arcade", description="Arcade games")
     @app_commands.choices(game=[
         app_commands.Choice(name="👻 PacMan", value="pacman"),
-        app_commands.Choice(name="🧮 Math Game", value="mathgame"),
         app_commands.Choice(name="💣 Bomb Defuse", value="bombdefuse"),
         app_commands.Choice(name="🐍 Snake", value="snake"),
         app_commands.Choice(name="🧱 Tetris", value="tetris"),
@@ -401,8 +400,6 @@ class ArcadeGames(commands.Cog):
         
         if game_value == "pacman":
             await self.arcade_pacman_action(interaction)
-        elif game_value == "mathgame":
-            await self.arcade_mathgame_action(interaction)
         elif game_value == "bombdefuse":
             await self.arcade_bombdefuse_action(interaction)
         elif game_value == "snake":
@@ -424,105 +421,6 @@ class ArcadeGames(commands.Cog):
         if _arc_inc:
             try:
                 _arc_inc(interaction.user.id, 'arcade_played')
-            except Exception:
-                pass
-    
-    @app_commands.describe(difficulty="Easy, Medium, or Hard")
-    async def arcade_mathgame_action(self, interaction: discord.Interaction, difficulty: str = "medium"):
-        """Math game challenges"""
-        difficulties = {
-            "easy": (1, 20, ["+", "-"], 10),
-            "medium": (10, 100, ["+", "-", "*"], 15),
-            "hard": (20, 200, ["+", "-", "*", "//"], 20)
-        }
-        
-        if difficulty.lower() not in difficulties:
-            await interaction.response.send_message("❌ Choose: easy, medium, or hard", ephemeral=True)
-            return
-        
-        min_val, max_val, operations, num_questions = difficulties[difficulty.lower()]
-        
-        score = 0
-        start_time = time.time()
-        
-        embed = discord.Embed(
-            title="🧮 Math Game",
-            description=f"**{num_questions} questions** | {difficulty.title()} difficulty\n\nGet ready!",
-            color=discord.Color.blue()
-        )
-        await interaction.response.send_message(embed=embed)
-        await asyncio.sleep(2)
-        
-        for i in range(num_questions):
-            a = random.randint(min_val, max_val)
-            b = random.randint(min_val, max_val)
-            op = random.choice(operations)
-            
-            if op == "+":
-                answer = a + b
-                question = f"{a} + {b}"
-            elif op == "-":
-                answer = a - b
-                question = f"{a} - {b}"
-            elif op == "*":
-                answer = a * b
-                question = f"{a} × {b}"
-            else:  # //
-                b = max(1, b)  # Avoid division by zero
-                answer = a // b
-                question = f"{a} ÷ {b}"
-            
-            embed = discord.Embed(
-                title=f"🧮 Question {i + 1}/{num_questions}",
-                description=f"**{question} = ?**\n\nType your answer!",
-                color=discord.Color.green()
-            )
-            await interaction.edit_original_response(embed=embed)
-            
-            def check(m):
-                return m.author.id == interaction.user.id and m.channel.id == interaction.channel.id
-            
-            try:
-                msg = await self.bot.wait_for('message', check=check, timeout=15.0)
-                
-                try:
-                    user_answer = int(msg.content)
-                    if user_answer == answer:
-                        score += 10
-                        await msg.add_reaction("✅")
-                    else:
-                        await msg.add_reaction("❌")
-                        await msg.reply(f"Correct answer: {answer}")
-                except ValueError:
-                    await msg.add_reaction("❌")
-                    
-            except asyncio.TimeoutError:
-                await interaction.followup.send(f"⏰ Time's up! Answer: {answer}")
-        
-        elapsed = time.time() - start_time
-        reward = int(score * (1 + (num_questions * 10 - elapsed) / 100))
-        
-        embed = discord.Embed(
-            title="🎉 Math Game Complete!",
-            description=f"**Score: {score}/{num_questions * 10}**\n"
-                       f"Time: {elapsed:.1f}s\n\n"
-                       f"**+{reward} PsyCoins!** 🪙",
-            color=discord.Color.gold()
-        )
-        await interaction.edit_original_response(embed=embed)
-        if _arc_mg:
-            try:
-                _arc_mg(interaction.user.id, 'mathgame', 'win', reward)
-                _arc_inc(interaction.user.id, 'arcade_wins')
-            except Exception:
-                pass
-        # Chance to award a difficult TCG card for math-game completion
-        if tcg_manager:
-            try:
-                awarded = tcg_manager.award_for_game_event(str(interaction.user.id), 'difficult')
-                if awarded:
-                    names = [CARD_DATABASE.get(c, {}).get('name', c) for c in awarded]
-                    await interaction.followup.send(f"🎴 Bonus TCG reward: {', '.join(names)}")
             except Exception:
                 pass
     
