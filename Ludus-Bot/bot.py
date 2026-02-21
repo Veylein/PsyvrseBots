@@ -512,101 +512,56 @@ async def on_ready():
     
     print("="*50)
     
-  # ===== DEV GUILD COMMAND SYNC SYSTEM =====
-    print("\n" + "="*50)
-    print("🔄 SYNCING SLASH COMMANDS...")
-    print("="*50)
+    # ===== COMMAND SYNC =====
+    DEV_ONLY_COMMANDS = []  # Commands to sync only to dev guild
 
-    # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
-    # All other commands sync globally
-    # Do NOT include entry point commands (like 'start') in DEV_ONLY_COMMANDS!
-    DEV_ONLY_COMMANDS = ['minigames']  # Only non-entry-point commands for dev guild testing
+    print("\n" + "="*50)
+    print("🔄 SYNCING SLASH COMMANDS")
+    print("="*50)
+    print(f"   📋 Commands in tree: {len(bot.tree.get_commands())}")
 
     try:
-        import os
-
         dev_guilds_raw = os.environ.get('DEV_GUILD_IDS') or os.environ.get('DEV_GUILD_ID')
         if dev_guilds_raw:
-            print("🛠️ DEV_GUILD_ID detected - splitting commands")
-            dev_guild_ids = [int(g.strip()) for g in dev_guilds_raw.split(',') if g.strip()]
-            dev_guild_objs = [discord.Object(id=gid) for gid in dev_guild_ids]
+            guild_ids = [g.strip() for g in dev_guilds_raw.split(',') if g.strip()]
+            print(f"   🛠️  Dev guild(s): {', '.join(guild_ids)}")
 
-            # Mark dev-only commands to sync only to provided guild IDs
-            dev_only_roots = {name.lower() for name in DEV_ONLY_COMMANDS}
-            restricted = []
-            skipped_entry_point = []
-            if dev_only_roots:
-                for cmd in bot.tree.get_commands():  # top-level commands only
-                    if cmd.name.lower() in dev_only_roots:
-                        cmd_type = getattr(cmd, "type", None)
-                        is_entry_point = str(cmd_type).lower().endswith("primary_entry_point") or cmd.name.lower() == "start"
-                        if is_entry_point:
-                            skipped_entry_point.append(cmd.name)
-                            continue
-                        cmd._guild_ids = dev_guild_ids  # ensure these stay guild-bound
-                        extras = getattr(cmd, "extras", None)
-                        if extras is None:
-                            cmd.extras = {}
-                            extras = cmd.extras
-                        extras['_dev_only_managed'] = True
-                        restricted.append(cmd.name)
+            dev_commands = {}
+            for cmd_name in DEV_ONLY_COMMANDS:
+                cmd = bot.tree.get_command(cmd_name)
+                if cmd:
+                    dev_commands[cmd_name] = cmd
+                    bot.tree.remove_command(cmd_name)
+            if dev_commands:
+                print(f"   🔒 Guild-only: {', '.join(dev_commands.keys())}")
 
-            if restricted:
-                print(f"🔧 Dev-only commands: {', '.join(sorted(restricted))}")
-            elif DEV_ONLY_COMMANDS:
-                print("ℹ️ No matching commands found for DEV_ONLY_COMMANDS list.")
+            synced_global = await bot.tree.sync()
+            print(f"   🌍 Global: {len(synced_global)} commands synced")
 
-            if skipped_entry_point:
-                print("   Warning: entry point command(s) cannot be dev-only and were left global.")
-                print("   " + ", ".join(sorted(set(skipped_entry_point))))
-
-            print("\n🌍 Syncing global commands (dev-only ones remain guild-scoped)...")
-            try:
-                synced_global = await bot.tree.sync()
-                print(f"   • Synced {len(synced_global)} global commands.")
-            except discord.HTTPException as http_error:
-                if http_error.code == 50240:
-                    print("   ⚠️ Global sync rejected (50240): entry-point command removal is not allowed.")
-                    print("   ⚠️ Keeping entry-point commands global and continuing startup.")
-                    print("   ⚠️ Remove the entry-point command from DEV_ONLY_COMMANDS to avoid this.")
-                else:
-                    raise
-
-            # Sync dev-only commands to each dev guild
-            if restricted:
-                print(f"\n🏰 Syncing dev-only commands to {len(dev_guild_objs)} dev guild(s)...")
-                for guild_obj in dev_guild_objs:
-                    try:
-                        synced_guild = await bot.tree.sync(guild=guild_obj)
-                        print(f"   • Guild {guild_obj.id}: synced {len(synced_guild)} commands.")
-                    except Exception as guild_sync_err:
-                        print(f"   ❌ Guild {guild_obj.id} sync failed: {guild_sync_err}")
+            for dev_gid in guild_ids:
+                guild_obj = discord.Object(id=int(dev_gid))
+                bot.tree.clear_commands(guild=guild_obj)
+                for cmd_name, cmd in dev_commands.items():
+                    bot.tree.add_command(cmd, guild=guild_obj)
+                synced_guild = await bot.tree.sync(guild=guild_obj)
+                print(f"   🏰 Guild {dev_gid}: {len(synced_guild)} commands synced")
         else:
-            # No dev guild, sync all commands globally
-            if DEV_ONLY_COMMANDS:
-                for cmd in bot.tree.get_commands():
-                    if cmd.extras.get('_dev_only_managed'):
-                        cmd._guild_ids = None
-            print("🌍 Syncing all commands globally...")
-            synced_commands = await bot.tree.sync()
-            print(f"   • Synced {len(synced_commands)} commands.")
-
+            synced = await bot.tree.sync()
+            print(f"   🌍 Global: {len(synced)} commands synced")
     except Exception as e:
-        print(f"❌ Error in command sync logic: {e}")
+        print(f"   ❌ Sync error: {e}")
         traceback.print_exc()
-        try:
-            ludus_logging.log_exception(e, message="Failed during command sync")
-        except Exception:
-            pass
 
     print("="*50)
+
+
     
     # Set bot's presence
     try:
         # discord.Game no longer has a 'type' parameter.
-        game = discord.Game(name="L!help")
+        game = discord.Game(name="minigames")
         await bot.change_presence(activity=game)
-        print("✅ Presence updated to 'Playing L!help'")
+        print("✅ Presence updated to 'Playing minigames'")
     except Exception as e:
         print(f"❌ Failed to set presence: {e}")
         traceback.print_exc()
@@ -614,7 +569,6 @@ async def on_ready():
     print("="*50)
     print("✅ All startup tasks complete. Bot is fully operational.")
     print("="*50)
-
 
 
 
