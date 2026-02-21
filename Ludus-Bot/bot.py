@@ -512,7 +512,7 @@ async def on_ready():
     
     print("="*50)
     
- # ===== DEV GUILD COMMAND SYNC SYSTEM =====
+  # ===== DEV GUILD COMMAND SYNC SYSTEM =====
     print("\n" + "="*50)
     print("🔄 SYNCING SLASH COMMANDS...")
     print("="*50)
@@ -563,8 +563,11 @@ async def on_ready():
 
             print("\n🌍 Syncing global commands (dev-only ones remain guild-scoped)...")
             try:
-                synced_global = await bot.tree.sync()
-                print(f"   • Synced {len(synced_global)} global commands.")
+                # copy_global_to avoids the 50240 entry-point removal error
+                for guild_obj in dev_guild_objs:
+                    bot.tree.copy_global_to(guild=guild_obj)
+                    synced_guild = await bot.tree.sync(guild=guild_obj)
+                    print(f"   • Guild {guild_obj.id}: synced {len(synced_guild)} commands.")
             except discord.HTTPException as http_error:
                 if http_error.code == 50240:
                     print("   ⚠️ Global sync rejected (50240): entry-point command removal is not allowed.")
@@ -572,6 +575,17 @@ async def on_ready():
                     print("   ⚠️ Remove the entry-point command from DEV_ONLY_COMMANDS to avoid this.")
                 else:
                     raise
+
+            # Always also sync globally so stale global commands (old names etc.) get removed
+            print("\n🌍 Syncing global command list (removes stale/renamed commands)...")
+            try:
+                synced_global = await bot.tree.sync()
+                print(f"   • Global: synced {len(synced_global)} commands.")
+            except discord.HTTPException as he:
+                if he.code == 50240:
+                    print("   ⚠️ Global sync skipped (50240 — Activity entry-point protected). Stale commands may linger up to 1h.")
+                else:
+                    print(f"   ❌ Global sync failed: {he}")
 
             # Sync dev-only commands to each dev guild
             if restricted:
