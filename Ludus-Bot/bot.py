@@ -338,22 +338,6 @@ async def load_cogs():
             # skip non-py files and plain folders
             continue
 
-        # Skip specific legacy or disabled cogs
-        if cog_name == "music_new":
-            skipped_cogs.append(f"{cog_name} (using music.py instead)")
-            continue
-        if cog_name == "uno_gofish":
-            skipped_cogs.append(f"{cog_name} (legacy - using cardgames.py)")
-            continue
-        if cog_name == "leveling":
-            skipped_cogs.append(f"{cog_name} (disabled - causes issues)")
-            continue
-        if cog_name == "music" and not config.get("music_enabled", True):
-            skipped_cogs.append(f"{cog_name} (disabled in config.json)")
-            continue
-        if cog_name == "tcg":
-            skipped_cogs.append(f"{cog_name} (legacy - conflicts)")
-            continue
 
         try:
             await bot.load_extension(f"cogs.{cog_name}")
@@ -536,7 +520,7 @@ async def on_ready():
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
     # Do NOT include entry point commands (like 'start') in DEV_ONLY_COMMANDS!
-    DEV_ONLY_COMMANDS = ['profile']  # Only non-entry-point commands for dev guild testing
+    DEV_ONLY_COMMANDS = []  # Only non-entry-point commands for dev guild testing
 
     try:
         import os
@@ -587,6 +571,16 @@ async def on_ready():
                     print("   ⚠️ Remove the entry-point command from DEV_ONLY_COMMANDS to avoid this.")
                 else:
                     raise
+
+            # Sync dev-only commands to each dev guild
+            if restricted:
+                print(f"\n🏰 Syncing dev-only commands to {len(dev_guild_objs)} dev guild(s)...")
+                for guild_obj in dev_guild_objs:
+                    try:
+                        synced_guild = await bot.tree.sync(guild=guild_obj)
+                        print(f"   • Guild {guild_obj.id}: synced {len(synced_guild)} commands.")
+                    except Exception as guild_sync_err:
+                        print(f"   ❌ Guild {guild_obj.id} sync failed: {guild_sync_err}")
         else:
             # No dev guild, sync all commands globally
             if DEV_ONLY_COMMANDS:
