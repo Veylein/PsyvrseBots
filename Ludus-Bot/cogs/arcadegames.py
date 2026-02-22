@@ -351,6 +351,306 @@ class PacManGame:
         buffer.seek(0)
         return buffer
 
+class BombDefuseGame:
+    """Arcade Bomb Defuse Visual Logic"""
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.state = "playing" # playing, win, game_over
+        self.wires = [] # List of {"color": "red", "cut": False}
+        self.serial = ""
+        self.batteries = 0
+        self.correct_index = -1 
+        self.logic_text = ""
+        
+        self.generate_puzzle()
+
+    def generate_puzzle(self):
+        # 1. Generate Environment
+        colors_pool = ["red", "blue", "white", "yellow", "black"]
+        num_wires = random.randint(3, 6)
+        self.wires = [{"color": random.choice(colors_pool), "cut": False} for _ in range(num_wires)]
+        
+        self.serial = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=6))
+        # Ensure last digit is a number for Odd/Even logic sometimes, or handle it
+        if not self.serial[-1].isdigit():
+             self.serial = self.serial[:-1] + str(random.randint(0, 9))
+             
+        self.batteries = random.randint(0, 5)
+        
+        # 2. Determine Solution (Simple Wires Logic)
+        colors = [w["color"] for w in self.wires]
+        last_digit_odd = int(self.serial[-1]) % 2 != 0
+        
+        rule_desc = "Unknown"
+        target = -1
+        
+        if num_wires == 3:
+            if "red" not in colors:
+                target = 1 # Second wire
+                rule_desc = "No red wires -> Cut second wire"
+            elif colors[-1] == "white":
+                target = 2 # Last wire
+                rule_desc = "Last wire is white -> Cut last wire"
+            elif colors.count("blue") > 1:
+                # Last blue wire
+                idx = -1
+                for i in range(2, -1, -1):
+                    if colors[i] == "blue": idx = i; break
+                target = idx
+                rule_desc = ">1 blue wires -> Cut last blue wire"
+            else:
+                target = 2 # Last wire
+                rule_desc = "Otherwise -> Cut last wire"
+
+        elif num_wires == 4:
+            if colors.count("red") > 1 and last_digit_odd:
+                # Last red wire
+                idx = -1
+                for i in range(3, -1, -1):
+                    if colors[i] == "red": idx = i; break
+                target = idx
+                rule_desc = ">1 red wires & odd serial -> Cut last red wire"
+            elif colors[-1] == "yellow" and "red" not in colors:
+                target = 0 # First wire
+                rule_desc = "Last wire yellow & no red -> Cut first wire"
+            elif colors.count("blue") == 1:
+                target = 0 # First wire
+                rule_desc = "Exactly 1 blue wire -> Cut first wire"
+            elif colors.count("yellow") > 1:
+                target = 3 # Last wire
+                rule_desc = ">1 yellow wires -> Cut last wire"
+            else:
+                target = 1 # Second wire
+                rule_desc = "Otherwise -> Cut second wire"
+
+        elif num_wires == 5:
+            if colors[-1] == "black" and last_digit_odd:
+                target = 3 # Fourth wire
+                rule_desc = "Last wire black & odd serial -> Cut fourth wire"
+            elif colors.count("red") == 1 and colors.count("yellow") > 1:
+                target = 0 # First wire
+                rule_desc = "1 red wire & >1 yellow -> Cut first wire"
+            elif "black" not in colors:
+                target = 1 # Second wire
+                rule_desc = "No black wires -> Cut second wire"
+            else:
+                target = 0 # First wire
+                rule_desc = "Otherwise -> Cut first wire"
+                
+        elif num_wires == 6:
+            if "yellow" not in colors and last_digit_odd:
+                target = 2 # Third wire
+                rule_desc = "No yellow & odd serial -> Cut third wire"
+            elif colors.count("yellow") == 1 and colors.count("white") > 1:
+                target = 3 # Fourth wire
+                rule_desc = "1 yellow & >1 white -> Cut fourth wire"
+            elif "red" not in colors:
+                target = 5 # Last wire
+                rule_desc = "No red wires -> Cut last wire"
+            else:
+                target = 3 # Fourth wire
+                rule_desc = "Otherwise -> Cut fourth wire"
+        
+        self.correct_index = target
+        self.logic_text = rule_desc # Store for debug or post-game
+
+    def cut(self, index):
+        if self.state != "playing": return
+        if self.wires[index]["cut"]: return # Already cut
+        
+        self.wires[index]["cut"] = True
+        
+        if index == self.correct_index:
+            self.state = "win"
+        else:
+            self.state = "game_over"
+
+    def render(self):
+        w, h = 600, 400
+        img = Image.new('RGB', (w, h), color=(40, 40, 45))
+        draw = ImageDraw.Draw(img)
+        
+        # Panel Bevel
+        draw.rectangle([5, 5, w-5, h-5], outline=(100, 100, 100), width=3)
+        draw.rectangle([15, 15, w-15, h-15], fill=(30, 30, 30))
+        
+        # --- Top Section: Indicators ---
+        
+        # Serial Number (Sticker)
+        draw.rectangle([40, 40, 190, 90], fill=(230, 230, 230))
+        draw.text((50, 45), "SERIAL #", fill=(0,0,0))
+        draw.text((50, 60), f"{self.serial}", fill=(0,0,0)) # Simulating bold by printing twice? No, plain is fine
+        
+        # Batteries
+        bat_x = 220
+        for i in range(min(self.batteries, 4)):
+            draw.rectangle([bat_x, 50, bat_x+20, 80], fill=(10, 10, 10), outline=(200, 200, 200)) # Body
+            draw.rectangle([bat_x+5, 45, bat_x+15, 50], fill=(150, 150, 150)) # Hub
+            bat_x += 30
+        if self.batteries > 4:
+            draw.text((bat_x, 60), f"+{self.batteries-4}", fill=(255, 255, 255))
+            
+        # Timer Display
+        draw.rectangle([430, 40, 560, 90], fill=(0, 0, 0), outline=(60, 60, 60), width=2)
+        status_text = "00:45"
+        text_col = (255, 0, 0)
+        
+        if self.state == "game_over": 
+            status_text = "BOOM"
+        elif self.state == "win":
+            status_text = "SAFE"
+            text_col = (0, 255, 0)
+            
+        # Draw "Segments" (roughly center)
+        draw.text((455, 55), status_text, fill=text_col)
+        
+        # Status Light
+        led_col = (50, 0, 0) # Off red
+        if self.state == "game_over": led_col = (255, 0, 0) # Bright Red
+        elif self.state == "win": led_col = (0, 255, 0) # Bright Green
+        
+        draw.ellipse([530, 50, 550, 70], fill=led_col, outline=(100, 100, 100))
+        
+        # --- Middle Section: Wires ---
+        # Draw "sockets" on left and right
+        num_w = len(self.wires)
+        
+        y_start = 130
+        y_end = 350
+        spacing = (y_end - y_start) // (num_w)
+        
+        c_map = {
+            "red": (200, 20, 20),
+            "blue": (20, 20, 200),
+            "yellow": (200, 200, 20),
+            "white": (240, 240, 240),
+            "black": (10, 10, 10)
+        }
+        
+        for i, wire in enumerate(self.wires):
+            y = y_start + (i * spacing) + (spacing//2)
+            col = c_map.get(wire["color"], (128, 128, 128))
+            
+            # Left Socket
+            draw.rectangle([50, y-10, 80, y+10], fill=(20, 20, 20), outline=(100, 100, 100))
+            draw.text((30, y-8), f"{i+1}", fill=(255, 255, 255))
+            
+            # Right Socket
+            draw.rectangle([520, y-10, 550, y+10], fill=(20, 20, 20), outline=(100, 100, 100))
+            
+            # Wire
+            if wire["cut"]:
+                # Cut wire - two loose ends
+                draw.line([(80, y), (250, y)], fill=col, width=10)
+                draw.ellipse([245, y-5, 255, y+5], fill=(184, 115, 51)) # Copper
+                
+                draw.line([(350, y), (520, y)], fill=col, width=10)
+                draw.ellipse([345, y-5, 355, y+5], fill=(184, 115, 51)) # Copper
+                
+                # Scorch marks?
+            else:
+                # Full Wire (Arc slightly?)
+                # Just straight for now for clean look, maybe slight bezier if I had time
+                draw.line([(80, y), (520, y)], fill=col, width=10)
+                # Highlight
+                draw.line([(80, y-2), (520, y-2)], fill=(255, 255, 255, 80), width=2)
+
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        return buffer
+
+class BombDefuseView(discord.ui.View):
+    def __init__(self, game, interaction, cog):
+        super().__init__(timeout=180)
+        self.game = game
+        self.original_interaction = interaction
+        self.cog = cog
+        self.message = None
+        
+        # Add wire buttons dynamically
+        for i in range(len(game.wires)):
+             # Create button for each wire
+             btn = discord.ui.Button(label=f"✂️ {i+1}", style=discord.ButtonStyle.secondary, custom_id=f"cut_{i}", row=0 if i < 3 else 1)
+             btn.callback = self.make_callback(i)
+             self.add_item(btn)
+
+    def make_callback(self, index):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.game.user_id:
+                return
+            
+            self.game.cut(index)
+            await self.update_board(interaction)
+        return callback
+
+    @discord.ui.button(label="🔄 Restart", style=discord.ButtonStyle.primary, row=2)
+    async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.game.user_id: return
+        await self.cog.start_bomb(interaction)
+
+    @discord.ui.button(label="🏠 Menu", style=discord.ButtonStyle.secondary, row=2)
+    async def menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.show_arcade_menu(interaction)
+
+    async def update_board(self, interaction=None):
+        file = discord.File(self.game.render(), filename="bomb.png")
+        
+        if self.game.state == "win":
+            reward = 300
+            desc = f"✅ **BOMB DEFUSED!**\n\nThe correct wire was cut. Good job!\n**+{reward} PsyCoins** 🪙"
+            color = discord.Color.green()
+            
+            # Disable buttons
+            for item in self.children:
+                if isinstance(item, discord.ui.Button) and item.custom_id and item.custom_id.startswith("cut_"):
+                    item.disabled = True
+            
+            if _arc_mg:
+                 try:
+                     _arc_mg(self.game.user_id, 'bombdefuse', 'win', reward)
+                     _arc_inc(self.game.user_id, 'arcade_wins')
+                 except Exception: pass
+            
+        elif self.game.state == "game_over":
+            desc = f"💥 **BOOM!**\n\nYou cut the wrong wire! The bomb exploded.\n\n**Solution Logic:**\n{self.game.logic_text}"
+            color = discord.Color.dark_red()
+            
+            # Disable buttons
+            for item in self.children:
+                if isinstance(item, discord.ui.Button) and item.custom_id and item.custom_id.startswith("cut_"):
+                    item.disabled = True
+                    if item.custom_id == f"cut_{self.game.correct_index}":
+                        item.style = discord.ButtonStyle.success # Highlight correct one
+            
+            if _arc_mg:
+                 try:
+                     _arc_mg(self.game.user_id, 'bombdefuse', 'loss', 0)
+                 except Exception: pass
+        else:
+            desc = (
+                "**LOGIC PUZZLE - MANUAL**\n"
+                "Follow these rules based on the bomb configuration:\n\n"
+            )
+            # Add rules manual
+            desc += "**3 Wires:**\n- No Red: Cut 2nd\n- Last is White: Cut Last\n- >1 Blue: Cut Last Blue\n- Else: Cut Last\n\n"
+            desc += "**4 Wires:**\n- >1 Red & Odd Serial: Cut Last Red\n- Last Yellow & No Red: Cut 1st\n- 1 Blue: Cut 1st\n- >1 Yellow: Cut Last\n- Else: Cut 2nd\n\n"
+            desc += "**5 Wires:**\n- Last Black & Odd Serial: Cut 4th\n- 1 Red & >1 Yellow: Cut 1st\n- No Black: Cut 2nd\n- Else: Cut 1st\n\n"
+            desc += "**6 Wires:**\n- No Yellow & Odd Serial: Cut 3rd\n- 1 Yellow & >1 White: Cut 4th\n- No Red: Cut Last\n- Else: Cut 4th"
+            
+            color = discord.Color.gold()
+
+        embed = discord.Embed(title="💣 Bomb Defusal", description=desc, color=color)
+        embed.set_image(url="attachment://bomb.png")
+        
+        if interaction:
+            await interaction.response.edit_message(embed=embed, attachments=[file], view=self)
+        elif self.message:
+            await self.message.edit(embed=embed, attachments=[file], view=self)
+        else:
+            await self.original_interaction.response.send_message(embed=embed, file=file, view=self)
+            self.message = await self.original_interaction.original_response()
+
 class MainArcadeMenu(discord.ui.View):
     def __init__(self, cog):
         super().__init__(timeout=None)
@@ -547,146 +847,21 @@ class ArcadeGames(commands.Cog):
             except Exception:
                 pass
 
-    async def start_bomb(self, interaction: discord.Interaction):
-        await self.arcade_bombdefuse_action(interaction)
-    
-    async def arcade_bombdefuse_action(self, interaction: discord.Interaction):
-        """Bomb defuser game"""
-        wires = ["🔴", "🔵", "🟢", "🟡", "⚪", "🟠"]
-        num_wires = random.randint(4, 6)
-        bomb_wires = random.sample(wires, num_wires)
-        correct_wire = random.choice(bomb_wires)
+    async def start_  (self, interaction: discord.Interaction):
+        """Bomb defuser game - New Visual Version"""
+        game = BombDefuseGame(interaction.user.id)
+        view = BombDefuseView(game, interaction, self)
         
-        # Generate clues
-        clues = []
-        if correct_wire in ["🔴", "🟠"]:
-            clues.append("The correct wire is a warm color")
-        else:
-            clues.append("The correct wire is a cool color")
+        # Initial render/send
+        await view.update_board(interaction)
         
-        if bomb_wires.index(correct_wire) < len(bomb_wires) // 2:
-            clues.append("Cut one of the first wires")
-        else:
-            clues.append("Cut one of the last wires")
-        
-        game_id = f"{interaction.guild.id}_{interaction.user.id}_bomb"
-        self.active_games[game_id] = {
-            "wires": bomb_wires,
-            "correct": correct_wire,
-            "attempts": 3,
-            "clues_shown": 1
-        }
-        
-        wire_display = " ".join([f"{i+1}️⃣ {w}" for i, w in enumerate(bomb_wires)])
-        
-        embed = discord.Embed(
-            title="💣 BOMB DEFUSAL",
-            description=f"**⏰ BOMB ACTIVE ⏰**\n\n"
-                       f"{wire_display}\n\n"
-                       f"**Clue:** {clues[0]}\n\n"
-                       f"Cut the correct wire!\n"
-                       f"Type the wire number (1-{num_wires})\n\n"
-                       f"**Attempts: 3** | React 🔍 for another clue",
-            color=discord.Color.red()
-        )
-        
-        await interaction.response.send_message(embed=embed)
-        msg = await interaction.original_response()
-        await msg.add_reaction("🔍")
-        
-        def check_reaction(reaction, user):
-            return user.id == interaction.user.id and str(reaction.emoji) == "🔍"
-        
-        def check_message(m):
-            return m.author.id == interaction.user.id and m.channel.id == interaction.channel.id
-        
-        while game_id in self.active_games:
-            game = self.active_games[game_id]
-            
-            done, pending = await asyncio.wait([
-                asyncio.create_task(self.bot.wait_for('reaction_add', check=check_reaction, timeout=45.0)),
-                asyncio.create_task(self.bot.wait_for('message', check=check_message, timeout=45.0))
-            ], return_when=asyncio.FIRST_COMPLETED)
-            
-            for task in pending:
-                task.cancel()
-            
+        # Track statistics if available
+        if _arc_inc:
             try:
-                result = done.pop().result()
-                
-                if isinstance(result, tuple):  # Reaction - show clue
-                    if game["clues_shown"] < len(clues):
-                        await interaction.followup.send(f"🔍 **Clue:** {clues[game['clues_shown']]}")
-                        game["clues_shown"] += 1
-                    else:
-                        await interaction.followup.send("🔍 No more clues!")
-                
-                else:  # Message - wire cut attempt
-                    try:
-                        choice = int(result.content)
-                        if 1 <= choice <= len(game["wires"]):
-                            chosen_wire = game["wires"][choice - 1]
-                            
-                            if chosen_wire == game["correct"]:
-                                reward = game["attempts"] * 200
-                                embed = discord.Embed(
-                                    title="✅ BOMB DEFUSED!",
-                                    description=f"You cut the {chosen_wire} wire!\n\n"
-                                               f"**+{reward} PsyCoins!** 🪙",
-                                    color=discord.Color.green()
-                                )
-                                await result.reply(embed=embed)
-                                if _arc_mg:
-                                    try:
-                                        _arc_mg(interaction.user.id, 'bombdefuse', 'win', reward)
-                                        _arc_inc(interaction.user.id, 'arcade_wins')
-                                    except Exception:
-                                        pass
-                                # Chance to award a difficult TCG card for bomb defuse win
-                                if tcg_manager:
-                                    try:
-                                        awarded = tcg_manager.award_for_game_event(str(result.author.id), 'difficult')
-                                        if awarded:
-                                            names = [CARD_DATABASE.get(c, {}).get('name', c) for c in awarded]
-                                            await result.reply(f"🎴 Bonus TCG reward: {', '.join(names)}")
-                                    except Exception:
-                                        pass
-                                del self.active_games[game_id]
-                                break
-                            else:
-                                game["attempts"] -= 1
-                                if game["attempts"] <= 0:
-                                    embed = discord.Embed(
-                                        title="💥 BOOM!",
-                                        description=f"The bomb exploded!\n\n"
-                                                   f"Correct wire was {game['correct']}",
-                                        color=discord.Color.dark_red()
-                                    )
-                                    await result.reply(embed=embed)
-                                    if _arc_mg:
-                                        try:
-                                            _arc_mg(interaction.user.id, 'bombdefuse', 'loss', 0)
-                                        except Exception:
-                                            pass
-                                    del self.active_games[game_id]
-                                    break
-                                else:
-                                    await result.reply(f"❌ Wrong wire! **{game['attempts']} attempts left!**")
-                        else:
-                            await result.reply(f"❌ Choose 1-{len(game['wires'])}")
-                    except ValueError:
-                        await result.reply("❌ Type a number!")
-            
-            except asyncio.TimeoutError:
-                if game_id in self.active_games:
-                    embed = discord.Embed(
-                        title="💥 TIMEOUT - BOOM!",
-                        description=f"You ran out of time!\n\nCorrect wire: {game['correct']}",
-                        color=discord.Color.dark_red()
-                    )
-                    await interaction.followup.send(embed=embed)
-                    del self.active_games[game_id]
-                break
+                _arc_inc(interaction.user.id, 'arcade_played')
+            except Exception:
+                pass
+
 
     async def arcade_snake_action(self, interaction: discord.Interaction):
         """Snake game (Placeholder)"""
