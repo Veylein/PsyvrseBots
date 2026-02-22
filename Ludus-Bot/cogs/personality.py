@@ -9,6 +9,7 @@ import sys
 import os
 import json
 import re
+import aiohttp
 from difflib import get_close_matches
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
@@ -1001,6 +1002,15 @@ class LudusPersonality(commands.Cog):
                 await message.channel.send(reply)
                 return
 
+        # Wordle Answer
+        if self._is_wordle_question(content):
+            answer = await self._get_todays_wordle()
+            if answer:
+                await message.channel.send(f"Today's wordle answer is: {answer.upper()}")
+                return
+            else:
+                 pass
+
         # Math question detection
         if self._is_math_question(content):
             answer = self._solve_math(content)
@@ -1049,6 +1059,31 @@ class LudusPersonality(commands.Cog):
         for kw in math_keywords:
             if kw in content:
                 return True
+        return False
+
+    async def _get_todays_wordle(self):
+        """Fetch today's NYT Wordle answer"""
+        try:
+            # NYT uses local dates but publishes globally around midnight local time?
+            # Actually the JSON is keyed by YYYY-MM-DD.
+            # Using current UTC date is a safe bet as it covers most of the world.
+            today_str = datetime.utcnow().strftime("%Y-%m-%d")
+            url = f"https://www.nytimes.com/svc/wordle/v2/{today_str}.json"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data.get("solution")
+        except Exception as e:
+            print(f"Error fetching Wordle answer: {e}")
+        return None
+
+    def _is_wordle_question(self, content):
+        """Check if message is asking for wordle answer"""
+        content = content.lower()
+        if "wordle" in content:
+             if any(kw in content for kw in ["answer", "solution", "word", "today"]):
+                 return True
         return False
 
     def _solve_math(self, content):
