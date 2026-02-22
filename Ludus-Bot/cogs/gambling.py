@@ -519,7 +519,7 @@ class Gambling(commands.Cog):
                 await ctx_or_interaction.followup.send(content=content, embed=embed, view=view)
         else:
             await ctx_or_interaction.send(content=content, embed=embed, view=view)
-        
+
     def load_stats(self):
         """Load gambling statistics"""
         if os.path.exists(self.gambling_stats_file):
@@ -587,143 +587,7 @@ class Gambling(commands.Cog):
             except Exception:
                 pass
     
-    # ==================== POKER ====================
-    
-    @commands.command(name="poker")
-    async def poker_prefix(self, ctx, bet: int):
-        """Play 5-card poker (10-10,000 coins) - Prefix version"""
-        economy_cog = self.bot.get_cog("Economy")
-        if not economy_cog:
-            await ctx.send("❌ Economy system not loaded!")
-            return
-        
-        # Validate bet
-        if bet < 10 or bet > 10000:
-            await ctx.send("❌ Bet must be between 10 and 10,000 coins!")
-            return
-        
-        balance = economy_cog.get_balance(ctx.author.id)
-        if balance < bet:
-            await ctx.send(f"❌ You only have {balance:,} coins!")
-            return
-        
-        # Deduct bet
-        economy_cog.economy_data[str(ctx.author.id)]["balance"] -= bet
-        economy_cog.save_economy()
-        
-        # Deal cards
-        deck = self.create_deck()
-        player_hand = [deck.pop() for _ in range(5)]
-        dealer_hand = [deck.pop() for _ in range(5)]
-        
-        # Evaluate hands
-        player_rank, player_name = self.evaluate_poker_hand(player_hand)
-        dealer_rank, dealer_name = self.evaluate_poker_hand(dealer_hand)
-        
-        # Determine winner
-        if player_rank > dealer_rank:
-            payout = bet * player_rank
-            economy_cog.add_coins(ctx.author.id, payout, "poker_win")
-            result = f"🎉 You win with **{player_name}**!"
-            color = discord.Color.green()
-            won = True
-        elif player_rank < dealer_rank:
-            payout = 0
-            result = f"💀 You lose! Dealer has **{dealer_name}**"
-            color = discord.Color.red()
-            won = False
-        else:
-            # Push - return bet
-            economy_cog.add_coins(ctx.author.id, bet, "poker_push")
-            payout = bet
-            result = f"🤝 Push! Both have **{player_name}**"
-            color = discord.Color.gold()
-            won = False
-        
-        # Record game
-        self.record_game(ctx.author.id, "poker", bet, won, payout)
-        # Update most played games
-        profile_cog = self.bot.get_cog("Profile")
-        if profile_cog and hasattr(profile_cog, "profile_manager"):
-            profile_cog.profile_manager.record_game_played(ctx.author.id, "poker")
-        
-        # Create embed
-        embed = discord.Embed(title="🃏 Poker Game", color=color)
-        embed.add_field(name="Your Hand", value=" ".join([f"{card[0]}{card[1]}" for card in player_hand]), inline=False)
-        embed.add_field(name="Your Rank", value=player_name, inline=True)
-        embed.add_field(name="Dealer's Rank", value=dealer_name, inline=True)
-        embed.add_field(name="Result", value=result, inline=False)
-        if payout > 0:
-            embed.add_field(name="Payout", value=f"+{payout:,} coins", inline=True)
-        embed.set_footer(text=f"New balance: {economy_cog.get_balance(ctx.author.id):,} coins")
-        
-        await ctx.send(embed=embed)
-    
-    # Note: Poker commands removed - use /poker from poker_texas.py for full Texas Hold'em
-    
-    def create_deck(self):
-        """Create a standard 52-card deck"""
-        suits = ['♠', '♥', '♦', '♣']
-        ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
-        deck = [(rank, suit) for suit in suits for rank in ranks]
-        random.shuffle(deck)
-        return deck
-    
-    def format_hand(self, hand):
-        """Format poker hand for display"""
-        return ' '.join([f"{rank}{suit}" for rank, suit in hand])
-    
-    def evaluate_poker_hand(self, hand):
-        """Evaluate poker hand strength (returns multiplier and name)"""
-        ranks = [card[0] for card in hand]
-        suits = [card[1] for card in hand]
-        
-        rank_values = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
-        rank_counts = {r: ranks.count(r) for r in set(ranks)}
-        counts = sorted(rank_counts.values(), reverse=True)
-        
-        is_flush = len(set(suits)) == 1
-        sorted_values = sorted([rank_values[r] for r in ranks])
-        is_straight = (sorted_values == list(range(sorted_values[0], sorted_values[0] + 5)) or 
-                      sorted_values == [2, 3, 4, 5, 14])  # Ace-low straight
-        
-        # Royal Flush
-        if is_flush and is_straight and sorted_values == [10, 11, 12, 13, 14]:
-            return (10, "Royal Flush")
-        # Straight Flush
-        elif is_flush and is_straight:
-            return (9, "Straight Flush")
-        # Four of a Kind
-        elif counts == [4, 1]:
-            return (8, "Four of a Kind")
-        # Full House
-        elif counts == [3, 2]:
-            return (7, "Full House")
-        # Flush
-        elif is_flush:
-            return (6, "Flush")
-        # Straight
-        elif is_straight:
-            return (5, "Straight")
-        # Three of a Kind
-        elif counts == [3, 1, 1]:
-            return (4, "Three of a Kind")
-        # Two Pair
-        elif counts == [2, 2, 1]:
-            return (3, "Two Pair")
-        # Pair
-        elif counts == [2, 1, 1, 1]:
-            return (2, "Pair")
-        # High Card
-        else:
-            return (1, "High Card")
-    
     # ==================== SLOTS ====================
-    
-    @commands.command(name="slots")
-    async def slots_prefix(self, ctx, bet: int):
-        """Play slots (prefix version)"""
-        await self._play_slots(ctx, bet, is_slash=False)
     
     @app_commands.command(name="slots", description="Spin the slot machine (10-5,000 coins)")
     async def slots_slash(self, interaction: discord.Interaction, bet: int):
@@ -849,11 +713,6 @@ class Gambling(commands.Cog):
     
     # ==================== ROULETTE ====================
     
-    @commands.command(name="roulette")
-    async def roulette_prefix(self, ctx, bet: int, choice: str):
-        """Spin the roulette wheel (L!roulette <bet> <red/black/odd/even/0-36>)"""
-        await ctx.send("💡 For the best experience, use `/roulette <bet> <choice>` instead!")
-    
     @app_commands.command(name="roulette", description="Spin the roulette wheel (10-10,000 coins)")
     async def roulette_slash(self, interaction: discord.Interaction, bet: int, choice: str):
         """Play roulette"""
@@ -951,11 +810,6 @@ class Gambling(commands.Cog):
     
     # ==================== HIGHER/LOWER ====================
     
-    @commands.command(name="higherlower", aliases=["hl"])
-    async def higherlower_prefix(self, ctx, bet: int):
-        """Guess if next card is higher or lower (L!higherlower <bet>)"""
-        await ctx.send("❌ Higher/Lower requires interactive buttons! Please use `/higherlower <bet>` instead.")
-    
     @app_commands.command(name="higherlower", description="Guess if next card is higher or lower (10-10,000 coins)")
     async def higherlower(self, interaction: discord.Interaction, bet: int):
         """Play higher or lower"""
@@ -999,11 +853,6 @@ class Gambling(commands.Cog):
             profile_cog.profile_manager.record_game_played(interaction.user.id, "higherlower")
     
     # ==================== STATS & INFO ====================
-    
-    @commands.command(name="gambling_stats", aliases=["gamblingstats", "gstats"])
-    async def gambling_stats_prefix(self, ctx, user: Optional[discord.Member] = None):
-        """View gambling statistics (L!gambling_stats [user])"""
-        await self._show_gambling_stats(ctx, user, is_slash=False)
     
     @app_commands.command(name="gambling_stats", description="View your gambling statistics")
     async def gambling_stats_slash(self, interaction: discord.Interaction, user: Optional[discord.Member] = None):
@@ -1056,11 +905,6 @@ class Gambling(commands.Cog):
             )
         
         await self._send_message(ctx_or_interaction, embed=embed, is_slash=is_slash)
-    
-    @commands.command(name="odds")
-    async def odds_prefix(self, ctx):
-        """View gambling game odds and payouts (L!odds)"""
-        await self._show_odds(ctx, is_slash=False)
     
     @app_commands.command(name="odds", description="View gambling game odds and payouts")
     async def odds_slash(self, interaction: discord.Interaction):
@@ -1142,11 +986,6 @@ class Gambling(commands.Cog):
         embed.set_footer(text="💡 Tip: Higher risk = Higher reward!")
         
         await self._send_message(ctx_or_interaction, embed=embed, is_slash=is_slash)
-    
-    @commands.command(name="strategy", aliases=["strat"])
-    async def strategy_prefix(self, ctx, game: str):
-        """Get strategy tips for gambling games (L!strategy <game>)"""
-        await self._show_strategy(ctx, game, is_slash=False)
     
     @app_commands.command(name="strategy", description="Get strategy tips for gambling games")
     async def strategy_slash(self, interaction: discord.Interaction, game: str):
@@ -1231,72 +1070,6 @@ class Gambling(commands.Cog):
 
     # ==================== DICE ROLL GAMBLING ====================
     
-    @commands.command(name="dicegamble", aliases=["dicebet"])
-    async def dice_gamble_prefix(self, ctx, bet: int, target: int):
-        """Bet on dice roll outcome (L!dicegamble <bet> <number 1-6>)"""
-        # Dice doesn't need buttons, so just call the actual game logic
-        # We'll treat ctx like an interaction for this simple game
-        economy_cog = self.bot.get_cog("Economy")
-        if not economy_cog:
-            await ctx.send("❌ Economy system not loaded!")
-            return
-        
-        # Validate bet
-        if bet < 10 or bet > 10000:
-            await ctx.send("❌ Bet must be between 10 and 10,000 coins!")
-            return
-        
-        # Validate target
-        if target < 1 or target > 6:
-            await ctx.send("❌ Target must be between 1 and 6!")
-            return
-        
-        balance = economy_cog.get_balance(ctx.author.id)
-        if balance < bet:
-            await ctx.send(f"❌ You only have {balance:,} coins!")
-            return
-        
-        # Deduct bet
-        economy_cog.economy_data[str(ctx.author.id)]["balance"] -= bet
-        economy_cog.save_economy()
-        
-        # Roll dice
-        roll = random.randint(1, 6)
-        
-        # Determine result
-        dice_emoji = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
-        
-        if roll == target:
-            # Exact match - 6x payout!
-            payout = bet * 6
-            economy_cog.add_coins(ctx.author.id, payout, "dice_win")
-            result_text = f"🎉 **EXACT MATCH!**\n+{payout:,} coins (6x)"
-            color = discord.Color.gold()
-            won = True
-        else:
-            payout = 0
-            result_text = f"💀 **NO MATCH!**\n-{bet:,} coins"
-            color = discord.Color.red()
-            won = False
-        
-        # Record stats
-        self.record_game(ctx.author.id, "dice", bet, won, payout)
-        # Update most played games
-        profile_cog = self.bot.get_cog("Profile")
-        if profile_cog and hasattr(profile_cog, "profile_manager"):
-            profile_cog.profile_manager.record_game_played(ctx.author.id, "dice")
-        
-        # Create embed
-        embed = discord.Embed(title="🎲 Dice Gamble", color=color)
-        embed.add_field(name="Your Bet", value=f"Number {target}", inline=True)
-        embed.add_field(name="Roll Result", value=f"{dice_emoji[roll-1]} **{roll}**", inline=True)
-        embed.add_field(name="Outcome", value=result_text, inline=False)
-        embed.set_footer(text="Exact number = 6x payout!")
-        
-        # Add disclaimer button
-        view = GamblingDisclaimerView()
-        await ctx.send(embed=embed, view=view)
-    
     @app_commands.command(name="dicegamble", description="Bet on dice roll outcome (10-10,000 coins)")
     async def dice_gamble_slash(self, interaction: discord.Interaction, bet: int, target: int):
         """Gamble on dice roll - guess the number (1-6) for 6x payout, or bet on odd/even for 2x"""
@@ -1363,11 +1136,6 @@ class Gambling(commands.Cog):
 
     # ==================== CRASH GAME ====================
     
-    @commands.command(name="crash")
-    async def crash_prefix(self, ctx, bet: int):
-        """Multiplier crash game - cash out before it crashes! (L!crash <bet>)"""
-        await ctx.send("❌ Crash game requires interactive buttons! Please use `/crash <bet>` instead.")
-    
     @app_commands.command(name="crash", description="Multiplier crash game - cash out before it crashes! (10-10,000)")
     async def crash_slash(self, interaction: discord.Interaction, bet: int):
         """Play crash game"""
@@ -1427,11 +1195,6 @@ class Gambling(commands.Cog):
     
     # ==================== MINES ====================
     
-    @commands.command(name="mines")
-    async def mines_prefix(self, ctx, bet: int, mine_count: int = 8):
-        """Minesweeper gambling - reveal tiles without hitting mines! (L!mines <bet> [mines])"""
-        await ctx.send("❌ Mines game requires interactive buttons! Please use `/mines <bet> [mine_count]` instead.")
-    
     @app_commands.command(name="mines", description="Minesweeper gambling - reveal tiles without hitting mines! (10-5,000)")
     async def mines_slash(self, interaction: discord.Interaction, bet: int, mine_count: int = 8):
         """Play mines game"""
@@ -1477,11 +1240,6 @@ class Gambling(commands.Cog):
         await interaction.response.send_message(embed=embed, view=view)
 
     # ==================== COINFLIP ====================
-    
-    @commands.command(name="coinflip", aliases=["cf", "flip"])
-    async def coinflip_prefix(self, ctx, side: str, wager: int):
-        """Flip a coin - Double or nothing! Usage: L!coinflip heads 1000"""
-        await self._coinflip(ctx.author.id, ctx.author.display_name, side.lower(), wager, ctx=ctx)
     
     @app_commands.command(name="coinflip", description="Flip a coin - Double or nothing!")
     @app_commands.describe(
