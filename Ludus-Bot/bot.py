@@ -526,6 +526,20 @@ async def on_ready():
     except Exception as ep_err:
         print(f"   ⚠️  Could not remove entry-point: {ep_err}")
 
+    # ── Clear guild-specific commands from ALL guilds (removes duplicates) ────
+    # Guild commands don't expire on their own — must sync empty tree to remove.
+    print("🧹 Clearing guild-specific commands (fixes duplicates)...")
+    cleared = 0
+    for guild in bot.guilds:
+        try:
+            bot.tree.clear_commands(guild=guild)
+            await bot.tree.sync(guild=guild)
+            cleared += 1
+        except Exception:
+            pass
+    print(f"   ✅ Cleared guild commands from {cleared}/{len(bot.guilds)} guilds.")
+    # ──────────────────────────────────────────────────────────────────────────
+
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
     # Do NOT include entry point commands (like 'start') in DEV_ONLY_COMMANDS!

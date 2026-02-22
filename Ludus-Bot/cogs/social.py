@@ -874,11 +874,11 @@ class Social(commands.Cog):
             description=f"🐾 **{interaction.user.display_name}** is petting **{user.display_name}**!",
             color=discord.Color.from_str("#ffeaa7"),
         )
-        embed.set_footer(text="Good boi/girl! 🐾")
+        embed.set_footer(text="Good boy/girl! 🐾")
 
         try:
             session = await self._get_session()
-            async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=8)) as r:
+            async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=15)) as r:
                 if r.status == 200:
                     gif_bytes = await r.read()
                     gif_file  = discord.File(io.BytesIO(gif_bytes), filename="petpet.gif")
@@ -886,9 +886,9 @@ class Social(commands.Cog):
                     await interaction.followup.send(embed=embed, file=gif_file)
                     return
                 else:
-                    print(f"[petpet] API returned status {r.status} for {api_url}")
+                    print(f"[petpet] API error {r.status}")
         except Exception as e:
-            print(f"[petpet] Exception: {e}")
+            print(f"[petpet] Exception: {type(e).__name__}: {e}")
 
         # fallback – no GIF available
         embed.set_thumbnail(url=avatar_url)
