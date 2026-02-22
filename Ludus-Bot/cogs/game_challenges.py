@@ -87,7 +87,7 @@ class GameChallenges(commands.Cog):
         """Check if challenges need to be reset"""
         today = datetime.now().strftime("%Y-%m-%d")
         current_week = self._get_week_number()
-        
+
         # Reset daily challenges
         if self.challenges["daily"]["date"] != today:
             self.challenges["daily"] = {
@@ -96,7 +96,7 @@ class GameChallenges(commands.Cog):
                 "completed": {}
             }
             self._save_data(self.challenges_file, self.challenges)
-        
+
         # Reset weekly challenges
         if self.challenges["weekly"]["week"] != current_week:
             self.challenges["weekly"] = {
@@ -105,7 +105,103 @@ class GameChallenges(commands.Cog):
                 "completed": {}
             }
             self._save_data(self.challenges_file, self.challenges)
-    
+
+    # ── event_type → challenge IDs mapping ──────────────────────────────────
+    _EVENT_MAP: dict[str, list[str]] = {
+        "game_win":       ["win_5_games", "win_30_games", "perfect_streak", "perfect_10"],
+        "coin_earn":      ["earn_1000", "earn_5000"],
+        "game_played":    ["play_variety", "master_all"],
+        "word_game_win":  ["word_master"],
+        "math_game_win":  ["math_genius"],
+        "social_game":    ["social_butterfly"],
+        "board_game_win": ["board_game_king"],
+        "puzzle_win":     ["puzzle_master"],
+        "trivia_correct": ["trivia_champion"],
+        "speed_win":      ["speed_demon"],
+    }
+
+    def record_game_event(
+        self,
+        user_id: int,
+        event_type: str,
+        amount: int = 1,
+        game_name: str | None = None,
+    ) -> list[dict]:
+        """
+        Record a game event for challenge progress tracking.
+
+        Called by other cogs when relevant things happen:
+            challenges_cog = bot.get_cog("GameChallenges")
+            if challenges_cog:
+                challenges_cog.record_game_event(user_id, "game_win", 1)
+
+        Parameters
+        ----------
+        user_id : int
+        event_type : str
+            One of: game_win, coin_earn, game_played, word_game_win,
+            math_game_win, social_game, board_game_win, puzzle_win,
+            trivia_correct, speed_win
+        amount : int  (default 1)
+            Amount to add to progress counter.
+        game_name : str | None
+            For play_variety / master_all challenges — the specific game played.
+
+        Returns
+        -------
+        list[dict]  — list of newly-completed challenge dicts (may be empty).
+        """
+        self._check_and_reset_challenges()
+        user_key = str(user_id)
+        relevant_ids = self._EVENT_MAP.get(event_type, [])
+        completed_now: list[dict] = []
+
+        economy_cog = self.bot.get_cog("Economy")
+
+        for period in ("daily", "weekly"):
+            period_data = self.challenges[period]
+            user_progress = period_data["completed"].setdefault(user_key, {})
+
+            for challenge in period_data["challenges"]:
+                cid = challenge["id"]
+                if cid not in relevant_ids:
+                    continue
+
+                # Skip already-completed challenges
+                if user_progress.get(cid):
+                    continue
+
+                # Special case: play_variety / master_all need unique games
+                if cid in ("play_variety", "master_all"):
+                    if game_name is None:
+                        continue
+                    seen_key = f"{cid}_games"
+                    seen: list = user_progress.setdefault(seen_key, [])
+                    if game_name not in seen:
+                        seen.append(game_name)
+                    prog = len(seen)
+                else:
+                    prog_key = f"{cid}_progress"
+                    user_progress[prog_key] = user_progress.get(prog_key, 0) + amount
+                    prog = user_progress[prog_key]
+
+                # Check completion
+                if prog >= challenge["target"]:
+                    user_progress[cid] = True
+                    completed_now.append(challenge)
+
+                    # Award coins via Economy cog
+                    if economy_cog:
+                        try:
+                            economy_cog.add_coins(user_id, challenge["reward"], "challenge_complete")
+                        except Exception:
+                            pass
+
+        if completed_now:
+            self._save_data(self.challenges_file, self.challenges)
+
+        return completed_now
+
     @commands.command(name="challenges", aliases=["challenge", "dailychallenge", "weeklychallenge"])
     async def view_challenges(self, ctx):
         """View today's daily and weekly challenges"""
@@ -257,44 +353,45 @@ class GameChallenges(commands.Cog):
     @commands.command(name="randgame", aliases=["randomgame", "pickgame"])
     async def random_game(self, ctx):
         """Pick a random minigame for you to play!"""
-        
+
+        # Only list commands that are confirmed to exist in the bot
         games = [
-            {"name": "Wordle", "cmd": "L!wordle", "emoji": "📝", "desc": "Guess the 5-letter word"},
-            {"name": "Riddle", "cmd": "L!riddle", "emoji": "🤔", "desc": "Solve the riddle"},
-            {"name": "Trivia", "cmd": "L!trivia", "emoji": "🧠", "desc": "Test your knowledge"},
-            {"name": "Type Race", "cmd": "L!typerace", "emoji": "⌨️", "desc": "Speed typing challenge"},
-            {"name": "Guess the Number", "cmd": "L!gtn", "emoji": "🔢", "desc": "Guess 1-100"},
-            {"name": "Anagram", "cmd": "L!anagram", "emoji": "🔤", "desc": "Unscramble words"},
-            {"name": "Calculator", "cmd": "L!calculator", "emoji": "🧮", "desc": "Mental math"},
-            {"name": "Memory Chain", "cmd": "L!memorychain", "emoji": "🧠", "desc": "Remember sequences"},
-            {"name": "Reaction Test", "cmd": "L!reaction", "emoji": "⚡", "desc": "Test reflexes"},
-            {"name": "Emoji Blitz", "cmd": "L!emojiblitz", "emoji": "😎", "desc": "Type emoji sequences"},
-            {"name": "Quick Maths", "cmd": "L!quickmaths", "emoji": "🔥", "desc": "Rapid math problems"},
-            {"name": "Lightning Round", "cmd": "L!lightning", "emoji": "⚡", "desc": "10 challenges in 60s"},
-            {"name": "Maze Runner", "cmd": "L!maze", "emoji": "🗺️", "desc": "Navigate the maze"},
-            {"name": "Nim", "cmd": "L!nim", "emoji": "🎲", "desc": "Strategy stone game"},
-            {"name": "Tic-Tac-Toe", "cmd": "L!tictactoe", "emoji": "❌", "desc": "Classic board game"},
-            {"name": "Hangman", "cmd": "L!hangman", "emoji": "🎯", "desc": "Guess the word"},
-            {"name": "Connect 4", "cmd": "L!connect4", "emoji": "🔴", "desc": "Connect four in a row"},
-            {"name": "Word Chain", "cmd": "L!wordchain", "emoji": "🔗", "desc": "Chain words together"},
-            {"name": "Rhyme Time", "cmd": "L!rhymetime", "emoji": "🎵", "desc": "Find rhyming words"},
-            {"name": "Category", "cmd": "L!category", "emoji": "📂", "desc": "Name items in category"},
+            {"name": "Anagram",       "cmd": "L!anagram",     "emoji": "🔤", "desc": "Unscramble letters into a word"},
+            {"name": "Calculator",    "cmd": "L!calculator",  "emoji": "🧮", "desc": "Mental math challenge"},
+            {"name": "Memory Chain",  "cmd": "L!memorychain", "emoji": "🧠", "desc": "Remember and repeat sequences"},
+            {"name": "Quick Maths",   "cmd": "L!quickmaths",  "emoji": "🔥", "desc": "Rapid arithmetic problems"},
+            {"name": "Lightning",     "cmd": "L!lightning",   "emoji": "⚡",  "desc": "10 challenges in 60 seconds"},
+            {"name": "Nim",           "cmd": "L!nim",         "emoji": "🎲", "desc": "Strategy stone-removal game"},
+            {"name": "Word Chain",    "cmd": "L!wordchain",   "emoji": "🔗", "desc": "Chain words — last letter starts next"},
+            {"name": "Maze Runner",   "cmd": "L!maze",        "emoji": "🗺️", "desc": "Navigate the ASCII maze"},
+            {"name": "Tic-Tac-Toe",  "cmd": "/tictactoe",    "emoji": "❌",  "desc": "Classic board game vs AI"},
+            {"name": "Hangman",       "cmd": "/hangman",      "emoji": "🎯", "desc": "Guess the hidden word"},
+            {"name": "Chess",         "cmd": "/chess",        "emoji": "♟️",  "desc": "Full chess vs human or AI"},
+            {"name": "Checkers",      "cmd": "/checkers",     "emoji": "🔴", "desc": "Classic draughts"},
+            {"name": "Akinator",      "cmd": "/akinator",     "emoji": "🧙", "desc": "20-questions AI genie"},
+            {"name": "Wizard Wars",   "cmd": "/wizardwars",   "emoji": "🧙‍♂️", "desc": "Spell-based MMO strategy"},
+            {"name": "Blackjack",     "cmd": "/blackjack",    "emoji": "♠️",  "desc": "Beat the dealer"},
+            {"name": "UNO",           "cmd": "/uno",          "emoji": "🎴", "desc": "Classic card game"},
+            {"name": "Go Fish",       "cmd": "/gofish",       "emoji": "🎣", "desc": "Collect sets of 4 cards"},
+            {"name": "Minigames Hub", "cmd": "/minigames",    "emoji": "🕹️", "desc": "Browse all available minigames"},
         ]
-        
+
         chosen = random.choice(games)
-        
+
         embed = EmbedBuilder.create(
             title=f"{Emojis.GAME} Random Game Picker",
-            description=f"**Your randomly selected game:**\n\n"
-                       f"{chosen['emoji']} **{chosen['name']}**\n"
-                       f"📝 {chosen['desc']}\n\n"
-                       f"**To play:**\n"
-                       f"`{chosen['cmd']}`\n\n"
-                       f"Good luck! 🍀",
+            description=(
+                f"**Your randomly selected game:**\n\n"
+                f"{chosen['emoji']} **{chosen['name']}**\n"
+                f"📝 {chosen['desc']}\n\n"
+                f"**To play:**\n"
+                f"`{chosen['cmd']}`\n\n"
+                f"Good luck! 🍀"
+            ),
             color=Colors.PRIMARY
         )
-        
-        embed.set_footer(text="Can't decide? Let fate choose! Use L!randgame again for another game.")
+
+        embed.set_footer(text="Use L!randgame again for a different suggestion!")
         await ctx.send(embed=embed)
     
     @commands.command(name="gameduel", aliases=["gchallenge"])
@@ -303,32 +400,98 @@ class GameChallenges(commands.Cog):
         if not opponent:
             await ctx.send(f"{Emojis.WARNING} Mention someone to challenge! `L!gameduel @user`")
             return
-        
+
         if opponent.bot:
             await ctx.send(f"{Emojis.WARNING} You can't challenge bots!")
             return
-        
+
         if opponent == ctx.author:
             await ctx.send(f"{Emojis.WARNING} You can't challenge yourself!")
             return
-        
-        # Pick random competitive game
-        duel_games = ["wordle", "typerace", "quickmaths", "calculator", "trivia", "anagram"]
-        chosen_game = random.choice(duel_games)
-        
-        embed = EmbedBuilder.create(
-            title=f"{Emojis.TROPHY} Game Duel Challenge!",
-            description=f"**{ctx.author.mention} challenges {opponent.mention}!**\n\n"
-                       f"🎮 Game: **{chosen_game.title()}**\n"
-                       f"🏆 Winner takes glory!\n\n"
-                       f"Both players should type:\n"
-                       f"`L!{chosen_game}`\n\n"
-                       f"Highest score wins! 🔥",
-            color=Colors.WARNING
+
+        # Competitive games that actually exist in the bot
+        duel_games = [
+            {"name": "Anagram",     "cmd": "L!anagram",    "desc": "Fastest to unscramble wins"},
+            {"name": "Quick Maths", "cmd": "L!quickmaths", "desc": "Most correct answers wins"},
+            {"name": "Calculator",  "cmd": "L!calculator", "desc": "Fastest math solver wins"},
+            {"name": "Memory Chain","cmd": "L!memorychain","desc": "Longest chain wins"},
+            {"name": "Nim",         "cmd": "L!nim",        "desc": "Outsmart your opponent"},
+            {"name": "Blackjack",   "cmd": "/blackjack",   "desc": "Highest score wins"},
+            {"name": "Tic-Tac-Toe", "cmd": "/tictactoe",   "desc": "Classic board game"},
+            {"name": "Chess",       "cmd": "/chess",       "desc": "Checkmate your opponent"},
+        ]
+        chosen = random.choice(duel_games)
+
+        class DuelView(discord.ui.View):
+            def __init__(self_v):
+                super().__init__(timeout=60)
+                self_v.accepted = False
+
+            @discord.ui.button(label=f"⚔️ Accept Duel!", style=discord.ButtonStyle.success)
+            async def accept_btn(self_v, interaction: discord.Interaction, button: discord.ui.Button):
+                if interaction.user.id != opponent.id:
+                    await interaction.response.send_message("❌ This challenge isn't for you!", ephemeral=True)
+                    return
+                self_v.accepted = True
+                self_v.stop()
+                for item in self_v.children:
+                    item.disabled = True
+                await interaction.response.edit_message(
+                    embed=discord.Embed(
+                        title=f"⚔️ Duel Accepted! — {chosen['name']}",
+                        description=(
+                            f"{ctx.author.mention} **vs** {opponent.mention}\n\n"
+                            f"🎮 **Game:** {chosen['name']}\n"
+                            f"📝 **Objective:** {chosen['desc']}\n\n"
+                            f"**Both players run:**\n"
+                            f"`{chosen['cmd']}`\n\n"
+                            f"May the best player win! 🌟"
+                        ),
+                        color=discord.Color.green()
+                    ),
+                    view=self_v
+                )
+
+            @discord.ui.button(label="❌ Decline", style=discord.ButtonStyle.danger)
+            async def decline_btn(self_v, interaction: discord.Interaction, button: discord.ui.Button):
+                if interaction.user.id not in (opponent.id, ctx.author.id):
+                    await interaction.response.send_message("❌ Not your duel!", ephemeral=True)
+                    return
+                self_v.stop()
+                for item in self_v.children:
+                    item.disabled = True
+                await interaction.response.edit_message(
+                    embed=discord.Embed(
+                        title="🚫 Duel Declined",
+                        description=f"{opponent.mention} declined the challenge.",
+                        color=discord.Color.red()
+                    ),
+                    view=self_v
+                )
+
+            async def on_timeout(self_v):
+                for item in self_v.children:
+                    item.disabled = True
+                if self_v.message:
+                    try:
+                        await self_v.message.edit(view=self_v)
+                    except Exception:
+                        pass
+
+        view = DuelView()
+        embed = discord.Embed(
+            title=f"⚔️ Game Duel Challenge!",
+            description=(
+                f"{ctx.author.mention} is challenging {opponent.mention}!\n\n"
+                f"🎮 **Game:** {chosen['name']}\n"
+                f"📝 {chosen['desc']}\n\n"
+                f"{opponent.mention}, do you accept?"
+            ),
+            color=discord.Color.gold()
         )
-        
-        embed.set_footer(text="You have 5 minutes to complete the game!")
-        await ctx.send(embed=embed)
+        embed.set_footer(text="Challenge expires in 60 seconds")
+        msg = await ctx.send(embed=embed, view=view)
+        view.message = msg
     
     @app_commands.command(name="challenges", description="View daily and weekly game challenges")
     async def challenges_slash(self, interaction: discord.Interaction):

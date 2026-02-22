@@ -11,6 +11,184 @@ try:
 except Exception:
     _h_inc = _h_mg = None
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Discord V2 interactive lobby view
+# ─────────────────────────────────────────────────────────────────────────────
+
+class HeistJoinView(discord.ui.View):
+    """Interactive heist lobby with join/launch buttons."""
+
+    def __init__(self, cog: "Heist", channel_id: int, max_crew: int, timeout_secs: int):
+        super().__init__(timeout=timeout_secs)
+        self.cog = cog
+        self.channel_id = channel_id
+        self.max_crew = max_crew
+        self.message: Optional[discord.Message] = None
+        self._executed = False
+
+    # ── helpers ──
+
+    def _build_embed(self) -> discord.Embed:
+        heist = self.cog.active_heists.get(self.channel_id)
+        if not heist:
+            return discord.Embed(title="Heist Over", color=discord.Color.grayed())
+
+        crew_size = len(heist["crew"])
+        heist_type = heist["type"]
+        bet = heist["bet_amount"]
+
+        if heist_type == "bank":
+            title = "🏦 BANK HEIST — RECRUITING"
+            color = discord.Color.red()
+            reward_text = "10,000–50,000 coins split among crew"
+        else:
+            target_name = heist.get("target_name", "Unknown")
+            title = f"🏢 BUSINESS HEIST — RECRUITING\nTarget: {target_name}"
+            color = discord.Color.orange()
+            reward_text = "Target's pending business income"
+
+        embed = discord.Embed(title=title, color=color)
+        embed.add_field(name="💰 Bet per person", value=f"{bet:,} coins", inline=True)
+        embed.add_field(name="👥 Crew", value=f"{crew_size} / {self.max_crew}", inline=True)
+        embed.add_field(name="🎯 Reward", value=reward_text, inline=True)
+
+        success_rates = {2: 40, 3: 55, 4: 70, 5: 80, 6: 90}
+        rate = success_rates.get(min(crew_size, 6), 40)
+        embed.add_field(name="📊 Current success rate", value=f"{rate}%", inline=True)
+
+        # List current crew members (fetch cached users)
+        crew_lines = []
+        for uid_str in heist["crew"]:
+            user = self.cog.bot.get_user(int(uid_str))
+            crew_lines.append(user.mention if user else f"<@{uid_str}>")
+        if crew_lines:
+            embed.add_field(name="🔫 Crew members", value="\n".join(crew_lines), inline=False)
+
+        embed.set_footer(text=f"Need {bet:,} coins to join • Leader can launch once 2+ people are ready")
+        return embed
+
+    async def _execute(self) -> None:
+        if self._executed:
+            return
+        self._executed = True
+        self.stop()
+        for item in self.children:
+            item.disabled = True
+        channel = self.cog.bot.get_channel(self.channel_id)
+        if channel:
+            await self.cog._run_heist(channel)
+
+    async def on_timeout(self) -> None:
+        await self._execute()
+
+    # ── buttons ──
+
+    @discord.ui.button(label="⚔️ Join Heist!", style=discord.ButtonStyle.success, custom_id="heist_join", row=0)
+    async def join_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        heist = self.cog.active_heists.get(self.channel_id)
+        if not heist:
+            await interaction.response.send_message("❌ No active heist in this channel.", ephemeral=True)
+            return
+
+        user_key = str(interaction.user.id)
+        if user_key in heist["crew"]:
+            await interaction.response.send_message("✅ You're already in the crew!", ephemeral=True)
+            return
+
+        if len(heist["crew"]) >= self.max_crew:
+            await interaction.response.send_message(f"❌ Crew is full! ({self.max_crew}/{self.max_crew})", ephemeral=True)
+            return
+
+        bet = heist["bet_amount"]
+        economy_cog = self.cog.bot.get_cog("Economy")
+        if not economy_cog:
+            await interaction.response.send_message("❌ Economy system offline.", ephemeral=True)
+            return
+
+        balance = economy_cog.get_balance(interaction.user.id)
+        if balance < bet:
+            await interaction.response.send_message(
+                f"❌ You need **{bet:,}** coins to join but only have **{balance:,}**.",
+                ephemeral=True
+            )
+            return
+
+        economy_cog.remove_coins(interaction.user.id, bet, "heist_bet")
+        heist["crew"][user_key] = bet
+
+        embed = self._build_embed()
+
+        # Auto-launch when crew full
+        if len(heist["crew"]) >= self.max_crew:
+            for item in self.children:
+                item.disabled = True
+            await interaction.response.edit_message(embed=embed, view=self)
+            await self._execute()
+        else:
+            await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="🚀 Launch Now!", style=discord.ButtonStyle.blurple, custom_id="heist_launch", row=0)
+    async def launch_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        heist = self.cog.active_heists.get(self.channel_id)
+        if not heist:
+            await interaction.response.send_message("❌ No active heist.", ephemeral=True)
+            return
+
+        if interaction.user.id != heist["leader"]:
+            await interaction.response.send_message("❌ Only the heist leader can launch early!", ephemeral=True)
+            return
+
+        if len(heist["crew"]) < 2:
+            await interaction.response.send_message(
+                "❌ Need at least **2 crew members** before launching!", ephemeral=True
+            )
+            return
+
+        for item in self.children:
+            item.disabled = True
+        embed = self._build_embed()
+        embed.set_footer(text="Heist launched by the leader!")
+        await interaction.response.edit_message(embed=embed, view=self)
+        await self._execute()
+
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.danger, custom_id="heist_cancel", row=0)
+    async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        heist = self.cog.active_heists.get(self.channel_id)
+        if not heist:
+            await interaction.response.send_message("❌ No active heist.", ephemeral=True)
+            return
+
+        if interaction.user.id != heist["leader"]:
+            await interaction.response.send_message("❌ Only the heist leader can cancel!", ephemeral=True)
+            return
+
+        # Refund everyone
+        economy_cog = self.cog.bot.get_cog("Economy")
+        if economy_cog:
+            for uid_str, bet_amount in heist["crew"].items():
+                economy_cog.add_coins(int(uid_str), bet_amount, "heist_cancelled")
+
+        del self.cog.active_heists[self.channel_id]
+        self._executed = True
+        self.stop()
+
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="🚫 Heist Cancelled",
+                description="The leader called it off. All bets have been refunded.",
+                color=discord.Color.grayed()
+            ),
+            view=self
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Cog
+# ─────────────────────────────────────────────────────────────────────────────
+
 class Heist(commands.Cog):
     """Team up for heists and rob banks or players"""
     
@@ -104,13 +282,12 @@ class Heist(commands.Cog):
         )
         
         embed.add_field(
-            name="ℹ️ Commands",
-            value="```\n"
-                  "L!heist bank <bet>\n"
-                  "L!heist business <@user> <bet>\n"
-                  "L!heist join\n"
-                  "L!heist stats [@user]\n"
-                  "```",
+            name="ℹ️ How it works",
+            value="```\nL!heist bank <bet>         — Start bank job\n"
+                  "L!heist business @user <bet> — Rob a business\n"
+                  "L!heist stats [@user]        — View your stats\n```\n"
+                  "Use the **⚔️ Join Heist!** button in the lobby to join.\n"
+                  "Leader can **🚀 Launch** early or **❌ Cancel** at any time.",
             inline=False
         )
         
@@ -152,45 +329,24 @@ class Heist(commands.Cog):
             await ctx.send("❌ A heist is already being planned in this channel!")
             return
         
-        # Deduct bet
+        # Deduct bet from leader
         economy_cog.remove_coins(ctx.author.id, bet, "heist_bet")
-        
-        # Create heist
+
+        # Create heist record
         self.active_heists[ctx.channel.id] = {
             "type": "bank",
             "leader": ctx.author.id,
             "crew": {str(ctx.author.id): bet},
             "bet_amount": bet,
             "target": None,
+            "target_name": None,
             "started": datetime.utcnow().isoformat()
         }
-        
-        embed = discord.Embed(
-            title="🏦 BANK HEIST RECRUITING!",
-            description=f"{ctx.author.mention} is planning a bank heist!",
-            color=discord.Color.red()
-        )
-        
-        embed.add_field(name="Bet Amount", value=f"{bet:,} coins", inline=True)
-        embed.add_field(name="Crew Size", value="1/6", inline=True)
-        embed.add_field(name="Potential Reward", value="10,000-50,000 coins", inline=True)
-        
-        embed.add_field(
-            name="Join Now!",
-            value=f"Type `L!heist join` to join the crew!\n"
-                  f"You need {bet:,} coins to join.\n\n"
-                  f"⏰ Heist starts in 60 seconds!",
-            inline=False
-        )
-        
-        await ctx.send(embed=embed)
-        
-        # Wait 60 seconds for crew
-        await asyncio.sleep(60)
-        
-        # Execute heist
-        if ctx.channel.id in self.active_heists:
-            await self.execute_heist(ctx)
+
+        view = HeistJoinView(self, ctx.channel.id, max_crew=6, timeout_secs=60)
+        embed = view._build_embed()
+        msg = await ctx.send(embed=embed, view=view)
+        view.message = msg
     
     @heist.command(name="business")
     async def heist_business(self, ctx, target: discord.Member, bet: int):
@@ -248,125 +404,66 @@ class Heist(commands.Cog):
             await ctx.send("❌ A heist is already being planned in this channel!")
             return
         
-        # Deduct bet
+        # Deduct bet from leader
         economy_cog.remove_coins(ctx.author.id, bet, "heist_bet")
-        
-        # Create heist
+
+        # Create heist record
         self.active_heists[ctx.channel.id] = {
             "type": "business",
             "leader": ctx.author.id,
             "crew": {str(ctx.author.id): bet},
             "bet_amount": bet,
             "target": target.id,
+            "target_name": target.display_name,
             "started": datetime.utcnow().isoformat()
         }
-        
-        embed = discord.Embed(
-            title="🏢 BUSINESS HEIST RECRUITING!",
-            description=f"{ctx.author.mention} is planning to rob {target.mention}!",
-            color=discord.Color.orange()
-        )
-        
-        embed.add_field(name="Bet Amount", value=f"{bet:,} coins", inline=True)
-        embed.add_field(name="Crew Size", value="1/4", inline=True)
-        embed.add_field(name="Target", value=target.mention, inline=True)
-        
-        embed.add_field(
-            name="Join Now!",
-            value=f"Type `L!heist join` to join the crew!\n"
-                  f"You need {bet:,} coins to join.\n\n"
-                  f"⏰ Heist starts in 45 seconds!",
-            inline=False
-        )
-        
-        await ctx.send(embed=embed)
-        
-        # Wait 45 seconds
-        await asyncio.sleep(45)
-        
-        # Execute heist
-        if ctx.channel.id in self.active_heists:
-            await self.execute_heist(ctx)
+
+        view = HeistJoinView(self, ctx.channel.id, max_crew=4, timeout_secs=45)
+        embed = view._build_embed()
+        msg = await ctx.send(embed=embed, view=view)
+        view.message = msg
     
-    @heist.command(name="join")
-    async def heist_join(self, ctx):
-        """Join an active heist"""
-        if ctx.channel.id not in self.active_heists:
-            await ctx.send("❌ No heist is being planned in this channel!")
+    async def _run_heist(self, channel: discord.TextChannel) -> None:
+        """Execute the heist and post result embed to channel."""
+        heist = self.active_heists.get(channel.id)
+        if not heist:
             return
-        
-        heist = self.active_heists[ctx.channel.id]
-        user_key = str(ctx.author.id)
-        
-        # Check if already in crew
-        if user_key in heist["crew"]:
-            await ctx.send("❌ You're already in the crew!")
-            return
-        
-        # Check crew size
-        max_crew = 6 if heist["type"] == "bank" else 4
-        if len(heist["crew"]) >= max_crew:
-            await ctx.send(f"❌ Crew is full! ({max_crew}/{max_crew})")
-            return
-        
-        # Check balance
+
+        crew_size = len(heist["crew"])
+
         economy_cog = self.bot.get_cog("Economy")
-        bet = heist["bet_amount"]
-        balance = economy_cog.get_balance(ctx.author.id)
-        
-        if balance < bet:
-            await ctx.send(f"❌ You need {bet:,} coins to join but have {balance:,}")
-            return
-        
-        # Join heist
-        economy_cog.remove_coins(ctx.author.id, bet, "heist_bet")
-        heist["crew"][user_key] = bet
-        
-        crew_size = len(heist["crew"])
-        await ctx.send(f"✅ {ctx.author.mention} joined the crew! ({crew_size}/{max_crew})")
-    
-    async def execute_heist(self, ctx):
-        """Execute the heist"""
-        heist = self.active_heists[ctx.channel.id]
-        crew_size = len(heist["crew"])
-        
+
         if crew_size < 2:
             # Refund everyone
-            economy_cog = self.bot.get_cog("Economy")
-            for user_id, bet in heist["crew"].items():
-                economy_cog.add_coins(int(user_id), bet, "heist_cancelled")
-            
-            del self.active_heists[ctx.channel.id]
-            await ctx.send("❌ Heist cancelled! Not enough crew members. Bets refunded.")
+            if economy_cog:
+                for user_id, bet_amount in heist["crew"].items():
+                    economy_cog.add_coins(int(user_id), bet_amount, "heist_cancelled")
+            del self.active_heists[channel.id]
+            await channel.send("❌ Heist cancelled — not enough crew members. All bets refunded.")
             return
-        
+
         # Calculate success rate
         success_rates = {2: 0.40, 3: 0.55, 4: 0.70, 5: 0.80, 6: 0.90}
-        success_rate = success_rates.get(crew_size, 0.40)
-        
-        # Roll for success
+        success_rate = success_rates.get(min(crew_size, 6), 0.40)
+
         success = random.random() < success_rate
-        
-        economy_cog = self.bot.get_cog("Economy")
-        
+
         if success:
             if heist["type"] == "bank":
-                # Bank heist reward
                 base_reward = random.randint(10000, 50000)
                 reward_per_person = base_reward // crew_size
-                
+
                 embed = discord.Embed(
-                    title="✅ HEIST SUCCESS!",
-                    description=f"The crew successfully robbed the bank!",
+                    title="✅ HEIST SUCCESS — BANK ROBBED!",
+                    description=f"The crew cracked the vault and escaped clean!",
                     color=discord.Color.green()
                 )
-                
+
                 crew_mentions = []
-                for user_id, bet in heist["crew"].items():
+                for user_id, _bet in heist["crew"].items():
                     uid = int(user_id)
-                    economy_cog.add_coins(uid, reward_per_person, "heist_success")
-                    
-                    # Update stats
+                    if economy_cog:
+                        economy_cog.add_coins(uid, reward_per_person, "heist_success")
                     stats = self.get_user_stats(uid)
                     stats["total_heists"] += 1
                     stats["successful"] += 1
@@ -374,59 +471,52 @@ class Heist(commands.Cog):
                     stats["last_heist"] = datetime.utcnow().isoformat()
                     if _h_mg:
                         try:
-                            _h_mg(uid, 'heist', 'win', reward_per_person)
-                            _h_inc(uid, 'heist_participated')
-                            _h_inc(uid, 'heist_successful')
-                            _h_inc(uid, 'heist_coins_earned', reward_per_person)
+                            _h_mg(uid, "heist", "win", reward_per_person)
+                            _h_inc(uid, "heist_participated")
+                            _h_inc(uid, "heist_successful")
+                            _h_inc(uid, "heist_coins_earned", reward_per_person)
                         except Exception:
                             pass
-                    
                     user = await self.bot.fetch_user(uid)
                     crew_mentions.append(user.mention)
-                
-                embed.add_field(name="Crew Size", value=crew_size, inline=True)
-                embed.add_field(name="Total Loot", value=f"{base_reward:,} coins", inline=True)
-                embed.add_field(name="Per Person", value=f"{reward_per_person:,} coins", inline=True)
-                embed.add_field(name="Crew", value=", ".join(crew_mentions), inline=False)
-                
+
+                embed.add_field(name="👥 Crew", value=crew_size, inline=True)
+                embed.add_field(name="💰 Total Loot", value=f"{base_reward:,} coins", inline=True)
+                embed.add_field(name="🏅 Per Person", value=f"{reward_per_person:,} coins", inline=True)
+                embed.add_field(name="🔫 Crew Members", value=", ".join(crew_mentions), inline=False)
+
             else:  # Business heist
                 business_cog = self.bot.get_cog("Business")
-                target_businesses = business_cog.get_user_businesses(heist["target"])
-                
-                # Calculate total pending income
                 total_stolen = 0
-                for biz_id, biz_data in target_businesses["businesses"].items():
-                    biz_type = biz_data["type"]
-                    level = biz_data["level"]
-                    income = business_cog.calculate_income(biz_type, level)
-                    
-                    last_collect = datetime.fromisoformat(biz_data["last_collect"])
-                    hours_passed = (datetime.utcnow() - last_collect).total_seconds() / 3600
-                    pending = int(income * hours_passed)
-                    total_stolen += pending
-                    
-                    # Reset their collection timer
-                    biz_data["last_collect"] = datetime.utcnow().isoformat()
-                
-                business_cog.save_data()
-                
+                if business_cog:
+                    target_businesses = business_cog.get_user_businesses(heist["target"])
+                    for _biz_id, biz_data in target_businesses.get("businesses", {}).items():
+                        biz_type = biz_data["type"]
+                        level = biz_data["level"]
+                        income = business_cog.calculate_income(biz_type, level)
+                        last_collect = datetime.fromisoformat(biz_data["last_collect"])
+                        hours_passed = (datetime.utcnow() - last_collect).total_seconds() / 3600
+                        total_stolen += int(income * hours_passed)
+                        biz_data["last_collect"] = datetime.utcnow().isoformat()
+                    business_cog.save_data()
+
                 if total_stolen == 0:
-                    total_stolen = 1000  # Minimum payout
-                
+                    total_stolen = 1000  # minimum payout
+
                 reward_per_person = total_stolen // crew_size
-                
+                target_user = await self.bot.fetch_user(heist["target"])
+
                 embed = discord.Embed(
-                    title="✅ HEIST SUCCESS!",
-                    description=f"The crew robbed {(await self.bot.fetch_user(heist['target'])).mention}'s businesses!",
+                    title="✅ HEIST SUCCESS — BUSINESS HIT!",
+                    description=f"The crew stripped {target_user.mention}'s income!",
                     color=discord.Color.green()
                 )
-                
+
                 crew_mentions = []
-                for user_id in heist["crew"].keys():
+                for user_id in heist["crew"]:
                     uid = int(user_id)
-                    economy_cog.add_coins(uid, reward_per_person, "heist_success")
-                    
-                    # Update stats
+                    if economy_cog:
+                        economy_cog.add_coins(uid, reward_per_person, "heist_success")
                     stats = self.get_user_stats(uid)
                     stats["total_heists"] += 1
                     stats["successful"] += 1
@@ -434,36 +524,32 @@ class Heist(commands.Cog):
                     stats["last_heist"] = datetime.utcnow().isoformat()
                     if _h_mg:
                         try:
-                            _h_mg(uid, 'heist', 'win', reward_per_person)
-                            _h_inc(uid, 'heist_participated')
-                            _h_inc(uid, 'heist_successful')
-                            _h_inc(uid, 'heist_coins_earned', reward_per_person)
+                            _h_mg(uid, "heist", "win", reward_per_person)
+                            _h_inc(uid, "heist_participated")
+                            _h_inc(uid, "heist_successful")
+                            _h_inc(uid, "heist_coins_earned", reward_per_person)
                         except Exception:
                             pass
-                    
                     user = await self.bot.fetch_user(uid)
                     crew_mentions.append(user.mention)
-                
-                embed.add_field(name="Crew Size", value=crew_size, inline=True)
-                embed.add_field(name="Total Stolen", value=f"{total_stolen:,} coins", inline=True)
-                embed.add_field(name="Per Person", value=f"{reward_per_person:,} coins", inline=True)
-                embed.add_field(name="Crew", value=", ".join(crew_mentions), inline=False)
-        
+
+                embed.add_field(name="👥 Crew", value=crew_size, inline=True)
+                embed.add_field(name="💸 Total Stolen", value=f"{total_stolen:,} coins", inline=True)
+                embed.add_field(name="🏅 Per Person", value=f"{reward_per_person:,} coins", inline=True)
+                embed.add_field(name="🔫 Crew Members", value=", ".join(crew_mentions), inline=False)
+
         else:
-            # Heist failed
+            # Heist failed — bets already deducted, no refund
             embed = discord.Embed(
-                title="❌ HEIST FAILED!",
-                description="The crew was caught!",
+                title="❌ HEIST FAILED — GOT CAUGHT!",
+                description="The police were waiting. The crew is in cuffs.",
                 color=discord.Color.red()
             )
-            
+
             total_lost = sum(heist["crew"].values())
-            
             crew_mentions = []
-            for user_id in heist["crew"].keys():
+            for user_id in heist["crew"]:
                 uid = int(user_id)
-                
-                # Update stats
                 stats = self.get_user_stats(uid)
                 stats["total_heists"] += 1
                 stats["failed"] += 1
@@ -471,23 +557,23 @@ class Heist(commands.Cog):
                 stats["last_heist"] = datetime.utcnow().isoformat()
                 if _h_mg:
                     try:
-                        _h_mg(uid, 'heist', 'loss', 0)
-                        _h_inc(uid, 'heist_participated')
+                        _h_mg(uid, "heist", "loss", 0)
+                        _h_inc(uid, "heist_participated")
                     except Exception:
                         pass
-                
                 user = await self.bot.fetch_user(uid)
                 crew_mentions.append(user.mention)
-            
-            embed.add_field(name="Crew Size", value=crew_size, inline=True)
-            embed.add_field(name="Success Rate", value=f"{int(success_rate * 100)}%", inline=True)
-            embed.add_field(name="Total Lost", value=f"{total_lost:,} coins", inline=True)
-            embed.add_field(name="Crew", value=", ".join(crew_mentions), inline=False)
-        
+
+            embed.add_field(name="👥 Crew", value=crew_size, inline=True)
+            embed.add_field(name="📊 Success Chance Was", value=f"{int(success_rate * 100)}%", inline=True)
+            embed.add_field(name="💸 Total Lost", value=f"{total_lost:,} coins", inline=True)
+            embed.add_field(name="🔫 Arrested Crew", value=", ".join(crew_mentions), inline=False)
+
         self.save_data()
-        del self.active_heists[ctx.channel.id]
-        
-        await ctx.send(embed=embed)
+        if channel.id in self.active_heists:
+            del self.active_heists[channel.id]
+
+        await channel.send(embed=embed)
     
     @heist.command(name="stats")
     async def heist_stats(self, ctx, member: Optional[discord.Member] = None):

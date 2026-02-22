@@ -60,8 +60,8 @@ def load_translations():
     global _translations_cache
     if _translations_cache is None:
         try:
-            # Path from cogs/uno/ -> go up 2 levels to root, then to data/
-            translations_path = Path(__file__).parent.parent.parent / 'data' / 'uno_translations.json'
+            # Path from cogs/uno/ -> go up 2 levels to root, then to language/
+            translations_path = Path(__file__).parent.parent.parent / 'language' / 'uno_translations.json'
             if translations_path.exists():
                 with open(translations_path, 'r', encoding='utf-8') as f:
                     _translations_cache = json.load(f)

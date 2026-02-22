@@ -8,7 +8,84 @@ import random
 from datetime import datetime, timedelta
 from typing import Optional
 
-class GlobalEvents(commands.Cog):
+# ─── V2 Attack Button ────────────────────────────────────────────────────────
+
+class AttackView(discord.ui.View):
+    """Persistent ⚔️ Attack button shown while world boss is alive."""
+
+    def __init__(self, cog: "GlobalEvents"):
+        super().__init__(timeout=None)  # keep alive until boss dies
+        self.cog = cog
+
+    @discord.ui.button(label="⚔️ Attack!", style=discord.ButtonStyle.danger, custom_id="worldboss_attack")
+    async def attack_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle button attack — same logic as L!attack but via button."""
+        if "worldboss" not in self.cog.active_events:
+            await interaction.response.send_message("❌ No World Boss is active!", ephemeral=True)
+            return
+
+        boss_data = self.cog.active_events["worldboss"]
+        boss = self.cog.bosses[boss_data["boss"]]
+
+        # Per-user cooldown (30 s)
+        user_id = str(interaction.user.id)
+        now = datetime.utcnow()
+        last = boss_data.get("cooldowns", {}).get(user_id)
+        if last:
+            diff = (now - datetime.fromisoformat(last)).total_seconds()
+            if diff < 30:
+                remaining = int(30 - diff)
+                await interaction.response.send_message(
+                    f"⏳ Cooldown! Attack again in **{remaining}s**.", ephemeral=True
+                )
+                return
+
+        if "cooldowns" not in boss_data:
+            boss_data["cooldowns"] = {}
+        boss_data["cooldowns"][user_id] = now.isoformat()
+
+        # Enrage phase: >75% hp gone → 1.5× damage
+        hp_gone_pct = 1 - (boss_data["hp"] / boss_data["max_hp"])
+        dmg_min, dmg_max = boss["damage_range"]
+        if hp_gone_pct >= 0.75:
+            dmg_min = int(dmg_min * 1.5)
+            dmg_max = int(dmg_max * 1.5)
+            enraged = True
+        else:
+            enraged = False
+
+        dmg = random.randint(dmg_min, dmg_max)
+        boss_data["hp"] = max(0, boss_data["hp"] - dmg)
+        boss_data["participants"][user_id] = boss_data["participants"].get(user_id, 0) + dmg
+        server_id = str(interaction.guild_id) if interaction.guild_id else "dm"
+        boss_data["server_damage"][server_id] = boss_data["server_damage"].get(server_id, 0) + dmg
+        boss_data["last_hit"] = user_id
+
+        if boss_data["hp"] <= 0:
+            await interaction.response.defer()
+            await self.cog.defeat_worldboss(interaction.channel)
+            self.stop()
+            return
+
+        hp_pct = (boss_data["hp"] / boss_data["max_hp"]) * 100
+        bars = int(hp_pct / 5)
+        bar = "🟩" * bars + ("🟥" if enraged else "⬜") * (20 - bars)
+        phase = " 🔥 **ENRAGED!**" if enraged else ""
+
+        embed = discord.Embed(
+            title=f"⚔️ {interaction.user.display_name} attacks!{phase}",
+            description=(
+                f"**Damage Dealt:** `{dmg:,}`\n\n"
+                f"**{boss['emoji']} {boss['name']}**\n"
+                f"`{bar}` {hp_pct:.1f}%\n"
+                f"**HP:** {boss_data['hp']:,} / {boss_data['max_hp']:,}\n\n"
+                f"**Total attackers:** {len(boss_data['participants'])}"
+            ),
+            color=discord.Color.red() if enraged else discord.Color.orange()
+        )
+        await interaction.response.send_message(embed=embed)
+
+
     """Epic server vs server global events - Owner only!"""
     
     def __init__(self, bot):
@@ -168,11 +245,15 @@ class GlobalEvents(commands.Cog):
                 pass
         
         await ctx.send("✅ WAR EVENT STARTED! Announced to all servers!")
-        
-        # Schedule event end
+
+        # Schedule end in background (non-blocking)
+        asyncio.create_task(self._auto_end_war(ctx.channel, hours))
+
+    async def _auto_end_war(self, channel: discord.TextChannel, hours: int) -> None:
+        """Background task: auto-end WAR after given hours."""
         await asyncio.sleep(hours * 3600)
         if "war" in self.active_events:
-            await self.end_event("war", ctx.channel)
+            await self.end_event("war", channel)
     
     @commands.command(name="joinfaction")
     async def join_faction(self, ctx, faction: str):
@@ -267,28 +348,32 @@ class GlobalEvents(commands.Cog):
             "max_hp": boss["hp"],
             "participants": {},
             "server_damage": {},
+            "cooldowns": {},
             "last_hit": None,
             "started": datetime.now().isoformat()
         }
         
         embed = discord.Embed(
             title=f"🐉 WORLD BOSS INVASION! 🐉",
-            description=f"**{boss['emoji']} {boss['name']}** has appeared!\n\n"
-                       f"**Global HP:** {boss['hp']:,}\n\n"
-                       f"Every attack from ANY server damages the boss!\n\n"
-                       f"**Use `L!attack` to deal damage!**\n"
-                       f"**Use `L!bossstats` to check progress!**\n\n"
-                       f"**Rewards for ALL participants when defeated!**\n"
-                       f"🏆 Top damage dealers get bonus rewards!\n"
-                       f"⚡ Last hit bonus!\n"
-                       f"🌐 All servers share in victory!",
+            description=(
+                f"**{boss['emoji']} {boss['name']}** has appeared!\n\n"
+                f"**Global HP:** {boss['hp']:,}\n\n"
+                f"Every attack from ANY server damages the boss!\n\n"
+                f"**Click \u2694\ufe0f Attack! or use `L!attack`**\n"
+                f"**Use `L!bossstats` to check progress!**\n\n"
+                f"**All participants rewarded when defeated!**\n"
+                f"🏆 Top damage dealers get bonus rewards!\n"
+                f"⚡ Last hit bonus: **15,000 coins**!\n"
+                f"💪 Enrage at 75% health lost (×1.5 dmg)!"
+            ),
             color=discord.Color.dark_red()
         )
-        
+
+        view = AttackView(self)
         for guild in self.bot.guilds:
             try:
                 channel = guild.system_channel or guild.text_channels[0]
-                await channel.send(embed=embed)
+                await channel.send(embed=embed, view=view)
             except:
                 pass
         
@@ -301,41 +386,57 @@ class GlobalEvents(commands.Cog):
         if "worldboss" not in self.active_events:
             await ctx.send("❌ No World Boss is currently active!")
             return
-        
+
         boss_data = self.active_events["worldboss"]
         boss = self.bosses[boss_data["boss"]]
-        
-        # Calculate damage
-        damage = random.randint(*boss["damage_range"])
-        
-        # Apply damage
+
+        # Enrage at 75% hp gone
+        hp_gone_pct = 1 - (boss_data["hp"] / boss_data["max_hp"])
+        dmg_min, dmg_max = boss["damage_range"]
+        if hp_gone_pct >= 0.75:
+            dmg_min = int(dmg_min * 1.5)
+            dmg_max = int(dmg_max * 1.5)
+            enraged = True
+        else:
+            enraged = False
+
+        damage = random.randint(dmg_min, dmg_max)
         boss_data["hp"] = max(0, boss_data["hp"] - damage)
-        
-        # Track participation
+
         user_id = str(ctx.author.id)
-        server_id = str(ctx.guild.id)
-        
+        server_id = str(ctx.guild.id) if ctx.guild else "dm"
+        boss_data.setdefault("cooldowns", {})
         boss_data["participants"][user_id] = boss_data["participants"].get(user_id, 0) + damage
         boss_data["server_damage"][server_id] = boss_data["server_damage"].get(server_id, 0) + damage
         boss_data["last_hit"] = user_id
-        
+
         if boss_data["hp"] <= 0:
-            await self.defeat_worldboss(ctx)
-        else:
-            hp_percent = (boss_data["hp"] / boss_data["max_hp"]) * 100
-            embed = discord.Embed(
-                title=f"⚔️ {ctx.author.display_name} attacks!",
-                description=f"**Damage Dealt:** {damage:,}\n\n"
-                           f"**{boss['emoji']} {boss['name']}**\n"
-                           f"**HP:** {boss_data['hp']:,} / {boss_data['max_hp']:,} ({hp_percent:.1f}%)\n\n"
-                           f"{'🟩' * int(hp_percent / 5)}{'⬜' * (20 - int(hp_percent / 5))}",
-                color=discord.Color.orange()
-            )
-            await ctx.send(embed=embed)
+            await self.defeat_worldboss(ctx.channel)
+            return
+
+        hp_pct = (boss_data["hp"] / boss_data["max_hp"]) * 100
+        bars = int(hp_pct / 5)
+        bar = "🟩" * bars + ("🟥" if enraged else "⬜") * (20 - bars)
+        phase = " 🔥 **ENRAGED!**" if enraged else ""
+
+        embed = discord.Embed(
+            title=f"⚔️ {ctx.author.display_name} attacks!{phase}",
+            description=(
+                f"**Damage Dealt:** `{damage:,}`\n\n"
+                f"**{boss['emoji']} {boss['name']}**\n"
+                f"`{bar}` {hp_pct:.1f}%\n"
+                f"**HP:** {boss_data['hp']:,} / {boss_data['max_hp']:,}\n\n"
+                f"**Total attackers:** {len(boss_data['participants'])}"
+            ),
+            color=discord.Color.red() if enraged else discord.Color.orange()
+        )
+        await ctx.send(embed=embed)
     
-    async def defeat_worldboss(self, ctx):
+    async def defeat_worldboss(self, channel: discord.TextChannel):
         """Handle world boss defeat"""
-        boss_data = self.active_events["worldboss"]
+        boss_data = self.active_events.get("worldboss")
+        if not boss_data:
+            return
         boss = self.bosses[boss_data["boss"]]
         
         # Award rewards
@@ -381,11 +482,11 @@ class GlobalEvents(commands.Cog):
         
         for guild in self.bot.guilds:
             try:
-                channel = guild.system_channel or guild.text_channels[0]
-                await channel.send(embed=embed)
+                ch = guild.system_channel or guild.text_channels[0]
+                await ch.send(embed=embed)
             except:
                 pass
-        
+
         del self.active_events["worldboss"]
         self.save_events()
     
@@ -401,12 +502,14 @@ class GlobalEvents(commands.Cog):
         
         hp_percent = (boss_data["hp"] / boss_data["max_hp"]) * 100
         
-        # Top 5 servers
+        # Top 5 servers with names
         top_servers = sorted(boss_data["server_damage"].items(), key=lambda x: -x[1])[:5]
-        server_text = "\n".join([
-            f"{i+1}. Server {guild_id[:8]}... - {damage:,} damage"
-            for i, (guild_id, damage) in enumerate(top_servers)
-        ])
+        server_lines = []
+        for i, (guild_id, damage) in enumerate(top_servers, 1):
+            guild_obj = self.bot.get_guild(int(guild_id))
+            guild_name = guild_obj.name if guild_obj else f"Server #{guild_id[:6]}"
+            server_lines.append(f"{i}. **{guild_name}** — {damage:,} dmg")
+        server_text = "\n".join(server_lines) or "None yet"
         
         embed = discord.Embed(
             title=f"{boss['emoji']} {boss['name']} Status",

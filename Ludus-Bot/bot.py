@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import discord
 from discord.ext import commands
 import json
@@ -392,6 +392,13 @@ async def on_resume():
 
 @bot.event
 async def on_ready():
+    # Register bot reference in stat_hooks for challenge event routing
+    try:
+        from utils.stat_hooks import us_set_bot
+        us_set_bot(bot)
+    except Exception:
+        pass
+
     # Initialize Database Schema
     # try:
     #     from utils.database import db
@@ -543,7 +550,7 @@ async def on_ready():
     # Commands in DEV_ONLY_COMMANDS list sync ONLY to dev guild (fast testing)
     # All other commands sync globally
     # Do NOT include entry point commands (like 'start') in DEV_ONLY_COMMANDS!
-    DEV_ONLY_COMMANDS = []  # Only non-entry-point commands for dev guild testing
+    DEV_ONLY_COMMANDS = ['tutorial']  # Only non-entry-point commands for dev guild testing
 
     try:
         import os
