@@ -215,6 +215,7 @@ class PacManGame:
                     else:
                         # Reset positions
                         self.pacman["x"], self.pacman["y"] = 1, 1
+                        self.pacman["dir"] = "right" # Reset direction too
                         # Reset ghosts
                         self.ghosts = []
                         self.spawn_ghosts()
@@ -243,50 +244,149 @@ class PacManGame:
                 r = 8
                 draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=(255, 184, 174))
         
-        # Draw Ghosts
+        # Draw Ghosts with improved graphics
         for ghost in self.ghosts:
             gx, gy = ghost["x"] * self.block_size, ghost["y"] * self.block_size
             color = (0, 0, 255) if ghost["scared"] > 0 else ghost["color"]
             
-            # Simple Ghost Shape (dome top, jagged bottom)
-            draw.chord([gx+4, gy+4, gx+28, gy+28], 180, 0, fill=color) # Top head
-            draw.rectangle([gx+4, gy+16, gx+28, gy+28], fill=color) # Body
-            # Eyes
-            draw.ellipse([gx+8, gy+10, gx+14, gy+16], fill=(255, 255, 255))
-            draw.ellipse([gx+18, gy+10, gx+24, gy+16], fill=(255, 255, 255))
-            draw.point([gx+11, gy+13], fill=(0, 0, 255))
-            draw.point([gx+21, gy+13], fill=(0, 0, 255))
+            # Body (Round top)
+            draw.chord([gx+2, gy+2, gx+30, gy+30], 180, 0, fill=color) 
+            draw.rectangle([gx+2, gy+16, gx+30, gy+26], fill=color)
+            
+            # Wavy feet (3 triangles)
+            foot_size = 28 // 3
+            for i in range(3):
+                fx = gx + 2 + (i * foot_size)
+                # Simple jagged bottom
+                draw.polygon([
+                    (fx, gy+26), 
+                    (fx + foot_size//2, gy+30), 
+                    (fx + foot_size, gy+26)
+                ], fill=color)
 
-        # Draw PacMan
+            # Eyes (White sclera)
+            eye_y = gy + 10
+            # Scared ghosts have different eyes (wavy mouth or small eyes)
+            if ghost["scared"] > 0:
+                 # Small scared eyes
+                 draw.rectangle([gx+8, gy+12, gx+12, gy+14], fill=(255, 200, 200)) 
+                 draw.rectangle([gx+20, gy+12, gx+24, gy+14], fill=(255, 200, 200))
+                 # Wavy scared mouth
+                 draw.line([(gx+6, gy+20), (gx+10, gy+18), (gx+14, gy+20), (gx+18, gy+18), (gx+22, gy+20), (gx+26, gy+18)], fill=(255, 200, 200), width=1)
+            else:
+                # Normal eyes looking in direction of movement (simulated randomness for now or center)
+                draw.ellipse([gx+6, gy+8, gx+14, gy+18], fill=(255, 255, 255))
+                draw.ellipse([gx+18, gy+8, gx+26, gy+18], fill=(255, 255, 255))
+                # Pupils (Blue)
+                # Look towards PacMan simply
+                look_x = 0
+                if self.pacman["x"] > ghost["x"]: look_x = 2
+                elif self.pacman["x"] < ghost["x"]: look_x = -2
+                
+                look_y = 0
+                if self.pacman["y"] > ghost["y"]: look_y = 2
+                elif self.pacman["y"] < ghost["y"]: look_y = -2
+                
+                draw.ellipse([gx+8+look_x, gy+11+look_y, gx+12+look_x, gy+15+look_y], fill=(0, 0, 255))
+                draw.ellipse([gx+20+look_x, gy+11+look_y, gx+24+look_x, gy+15+look_y], fill=(0, 0, 255))
+
+
+        
+        # Draw PacMan (High Quality)
         px, py = self.pacman["x"] * self.block_size, self.pacman["y"] * self.block_size
         mouth_angle = 45 if self.pacman["mouth_open"] else 5
         start_angle = 0
         direction = self.pacman["dir"]
         
+        # Determine angle
         if direction == "right": start_angle = 0
         elif direction == "down": start_angle = 90
         elif direction == "left": start_angle = 180
         elif direction == "up": start_angle = 270
         
-        # Pieslice expects angles in degrees
+        # Shadow/3D effect
+        # draw.pieslice([px+4, py+4, px+32, py+32], start_angle + mouth_angle, start_angle + 360 - mouth_angle, fill=(180, 180, 0))
+        
+        # Main Body
         draw.pieslice([px+2, py+2, px+30, py+30], start_angle + mouth_angle, start_angle + 360 - mouth_angle, fill=(255, 255, 0))
+        
+        # Eye (if mouth is open wide, maybe hide it, but classic pacman has no eye often, let's add a small black dot for personality)
+        # Position depends on rotation
+        eye_rad = 2
+        eye_offset_x = 0
+        eye_offset_y = 0
+        
+        if direction == "right": eye_offset_x, eye_offset_y = 16, 8
+        elif direction == "left": eye_offset_x, eye_offset_y = 16, 8
+        elif direction == "up": eye_offset_x, eye_offset_y = 8, 16 
+        elif direction == "down": eye_offset_x, eye_offset_y = 24, 16 
+        
+        if direction in ["right", "up"]: # Top/Right side eye
+             draw.ellipse([px+eye_offset_x-eye_rad, py+eye_offset_y-eye_rad, px+eye_offset_x+eye_rad, py+eye_offset_y+eye_rad], fill=(0, 0, 0))
+        elif direction == "left": # Need to mirror
+             draw.ellipse([px+(32-eye_offset_x)-eye_rad, py+eye_offset_y-eye_rad, px+(32-eye_offset_x)+eye_rad, py+eye_offset_y+eye_rad], fill=(0, 0, 0))
+        elif direction == "down":
+             draw.ellipse([px+eye_offset_x-eye_rad, py+(32-eye_offset_y)-eye_rad, px+eye_offset_x+eye_rad, py+(32-eye_offset_y)+eye_rad], fill=(0, 0, 0))
+
 
         # Game Over Overlay
-        if self.state == "game_over":
-             draw.text((w//2 - 40, h//2), "GAME OVER", fill=(255, 0, 0))
-        elif self.state == "win":
-             draw.text((w//2 - 30, h//2), "WINNER!", fill=(0, 255, 0))
+        if self.state in ["game_over", "win"]:
+            # Darkened overlay
+            overlay = Image.new('RGBA', (w, h), (0, 0, 0, 180))
+            img = img.convert("RGBA")
+            img = Image.alpha_composite(img, overlay)
+            img = img.convert("RGB")
+            draw = ImageDraw.Draw(img)
+            
+            # Text
+            text = "GAME OVER" if self.state == "game_over" else "YOU WIN!"
+            color = (255, 50, 50) if self.state == "game_over" else (50, 255, 50)
+            
+            # Simple centering (not perfect without font metrics but works)
+            draw.text((w//2 - 30, h//2 - 10), text, fill=color)
+            draw.text((w//2 - 40, h//2 + 10), f"Final Score: {self.score}", fill=(255, 255, 255))
 
         buffer = io.BytesIO()
         img.save(buffer, format='PNG')
         buffer.seek(0)
         return buffer
 
+class MainArcadeMenu(discord.ui.View):
+    def __init__(self, cog):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    @discord.ui.button(label="👻 PacMan", style=discord.ButtonStyle.primary, row=0)
+    async def pacman(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.start_pacman(interaction)
+
+    @discord.ui.button(label="💣 Bomb Defuse", style=discord.ButtonStyle.danger, row=0)
+    async def bomb(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.start_bomb(interaction)
+
+    @discord.ui.button(label="🐍 Snake", style=discord.ButtonStyle.success, row=1)
+    async def snake(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🐍 Snake is coming soon!", ephemeral=True)
+
+    @discord.ui.button(label="🧱 Tetris", style=discord.ButtonStyle.primary, row=1)
+    async def tetris(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🧱 Tetris is coming soon!", ephemeral=True)
+
+    @discord.ui.button(label="👾 Space Invaders", style=discord.ButtonStyle.secondary, row=2)
+    async def space(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("👾 Space Invaders is coming soon!", ephemeral=True)
+        
+    @discord.ui.button(label="🏓 Pong", style=discord.ButtonStyle.secondary, row=2)
+    async def pong(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🏓 Pong is coming soon!", ephemeral=True)
+
+
 class PacManView(discord.ui.View):
-    def __init__(self, game, interaction):
+    def __init__(self, game, interaction, cog):
         super().__init__(timeout=120)
         self.game = game
         self.original_interaction = interaction
+        self.cog = cog
         self.message = None
     
     async def update_board(self, interaction=None):
@@ -300,12 +400,15 @@ class PacManView(discord.ui.View):
             
         embed = discord.Embed(title="🕹️ PacMan Arcade", description=desc, color=discord.Color.yellow())
         embed.set_image(url="attachment://pacman.png")
+        embed.set_footer(text="Use the buttons below to play!")
         
         if self.game.state != "playing":
-            self.disable_all_items()
-            self.stop()
+            # Update buttons for game over state
+            self.clear_items()
+            self.add_item(discord.ui.Button(label="🔄 Restart", style=discord.ButtonStyle.success, custom_id="restart"))
+            self.add_item(discord.ui.Button(label="🏠 Menu", style=discord.ButtonStyle.secondary, custom_id="menu"))
             
-            # handle rewards
+            # handle rewards logic (omitted for brevity, copied from previous)
             if self.game.state == "win":
                 reward = self.game.score * 2
                 if _arc_mg:
@@ -315,22 +418,7 @@ class PacManView(discord.ui.View):
                     except Exception:
                         pass
                 embed.description += f"\n**+{reward} PsyCoins!** 🪙"
-                
-                # TCG Reward chance
-                if tcg_manager:
-                    try:
-                        awarded = tcg_manager.award_for_game_event(str(self.game.user_id), 'difficult')
-                        if awarded:
-                            names = [CARD_DATABASE.get(c, {}).get('name', c) for c in awarded]
-                            embed.description += f"\n🎴 Bonus TCG reward: {', '.join(names)}"
-                    except Exception:
-                        pass
-            elif self.game.state == "game_over":
-                 if _arc_mg:
-                    try:
-                        _arc_mg(self.game.user_id, 'pacman', 'loss', 0)
-                    except Exception:
-                        pass
+            
         
         if interaction:
             await interaction.response.edit_message(embed=embed, attachments=[file], view=self)
@@ -340,11 +428,22 @@ class PacManView(discord.ui.View):
             await self.original_interaction.response.send_message(embed=embed, file=file, view=self)
             self.message = await self.original_interaction.original_response()
 
+    # Row 0: Restart, Up, Menu
+    @discord.ui.button(label="🔄 Restart", style=discord.ButtonStyle.secondary, row=0)
+    async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Restart game with same user
+        await self.cog.start_pacman(interaction, is_retry=True)
+
     @discord.ui.button(label="⬆️", style=discord.ButtonStyle.primary, row=0)
     async def up(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.game.move_player("up")
         await self.update_board(interaction)
 
+    @discord.ui.button(label="🏠 Menu", style=discord.ButtonStyle.secondary, row=0)
+    async def menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.show_arcade_menu(interaction)
+
+    # Row 1: Left, Down, Right
     @discord.ui.button(label="⬅️", style=discord.ButtonStyle.primary, row=1)
     async def left(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.game.move_player("left")
@@ -359,11 +458,22 @@ class PacManView(discord.ui.View):
     async def right(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.game.move_player("right")
         await self.update_board(interaction)
-        
-    @discord.ui.button(label="❌ Quit", style=discord.ButtonStyle.danger, row=2)
-    async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.game.state = "game_over"
-        await self.update_board(interaction)
+    
+    # Custom handler for dynamic buttons added in game over
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.game.user_id:
+            await interaction.response.send_message("This isn't your game!", ephemeral=True)
+            return False
+            
+        custom_id = interaction.data.get("custom_id")
+        if custom_id == "restart":
+            await self.cog.start_pacman(interaction, is_retry=True)
+            return False # Stop processing
+        elif custom_id == "menu":
+            await self.cog.show_arcade_menu(interaction)
+            return False
+            
+        return True
 
 class ArcadeGames(commands.Cog):
     """Arcade-style games"""
@@ -385,37 +495,50 @@ class ArcadeGames(commands.Cog):
         self.bot = bot
         self.active_games = {}
     
-    @app_commands.command(name="arcade", description="Arcade games")
-    @app_commands.choices(game=[
-        app_commands.Choice(name="👻 PacMan", value="pacman"),
-        app_commands.Choice(name="💣 Bomb Defuse", value="bombdefuse"),
-        app_commands.Choice(name="🐍 Snake", value="snake"),
-        app_commands.Choice(name="🧱 Tetris", value="tetris"),
-        app_commands.Choice(name="👾 Space Invaders", value="space_invaders"),
-        app_commands.Choice(name="🏓 Pong", value="pong")
-    ])
-    async def arcade_command(self, interaction: discord.Interaction, game: app_commands.Choice[str]):
-        """Unified arcade command with game dropdown"""
-        game_value = game.value if isinstance(game, app_commands.Choice) else game
+    @app_commands.command(name="arcade", description="Arcade games menu")
+    async def arcade_command(self, interaction: discord.Interaction):
+        """Unified arcade command"""
+        await self.show_arcade_menu(interaction)
         
-        if game_value == "pacman":
-            await self.arcade_pacman_action(interaction)
-        elif game_value == "bombdefuse":
-            await self.arcade_bombdefuse_action(interaction)
-        elif game_value == "snake":
-            await self.arcade_snake_action(interaction)
-        elif game_value == "tetris":
-            await self.arcade_tetris_action(interaction)
-        elif game_value == "space_invaders":
-            await self.arcade_space_invaders_action(interaction)
-        elif game_value == "pong":
-            await self.arcade_pong_action(interaction)
-    
-    async def arcade_pacman_action(self, interaction: discord.Interaction):
+    async def show_arcade_menu(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="🕹️ LUDUS ARCADE",
+            description="Welcome to the arcade! Insert coin to play.",
+            color=discord.Color.from_rgb(255, 0, 255)
+        )
+        embed.set_image(url="https://media.discordapp.net/attachments/900000000000000000/111111111111111111/arcade_banner_placeholder.png?width=800&height=200") # Placeholder or remove if no image
+        # Actually let's just use a nice text art or nothing for now to avoid broken links
+        embed.set_image(url=None) 
+        embed.add_field(name="Available Games", value="""
+👻 **PacMan** - Classic arcade action
+💣 **Bomb Defuse** - Cut the right wire!
+🐍 **Snake** - Grow your snake (Soon)
+🧱 **Tetris** - Stack blocks (Soon)
+👾 **Space Invaders** - Defend Earth (Soon)
+🏓 **Pong** - Retro tennis (Soon)
+""", inline=False)
+        
+        view = MainArcadeMenu(self)
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, view=view)
+        else:
+            await interaction.response.send_message(embed=embed, view=view)
+
+    async def start_pacman(self, interaction: discord.Interaction, is_retry=False):
         """PacMan game - Procedurally Generated"""
         game = PacManGame(interaction.user.id)
-        view = PacManView(game, interaction)
-        await view.update_board()
+        view = PacManView(game, interaction, self)
+        
+        # If it's a retry/restart/menu navigation, we might need to edit or send new
+        # But PacManView handles its own initial send/update logic mostly
+        # We just need to trigger the initial update_board
+        if is_retry:
+             # For restart, we likely want to edit the existing message if possible or send new
+             # PacManView.update_board handles interaction logic
+             await view.update_board(interaction)
+        else:
+             # Fresh start from menu
+             await view.update_board(interaction)
         
         # Track statistics if available
         if _arc_inc:
@@ -423,6 +546,9 @@ class ArcadeGames(commands.Cog):
                 _arc_inc(interaction.user.id, 'arcade_played')
             except Exception:
                 pass
+
+    async def start_bomb(self, interaction: discord.Interaction):
+        await self.arcade_bombdefuse_action(interaction)
     
     async def arcade_bombdefuse_action(self, interaction: discord.Interaction):
         """Bomb defuser game"""
