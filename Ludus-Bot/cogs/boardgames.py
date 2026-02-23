@@ -490,6 +490,77 @@ async def handle_bot_move(bot, message, game_id, game):
 
     await process_move(bot, FakeInteraction(message), game_id, game, move_idx)
 
+# ==================== CONNECT 4 CONSTANTS & VIEW ====================
+
+_C4_EMPTY   = "⬛"
+_C4_P1      = "🔴"
+_C4_P2      = "🟡"
+_C4_COLS    = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣"]
+
+def _render_c4_board(board):
+    """Render the Connect 4 board as an emoji grid with column numbers."""
+    header = "".join(_C4_COLS)
+    rows = ["".join(cell if cell != " " else _C4_EMPTY for cell in row) for row in board]
+    return header + "\n" + "\n".join(rows)
+
+
+class Connect4View(discord.ui.View):
+    """Button-based UI for Connect 4."""
+
+    def __init__(self, cog, game_id: str, game_state: dict):
+        super().__init__(timeout=180)
+        self.cog       = cog
+        self.game_id   = game_id
+        self.game_state = game_state
+        self._rebuild_buttons()
+
+    def _rebuild_buttons(self):
+        self.clear_items()
+        board     = self.game_state["board"]
+        game_over = self.game_state.get("game_over", False)
+
+        # Column buttons: cols 1-5 on row 0, cols 6-7 on row 1
+        for col in range(7):
+            is_full = board[0][col] != " "
+            btn = discord.ui.Button(
+                label=str(col + 1),
+                style=discord.ButtonStyle.primary if not is_full else discord.ButtonStyle.secondary,
+                disabled=is_full or game_over,
+                row=col // 5,
+                custom_id=f"c4_col_{self.game_id}_{col}",
+            )
+            btn.callback = self._make_col_callback(col)
+            self.add_item(btn)
+
+        # Quit button on row 1
+        quit_btn = discord.ui.Button(
+            label="🚪 Quit",
+            style=discord.ButtonStyle.danger,
+            disabled=game_over,
+            row=1,
+            custom_id=f"c4_quit_{self.game_id}",
+        )
+        quit_btn.callback = self._quit_callback
+        self.add_item(quit_btn)
+
+    def _make_col_callback(self, col: int):
+        async def callback(interaction: discord.Interaction):
+            await self.cog._handle_c4_button(interaction, self, col)
+        return callback
+
+    async def _quit_callback(self, interaction: discord.Interaction):
+        await self.cog._handle_c4_quit(interaction, self)
+
+    async def on_timeout(self):
+        self.game_state["game_over"] = True
+        self._rebuild_buttons()
+        for p_id in self.game_state.get("players", []):
+            if p_id != "AI" and p_id in self.cog.player_games:
+                del self.cog.player_games[p_id]
+        if self.game_id in self.cog.active_games:
+            del self.cog.active_games[self.game_id]
+
+
 # ==================== BOARD GAMES COG ====================
 
 class BoardGames(commands.Cog):
@@ -958,278 +1029,239 @@ class BoardGames(commands.Cog):
         return view
 
     # ==================== CONNECT 4 ====================
-    
-    connect4_group = app_commands.Group(name="connect4", description="Connect 4 game")
-    
-    @commands.group(name="connect4", aliases=["c4"], invoke_without_command=True)
-    async def connect4(self, ctx):
-        """Connect 4 commands"""
-        await ctx.send("**Connect 4 Commands:**\n`L!connect4 start [@player]` - Start a game\n`L!connect4 drop <1-7>` - Drop a piece\n`L!connect4 quit` - Quit current game")
 
-    @connect4.command(name="start")
-    async def c4_start(self, ctx, opponent: Optional[discord.Member] = None):
-        """Start a Connect 4 game"""
-        await self._start_connect4(ctx.author, opponent, ctx, None)
-
-    @connect4_group.command(name="start", description="Start a Connect 4 game")
-    @app_commands.describe(opponent="Player to challenge (optional, defaults to AI)")
+    @app_commands.command(name="connect4", description="Play Connect 4 against another player or AI")
+    @app_commands.describe(opponent="Player to challenge (leave empty to play against AI)")
     async def connect4_slash(self, interaction: discord.Interaction, opponent: Optional[discord.Member] = None):
         await interaction.response.defer()
-        await self._start_connect4(interaction.user, opponent, None, interaction)
+        await self._start_connect4(interaction.user, opponent, interaction)
 
-    async def _start_connect4(self, player1, opponent, ctx, interaction):
+    async def _start_connect4(self, player1, opponent, interaction):
         if player1.id in self.player_games:
-            msg = "❌ You're already in a game! Finish it first."
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
+            await interaction.followup.send(
+                "❌ You're already in a game! Use the 🚪 Quit button to resign first.", ephemeral=True
+            )
             return
 
-        is_ai = opponent is None
+        is_ai   = opponent is None
         player2 = "AI" if is_ai else opponent
-        
+
+        if not is_ai and opponent.bot:
+            await interaction.followup.send(
+                "❌ You can't challenge a bot! Leave the opponent blank to play against AI.", ephemeral=True
+            )
+            return
+
         if not is_ai and opponent.id in self.player_games:
-            msg = f"❌ {opponent.mention} is already in a game!"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
+            await interaction.followup.send(f"❌ {opponent.mention} is already in a game!", ephemeral=True)
             return
 
         game_id = f"c4_{player1.id}_{random.randint(1000, 9999)}"
-        board = [[" " for _ in range(7)] for _ in range(6)]
-        
+        board   = [[" " for _ in range(7)] for _ in range(6)]
+        p2_id   = "AI" if is_ai else player2.id
+
         game_state = {
-            "type": "connect4",
-            "board": board,
-            "players": [player1.id, player2 if is_ai else player2.id],
+            "type":         "connect4",
+            "board":        board,
+            "players":      [player1.id, p2_id],
             "current_turn": player1.id,
-            "symbols": {player1.id: "🔴", (player2 if is_ai else player2.id): "🟡"},
-            "is_ai": is_ai,
-            "channel": ctx.channel.id if ctx else interaction.channel.id
+            "symbols":      {player1.id: _C4_P1, p2_id: _C4_P2},
+            "is_ai":        is_ai,
+            "channel":      interaction.channel.id,
+            "game_over":    False,
         }
-        
-        self.active_games[game_id] = game_state
+
+        self.active_games[game_id]    = game_state
         self.player_games[player1.id] = game_id
         if not is_ai:
-            self.player_games[opponent.id] = game_id
+            self.player_games[player2.id] = game_id
 
-        embed = self._create_c4_embed(game_state, player1, player2)
-        
-        if interaction:
-            await interaction.followup.send(embed=embed)
+        view  = Connect4View(self, game_id, game_state)
+        embed = self._build_c4_embed(game_state, player1, player2)
+        await interaction.followup.send(embed=embed, view=view)
+
+    # ---------- Board embed builder ----------
+
+    def _build_c4_embed(self, game_state, player1, player2, result: str = None, extra_value: str = None):
+        board_str = _render_c4_board(game_state["board"])
+
+        if result == "win":
+            title, color = "🎉 Game Over – Winner!", discord.Color.green()
+        elif result == "draw":
+            title, color = "🤝 It's a Draw!", discord.Color.orange()
+        elif result == "ai_win":
+            title, color = "🤖 AI Wins!", discord.Color.red()
+        elif result in ("timeout", "quit"):
+            title, color = ("⏰ Game Timed Out" if result == "timeout" else "🚪 Game Resigned"), discord.Color.greyple()
         else:
-            await ctx.send(embed=embed)
+            title, color = "🔴 Connect 4 🟡", discord.Color.blue()
 
-    def _create_c4_embed(self, game_state, player1, player2):
-        board = game_state["board"]
-        board_display = "```\n 1   2   3   4   5   6   7\n"
-        board_display += "╔═══╦═══╦═══╦═══╦═══╦═══╦═══╗\n"
-        for i, row in enumerate(board):
-            board_display += "║ " + " ║ ".join([cell if cell != " " else " " for cell in row]) + " ║\n"
-            if i < 5:
-                board_display += "╠═══╬═══╬═══╬═══╬═══╬═══╬═══╣\n"
-        board_display += "╚═══╩═══╩═══╩═══╩═══╩═══╩═══╝\n```"
-        
-        current_player = self.bot.get_user(game_state["current_turn"]) if not game_state["is_ai"] or game_state["current_turn"] != "AI" else "AI"
-        
-        embed = discord.Embed(
-            title="🔴 Connect 4 🟡",
-            description=board_display,
-            color=discord.Color.blue()
-        )
-        
-        p1_name = player1.display_name if hasattr(player1, 'display_name') else str(player1)
-        p2_name = "AI" if game_state["is_ai"] else (player2.display_name if hasattr(player2, 'display_name') else str(player2))
-        
-        embed.add_field(name="Players", value=f"🔴 {p1_name} vs 🟡 {p2_name}", inline=False)
-        embed.add_field(name="Current Turn", value=f"**{current_player.display_name if hasattr(current_player, 'display_name') else current_player}**", inline=False)
-        embed.add_field(name="How to Play", value="Use `L!connect4 drop <1-7>` or `/c4-drop <1-7>` to drop a piece", inline=False)
-        
+        embed = discord.Embed(title=title, description=board_str, color=color)
+
+        p1_name = player1.display_name if hasattr(player1, "display_name") else str(player1)
+        p2_name = "🤖 AI" if game_state["is_ai"] else (player2.display_name if hasattr(player2, "display_name") else str(player2))
+        embed.add_field(name="Players", value=f"{_C4_P1} **{p1_name}**  vs  {_C4_P2} **{p2_name}**", inline=False)
+
+        if not game_state.get("game_over", False):
+            cid = game_state["current_turn"]
+            if cid == "AI":
+                turn_str = "🤖 AI is thinking…"
+            else:
+                u = self.bot.get_user(cid)
+                sym = game_state["symbols"].get(cid, "")
+                turn_str = f"{sym} {u.mention if u else f'<@{cid}>'}"
+            embed.add_field(name="Current Turn", value=turn_str, inline=False)
+        elif extra_value:
+            embed.add_field(name="Result", value=extra_value, inline=False)
+
+        embed.set_footer(text="Click a column button to drop your disc · 🚪 Quit to resign · 180 s timeout")
         return embed
 
-    @connect4.command(name="drop")
-    async def c4_drop(self, ctx, column: int):
-        """Drop a piece in Connect 4"""
-        await self._make_c4_move(ctx.author, column, ctx, None)
+    # ---------- Button handlers ----------
 
-    @connect4_group.command(name="drop", description="Drop a Connect 4 piece")
-    @app_commands.describe(column="Column to drop piece (1-7)")
-    async def c4_drop_slash(self, interaction: discord.Interaction, column: int):
-        await interaction.response.defer()
-        await self._make_c4_move(interaction.user, column, None, interaction)
+    async def _handle_c4_button(self, interaction: discord.Interaction, view: Connect4View, col: int):
+        game_state = view.game_state
+        player     = interaction.user
 
-    async def _make_c4_move(self, player, column, ctx, interaction):
-        if player.id not in self.player_games:
-            msg = "❌ You're not in a game! Start one with `L!connect4 start`"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
-            return
-
-        game_id = self.player_games[player.id]
-        game_state = self.active_games[game_id]
-        
-        if game_state["type"] != "connect4":
-            msg = "❌ You're not in a Connect 4 game!"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
-            return
-        
         if game_state["current_turn"] != player.id:
-            msg = "❌ It's not your turn!"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
+            cid = game_state["current_turn"]
+            exp = self.bot.get_user(cid) if cid != "AI" else None
+            await interaction.response.send_message(
+                f"❌ It's not your turn! Waiting for **{exp.display_name if exp else 'AI'}**.",
+                ephemeral=True,
+            )
             return
 
-        if column < 1 or column > 7:
-            msg = "❌ Column must be between 1 and 7!"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
-            return
+        board = game_state["board"]
 
-        # Find lowest empty row in column
-        col_idx = column - 1
+        # Drop disc into lowest empty row
         row_idx = None
         for r in range(5, -1, -1):
-            if game_state["board"][r][col_idx] == " ":
+            if board[r][col] == " ":
                 row_idx = r
                 break
 
         if row_idx is None:
-            msg = "❌ That column is full!"
-            if interaction:
-                await interaction.followup.send(msg)
-            else:
-                await ctx.send(msg)
+            await interaction.response.send_message("❌ That column is full!", ephemeral=True)
             return
 
-        # Make move
-        symbol = game_state["symbols"][player.id]
-        game_state["board"][row_idx][col_idx] = symbol
+        await interaction.response.defer()
 
-        # Check for win
-        if self._check_c4_winner(game_state["board"], row_idx, col_idx):
-            embed = self._create_c4_embed(game_state, player, game_state["players"][1])
-            embed.title = f"🎉 {player.display_name} wins!"
-            embed.color = discord.Color.green()
-            
-            # Award coins
+        board[row_idx][col] = game_state["symbols"][player.id]
+
+        p1 = self.bot.get_user(game_state["players"][0])
+        p2 = "AI" if game_state["is_ai"] else self.bot.get_user(game_state["players"][1])
+
+        # ---- Win check ----
+        if self._check_c4_winner(board, row_idx, col):
+            game_state["game_over"] = True
+            view._rebuild_buttons()
+
             economy_cog = self.bot.get_cog("Economy")
             if economy_cog:
                 economy_cog.add_coins(player.id, 75, "c4_win")
-                embed.add_field(name="Reward", value="+75 PsyCoins", inline=False)
 
-            # Track Connect4 stats
-            try:
-                profile_cog = self.bot.get_cog("Profile")
-                if profile_cog and hasattr(profile_cog, "profile_manager"):
-                    pm = profile_cog.profile_manager
-                    pm.increment_stat(player.id, 'connect4_played')
-                    pm.increment_stat(player.id, 'connect4_wins')
-                    for p_id in game_state["players"]:
-                        if p_id != "AI" and p_id != player.id:
-                            pm.increment_stat(p_id, 'connect4_played')
-            except Exception:
-                pass
-            _record_game(player.id, 'connect4', 'win', 75)
-            _inc_stat(player.id, 'connect4_wins')
-            _inc_stat(player.id, 'connect4_played')
+            _record_game(player.id, "connect4", "win", 75)
+            _inc_stat(player.id, "connect4_wins")
+            _inc_stat(player.id, "connect4_played")
             for p_id in game_state["players"]:
                 if p_id != "AI" and p_id != player.id:
-                    _record_game(p_id, 'connect4', 'loss', 0)
-                    _inc_stat(p_id, 'connect4_losses')
-                    _inc_stat(p_id, 'connect4_played')
+                    _record_game(p_id, "connect4", "loss", 0)
+                    _inc_stat(p_id, "connect4_losses")
+                    _inc_stat(p_id, "connect4_played")
 
-            # Clean up game
-            for p_id in game_state["players"]:
-                if p_id != "AI" and p_id in self.player_games:
-                    del self.player_games[p_id]
-            del self.active_games[game_id]
-            
-            if interaction:
-                await interaction.followup.send(embed=embed)
-            else:
-                await ctx.send(embed=embed)
+            self._c4_cleanup(view.game_id, game_state)
+            embed = self._build_c4_embed(
+                game_state, p1, p2, result="win",
+                extra_value=f"🎉 {player.mention} wins and earns **+75 PsyCoins**!",
+            )
+            await interaction.followup.edit_message(interaction.message.id, embed=embed, view=view)
             return
 
-        # Check for draw
-        if all(game_state["board"][0][c] != " " for c in range(7)):
-            embed = self._create_c4_embed(game_state, player, game_state["players"][1])
-            embed.title = "🤝 It's a draw!"
-            embed.color = discord.Color.orange()
-            
-            # Clean up game
+        # ---- Draw check ----
+        if all(board[0][c] != " " for c in range(7)):
+            game_state["game_over"] = True
+            view._rebuild_buttons()
             for p_id in game_state["players"]:
-                if p_id != "AI" and p_id in self.player_games:
-                    del self.player_games[p_id]
-            del self.active_games[game_id]
-
-            # Track Connect4 draw stats
-            try:
-                profile_cog = self.bot.get_cog("Profile")
-                if profile_cog and hasattr(profile_cog, "profile_manager"):
-                    pm = profile_cog.profile_manager
-                    for p_id in list(game_state["players"]):
-                        if p_id != "AI":
-                            pm.increment_stat(p_id, 'connect4_played')
-            except Exception:
-                pass
-            
-            if interaction:
-                await interaction.followup.send(embed=embed)
-            else:
-                await ctx.send(embed=embed)
+                if p_id != "AI":
+                    _inc_stat(p_id, "connect4_played")
+            self._c4_cleanup(view.game_id, game_state)
+            embed = self._build_c4_embed(game_state, p1, p2, result="draw")
+            await interaction.followup.edit_message(interaction.message.id, embed=embed, view=view)
             return
 
-        # Switch turn or AI move
+        # ---- AI turn ----
         if game_state["is_ai"]:
             game_state["current_turn"] = "AI"
-            ai_col = self._get_ai_c4_move(game_state["board"], "🟡", "🔴")
-            
+            ai_col = self._get_ai_c4_move(board, _C4_P2, _C4_P1)
+            ai_row = 0
             for r in range(5, -1, -1):
-                if game_state["board"][r][ai_col] == " ":
-                    game_state["board"][r][ai_col] = "🟡"
-                    
-                    if self._check_c4_winner(game_state["board"], r, ai_col):
-                        embed = self._create_c4_embed(game_state, player, "AI")
-                        embed.title = "🤖 AI wins!"
-                        embed.color = discord.Color.red()
-                        # Track human player's loss against AI
-                        _record_game(player.id, 'connect4', 'loss', 0)
-                        _inc_stat(player.id, 'connect4_losses')
-                        _inc_stat(player.id, 'connect4_played')
-                        del self.player_games[player.id]
-                        del self.active_games[game_id]
-                        
-                        if interaction:
-                            await interaction.followup.send(embed=embed)
-                        else:
-                            await ctx.send(embed=embed)
-                        return
+                if board[r][ai_col] == " ":
+                    board[r][ai_col] = _C4_P2
+                    ai_row = r
                     break
-            
+
+            if self._check_c4_winner(board, ai_row, ai_col):
+                game_state["game_over"] = True
+                view._rebuild_buttons()
+                _record_game(player.id, "connect4", "loss", 0)
+                _inc_stat(player.id, "connect4_losses")
+                _inc_stat(player.id, "connect4_played")
+                self._c4_cleanup(view.game_id, game_state)
+                embed = self._build_c4_embed(
+                    game_state, p1, p2, result="ai_win",
+                    extra_value="Better luck next time!",
+                )
+                await interaction.followup.edit_message(interaction.message.id, embed=embed, view=view)
+                return
+
+            # Check draw after AI move
+            if all(board[0][c] != " " for c in range(7)):
+                game_state["game_over"] = True
+                view._rebuild_buttons()
+                for p_id in game_state["players"]:
+                    if p_id != "AI":
+                        _inc_stat(p_id, "connect4_played")
+                self._c4_cleanup(view.game_id, game_state)
+                embed = self._build_c4_embed(game_state, p1, p2, result="draw")
+                await interaction.followup.edit_message(interaction.message.id, embed=embed, view=view)
+                return
+
             game_state["current_turn"] = player.id
         else:
-            current_idx = game_state["players"].index(game_state["current_turn"])
-            game_state["current_turn"] = game_state["players"][1 - current_idx]
+            idx = game_state["players"].index(player.id)
+            game_state["current_turn"] = game_state["players"][1 - idx]
 
-        # Show updated board
+        view._rebuild_buttons()
+        embed = self._build_c4_embed(game_state, p1, p2)
+        await interaction.followup.edit_message(interaction.message.id, embed=embed, view=view)
+
+    async def _handle_c4_quit(self, interaction: discord.Interaction, view: Connect4View):
+        game_state = view.game_state
+        if interaction.user.id not in game_state["players"]:
+            await interaction.response.send_message("❌ You're not in this game!", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        game_state["game_over"] = True
+        view._rebuild_buttons()
+        self._c4_cleanup(view.game_id, game_state)
+
+        p1 = self.bot.get_user(game_state["players"][0])
         p2 = "AI" if game_state["is_ai"] else self.bot.get_user(game_state["players"][1])
-        embed = self._create_c4_embed(game_state, player, p2)
-        
-        if interaction:
-            await interaction.followup.send(embed=embed)
-        else:
-            await ctx.send(embed=embed)
+        embed = self._build_c4_embed(
+            game_state, p1, p2, result="quit",
+            extra_value=f"{interaction.user.mention} resigned the game.",
+        )
+        await interaction.followup.edit_message(interaction.message.id, embed=embed, view=view)
+
+    def _c4_cleanup(self, game_id: str, game_state: dict):
+        for p_id in game_state["players"]:
+            if p_id != "AI" and p_id in self.player_games:
+                del self.player_games[p_id]
+        self.active_games.pop(game_id, None)
+
+    # ---------- Game logic ----------
 
     def _check_c4_winner(self, board, row, col):
         """Check if there's a winner in Connect 4"""
@@ -1237,78 +1269,126 @@ class BoardGames(commands.Cog):
         if symbol == " ":
             return False
 
-        # Check directions: horizontal, vertical, diagonal
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-        
         for dr, dc in directions:
             count = 1
-            
-            # Check positive direction
             r, c = row + dr, col + dc
             while 0 <= r < 6 and 0 <= c < 7 and board[r][c] == symbol:
-                count += 1
-                r += dr
-                c += dc
-            
-            # Check negative direction
+                count += 1; r += dr; c += dc
             r, c = row - dr, col - dc
             while 0 <= r < 6 and 0 <= c < 7 and board[r][c] == symbol:
-                count += 1
-                r -= dr
-                c -= dc
-            
+                count += 1; r -= dr; c -= dc
             if count >= 4:
                 return True
-        
         return False
-    
-    def _get_ai_c4_move(self, board, ai_symbol, player_symbol):
-        """Strategic AI for Connect 4 with lookahead"""
+
+    def _c4_is_terminal(self, board) -> bool:
+        """True if someone has won or the board is full."""
+        for r in range(6):
+            for c in range(7):
+                if board[r][c] != " " and self._check_c4_winner(board, r, c):
+                    return True
+        return all(board[0][c] != " " for c in range(7))
+
+    def _c4_score_window(self, window, ai_sym, opp_sym) -> int:
+        ai  = window.count(ai_sym)
+        opp = window.count(opp_sym)
+        emp = window.count(" ")
+        if ai == 4:              return  1_000_000
+        if opp == 4:             return -1_000_000
+        if ai == 3 and emp == 1: return  50
+        if ai == 2 and emp == 2: return  10
+        if opp == 3 and emp == 1:return -80
+        if opp == 2 and emp == 2:return  -5
+        return 0
+
+    def _c4_heuristic(self, board, ai_sym, opp_sym) -> int:
+        score = 0
+        # Centre column bias
+        score += sum(1 for r in range(6) if board[r][3] == ai_sym) * 6
+        # Horizontal
+        for r in range(6):
+            for c in range(4):
+                score += self._c4_score_window(board[r][c:c+4], ai_sym, opp_sym)
+        # Vertical
+        for c in range(7):
+            col = [board[r][c] for r in range(6)]
+            for r in range(3):
+                score += self._c4_score_window(col[r:r+4], ai_sym, opp_sym)
+        # Diag /
+        for r in range(3):
+            for c in range(4):
+                score += self._c4_score_window([board[r+i][c+i] for i in range(4)], ai_sym, opp_sym)
+        # Diag \
+        for r in range(3, 6):
+            for c in range(4):
+                score += self._c4_score_window([board[r-i][c+i] for i in range(4)], ai_sym, opp_sym)
+        return score
+
+    def _c4_drop_copy(self, board, col, symbol):
+        """Return (new_board, row) after dropping, or (None, -1) if full."""
+        for r in range(5, -1, -1):
+            if board[r][col] == " ":
+                nb = [row[:] for row in board]
+                nb[r][col] = symbol
+                return nb, r
+        return None, -1
+
+    def _c4_minimax(self, board, depth, alpha, beta, maximising, ai_sym, opp_sym) -> int:
         available = [c for c in range(7) if board[0][c] == " "]
-        
-        # 1. Try to win immediately
+        if depth == 0 or not available or self._c4_is_terminal(board):
+            return self._c4_heuristic(board, ai_sym, opp_sym)
+        # Move order: centre first
+        ordered = sorted(available, key=lambda c: abs(c - 3))
+        if maximising:
+            val = -10_000_000
+            for col in ordered:
+                nb, _ = self._c4_drop_copy(board, col, ai_sym)
+                if nb is None: continue
+                val   = max(val, self._c4_minimax(nb, depth-1, alpha, beta, False, ai_sym, opp_sym))
+                alpha = max(alpha, val)
+                if alpha >= beta: break
+            return val
+        else:
+            val = 10_000_000
+            for col in ordered:
+                nb, _ = self._c4_drop_copy(board, col, opp_sym)
+                if nb is None: continue
+                val  = min(val, self._c4_minimax(nb, depth-1, alpha, beta, True, ai_sym, opp_sym))
+                beta = min(beta, val)
+                if alpha >= beta: break
+            return val
+
+    def _get_ai_c4_move(self, board, ai_symbol, player_symbol) -> int:
+        """Pick best column using minimax (depth 6) with alpha-beta pruning."""
+        available = [c for c in range(7) if board[0][c] == " "]
+        if not available:
+            return 3
+
+        # Immediate win
         for col in available:
-            test_board = [row[:] for row in board]
-            for r in range(5, -1, -1):
-                if test_board[r][col] == " ":
-                    test_board[r][col] = ai_symbol
-                    if self._check_c4_winner(test_board, r, col):
-                        return col
-                    break
-        
-        # 2. Block player from winning
+            nb, row = self._c4_drop_copy(board, col, ai_symbol)
+            if nb and self._check_c4_winner(nb, row, col):
+                return col
+
+        # Immediate block
         for col in available:
-            test_board = [row[:] for row in board]
-            for r in range(5, -1, -1):
-                if test_board[r][col] == " ":
-                    test_board[r][col] = player_symbol
-                    if self._check_c4_winner(test_board, r, col):
-                        return col
-                    break
-        
-        # 3. Prefer center columns (stronger position)
-        center_cols = [3, 2, 4, 1, 5, 0, 6]
-        for col in center_cols:
-            if col in available:
-                # Check if move doesn't create winning opportunity for opponent above
-                test_board = [row[:] for row in board]
-                row_idx = None
-                for r in range(5, -1, -1):
-                    if test_board[r][col] == " ":
-                        row_idx = r
-                        break
-                
-                if row_idx is not None and row_idx > 0:
-                    # Check if opponent can win in the row above
-                    test_board[row_idx][col] = ai_symbol
-                    test_board[row_idx - 1][col] = player_symbol
-                    if not self._check_c4_winner(test_board, row_idx - 1, col):
-                        return col
-                elif row_idx == 0:
-                    return col
-        
-        # 4. Fallback to any available move
-        return available[0] if available else 3
+            nb, row = self._c4_drop_copy(board, col, player_symbol)
+            if nb and self._check_c4_winner(nb, row, col):
+                return col
+
+        # Minimax search
+        best_col   = sorted(available, key=lambda c: abs(c - 3))[0]
+        best_score = -10_000_000
+        for col in sorted(available, key=lambda c: abs(c - 3)):
+            nb, _ = self._c4_drop_copy(board, col, ai_symbol)
+            if nb is None: continue
+            score = self._c4_minimax(nb, 5, -10_000_000, 10_000_000, False, ai_symbol, player_symbol)
+            if score > best_score:
+                best_score = score
+                best_col   = col
+        return best_col
+
 
     # ==================== HANGMAN ====================
     
