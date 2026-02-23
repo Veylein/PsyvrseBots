@@ -212,7 +212,7 @@ class ServerConfig(commands.Cog):
         self.configs[guild_id] = config
         self._save_configs()
         
-        await ctx.send(f"✅ Disabled command: `{command}`\nUsers will receive a clean error message when attempting to use it.")
+        await ctx.send(f"❌ Disabled command: `{command}`\nUsers will receive a clean error message when attempting to use it.")
     
     @commands.command(name="enablecmd", aliases=["enablecommand"])
     @commands.has_permissions(administrator=True)
