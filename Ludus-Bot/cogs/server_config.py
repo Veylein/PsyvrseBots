@@ -14,7 +14,7 @@ class ServerConfig(commands.Cog):
         self.bot = bot
         self.config_file = "data/server_configs.json"
         self.configs = self._load_configs()
-    
+
     def _load_configs(self):
         """Load server configurations"""
         os.makedirs("data", exist_ok=True)
@@ -28,7 +28,7 @@ class ServerConfig(commands.Cog):
         """Save server configurations"""
         with open(self.config_file, 'w') as f:
             json.dump(self.configs, f, indent=4)
-    
+
     def get_server_config(self, guild_id):
         """Get config for a server (creates default if not exists)"""
         guild_id = str(guild_id)

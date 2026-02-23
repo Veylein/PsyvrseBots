@@ -1,6 +1,7 @@
 import sys
 import discord
 from discord.ext import commands
+from discord import app_commands
 import json
 import os
 import asyncio
@@ -98,12 +99,35 @@ intents.voice_states = True
 owner_ids_set = set(config.get("owner_ids", []))
 print(f"[BOT] Creating bot with owner_ids: {owner_ids_set}")
 
+
+class BotCommandTree(app_commands.CommandTree):
+    """Custom command tree that blocks slash commands disabled per-server."""
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild is None or interaction.command is None:
+            return True
+        server_config_cog = interaction.client.get_cog("ServerConfig")
+        if not server_config_cog:
+            return True
+        guild_cfg = server_config_cog.get_server_config(str(interaction.guild.id))
+        disabled = guild_cfg.get("disabled_commands", [])
+        cmd_name = interaction.command.name
+        if cmd_name in disabled:
+            await interaction.response.send_message(
+                f"❌ Command `{cmd_name}` is disabled on this server.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+
 # Remove default help command so our custom help.py can work
 bot = commands.Bot(
-    command_prefix=config["prefix"], 
-    intents=intents, 
+    command_prefix=config["prefix"],
+    intents=intents,
     owner_ids=owner_ids_set,
     help_command=None,  # Disable default help to use custom help cog
+    tree_cls=BotCommandTree,
     description="🎮 The ultimate Discord minigame & music bot! Use `L!about` and `L!help` to get started. Made with ❤️ by Psyvrse Development.",
     # Performance/stability settings for cloud hosting
     max_messages=1000,  # Limit message cache to reduce memory
@@ -663,6 +687,22 @@ async def on_message(message):
             await personality_cog.on_message(message)
         except discord.Forbidden:
             pass
+    # Block disabled commands before processing
+    if message.guild:
+        server_config_cog = bot.get_cog("ServerConfig")
+        if server_config_cog:
+            ctx = await bot.get_context(message)
+            if ctx.command:
+                guild_cfg = server_config_cog.get_server_config(str(message.guild.id))
+                disabled = guild_cfg.get("disabled_commands", [])
+                cmd_name = ctx.command.name
+                invoked = ctx.invoked_with or ""
+                if cmd_name in disabled or invoked in disabled:
+                    await message.channel.send(
+                        f"❌ Command `{invoked or cmd_name}` is disabled on this server."
+                    )
+                    return
+
     # Always process prefix commands
     await bot.process_commands(message)
 

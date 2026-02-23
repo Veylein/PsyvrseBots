@@ -86,6 +86,7 @@ class AttackView(discord.ui.View):
         await interaction.response.send_message(embed=embed)
 
 
+class GlobalEvents(commands.Cog):
     """Epic server vs server global events - Owner only!"""
     
     def __init__(self, bot):
