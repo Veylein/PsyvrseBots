@@ -37,25 +37,45 @@ def save_ludus_qa(data):
 ludus_qa_data = load_ludus_qa()
 
 dotenv.load_dotenv()
-# Configure logging to file+console. If Render provides a disk path, use it.
+# Configure logging
+# Fallback logic: Try RENDER_DISK_PATH, then local logs, then no file logging (console only)
 RENDER_DISK_PATH = os.getenv("RENDER_DISK_PATH")
-if RENDER_DISK_PATH:
-    # On Render, use the absolute path provided if available
-    LOG_DIR = Path(RENDER_DISK_PATH) / "logs"
-else:
-    # Use local relative path as fallback
-    LOG_DIR = Path("logs")
-    
-try:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-except Exception:
-    pass
+handlers_list = [logging.StreamHandler()]
 
-log_file = LOG_DIR / "ludus.log"
-handler = logging.handlers.RotatingFileHandler(str(log_file), maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8")
-formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-handler.setFormatter(formatter)
-logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(), handler])
+log_file_path = None
+
+if RENDER_DISK_PATH:
+    try:
+        log_dir = Path(RENDER_DISK_PATH) / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file_path = log_dir / "ludus.log"
+    except Exception as e:
+        print(f"Warning: Could not create log directory at {RENDER_DISK_PATH}: {e}")
+
+if not log_file_path:
+    # Fallback to local ./logs directory
+    try:
+        log_dir = Path("logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file_path = log_dir / "ludus.log"
+    except Exception as e:
+        print(f"Warning: Could not create local log directory: {e}")
+
+if log_file_path:
+    try:
+        file_handler = logging.handlers.RotatingFileHandler(
+            str(log_file_path), 
+            maxBytes=5 * 1024 * 1024, 
+            backupCount=5, 
+            encoding="utf-8"
+        )
+        formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        file_handler.setFormatter(formatter)
+        handlers_list.append(file_handler)
+    except Exception as e:
+        print(f"Warning: Could not set up file logging: {e}")
+
+logging.basicConfig(level=logging.INFO, handlers=handlers_list)
 logger = logging.getLogger("ludus")
 
 # Ensure asyncio unhandled exceptions are routed to our logger
