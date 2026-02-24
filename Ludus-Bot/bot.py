@@ -38,11 +38,19 @@ ludus_qa_data = load_ludus_qa()
 
 dotenv.load_dotenv()
 # Configure logging to file+console. If Render provides a disk path, use it.
-LOG_DIR = Path(os.getenv("RENDER_DISK_PATH", ".")) / "logs"
+RENDER_DISK_PATH = os.getenv("RENDER_DISK_PATH")
+if RENDER_DISK_PATH:
+    # On Render, use the absolute path provided if available
+    LOG_DIR = Path(RENDER_DISK_PATH) / "logs"
+else:
+    # Use local relative path as fallback
+    LOG_DIR = Path("logs")
+    
 try:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
     pass
+
 log_file = LOG_DIR / "ludus.log"
 handler = logging.handlers.RotatingFileHandler(str(log_file), maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8")
 formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")

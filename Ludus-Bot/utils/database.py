@@ -35,7 +35,13 @@ class DatabaseManager:
 
     def _init_connection(self):
         # Use a local SQLite file in the data/ folder
-        self.db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "database.db")
+        # Respect RENDER_DISK_PATH if available to persist database
+        render_path = os.getenv("RENDER_DISK_PATH")
+        if render_path:
+             self.db_path = os.path.join(render_path, "data", "database.db")
+        else:
+             self.db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "database.db")
+        
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
     @contextmanager
