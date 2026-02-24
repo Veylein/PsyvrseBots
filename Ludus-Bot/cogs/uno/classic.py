@@ -2213,6 +2213,45 @@ class UnoCog(commands.Cog):
     # COMMANDS
     # ═══════════════════════════════════════════════════════════════════════════
     
+    @app_commands.command(name="uno_leave", description="Leave your current UNO lobby or game")
+    @app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
+    @app_commands.allowed_installs(guilds=True, users=True)
+    async def uno_leave(self, interaction: discord.Interaction):
+        uid_str = str(interaction.user.id)
+
+        # Check active lobbies first
+        for lid, lobby in list(self.bot.active_lobbies.items()):
+            if uid_str in lobby.get('players', []) or lobby.get('hostId') == uid_str:
+                # Remove player
+                if uid_str in lobby['players']:
+                    lobby['players'].remove(uid_str)
+                is_host = uid_str == lobby.get('hostId')
+                if not lobby['players'] or is_host:
+                    try:
+                        channel = interaction.channel
+                        if channel and lobby.get('messageId'):
+                            await channel.get_partial_message(lobby['messageId']).delete()
+                    except Exception:
+                        pass
+                    self.bot.active_lobbies.pop(lid, None)
+                    return await interaction.response.send_message("🚪 You left the lobby (disbanded).", ephemeral=True)
+                else:
+                    self.bot.active_lobbies[lid] = lobby
+                    return await interaction.response.send_message("🚪 You left the lobby.", ephemeral=True)
+
+        # Check active games
+        for gid, game in list(self.bot.active_games.items()):
+            if uid_str in game.get('players', []):
+                game['players'].remove(uid_str)
+                if uid_str in game.get('hands', {}):
+                    del game['hands'][uid_str]
+                if not [p for p in game.get('players', []) if not str(p).startswith('BOT_')]:
+                    self.bot.active_games.pop(gid, None)
+                    return await interaction.response.send_message("🚪 You left the game (it ended – no human players remain).", ephemeral=True)
+                return await interaction.response.send_message("🚪 You left the UNO game.", ephemeral=True)
+
+        await interaction.response.send_message("❌ You're not in any active UNO lobby or game.", ephemeral=True)
+
     @app_commands.command(name="uno", description="Create an UNO lobby")
     @app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
     @app_commands.allowed_installs(guilds=True, users=True)
@@ -2289,11 +2328,16 @@ class UnoCog(commands.Cog):
                 host = interaction.user
             
             embed, view = self.create_uno_lobby_embed_and_view(lobby_state, lobby_id, host)
-            
-            await interaction.response.send_message(embed=embed, view=view)
-            msg = await interaction.original_response()
-            lobby_state['messageId'] = msg.id
+
+            # Register lobby BEFORE sending so buttons always have a backing entry
             self.bot.active_lobbies[lobby_id] = lobby_state
+
+            await interaction.response.send_message(embed=embed, view=view)
+            try:
+                msg = await interaction.original_response()
+                lobby_state['messageId'] = msg.id
+            except Exception:
+                pass  # messageId stays None – lobby is still fully functional
         except Exception as e:
             print(f"[UNO] ERROR creating lobby: {e}")
             import traceback
@@ -2336,7 +2380,10 @@ class UnoCog(commands.Cog):
             
             lobby = self.bot.active_lobbies.get(lobby_id)
             if not lobby:
-                return await interaction.response.send_message("Lobby inactive.", ephemeral=True)
+                return await interaction.response.send_message(
+                    "❌ This lobby no longer exists – the game may have already started or it was disbanded.",
+                    ephemeral=True
+                )
 
             # Use cache only — avoids an HTTP round-trip before defer() which
             # would burn the 3-second interaction window and cause error 10062.
@@ -2444,19 +2491,40 @@ class UnoCog(commands.Cog):
             
             elif action == 'leave':
                 if uid not in lobby['players']:
-                    return await interaction.response.send_message("You're not in this lobby!", ephemeral=True)
-                
+                    # Ghost state: user is listed as host but was already removed from players.
+                    # Clean up so they can create a new lobby.
+                    if uid == lobby.get('hostId') and lobby_id in self.bot.active_lobbies:
+                        try:
+                            channel = interaction.channel
+                            if channel and lobby.get('messageId'):
+                                await channel.get_partial_message(lobby['messageId']).delete()
+                        except Exception:
+                            pass
+                        del self.bot.active_lobbies[lobby_id]
+                        return await interaction.response.send_message("🚪 Lobby closed.", ephemeral=True)
+                    return await interaction.response.send_message("❌ You're not in this lobby!", ephemeral=True)
+
+                # Guard against double-click race condition
+                if uid not in lobby['players']:
+                    return await interaction.response.send_message("❌ Already processed.", ephemeral=True)
+
                 lobby['players'].remove(uid)
                 lobby['last_activity'] = time.time()
-                
+
                 if not lobby['players'] or uid == lobby['hostId']:
+                    # Delete the actual lobby embed using stored messageId, NOT interaction.message
+                    # (interaction.message may be the ephemeral warning, not the lobby embed)
                     try:
-                        await interaction.message.delete()
+                        channel = interaction.channel
+                        if channel and lobby.get('messageId'):
+                            await channel.get_partial_message(lobby['messageId']).delete()
+                        else:
+                            await interaction.message.delete()
                     except Exception:
                         pass
                     del self.bot.active_lobbies[lobby_id]
-                    return await interaction.response.send_message("Lobby disbanded.", ephemeral=True)
-                
+                    return await interaction.response.send_message("🚪 Lobby disbanded.", ephemeral=True)
+
                 await interaction.response.defer()
                 embed, view = self.create_uno_lobby_embed_and_view(lobby, lobby_id, host)
                 await interaction.message.edit(embed=embed, view=view)

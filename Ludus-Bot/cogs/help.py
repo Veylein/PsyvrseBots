@@ -30,12 +30,18 @@ class Help(commands.Cog):
                 "desc": "Test your luck at the casino",
                 "commands": [
                     ("/slots <bet>", "Spin the slot machine (10-10,000)"),
+                    ("/coinflip <bet>", "Flip a coin (10-10,000)"),
+                    ("/higerlower <bet>", "Guess if next card is higher/lower (10-10,000)"),
+                    ("dicegamble <bet> <number>", "Roll dice and bet on number (10-10,000)"),
                     ("/blackjack <bet>", "Play blackjack (10-10,000)"),
                     ("/poker <bet>", "5-card poker vs dealer (10-10,000)"),
                     ("/crash <bet>", "Crash multiplier game (10-10,000)"),
                     ("/mines <bet> <mines>", "Minesweeper gambling (1-24 mines)"),
                     ("/dice <bet> <number>", "Roll dice and bet on number"),
                     ("/roulette <bet> <choice>", "Classic roulette"),
+                    ("/gambling_stats", "View your gambling statistics"),
+                    ("/odds", "View odds for all gambling games"),
+                    ("/strategy", "Gambling strategy tips and guides"),
                 ]
             },
             "🎲 Board Games": {

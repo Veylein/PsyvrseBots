@@ -93,3 +93,52 @@ def us_set(user_id: int, stat_name: str,
         _task(_set(int(user_id), stat_name, value, username))
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Challenge event hook  (requires bot to be registered via us_set_bot)
+# ---------------------------------------------------------------------------
+
+_bot_ref = None
+
+
+def us_set_bot(bot) -> None:
+    """Register the bot instance so us_challenge can find the GameChallenges cog.
+    Call this once in bot.py after the bot object is created:
+        from utils.stat_hooks import us_set_bot
+        us_set_bot(bot)
+    """
+    global _bot_ref
+    _bot_ref = bot
+
+
+def us_challenge(
+    user_id: int,
+    event_type: str,
+    amount: int = 1,
+    game_name: Optional[str] = None,
+) -> None:
+    """Notify the GameChallenges cog of a game event so it can update challenge progress.
+
+    Parameters
+    ----------
+    user_id    : Discord user ID
+    event_type : one of game_win, coin_earn, game_played, word_game_win,
+                 math_game_win, social_game, board_game_win, puzzle_win,
+                 trivia_correct, speed_win
+    amount     : points / count to add (default 1)
+    game_name  : required for event_type="game_played" (play_variety tracking)
+
+    Usage in any cog::
+
+        from utils.stat_hooks import us_challenge
+        us_challenge(ctx.author.id, "game_win")
+    """
+    if _bot_ref is None:
+        return
+    try:
+        cog = _bot_ref.get_cog("GameChallenges")
+        if cog is not None:
+            cog.record_game_event(int(user_id), event_type, amount, game_name)
+    except Exception:
+        pass

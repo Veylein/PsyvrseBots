@@ -151,49 +151,6 @@ class Utilities(commands.Cog):
         await feedback_channel.send(embed=embed)
         await ctx.send("✅ Thank you! Your feedback has been sent.")
 
-    # ---------- Help / Guide ----------
-    @commands.command(name="guide")
-    async def guide(self, ctx, category: Optional[str] = None):
-        await self.send_guide(ctx, category)
-
-    @app_commands.command(name="guide", description="View command guide and help")
-    @app_commands.describe(category="Category to view (optional)")
-    async def guide_slash(self, interaction: discord.Interaction, category: Optional[str] = None):
-        class FakeCtx:
-            def __init__(self, interaction):
-                self.author = interaction.user
-                self.send = interaction.followup.send
-        fake_ctx = FakeCtx(interaction)
-        await interaction.response.defer()
-        await self.send_guide(fake_ctx, category)
-
-    async def send_guide(self, ctx, category: Optional[str]):
-        categories = {
-            "tcg": {"title":"🎴 TCG Commands","desc":"Complete trading card game system","color":discord.Color.purple(),"commands":["/tcg","/tcgbattle @user","/tcgbattleai","/tcganimate"]},
-            "economy": {"title":"💰 Economy Commands","desc":"Coins & shop","color":discord.Color.gold(),"commands":["L!balance","L!daily","L!shop","L!buy <item>","L!inventory","L!use <item>","L!give @user","L!leaderboard"]},
-            "mini": {"title":"🎮 Minigames","desc":"100+ fun quick games","color":Colors.PRIMARY,"commands":["L!wordle","L!trivia","L!gtn","L!typerace","L!coinflip"]},
-            "social": {"title":"👥 Social","desc":"Community fun","color":discord.Color.green(),"commands":["L!compliment","L!roast","L!wyr","L!story"]},
-            # Add all other categories here dynamically
-        }
-
-        if category is None:
-            embed = discord.Embed(
-                title=f"{Emojis.SPARKLES} Ludus Guide",
-                description="Use `L!guide <category>` to view commands in a category",
-                color=Colors.PRIMARY
-            )
-            for cat_key, cat_data in categories.items():
-                embed.add_field(name=f"{cat_data['title']}", value=cat_data['desc'], inline=True)
-            await ctx.send(embed=embed)
-        else:
-            cat_data = categories.get(category.lower())
-            if not cat_data:
-                return await ctx.send("Category not found.")
-            embed = discord.Embed(title=cat_data["title"], description=cat_data["desc"], color=cat_data["color"])
-            for cmd in cat_data["commands"]:
-                embed.add_field(name=cmd, value="\u200b", inline=False)
-            await ctx.send(embed=embed)
-
     # ---------- Setup Embed ----------
     def create_setup_embed(self):
         embed = discord.Embed(
