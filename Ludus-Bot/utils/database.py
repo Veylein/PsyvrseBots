@@ -2,9 +2,8 @@
 import os
 import datetime
 import logging
+import sqlite3
 from typing import Optional, Dict, List, Any
-# import psycopg2
-# from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
 from dotenv import load_dotenv
 
@@ -15,28 +14,47 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("LudusDB")
 
+# helper to adapt datetime objects to sqlite
+def adapt_datetime(ts):
+    return ts.isoformat()
+
+def convert_datetime(ts):
+    return datetime.datetime.fromisoformat(ts.decode())
+
+sqlite3.register_adapter(datetime.datetime, adapt_datetime)
+sqlite3.register_converter("TIMESTAMP", convert_datetime)
+
 class DatabaseManager:
     _instance = None
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DatabaseManager, cls).__new__(cls)
-            cls._instance._init_connection_params()
+            cls._instance._init_connection()
         return cls._instance
 
-    def _init_connection_params(self):
-        self.host = os.getenv("DATABASE_HOST")
-        self.database = os.getenv("DATABASE_NAME")
-        self.user = os.getenv("DATABASE_USER")
-        self.password = os.getenv("DATABASE_PASSWORD")
-        self.port = os.getenv("DATABASE_PORT", "5432")
+    def _init_connection(self):
+        # Use a local SQLite file in the data/ folder
+        self.db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "database.db")
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
     @contextmanager
     def get_connection(self):
         """Context manager for database connections to ensure they are closed properly."""
-        # Database paused
-        yield None
-        return
+        conn = None
+        try:
+            conn = sqlite3.connect(
+                self.db_path, 
+                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+            )
+            conn.row_factory = sqlite3.Row # Enable name-based access
+            yield conn
+        except Exception as e:
+            logger.error(f"Database connection error: {e}")
+            yield None
+        finally:
+            if conn:
+                conn.close()
 
     @contextmanager
     def get_cursor(self, commit: bool = False):
@@ -46,15 +64,17 @@ class DatabaseManager:
                 yield None
                 return
                 
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor()
             try:
                 yield cursor
                 if commit:
                     conn.commit()
             except Exception as e:
-                conn.rollback()
+                if conn:
+                    conn.rollback()
                 logger.error(f"Database query error: {e}")
-                raise
+                # Don't raise, just log, to keep bot running
+                # raise 
             finally:
                 cursor.close()
 
@@ -63,7 +83,7 @@ class DatabaseManager:
         queries = [
             """
             CREATE TABLE IF NOT EXISTS users (
-                user_id BIGINT PRIMARY KEY,
+                user_id INTEGER PRIMARY KEY,
                 username TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -71,14 +91,14 @@ class DatabaseManager:
                 total_commands INTEGER DEFAULT 0,
                 daily_streak INTEGER DEFAULT 0,
                 daily_longest_streak INTEGER DEFAULT 0,
-                total_coins_earned BIGINT DEFAULT 0,
-                total_coins_spent BIGINT DEFAULT 0
+                total_coins_earned INTEGER DEFAULT 0,
+                total_coins_spent INTEGER DEFAULT 0
             );
             """,
             """
             CREATE TABLE IF NOT EXISTS stats (
-                id SERIAL PRIMARY KEY,
-                user_id BIGINT REFERENCES users(user_id),
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER REFERENCES users(user_id),
                 stat_name TEXT NOT NULL,
                 stat_value NUMERIC DEFAULT 0,
                 UNIQUE(user_id, stat_name)
@@ -86,8 +106,8 @@ class DatabaseManager:
             """,
             """
             CREATE TABLE IF NOT EXISTS activity (
-                id SERIAL PRIMARY KEY,
-                user_id BIGINT REFERENCES users(user_id),
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER REFERENCES users(user_id),
                 time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 type TEXT NOT NULL,
                 name TEXT NOT NULL
@@ -95,7 +115,7 @@ class DatabaseManager:
             """,
             """
             CREATE TABLE IF NOT EXISTS game_states (
-                user_id BIGINT,
+                user_id INTEGER,
                 game_name TEXT,
                 state_json TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -108,15 +128,15 @@ class DatabaseManager:
             if cursor:
                 for query in queries:
                     cursor.execute(query)
-                logger.info("Database schema initialized successfully.")
+                logger.info("Database schema initialized successfully (SQLite).")
 
     def upsert_user(self, user_id: int, username: str):
         """Insert a new user or update connection details."""
         query = """
         INSERT INTO users (user_id, username, created_at, updated_at, last_active)
-        VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id) DO UPDATE SET
-            username = EXCLUDED.username,
+        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id) DO UPDATE SET
+            username = excluded.username,
             updated_at = CURRENT_TIMESTAMP,
             last_active = CURRENT_TIMESTAMP;
         """
@@ -129,16 +149,16 @@ class DatabaseManager:
         if increment:
             query = """
             INSERT INTO stats (user_id, stat_name, stat_value)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (user_id, stat_name) DO UPDATE SET
-                stat_value = stats.stat_value + EXCLUDED.stat_value;
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, stat_name) DO UPDATE SET
+                stat_value = stats.stat_value + excluded.stat_value;
             """
         else:
             query = """
             INSERT INTO stats (user_id, stat_name, stat_value)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (user_id, stat_name) DO UPDATE SET
-                stat_value = EXCLUDED.stat_value;
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, stat_name) DO UPDATE SET
+                stat_value = excluded.stat_value;
             """
             
         with self.get_cursor(commit=True) as cursor:
@@ -154,13 +174,13 @@ class DatabaseManager:
         if timestamp:
             query = """
             INSERT INTO activity (user_id, type, name, time)
-            VALUES (%s, %s, %s, %s);
+            VALUES (?, ?, ?, ?);
             """
             params = (user_id, activity_type, activity_name, timestamp)
         else:
             query = """
             INSERT INTO activity (user_id, type, name)
-            VALUES (%s, %s, %s);
+            VALUES (?, ?, ?);
             """
             params = (user_id, activity_type, activity_name)
             
@@ -171,7 +191,7 @@ class DatabaseManager:
     def increment_command_count(self, user_id: int):
         """Increment the command usage counter."""
         query = """
-        UPDATE users SET total_commands = total_commands + 1 WHERE user_id = %s;
+        UPDATE users SET total_commands = total_commands + 1 WHERE user_id = ?;
         """
         with self.get_cursor(commit=True) as cursor:
             if cursor:
@@ -181,9 +201,9 @@ class DatabaseManager:
         """Save a game state to the database."""
         query = """
         INSERT INTO game_states (user_id, game_name, state_json, updated_at)
-        VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id, game_name) DO UPDATE SET
-            state_json = EXCLUDED.state_json,
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id, game_name) DO UPDATE SET
+            state_json = excluded.state_json,
             updated_at = CURRENT_TIMESTAMP;
         """
         with self.get_cursor(commit=True) as cursor:
@@ -197,18 +217,18 @@ class DatabaseManager:
                 return {}
 
             # Get main user data
-            cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
             user = cursor.fetchone()
             
             if not user:
                 return {}
                 
             # Get stats
-            cursor.execute("SELECT stat_name, stat_value FROM stats WHERE user_id = %s", (user_id,))
+            cursor.execute("SELECT stat_name, stat_value FROM stats WHERE user_id = ?", (user_id,))
             stats = cursor.fetchall()
             
             # Get game states
-            cursor.execute("SELECT game_name, state_json FROM game_states WHERE user_id = %s", (user_id,))
+            cursor.execute("SELECT game_name, state_json FROM game_states WHERE user_id = ?", (user_id,))
             games = cursor.fetchall()
 
             # Format data to match old JSON structure somewhat
@@ -232,9 +252,9 @@ class DatabaseManager:
             user_data['minigames'] = {"by_game": {}, "recent_plays": []}
             user_data['activity'] = {"counts": {}, "by_name": {}, "recent": []}
             user_data['meta'] = {
-                "created_at": str(user.get('created_at')),
-                "updated_at": str(user.get('updated_at')),
-                "last_active": str(user.get('last_active'))
+                "created_at": str(user['created_at']),
+                "updated_at": str(user['updated_at']),
+                "last_active": str(user['last_active'])
             }
             
             return user_data

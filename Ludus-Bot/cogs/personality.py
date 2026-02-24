@@ -651,30 +651,59 @@ class LudusPersonality(commands.Cog):
     def _extract_question_text(self, message):
         content = message.content.strip()
         if not content:
-            return None
-        addressed = False
+            return None, "none"
+            
+        trigger = "none"
+        
+        # Check mentions (HIGH priority)
         mention_targets = set()
         if self.bot.user:
             mention_targets.add(self.bot.user.mention)
         if message.guild and message.guild.me:
             mention_targets.add(message.guild.me.mention)
+        
+        is_mentioned = False
         for mention in mention_targets:
             if mention and mention in content:
                 content = content.replace(mention, " ")
-                addressed = True
-        lowered = content.lower()
-        if "ludus" in lowered:
-            addressed = True
-        if not message.guild:
-            addressed = True
-        content = re.sub(r"^(hey|hi|hello|yo|sup|hey there|hiya)\s+(ludus|bot)[:,]?\s*", "", content, flags=re.IGNORECASE)
-        content = re.sub(r"^ludus[:,]?\s*", "", content, flags=re.IGNORECASE)
+                is_mentioned = True
+                
+        if is_mentioned:
+            trigger = "high"
+        
+        # Check for "Hey Ludus" variants (HIGH priority)
+        if trigger == "none":
+            # "Hey Ludus" etc.
+            match = re.search(r"^(hey|hi|hello|yo|sup|hey there|hiya)\s+(ludus|bot)[,:]?\s*", content, flags=re.IGNORECASE)
+            if match:
+                content = content[match.end():]
+                trigger = "high"
+        
+        # Check for just "Ludus" at start (MEDIUM priority)
+        if trigger == "none":
+            match = re.search(r"^ludus[,:]?\s*", content, flags=re.IGNORECASE)
+            if match:
+                content = content[match.end():]
+                trigger = "medium"
+
+        # Check for "ludus" anywhere or DM (LOW/implicit)
+        if trigger == "none":
+            if not message.guild:
+                trigger = "medium" # DMs are fairly direct
+            elif "ludus" in content.lower():
+                trigger = "low"
+        
+        if trigger == "none":
+            return None, "none"
+            
         content = re.sub(r"\s+", " ", content).strip()
-        if not addressed:
-            return None
+        
+        # If not a question, treat as chat unless it's a command
+        # But this function is _extract_question_text, meant for learning/QA.
         if not self._looks_like_question(content):
-            return None
-        return content
+            return None, "none"
+            
+        return content, trigger
 
     def _fuzzy_key(self, normalized_question, candidates):
         candidate_list = [candidate for candidate in candidates if candidate]
@@ -1018,26 +1047,51 @@ class LudusPersonality(commands.Cog):
                 await message.channel.send(self._safe_response(f"{answer}"))
                 return
 
-        question_text = self._extract_question_text(message)
-        if question_text:
+        question_text, trigger_strength = self._extract_question_text(message)
+        
+        # Determine if we should prioritize knowledge base (learning questions)
+        # Only answer from knowledge if valid triggered question found.
+        
+        # Check if it's a choice question ("X or Y")
+        # We manually assume addressed=True here just to check the *structure* of the text
+        is_choice_question = self._is_yesno_or_question(content, addressed=True)
+
+        should_check_knowledge = False
+        
+        # Knowledge Base Logic:
+        # "Hey Ludus" (high) OR Mentions (high) -> Check Knowledge Base
+        # "Ludus" (medium) is usually chat/choice, UNLESS it's a clear question that isn't choice/math/etc.
+        
+        if trigger_strength == "high":
+            should_check_knowledge = True
+        elif trigger_strength == "medium":
+            # If it's a choice question ("Ludus, X or Y?"), prefer choice logic over knowledge
+            if is_choice_question:
+                should_check_knowledge = False
+            else:
+                should_check_knowledge = True # Let it try to answer "Ludus, who is X?"
+        elif not message.guild: # DM
+             should_check_knowledge = True
+             
+        if question_text and should_check_knowledge:
             handled = await self._handle_learning_question(message, question_text)
             if handled:
                 return
+
         # Yes/No/Or question detection
         # Check if addressed for stricter triggering on "or" questions
         is_addressed = False
-        if not message.guild:
+        if trigger_strength in ["high", "medium", "low"]:
             is_addressed = True
-        elif self.bot.user.mention in message.content:
+        elif not message.guild:
             is_addressed = True
-        elif message.guild.me and message.guild.me.mention in message.content:
+        elif "ludus" in content.lower():
             is_addressed = True
-        elif "ludus" in content:
-            is_addressed = True
-
+            
         if self._is_yesno_or_question(content, addressed=is_addressed):
             reply = self._safe_response(self._answer_yesno_or(content, message.author.id, personality))
-            await message.channel.send(reply)
+            if reply: 
+                 await message.channel.send(reply)
             return
         # Trigger-based responses
         triggers = self.personalities.get(personality, self.personalities["default"]).get("triggers", {})
