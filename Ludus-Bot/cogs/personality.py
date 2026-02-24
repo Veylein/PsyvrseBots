@@ -1024,7 +1024,18 @@ class LudusPersonality(commands.Cog):
             if handled:
                 return
         # Yes/No/Or question detection
-        if self._is_yesno_or_question(content):
+        # Check if addressed for stricter triggering on "or" questions
+        is_addressed = False
+        if not message.guild:
+            is_addressed = True
+        elif self.bot.user.mention in message.content:
+            is_addressed = True
+        elif message.guild.me and message.guild.me.mention in message.content:
+            is_addressed = True
+        elif "ludus" in content:
+            is_addressed = True
+
+        if self._is_yesno_or_question(content, addressed=is_addressed):
             reply = self._safe_response(self._answer_yesno_or(content, message.author.id, personality))
             await message.channel.send(reply)
             return
@@ -1150,7 +1161,7 @@ class LudusPersonality(commands.Cog):
         except Exception:
             return None
 
-    def _is_yesno_or_question(self, content):
+    def _is_yesno_or_question(self, content, addressed=False):
         # Detects "Do you ...?", "Are you ...?", "Is it ...?", and 'or' questions
         import re
         # Yes/No: "do you ...?", "are you ...?", "is it ...?", etc.
@@ -1174,7 +1185,8 @@ class LudusPersonality(commands.Cog):
             if re.match(pat, content):
                 return True
         # Or: "Do you like apples or oranges?", "Is it red or blue?"
-        if ' or ' in content:
+        # Only if addressed, otherwise "this or that" triggers too often
+        if addressed and ' or ' in content:
             return True
         return False
 
