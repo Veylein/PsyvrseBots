@@ -252,6 +252,11 @@ except Exception:
 @bot.event
 async def setup_hook():
     # ── Restore dynamic JSON data from PostgreSQL before any cog loads ──
+    _db_url = os.getenv("DATABASE_URL", "")
+    if persist and _db_url:
+        print(f"[BOT] DATABASE_URL configured — DB persistence active")
+    elif persist:
+        print("[BOT] DATABASE_URL not set — running without DB persistence (data will reset on redeploy)")
     if persist:
         try:
             restored = await persist.restore_all(DATA_DIR)
@@ -280,11 +285,19 @@ async def setup_hook():
     # Now load all cogs
     await load_cogs()
 
-    # ── Start background DB sync (every 5 minutes) ──
+    # ── Immediately back up current disk state to DB (seeds DB on first deploy) ──
     if persist:
         try:
-            bot.loop.create_task(persist.periodic_sync(DATA_DIR, interval=300))
-            print("[BOT] Periodic DB sync task started")
+            seeded = await persist.sync_now(DATA_DIR)
+            print(f"[BOT] Initial DB sync complete: {seeded} files backed up")
+        except Exception as _se:
+            print(f"[BOT] Initial DB sync failed: {_se}")
+
+    # ── Start background DB sync (every 60 seconds) ──
+    if persist:
+        try:
+            bot.loop.create_task(persist.periodic_sync(DATA_DIR, interval=60))
+            print("[BOT] Periodic DB sync task started (every 60s)")
         except Exception as _pe:
             print(f"[BOT] Failed to start persist sync task: {_pe}")
 
@@ -781,6 +794,32 @@ if not TOKEN:
     sys.exit(1)
 
 print("[MAIN] Starting Ludus Bot...")
+
+# Register SIGTERM handler so Render's graceful shutdown triggers a final DB sync
+import signal
+def _on_sigterm(signum, frame):
+    print("[BOT] SIGTERM received — syncing data to DB before shutdown...")
+    if persist and os.getenv("DATABASE_URL"):
+        import threading
+        def _run_sync():
+            import asyncio
+            try:
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(persist.sync_now(DATA_DIR))
+                loop.close()
+                print("[BOT] Shutdown sync complete")
+            except Exception as _e:
+                print(f"[BOT] Shutdown sync failed: {_e}")
+        t = threading.Thread(target=_run_sync, daemon=False)
+        t.start()
+        t.join(timeout=15)
+    raise SystemExit(0)
+
+try:
+    signal.signal(signal.SIGTERM, _on_sigterm)
+except Exception:
+    pass
+
 try:
     bot.run(TOKEN)
 except Exception as e:
