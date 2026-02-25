@@ -34,7 +34,16 @@ class Quests(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        # Determine data directory with proper failover
+        render_path = os.getenv("RENDER_DISK_PATH")
+        if render_path:
+             data_dir = os.path.join(render_path, "data")
+             # Ensure the subdirectory exists inside the persistent disk
+             os.makedirs(data_dir, exist_ok=True)
+        else:
+             data_dir = "data"
+             os.makedirs(data_dir, exist_ok=True)
+             
         self.quests_file = os.path.join(data_dir, "quests_data.json")
         self.achievements_file = os.path.join(data_dir, "achievements_data.json")
         self.quests_data = self.load_quests()
@@ -65,19 +74,29 @@ class Quests(commands.Cog):
         }
 
     def load_quests(self):
-        if os.path.exists(self.quests_file):
-            with open(self.quests_file, 'r') as f:
-                return json.load(f)
+        try:
+            if os.path.exists(self.quests_file):
+                with open(self.quests_file, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading quests: {e}")
         return {}
 
     def save_quests(self):
-        with open(self.quests_file, 'w') as f:
-            json.dump(self.quests_data, f, indent=2)
-
+        try:
+            with open(self.quests_file, 'w') as f:
+                json.dump(self.quests_data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving quests: {e}")
+            
     def load_achievements(self):
-        if os.path.exists(self.achievements_file):
-            with open(self.achievements_file, 'r') as f:
-                return json.load(f)
+        try:
+            if os.path.exists(self.achievements_file):
+                with open(self.achievements_file, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading achievements: {e}")
+        return {}
         return {}
 
     def save_achievements(self):
