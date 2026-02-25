@@ -156,9 +156,13 @@ async def main():
 
     # Keep track of which folders we've already attempted to start
     started = set()
+    abort_startups = False
 
     # First, start the curated BOT_ORDER so important services come up first
     for bot_name in BOT_ORDER:
+        if abort_startups:
+            break
+
         folder = find_folder_by_name(bot_name)
         if not folder:
             print(f"[skip] {bot_name} not found")
@@ -173,13 +177,35 @@ async def main():
         processes.append(proc)
         started.add(folder.name.lower())
 
-        await asyncio.sleep(START_DELAY)
+        # Check for early crash (e.g. Rate Limit / 429)
+        # Give the bot a few seconds to initialize
+        check_delay = 5
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=check_delay)
+            # If we get here, the process exited (crashed) within check_delay seconds
+            if proc.returncode != 0:
+                print(f"[warning] {bot_name} crashed immediately with code {proc.returncode}. Aborting further startups to prevent rate-limit spam.")
+                # Don't remove from processes list so we can cleanup if needed, 
+                # but stop starting new ones
+                abort_startups = True
+                break 
+        except asyncio.TimeoutError:
+            # Process is still running after check_delay seconds, which is good.
+            pass
+        except Exception as e:
+            print(f"[error] Error while checking specific bot startup: {e}")
+
+        # If we didn't break, wait the rest of the START_DELAY
+        msg_delay = max(0, START_DELAY - check_delay)
+        if msg_delay > 0:
+            await asyncio.sleep(msg_delay)
 
     # Then, scan all other directories and start any that have a valid entry but weren't in BOT_ORDER
-    for folder in dir_folders:
-        name_l = folder.name.lower()
-        if name_l in started:
-            continue
+    if not abort_startups:
+        for folder in dir_folders:
+            name_l = folder.name.lower()
+            if name_l in started:
+                continue
         # skip hidden or git/venv folders
         if folder.name.startswith('.') or folder.name.lower() in ('.git', '.venv', 'venv'):
             continue
