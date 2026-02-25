@@ -13,6 +13,7 @@ import logging.handlers
 from pathlib import Path
 import ludus_logging
 from utils import user_storage
+from utils import persist
 from datetime import datetime
 import aiofiles
 from googletrans import Translator
@@ -40,6 +41,7 @@ dotenv.load_dotenv()
 # Configure logging
 # Fallback logic: Try RENDER_DISK_PATH, then local logs, then no file logging (console only)
 RENDER_DISK_PATH = os.getenv("RENDER_DISK_PATH")
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 handlers_list = [logging.StreamHandler()]
 
 log_file_path = None
@@ -231,6 +233,16 @@ except Exception:
 # Setup hook to load UNO emoji before cogs initialize
 @bot.event
 async def setup_hook():
+    # ── Restore dynamic JSON data from PostgreSQL before any cog loads ──
+    try:
+        restored = await persist.restore_all(DATA_DIR)
+        if restored:
+            print(f"[BOT] Restored {restored} data files from database")
+        else:
+            print("[BOT] persist: DATABASE_URL not set or DB empty — using local files")
+    except Exception as _pe:
+        print(f"[BOT] persist.restore_all error: {_pe}")
+
     try:
         from cogs.uno import uno_logic
         # Load emoji mapping and get back emoji
@@ -248,7 +260,14 @@ async def setup_hook():
     
     # Now load all cogs
     await load_cogs()
-    
+
+    # ── Start background DB sync (every 5 minutes) ──
+    try:
+        bot.loop.create_task(persist.periodic_sync(DATA_DIR, interval=300))
+        print("[BOT] Periodic DB sync task started")
+    except Exception as _pe:
+        print(f"[BOT] Failed to start persist sync task: {_pe}")
+
     # Initialize user storage batch worker
     try:
         from utils import user_storage
