@@ -57,12 +57,12 @@ class FarmShop(commands.Cog):
                 return
             qty = max(1, quantity)
             seed_cost = farming_cog.manager.crops[crop_id]["seed_cost"] * qty
-            if economy.get_balance(interaction.user.id) < seed_cost:
-                await interaction.followup.send(f"Not enough PsyCoins to buy {qty} {crop_id} seeds (cost: {seed_cost}).", ephemeral=True)
+            if economy.get_farm_coins(interaction.user.id) < seed_cost:
+                await interaction.followup.send(f"Not enough FarmCoins to buy {qty} {crop_id} seeds (cost: {seed_cost}).", ephemeral=True)
                 return
-            economy.remove_coins(interaction.user.id, seed_cost)
+            economy.remove_farm_coins(interaction.user.id, seed_cost)
             farming_cog.manager.add_seeds(interaction.user.id, crop_id, qty)
-            await interaction.followup.send(f"Purchased {qty} x {crop_id} seeds for {seed_cost} PsyCoins.")
+            await interaction.followup.send(f"Purchased {qty} x {crop_id} seeds for {seed_cost} 🌾 FarmCoins.")
             return
 
         if action_value == "create":
@@ -90,7 +90,7 @@ class FarmShop(commands.Cog):
             }
             self.shops.append(listing)
             self.save_shops()
-            await interaction.followup.send(f"Created listing #{listing['id']}: {qty} x {crop_id} @ {listing['price']} PsyCoins each.")
+            await interaction.followup.send(f"Created listing #{listing['id']}: {qty} x {crop_id} @ {listing['price']} 🌾 FarmCoins each.")
             return
 
         if action_value == "list":
@@ -123,12 +123,12 @@ class FarmShop(commands.Cog):
             if not economy:
                 await interaction.followup.send("Economy system not available.", ephemeral=True)
                 return
-            if economy.get_balance(interaction.user.id) < total:
-                await interaction.followup.send(f"Not enough PsyCoins (need {total}).", ephemeral=True)
+            if economy.get_farm_coins(interaction.user.id) < total:
+                await interaction.followup.send(f"Not enough FarmCoins (need {total}).", ephemeral=True)
                 return
             # Transfer coins
-            economy.remove_coins(interaction.user.id, total)
-            economy.add_coins(int(listing['owner']), total, "farmshop_sale")
+            economy.remove_farm_coins(interaction.user.id, total)
+            economy.add_farm_coins(int(listing['owner']), total)
             # Transfer seeds to buyer
             if farming_cog:
                 farming_cog.manager.add_seeds(interaction.user.id, listing['crop'], qty)
@@ -136,7 +136,7 @@ class FarmShop(commands.Cog):
             if listing['quantity'] <= 0:
                 self.shops = [s for s in self.shops if s['id'] != listing_id]
             self.save_shops()
-            await interaction.followup.send(f"Purchased {qty} x {listing['crop']} for {total} PsyCoins from listing #{listing_id}.")
+            await interaction.followup.send(f"Purchased {qty} x {listing['crop']} for {total} 🌾 FarmCoins from listing #{listing_id}.")
             return
 
 async def setup(bot):

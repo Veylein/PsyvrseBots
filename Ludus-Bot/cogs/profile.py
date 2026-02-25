@@ -181,6 +181,9 @@ class ProfileManager:
             profile["coins_balance"] = user_eco.get("balance", 0)
             profile["total_earned"] = user_eco.get("total_earned", 0)
             profile["total_spent"] = user_eco.get("total_spent", 0)
+            profile["fish_coins"] = user_eco.get("fish_coins", 0)
+            profile["mine_coins"] = user_eco.get("mine_coins", 0)
+            profile["farm_coins"] = user_eco.get("farm_coins", 0)
             eco_streak = user_eco.get("daily_streak", 0)
             if eco_streak > profile.get("daily_streak", 0):
                 profile["daily_streak"] = eco_streak
@@ -731,6 +734,11 @@ class ProfileView(discord.ui.LayoutView):
 
 ## 🪙 Balance
 **Current Balance:** {p.get('coins_balance', 0):,} PsyCoins
+
+## 🎮 Game Currencies
+🐟 **FishCoins:** {p.get('fish_coins', 0):,}
+⛏️ **MineCoins:** {p.get('mine_coins', 0):,}
+🌾 **FarmCoins:** {p.get('farm_coins', 0):,}
 
 ## 💰 Finances
 **Total Earned:** {total_earned:,} coins

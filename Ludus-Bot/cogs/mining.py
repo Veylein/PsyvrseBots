@@ -750,7 +750,7 @@ class MiningGame:
         if bot:
             economy_cog = bot.get_cog("Economy")
             if economy_cog:
-                economy_cog.add_coins(self.user_id, total_value, "mining_sales")
+                economy_cog.add_mine_coins(self.user_id, total_value)
         
         self.coins += total_value
         self.stats["coins_earned"] += total_value
@@ -980,7 +980,7 @@ class MiningGame:
             if bot:
                 economy_cog = bot.get_cog("Economy")
                 if economy_cog:
-                    economy_cog.add_coins(self.user_id, achievement["reward"], f"mining_achievement_{achievement_key}")
+                    economy_cog.add_mine_coins(self.user_id, achievement["reward"])
             
             self.coins += achievement["reward"]
     
@@ -1935,7 +1935,7 @@ class MiningView(discord.ui.LayoutView):
                     inv_text += f"• {count}x {block} (${value * count})\n"
                 
                 total_value = sum(self.game.BLOCK_VALUES.get(b, 0) * c for b, c in self.game.inventory.items())
-                inv_text += f"\n💰 **Total Value:** {total_value} psycoins\n"
+                inv_text += f"\n⛏️ **Total Value:** {total_value} MineCoins\n"
             
             # Show items
             if any(self.game.items.values()):
@@ -1994,7 +1994,7 @@ class MiningView(discord.ui.LayoutView):
                 await self.refresh(interaction, "**❌ Inventory is empty!**")
                 return
             value, items = self.game.sell_inventory(interaction.client)
-            await self.refresh(interaction, f"💰 Sold items for {value} psycoins!")
+            await self.refresh(interaction, f"⛏️ Sold items for {value} ⛏️ MineCoins!")
         
         elif action == "pickaxe":
             cost = self.game.pickaxe_level * 500
@@ -2004,12 +2004,12 @@ class MiningView(discord.ui.LayoutView):
                 await self.refresh(interaction, "**❌ Economy system not available.**")
                 return
             
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                self.game.coins = economy_cog.get_balance(interaction.user.id)
+            if economy_cog.remove_mine_coins(interaction.user.id, cost):
+                self.game.coins = economy_cog.get_mine_coins(interaction.user.id)
                 self.game.pickaxe_level += 1
                 await self.refresh(interaction, f"⛏️ Upgraded pickaxe to level {self.game.pickaxe_level}!")
             else:
-                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
+                await self.refresh(interaction, f"**❌ Need {cost} ⛏️ MineCoins!**")
         
         elif action == "backpack":
             cost = self.game.backpack_capacity * 100
@@ -2019,12 +2019,12 @@ class MiningView(discord.ui.LayoutView):
                 await self.refresh(interaction, "**❌ Economy system not available.**")
                 return
             
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                self.game.coins = economy_cog.get_balance(interaction.user.id)
+            if economy_cog.remove_mine_coins(interaction.user.id, cost):
+                self.game.coins = economy_cog.get_mine_coins(interaction.user.id)
                 self.game.backpack_capacity += 10
                 await self.refresh(interaction, f"🎒 Upgraded backpack to {self.game.backpack_capacity} slots!")
             else:
-                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
+                await self.refresh(interaction, f"**❌ Need {cost} ⛏️ MineCoins!**")
         
         elif action == "energy":
             cost = self.game.max_energy * 50
@@ -2034,13 +2034,13 @@ class MiningView(discord.ui.LayoutView):
                 await self.refresh(interaction, "**❌ Economy system not available.**")
                 return
             
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                self.game.coins = economy_cog.get_balance(interaction.user.id)
+            if economy_cog.remove_mine_coins(interaction.user.id, cost):
+                self.game.coins = economy_cog.get_mine_coins(interaction.user.id)
                 self.game.max_energy += 20
                 self.game.energy = self.game.max_energy
                 await self.refresh(interaction, f"⚡ Upgraded max energy to {self.game.max_energy}!")
             else:
-                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
+                await self.refresh(interaction, f"**❌ Need {cost} ⛏️ MineCoins!**")
     
     async def left_callback(self, interaction: discord.Interaction):
         """Mine and move left"""
@@ -2783,7 +2783,7 @@ class OwnerMiningView(discord.ui.LayoutView):
                     inv_text += f"• {count}x {block} (${value * count})\n"
                 
                 total_value = sum(self.game.BLOCK_VALUES.get(b, 0) * c for b, c in self.game.inventory.items())
-                inv_text += f"\n💰 **Total Value:** {total_value} psycoins\n"
+                inv_text += f"\n⛏️ **Total Value:** {total_value} MineCoins\n"
             
             # Show items
             if any(self.game.items.values()):
@@ -3215,7 +3215,7 @@ class OwnerMiningView(discord.ui.LayoutView):
                 await self.refresh(interaction, "**❌ Inventory is empty!**")
                 return
             value, items = self.game.sell_inventory(interaction.client)
-            await self.refresh(interaction, f"💰 Sold items for {value} psycoins!")
+            await self.refresh(interaction, f"⛏️ Sold items for {value} ⛏️ MineCoins!")
         
         elif action == "pickaxe":
             cost = self.game.pickaxe_level * 500
@@ -3225,12 +3225,12 @@ class OwnerMiningView(discord.ui.LayoutView):
                 await self.refresh(interaction, "**❌ Economy system not available.**")
                 return
             
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                self.game.coins = economy_cog.get_balance(interaction.user.id)
+            if economy_cog.remove_mine_coins(interaction.user.id, cost):
+                self.game.coins = economy_cog.get_mine_coins(interaction.user.id)
                 self.game.pickaxe_level += 1
                 await self.refresh(interaction, f"⛏️ Upgraded pickaxe to level {self.game.pickaxe_level}!")
             else:
-                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
+                await self.refresh(interaction, f"**❌ Need {cost} ⛏️ MineCoins!**")
         
         elif action == "backpack":
             cost = self.game.backpack_capacity * 100
@@ -3240,12 +3240,12 @@ class OwnerMiningView(discord.ui.LayoutView):
                 await self.refresh(interaction, "**❌ Economy system not available.**")
                 return
             
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                self.game.coins = economy_cog.get_balance(interaction.user.id)
+            if economy_cog.remove_mine_coins(interaction.user.id, cost):
+                self.game.coins = economy_cog.get_mine_coins(interaction.user.id)
                 self.game.backpack_capacity += 10
                 await self.refresh(interaction, f"🎒 Upgraded backpack to {self.game.backpack_capacity} slots!")
             else:
-                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
+                await self.refresh(interaction, f"**❌ Need {cost} ⛏️ MineCoins!**")
         
         elif action == "energy":
             cost = self.game.max_energy * 50
@@ -3255,13 +3255,13 @@ class OwnerMiningView(discord.ui.LayoutView):
                 await self.refresh(interaction, "**❌ Economy system not available.**")
                 return
             
-            if economy_cog.remove_coins(interaction.user.id, cost):
-                self.game.coins = economy_cog.get_balance(interaction.user.id)
+            if economy_cog.remove_mine_coins(interaction.user.id, cost):
+                self.game.coins = economy_cog.get_mine_coins(interaction.user.id)
                 self.game.max_energy += 20
                 self.game.energy = self.game.max_energy
                 await self.refresh(interaction, f"⚡ Upgraded max energy to {self.game.max_energy}!")
             else:
-                await self.refresh(interaction, f"**❌ Need {cost} psycoins!**")
+                await self.refresh(interaction, f"**❌ Need {cost} ⛏️ MineCoins!**")
     
     async def left_callback(self, interaction: discord.Interaction):
         """Mine and move left"""
@@ -3905,7 +3905,7 @@ class Mining(commands.Cog):
             
             # Sync coins with economy
             if economy_cog:
-                game.coins = economy_cog.get_balance(user_id)
+                game.coins = economy_cog.get_mine_coins(user_id)
                 player_data["coins"] = game.coins
             
             # Update other players positions for rendering
@@ -3938,7 +3938,7 @@ class Mining(commands.Cog):
                 game = self.active_games[user_id]
                 # Sync coins with main economy on resume
                 if economy_cog:
-                    economy_balance = economy_cog.get_balance(user_id)
+                    economy_balance = economy_cog.get_mine_coins(user_id)
                     game.coins = economy_balance
             else:
                 # Create new game
@@ -3946,7 +3946,7 @@ class Mining(commands.Cog):
                 
                 # Sync coins with main economy
                 if economy_cog:
-                    economy_balance = economy_cog.get_balance(user_id)
+                    economy_balance = economy_cog.get_mine_coins(user_id)
                     game.coins = economy_balance
                 
                 self.active_games[user_id] = game
