@@ -37,6 +37,7 @@ def main():
         bot.run(TOKEN)
     except Exception as e:
         logging.exception('Bot failed to start: %s', e)
+        sys.exit(1)
 
 
 if __name__ == '__main__':

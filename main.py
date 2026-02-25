@@ -179,7 +179,7 @@ async def main():
 
         # Check for early crash (e.g. Rate Limit / 429)
         # Give the bot a few seconds to initialize
-        check_delay = 5
+        check_delay = 20
         try:
             await asyncio.wait_for(proc.wait(), timeout=check_delay)
             # If we get here, the process exited (crashed) within check_delay seconds
@@ -221,16 +221,21 @@ async def main():
         started.add(name_l)
         await asyncio.sleep(START_DELAY)
 
-    if not processes:
+    if not processes and not abort_startups:
         print("No bots were started.")
         return
 
-    print("\nAll bots launched. Monitoring...\n")
+    if abort_startups:
+        print("\nAll startups aborted due to early crash. Monitoring remaining processes (if any) or waiting before exit...")
+    else:
+        print("\nAll bots launched. Monitoring...\n")
 
     try:
-        # Wait for all processes to finish
-        await asyncio.gather(*(p.wait() for p in processes))
-        
+        if processes:
+            await asyncio.gather(*(p.wait() for p in processes))
+        else:
+             print("No processes running.")
+
         # If we reach here, all bots have stopped (crashed or exited).
         # We should sleep before exiting to prevent tight restart loops on the platform
         # which would hammer the API if we're rate-limited.

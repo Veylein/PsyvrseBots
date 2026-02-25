@@ -734,3 +734,4 @@ try:
 except Exception as e:
     print(f"[FATAL] An error occurred while running the bot: {e}")
     traceback.print_exc()
+    sys.exit(1)
