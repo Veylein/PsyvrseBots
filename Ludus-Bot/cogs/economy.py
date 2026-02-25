@@ -358,6 +358,80 @@ class Economy(commands.Cog):
             return True
         return False
 
+    # ==================== GAME-SPECIFIC CURRENCIES ====================
+
+    def get_fish_coins(self, user_id: int) -> int:
+        """Get user's FishCoin balance"""
+        user_key = str(user_id)
+        self.get_balance(user_id)  # Ensure user exists
+        return self.economy_data[user_key].get("fish_coins", 0)
+
+    def add_fish_coins(self, user_id: int, amount: int) -> int:
+        """Add FishCoins to user's balance"""
+        user_key = str(user_id)
+        self.get_balance(user_id)  # Ensure user exists
+        self.economy_data[user_key]["fish_coins"] = self.economy_data[user_key].get("fish_coins", 0) + amount
+        self.economy_dirty = True
+        return self.economy_data[user_key]["fish_coins"]
+
+    def remove_fish_coins(self, user_id: int, amount: int) -> bool:
+        """Remove FishCoins. Returns True if successful."""
+        user_key = str(user_id)
+        current = self.get_fish_coins(user_id)
+        if current >= amount:
+            self.economy_data[user_key]["fish_coins"] = current - amount
+            self.economy_dirty = True
+            return True
+        return False
+
+    def get_mine_coins(self, user_id: int) -> int:
+        """Get user's MineCoin balance"""
+        user_key = str(user_id)
+        self.get_balance(user_id)  # Ensure user exists
+        return self.economy_data[user_key].get("mine_coins", 0)
+
+    def add_mine_coins(self, user_id: int, amount: int) -> int:
+        """Add MineCoins to user's balance"""
+        user_key = str(user_id)
+        self.get_balance(user_id)  # Ensure user exists
+        self.economy_data[user_key]["mine_coins"] = self.economy_data[user_key].get("mine_coins", 0) + amount
+        self.economy_dirty = True
+        return self.economy_data[user_key]["mine_coins"]
+
+    def remove_mine_coins(self, user_id: int, amount: int) -> bool:
+        """Remove MineCoins. Returns True if successful."""
+        user_key = str(user_id)
+        current = self.get_mine_coins(user_id)
+        if current >= amount:
+            self.economy_data[user_key]["mine_coins"] = current - amount
+            self.economy_dirty = True
+            return True
+        return False
+
+    def get_farm_coins(self, user_id: int) -> int:
+        """Get user's FarmCoin balance"""
+        user_key = str(user_id)
+        self.get_balance(user_id)  # Ensure user exists
+        return self.economy_data[user_key].get("farm_coins", 0)
+
+    def add_farm_coins(self, user_id: int, amount: int) -> int:
+        """Add FarmCoins to user's balance"""
+        user_key = str(user_id)
+        self.get_balance(user_id)  # Ensure user exists
+        self.economy_data[user_key]["farm_coins"] = self.economy_data[user_key].get("farm_coins", 0) + amount
+        self.economy_dirty = True
+        return self.economy_data[user_key]["farm_coins"]
+
+    def remove_farm_coins(self, user_id: int, amount: int) -> bool:
+        """Remove FarmCoins. Returns True if successful."""
+        user_key = str(user_id)
+        current = self.get_farm_coins(user_id)
+        if current >= amount:
+            self.economy_data[user_key]["farm_coins"] = current - amount
+            self.economy_dirty = True
+            return True
+        return False
+
     @commands.command(name="balance", aliases=["bal", "coins"])
     async def balance(self, ctx, member: Optional[discord.Member] = None):
         """Check your or someone else's PsyCoin balance"""
@@ -410,6 +484,14 @@ class Economy(commands.Cog):
             value=f"```yaml\n{balance:,} PsyCoins\n```",
             inline=False
         )
+        
+        # Game-specific currencies
+        fish_coins = self.get_fish_coins(member.id)
+        mine_coins = self.get_mine_coins(member.id)
+        farm_coins = self.get_farm_coins(member.id)
+        embed.add_field(name="🐟 FishCoins", value=f"**{fish_coins:,}**", inline=True)
+        embed.add_field(name="⛏️ MineCoins", value=f"**{mine_coins:,}**", inline=True)
+        embed.add_field(name="🌾 FarmCoins", value=f"**{farm_coins:,}**", inline=True)
         
         # Stats grid
         total_earned = data.get('total_earned', 0)
@@ -883,169 +965,199 @@ class Economy(commands.Cog):
     
     # ==================== CURRENCY CONVERSION SYSTEM ====================
     
-    @app_commands.command(name="convert", description="Convert PsyCoins to other currencies")
-    @app_commands.choices(currency=[
-        app_commands.Choice(name="💎 Wizard Wars Gold (100 PsyCoins → 1 WW Gold)", value="ww_gold"),
-        app_commands.Choice(name="🌾 Farming Tokens (50 PsyCoins → 1 Farm Token)", value="farm_token"),
-        app_commands.Choice(name="🎮 Arcade Tickets (25 PsyCoins → 1 Ticket)", value="arcade_ticket"),
-        app_commands.Choice(name="🎣 Fishing Tokens (30 PsyCoins → 1 Fish Token)", value="fish_token"),
+    @app_commands.command(name="convert", description="Convert between PsyCoins and game currencies (FishCoins / MineCoins / FarmCoins)")
+    @app_commands.choices(direction=[
+        app_commands.Choice(name="💰 → 🐟  PsyCoin to FishCoin  (4 PSY = 1 FISH)", value="psy_to_fish"),
+        app_commands.Choice(name="🐟 → 💰  FishCoin to PsyCoin  (1 FISH = 2 PSY)", value="fish_to_psy"),
+        app_commands.Choice(name="💰 → ⛏️  PsyCoin to MineCoin  (5 PSY = 1 MINE)", value="psy_to_mine"),
+        app_commands.Choice(name="⛏️ → 💰  MineCoin to PsyCoin  (1 MINE = 3 PSY)", value="mine_to_psy"),
+        app_commands.Choice(name="💰 → 🌾  PsyCoin to FarmCoin  (4 PSY = 1 FARM)", value="psy_to_farm"),
+        app_commands.Choice(name="🌾 → 💰  FarmCoin to PsyCoin  (1 FARM = 2 PSY)", value="farm_to_psy"),
     ])
     @app_commands.describe(
-        currency="The currency you want to convert to",
-        amount="Amount of target currency you want (not PsyCoins!)"
+        direction="Conversion direction",
+        amount="Amount of the SOURCE currency to convert"
     )
-    async def convert_currency(self, interaction: discord.Interaction, currency: app_commands.Choice[str], amount: int):
-        """Convert PsyCoins to specialized currencies"""
-        
+    async def convert_currency(self, interaction: discord.Interaction, direction: app_commands.Choice[str], amount: int):
+        """Convert between PsyCoins and game-specific currencies"""
+
         if amount <= 0:
             await interaction.response.send_message("❌ Amount must be positive!", ephemeral=True)
             return
-        
-        user_id = str(interaction.user.id)
-        if user_id not in self.economy_data:
-            self.economy_data[user_id] = {"balance": 0, "daily_last": None, "daily_streak": 0}
-        
-        # Conversion rates (PsyCoins cost per 1 unit of target currency)
-        rates = {
-            "ww_gold": {"rate": 100, "name": "WW Gold", "emoji": "💎", "file": "wizard_wars_data.json", "key": "gold"},
-            "farm_token": {"rate": 50, "name": "Farming Tokens", "emoji": "🌾", "field": "farm_tokens"},
-            "arcade_ticket": {"rate": 25, "name": "Arcade Tickets", "emoji": "🎮", "field": "arcade_tickets"},
-            "fish_token": {"rate": 30, "name": "Fishing Tokens", "emoji": "🎣", "field": "fish_tokens"}
+
+        user_id = interaction.user.id
+
+        # Rates: each tuple is (source_rate, target_rate) meaning source_rate of source = target_rate of target
+        RATES = {
+            "psy_to_fish": {
+                "src_name": "PsyCoins", "src_emoji": "💰",
+                "tgt_name": "FishCoins", "tgt_emoji": "🐟",
+                "src_per_unit": 4, "tgt_per_unit": 1,
+                "get_src": self.get_balance, "remove_src": self.remove_coins,
+                "get_tgt": self.get_fish_coins, "add_tgt": self.add_fish_coins,
+            },
+            "fish_to_psy": {
+                "src_name": "FishCoins", "src_emoji": "🐟",
+                "tgt_name": "PsyCoins", "tgt_emoji": "💰",
+                "src_per_unit": 1, "tgt_per_unit": 2,
+                "get_src": self.get_fish_coins, "remove_src": self.remove_fish_coins,
+                "get_tgt": self.get_balance, "add_tgt": lambda uid, a: self.add_coins(uid, a, "convert"),
+            },
+            "psy_to_mine": {
+                "src_name": "PsyCoins", "src_emoji": "💰",
+                "tgt_name": "MineCoins", "tgt_emoji": "⛏️",
+                "src_per_unit": 5, "tgt_per_unit": 1,
+                "get_src": self.get_balance, "remove_src": self.remove_coins,
+                "get_tgt": self.get_mine_coins, "add_tgt": self.add_mine_coins,
+            },
+            "mine_to_psy": {
+                "src_name": "MineCoins", "src_emoji": "⛏️",
+                "tgt_name": "PsyCoins", "tgt_emoji": "💰",
+                "src_per_unit": 1, "tgt_per_unit": 3,
+                "get_src": self.get_mine_coins, "remove_src": self.remove_mine_coins,
+                "get_tgt": self.get_balance, "add_tgt": lambda uid, a: self.add_coins(uid, a, "convert"),
+            },
+            "psy_to_farm": {
+                "src_name": "PsyCoins", "src_emoji": "💰",
+                "tgt_name": "FarmCoins", "tgt_emoji": "🌾",
+                "src_per_unit": 4, "tgt_per_unit": 1,
+                "get_src": self.get_balance, "remove_src": self.remove_coins,
+                "get_tgt": self.get_farm_coins, "add_tgt": self.add_farm_coins,
+            },
+            "farm_to_psy": {
+                "src_name": "FarmCoins", "src_emoji": "🌾",
+                "tgt_name": "PsyCoins", "tgt_emoji": "💰",
+                "src_per_unit": 1, "tgt_per_unit": 2,
+                "get_src": self.get_farm_coins, "remove_src": self.remove_farm_coins,
+                "get_tgt": self.get_balance, "add_tgt": lambda uid, a: self.add_coins(uid, a, "convert"),
+            },
         }
-        
-        conversion = rates[currency.value]
-        cost = amount * conversion["rate"]
-        current_balance = self.economy_data[user_id]["balance"]
-        
-        if current_balance < cost:
+
+        r = RATES[direction.value]
+        # Calculate how much of source is needed for `amount` source units
+        # and how much target the user receives
+        # amount = source units to spend
+        # target = (amount / src_per_unit) * tgt_per_unit
+        # But for psy_to_xxx, amount is in psy (source) and target units = floor(amount / src_per_unit)
+        # For xxx_to_psy, amount is in game coins (source) and target = amount * tgt_per_unit
+
+        cost = amount  # source amount to spend
+        received = (amount // r["src_per_unit"]) * r["tgt_per_unit"]
+
+        if received <= 0:
             await interaction.response.send_message(
-                f"❌ Insufficient PsyCoins!\n"
-                f"**Cost:** {cost:,} PsyCoins\n"
-                f"**You have:** {current_balance:,} PsyCoins\n"
-                f"**Need:** {cost - current_balance:,} more",
+                f"❌ You need at least **{r['src_per_unit']} {r['src_name']}** to convert to 1 {r['tgt_name']}.",
                 ephemeral=True
             )
             return
-        
-        # Deduct PsyCoins
-        self.economy_data[user_id]["balance"] -= cost
-        self.economy_dirty = True
-        
-        # Add target currency
-        if currency.value == "ww_gold":
-            # Special handling for Wizard Wars
-            data_dir = os.getenv("RENDER_DISK_PATH", ".")
-            ww_file = os.path.join(data_dir, "wizard_wars_data.json")
-            
-            if os.path.exists(ww_file):
-                with open(ww_file, 'r') as f:
-                    ww_data = json.load(f)
-                
-                if user_id in ww_data.get('wizards', {}):
-                    ww_data['wizards'][user_id]['gold'] = ww_data['wizards'][user_id].get('gold', 0) + amount
-                    
-                    with open(ww_file, 'w') as f:
-                        json.dump(ww_data, f, indent=4)
-                else:
-                    await interaction.response.send_message(
-                        "❌ You need to create a wizard first! Use `/ww create`",
-                        ephemeral=True
-                    )
-                    # Refund
-                    self.economy_data[user_id]["balance"] += cost
-                    return
-            else:
-                await interaction.response.send_message(
-                    "❌ Wizard Wars system not initialized!",
-                    ephemeral=True
-                )
-                # Refund
-                self.economy_data[user_id]["balance"] += cost
-                return
-        else:
-            # Store in economy data
-            field_name = conversion["field"]
-            if field_name not in self.economy_data[user_id]:
-                self.economy_data[user_id][field_name] = 0
-            self.economy_data[user_id][field_name] += amount
-        
-        await self.save_economy()
-        
-        embed = EmbedBuilder.success(
-            "Currency Converted!",
-            f"Successfully converted PsyCoins to {conversion['name']}"
-        )
-        embed.add_field(name="💸 Cost", value=f"{cost:,} PsyCoins", inline=True)
-        embed.add_field(name=f"{conversion['emoji']} Received", value=f"{amount:,} {conversion['name']}", inline=True)
-        embed.add_field(name="💰 Remaining", value=f"{self.economy_data[user_id]['balance']:,} PsyCoins", inline=True)
-        embed.set_footer(text=f"Conversion Rate: {conversion['rate']} PsyCoins = 1 {conversion['name']}")
 
+        current_src = r["get_src"](user_id)
+        if current_src < cost:
+            await interaction.response.send_message(
+                f"❌ Not enough {r['src_emoji']} {r['src_name']}!\n"
+                f"**Cost:** {cost:,} {r['src_name']}\n"
+                f"**You have:** {current_src:,} {r['src_name']}\n"
+                f"**Need:** {cost - current_src:,} more",
+                ephemeral=True
+            )
+            return
+
+        # Execute conversion
+        r["remove_src"](user_id, cost)
+        r["add_tgt"](user_id, received)
+        await self.save_economy()
+
+        embed = EmbedBuilder.success(
+            "💱 Currency Converted!",
+            f"Successfully exchanged {r['src_emoji']} **{cost:,} {r['src_name']}** → {r['tgt_emoji']} **{received:,} {r['tgt_name']}**"
+        )
+        embed.add_field(name=f"{r['src_emoji']} Spent", value=f"{cost:,} {r['src_name']}", inline=True)
+        embed.add_field(name=f"{r['tgt_emoji']} Received", value=f"{received:,} {r['tgt_name']}", inline=True)
+        embed.add_field(
+            name="📊 New Balances",
+            value=(
+                f"💰 PsyCoins: **{self.get_balance(user_id):,}**\n"
+                f"🐟 FishCoins: **{self.get_fish_coins(user_id):,}**\n"
+                f"⛏️ MineCoins: **{self.get_mine_coins(user_id):,}**\n"
+                f"🌾 FarmCoins: **{self.get_farm_coins(user_id):,}**"
+            ),
+            inline=False
+        )
+        embed.set_footer(text=f"Rate: {r['src_per_unit']} {r['src_name']} = {r['tgt_per_unit']} {r['tgt_name']}")
         await interaction.response.send_message(embed=embed)
-    
-    @app_commands.command(name="currencies", description="View your currency balances")
+
+    @app_commands.command(name="currencies", description="View all your currency balances")
     async def view_currencies(self, interaction: discord.Interaction):
-        """View all currency balances"""
-        user_id = str(interaction.user.id)
-        
-        if user_id not in self.economy_data:
-            self.economy_data[user_id] = {"balance": 0, "daily_last": None, "daily_streak": 0}
-        
-        data = self.economy_data[user_id]
-        
+        """View all currency balances including game-specific ones"""
+        user_id = interaction.user.id
+        user_key = str(user_id)
+
+        if user_key not in self.economy_data:
+            self.economy_data[user_key] = {"balance": 0, "daily_last": None, "daily_streak": 0}
+
+        data = self.economy_data[user_key]
+
         embed = EmbedBuilder.create(
             title=f"💰 {interaction.user.display_name}'s Currencies",
-            color=Colors.ECONOMY
+            description="All your current currency balances across Ludus.",
+            color=Colors.ECONOMY,
+            thumbnail=interaction.user.display_avatar.url,
+            timestamp=True
         )
-        
-        # PsyCoins
+
+        # === Main Currency ===
         embed.add_field(
-            name="💰 PsyCoins",
-            value=f"{data.get('balance', 0):,}",
+            name="💰 PsyCoins  *(main currency)*",
+            value=f"```yaml\n{data.get('balance', 0):,}\n```",
+            inline=False
+        )
+
+        # === Game Currencies ===
+        fish_coins = self.get_fish_coins(user_id)
+        mine_coins = self.get_mine_coins(user_id)
+        farm_coins = self.get_farm_coins(user_id)
+
+        embed.add_field(
+            name="🐟 FishCoins",
+            value=f"**{fish_coins:,}**\n*Earned from fishing*",
             inline=True
         )
-        
+        embed.add_field(
+            name="⛏️ MineCoins",
+            value=f"**{mine_coins:,}**\n*Earned from mining*",
+            inline=True
+        )
+        embed.add_field(
+            name="🌾 FarmCoins",
+            value=f"**{farm_coins:,}**\n*Earned from farming*",
+            inline=True
+        )
+
         # Wizard Wars Gold
-        data_dir = os.getenv("RENDER_DISK_PATH", ".")
-        ww_file = os.path.join(data_dir, "wizard_wars_data.json")
+        ww_data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        ww_file = os.path.join(ww_data_dir, "wizard_wars_data.json")
         ww_gold = 0
         if os.path.exists(ww_file):
             try:
                 with open(ww_file, 'r') as f:
                     ww_data = json.load(f)
-                if user_id in ww_data.get('wizards', {}):
-                    ww_gold = ww_data['wizards'][user_id].get('gold', 0)
-            except:
+                if user_key in ww_data.get('wizards', {}):
+                    ww_gold = ww_data['wizards'][user_key].get('gold', 0)
+            except Exception:
                 pass
-        
+        embed.add_field(name="💎 Wizard Wars Gold", value=f"**{ww_gold:,}**\n*Earned in Wizard Wars*", inline=True)
+
+        # === Conversion Rates ===
         embed.add_field(
-            name="💎 Wizard Wars Gold",
-            value=f"{ww_gold:,}",
-            inline=True
-        )
-        
-        # Other currencies
-        embed.add_field(
-            name="🌾 Farming Tokens",
-            value=f"{data.get('farm_tokens', 0):,}",
-            inline=True
-        )
-        embed.add_field(
-            name="🎮 Arcade Tickets",
-            value=f"{data.get('arcade_tickets', 0):,}",
-            inline=True
-        )
-        embed.add_field(
-            name="🎣 Fishing Tokens",
-            value=f"{data.get('fish_tokens', 0):,}",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="📊 Conversion Rates",
-            value="100 💰 = 1 💎\n50 💰 = 1 🌾\n25 💰 = 1 🎮\n30 💰 = 1 🎣",
+            name="📊 Conversion Rates  *(use /convert)*",
+            value=(
+                "💰→🐟 `4 PSY = 1 FISH`   |   🐟→💰 `1 FISH = 2 PSY`\n"
+                "💰→⛏️ `5 PSY = 1 MINE`   |   ⛏️→💰 `1 MINE = 3 PSY`\n"
+                "💰→🌾 `4 PSY = 1 FARM`   |   🌾→💰 `1 FARM = 2 PSY`"
+            ),
             inline=False
         )
-        
+
         await interaction.response.send_message(embed=embed)
     
     @app_commands.command(name="equipdeck", description="Equip a card deck for poker games")

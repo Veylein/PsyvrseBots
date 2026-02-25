@@ -441,19 +441,19 @@ class FarmView(View):
         embed = EmbedBuilder.create(
             title=f"{Emojis.SUCCESS} Harvest Complete!",
             description=f"**Harvested {len(harvested)} crops!**\n\n{summary}\n"
-                       f"💰 **Total Value:** {total_value} PsyCoins\n"
+                       f"🌾 **Total Value:** {total_value} FarmCoins\n"
                        f"⭐ **Total XP:** {sum(h['xp'] for h in harvested)}",
             color=Colors.SUCCESS
         )
         
         await interaction.followup.send(embed=embed)
-        # Award PsyCoins for the harvested value via Economy cog
+        # Award FarmCoins for the harvested value via Economy cog
         economy_cog = self.manager and getattr(self.manager, 'data_dir', None) and self.manager
         # Use bot economy cog instead
         try:
             econ = self.ctx.bot.get_cog("Economy")
             if econ:
-                econ.add_coins(self.ctx.author.id, total_value, "farming")
+                econ.add_farm_coins(self.ctx.author.id, total_value)
         except Exception:
             pass
         if _farm_inc:
@@ -621,11 +621,11 @@ class Farming(commands.Cog):
             await ctx.send(f"❌ {result}")
             return
         
-        # Award PsyCoins via Economy cog
+        # Award FarmCoins via Economy cog
         economy_cog = self.bot.get_cog("Economy")
         if economy_cog:
             try:
-                economy_cog.add_coins(ctx.author.id, value, "farming")
+                economy_cog.add_farm_coins(ctx.author.id, value)
             except Exception:
                 pass
         if _farm_inc:
@@ -645,7 +645,7 @@ class Farming(commands.Cog):
         embed = EmbedBuilder.create(
             title=f"{Emojis.SUCCESS} Harvest Complete!",
             description=f"Harvested **{result['quantity']}x {result['crop']['emoji']} {result['crop']['name']}**!\n\n"
-                       f"💰 Earned: **{value} PsyCoins**\n"
+                       f"🌾 Earned: **{value} FarmCoins**\n"
                        f"⭐ XP: **+{result['xp']}**",
             color=Colors.SUCCESS
         )
@@ -740,11 +740,11 @@ class Farming(commands.Cog):
         # Deduct coins via Economy cog
         economy_cog = self.bot.get_cog("Economy")
         if economy_cog:
-            balance = economy_cog.get_balance(ctx.author.id)
+            balance = economy_cog.get_farm_coins(ctx.author.id)
             if balance < cost:
-                await ctx.send(f"❌ Not enough coins! Need {cost}, have {balance}.")
+                await ctx.send(f"❌ Not enough FarmCoins! Need {cost}, have {balance}.")
                 return
-            economy_cog.remove_coins(ctx.author.id, cost)
+            economy_cog.remove_farm_coins(ctx.author.id, cost)
         else:
             # Fallback to local economy file
             economy_file = os.path.join(self.manager.data_dir, "economy.json")
@@ -758,11 +758,11 @@ class Farming(commands.Cog):
 
             user_id = str(ctx.author.id)
             if user_id not in economy:
-                economy[user_id] = {"balance": 0}
-            if economy[user_id]["balance"] < cost:
-                await ctx.send(f"❌ Not enough coins! Need {cost}, have {economy[user_id]['balance']}.")
+                economy[user_id] = {"farm_coins": 0}
+            if economy[user_id].get("farm_coins", 0) < cost:
+                await ctx.send(f"❌ Not enough FarmCoins! Need {cost}, have {economy[user_id].get('farm_coins', 0)}.")
                 return
-            economy[user_id]["balance"] -= cost
+            economy[user_id]["farm_coins"] = economy[user_id].get("farm_coins", 0) - cost
             try:
                 with open(economy_file, 'w') as f:
                     json.dump(economy, f, indent=4)
@@ -771,7 +771,7 @@ class Farming(commands.Cog):
         
         embed = EmbedBuilder.create(
             title=f"{Emojis.SUCCESS} Upgrade Purchased!",
-            description=f"{message}\n\n💰 Cost: **{cost} PsyCoins**",
+            description=f"{message}\n\n🌾 Cost: **{cost} FarmCoins**",
             color=Colors.SUCCESS
         )
         await ctx.send(embed=embed)

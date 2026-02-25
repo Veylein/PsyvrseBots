@@ -369,10 +369,10 @@ class FishingMinigameView(discord.ui.View):
             except Exception:
                 pass
         
-        # Award coins
+        # Award FishCoins
         economy_cog = self.cog.bot.get_cog("Economy")
         if economy_cog:
-            economy_cog.add_coins(self.user.id, fish_data["value"], "fishing")
+            economy_cog.add_fish_coins(self.user.id, fish_data["value"])
         
         # Record for tournament if active
         if hasattr(interaction, 'guild_id') and interaction.guild_id:
@@ -408,7 +408,7 @@ class FishingMinigameView(discord.ui.View):
         description = (f"**You caught:** {fish_data['name']}\n"
                       f"**Rarity:** {fish_data['rarity']}\n"
                       f"**Weight:** {weight}kg\n"
-                      f"**Value:** +{fish_data['value']} coins\n\n"
+                      f"**Value:** +{fish_data['value']} 🐟 FishCoins\n\n"
                       f"Great job! The fish is added to your collection.")
         
         if card_dropped:
@@ -790,12 +790,12 @@ class KrakenBossFight(discord.ui.View):
         minutes = elapsed // 60
         seconds = elapsed % 60
         
-        # Give rewards
+        # Give rewards (in FishCoins)
         economy_cog = self.cog.bot.get_cog("Economy")
         reward_coins = random.randint(5000, 10000)
         
         if economy_cog:
-            economy_cog.add_coins(self.user.id, reward_coins, "kraken_victory")
+            economy_cog.add_fish_coins(self.user.id, reward_coins)
         
         # Add Kraken to collection
         user_data = self.cog.get_user_data(self.user.id)
@@ -836,7 +836,7 @@ class KrakenBossFight(discord.ui.View):
                        f"you have conquered the ancient terror of the deep!\n\n"
                        f"**Rewards:**\n"
                        f"🦑 **THE KRAKEN Caught!** (Weight: {kraken_weight:.1f}kg)\n"
-                       f"💰 **{reward_coins:,} PsyCoins**\n"
+                       f"� **{reward_coins:,} FishCoins**\n"
                        f"🏆 **Achievement Unlocked: Kraken Slayer**\n"
                        f"⭐ **Catches:** {self.catches}/{self.required_catches}\n"
                        f"💥 **Hits Taken:** {self.escapes}/{self.max_escapes}\n\n"
@@ -1073,7 +1073,7 @@ class ShopSelectView(discord.ui.View):
                 await interaction.followup.send("❌ Economy system not available.", ephemeral=True)
                 return
             
-            if economy_cog.remove_coins(interaction.user.id, cost):
+            if economy_cog.remove_fish_coins(interaction.user.id, cost):
                 owned_rods.append(rod_id)
                 self.user_data['rod'] = rod_id
                 self.fishing_cog.save_fishing_data()
@@ -1081,7 +1081,7 @@ class ShopSelectView(discord.ui.View):
                 # Show success message
                 temp_embed = discord.Embed(
                     title="✅ Success",
-                    description=f"🎣 Purchased **{rod['name']}** for {cost} PsyCoins!",
+                    description=f"🎣 Purchased **{rod['name']}** for {cost} 🐟 FishCoins!",
                     color=discord.Color.green()
                 )
                 await interaction.edit_original_response(embed=temp_embed, view=None)
@@ -1090,7 +1090,7 @@ class ShopSelectView(discord.ui.View):
                 # Refresh shop
                 await self._refresh_shop(interaction, economy_cog)
             else:
-                await interaction.followup.send(f"❌ You need {cost} PsyCoins to buy {rod['name']}.", ephemeral=True)
+                await interaction.followup.send(f"❌ You need {cost} 🐟 FishCoins to buy {rod['name']}.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
     
@@ -1111,7 +1111,7 @@ class ShopSelectView(discord.ui.View):
                 await interaction.followup.send("❌ Economy system not available.", ephemeral=True)
                 return
             
-            if economy_cog.remove_coins(interaction.user.id, cost):
+            if economy_cog.remove_fish_coins(interaction.user.id, cost):
                 owned_boats.append(boat_id)
                 self.user_data['boat'] = boat_id
                 self.fishing_cog.save_fishing_data()
@@ -1119,7 +1119,7 @@ class ShopSelectView(discord.ui.View):
                 # Show success message
                 temp_embed = discord.Embed(
                     title="✅ Success",
-                    description=f"🛶 Purchased **{boat['name']}** for {cost} PsyCoins!",
+                    description=f"🛶 Purchased **{boat['name']}** for {cost} 🐟 FishCoins!",
                     color=discord.Color.green()
                 )
                 await interaction.edit_original_response(embed=temp_embed, view=None)
@@ -1128,7 +1128,7 @@ class ShopSelectView(discord.ui.View):
                 # Refresh shop
                 await self._refresh_shop(interaction, economy_cog)
             else:
-                await interaction.followup.send(f"❌ You need {cost} PsyCoins to buy {boat['name']}.", ephemeral=True)
+                await interaction.followup.send(f"❌ You need {cost} 🐟 FishCoins to buy {boat['name']}.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
     
@@ -1144,7 +1144,7 @@ class ShopSelectView(discord.ui.View):
                 await interaction.followup.send("❌ Economy system not available.", ephemeral=True)
                 return
             
-            if economy_cog.remove_coins(interaction.user.id, cost):
+            if economy_cog.remove_fish_coins(interaction.user.id, cost):
                 inv = self.user_data.setdefault('bait_inventory', {})
                 inv[bait_id] = inv.get(bait_id, 0) + 1
                 self.fishing_cog.save_fishing_data()
@@ -1152,7 +1152,7 @@ class ShopSelectView(discord.ui.View):
                 # Show success message
                 temp_embed = discord.Embed(
                     title="✅ Success",
-                    description=f"🪱 Purchased 1x **{bait['name']}** for {cost} PsyCoins!",
+                    description=f"🪱 Purchased 1x **{bait['name']}** for {cost} 🐟 FishCoins!",
                     color=discord.Color.green()
                 )
                 await interaction.edit_original_response(embed=temp_embed, view=None)
@@ -1161,17 +1161,17 @@ class ShopSelectView(discord.ui.View):
                 # Refresh shop
                 await self._refresh_shop(interaction, economy_cog)
             else:
-                await interaction.followup.send(f"❌ You need {cost} PsyCoins to buy {bait['name']}.", ephemeral=True)
+                await interaction.followup.send(f"❌ You need {cost} 🐟 FishCoins to buy {bait['name']}.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
     
     async def _refresh_shop(self, interaction: discord.Interaction, economy_cog):
         """Refresh the shop embed with updated data"""
-        balance = economy_cog.get_balance(interaction.user.id) if economy_cog else 0
+        balance = economy_cog.get_fish_coins(interaction.user.id) if economy_cog else 0
         
         embed = discord.Embed(
             title="🪙 Fishing Shop",
-            description=f"**Your Balance:** {balance} PsyCoins\n\n"
+            description=f"**Your Balance:** {balance} 🐟 FishCoins\n\n"
                         f"**Current Equipment:**\n"
                         f"🎣 Rod: {self.fishing_cog.rods[self.user_data['rod']]['name']}\n"
                         f"🛶 Boat: {self.fishing_cog.boats[self.user_data['boat']]['name']}\n\n"
@@ -1184,7 +1184,7 @@ class ShopSelectView(discord.ui.View):
         owned_rods = self.user_data.setdefault('owned_rods', [self.user_data['rod']])
         for rod_id, rod in self.fishing_cog.rods.items():
             owned = "✅" if rod_id in owned_rods else ""
-            rods_text += f"{rod['name']} - **{rod['cost']} PsyCoins** {owned}\n"
+            rods_text += f"{rod['name']} - **{rod['cost']} 🐟 FishCoins** {owned}\n"
         embed.add_field(name="🎣 Fishing Rods", value=rods_text, inline=False)
         
         # Boats section
@@ -1192,13 +1192,13 @@ class ShopSelectView(discord.ui.View):
         owned_boats = self.user_data.setdefault('owned_boats', [self.user_data['boat']])
         for boat_id, boat in self.fishing_cog.boats.items():
             owned = "✅" if boat_id in owned_boats else ""
-            boats_text += f"{boat['name']} - **{boat['cost']} PsyCoins** {owned}\n"
+            boats_text += f"{boat['name']} - **{boat['cost']} 🐟 FishCoins** {owned}\n"
         embed.add_field(name="🛶 Boats", value=boats_text, inline=False)
         
         # Bait section
         bait_text = ""
         for bait_id, bait in self.fishing_cog.baits.items():
-            bait_text += f"{bait['name']} - **{bait['cost']} PsyCoins** (x1)\n"
+            bait_text += f"{bait['name']} - **{bait['cost']} 🐟 FishCoins** (x1)\n"
         embed.add_field(name="🪱 Bait", value=bait_text, inline=False)
         
         embed.set_footer(text="💡 Select from dropdowns below to buy items!")
@@ -1245,7 +1245,7 @@ class AreaSelectView(discord.ui.View):
                 req_boat = fishing_cog.boats.get(required_boat, {})
                 desc_parts.append(f"Requires: {req_boat.get('name', 'Boat')}")
             elif not unlocked:
-                desc_parts.append(f"Cost: {area['unlock_cost']:,} PsyCoins")
+                desc_parts.append(f"Cost: {area['unlock_cost']:,} 🐟 FishCoins")
             
             options.append(discord.SelectOption(
                 label=label[:100],
@@ -1294,7 +1294,7 @@ class AreaSelectView(discord.ui.View):
                 )
                 embed.add_field(
                     name="🛶 Required Boat",
-                    value=f"**{required_boat_data.get('name', 'Unknown')}**\n💰 {required_boat_data.get('cost', 0):,} PsyCoins",
+                    value=f"**{required_boat_data.get('name', 'Unknown')}**\n� {required_boat_data.get('cost', 0):,} FishCoins",
                     inline=True
                 )
                 embed.add_field(
@@ -1314,35 +1314,35 @@ class AreaSelectView(discord.ui.View):
                     return
                 
                 cost = area["unlock_cost"]
-                balance = economy_cog.get_balance(interaction.user.id)
+                balance = economy_cog.get_fish_coins(interaction.user.id)
                 
                 if balance >= cost:
-                    economy_cog.remove_coins(interaction.user.id, cost)
+                    economy_cog.remove_fish_coins(interaction.user.id, cost)
                     self.user_data["unlocked_areas"].append(area_id)
                     self.user_data["current_area"] = area_id
                     self.fishing_cog.save_fishing_data()
-                    success_message = f"🎉 Unlocked and traveled to **{area['name']}** for {cost:,} PsyCoins!"
+                    success_message = f"🎉 Unlocked and traveled to **{area['name']}** for {cost:,} 🐟 FishCoins!"
                 else:
                     # Not enough money!
                     needed = cost - balance
                     embed = discord.Embed(
-                        title=f"💰 Not Enough PsyCoins!",
+                        title=f"👛 Not Enough FishCoins!",
                         description=f"You can't afford to unlock **{area['name']}**",
                         color=discord.Color.orange()
                     )
                     embed.add_field(
-                        name="💳 Your Balance",
-                        value=f"**{balance:,}** PsyCoins",
+                        name="💳 Your FishCoins",
+                        value=f"**{balance:,}** FishCoins",
                         inline=True
                     )
                     embed.add_field(
                         name="💰 Area Cost",
-                        value=f"**{cost:,}** PsyCoins",
+                        value=f"**{cost:,}** FishCoins",
                         inline=True
                     )
                     embed.add_field(
                         name="📉 Need",
-                        value=f"**{needed:,}** PsyCoins",
+                        value=f"**{needed:,}** FishCoins",
                         inline=True
                     )
                     embed.add_field(
@@ -1372,11 +1372,11 @@ class AreaSelectView(discord.ui.View):
                 
                 # Refresh the areas view with updated data
                 current_area = self.fishing_cog.areas[self.user_data['current_area']]
-                balance = economy_cog.get_balance(interaction.user.id) if economy_cog else 0
+                balance = economy_cog.get_fish_coins(interaction.user.id) if economy_cog else 0
                 
                 new_embed = discord.Embed(
                     title="🗺️ Fishing Areas",
-                    description=f"**Your Balance:** {balance} PsyCoins\n"
+                    description=f"**Your Balance:** {balance} 🐟 FishCoins\n"
                                 f"**Current Location:** 📍 {current_area['name']}\n"
                                 f"**Unlocked Areas:** {len(self.user_data['unlocked_areas'])}/{len(self.fishing_cog.areas)}\n\n"
                                 "**Select an area from the dropdown below to travel or unlock!**",
@@ -1414,7 +1414,7 @@ class AreaSelectView(discord.ui.View):
                         requirements.append(f"🛶 Requires: **{req_boat_data.get('name', 'Unknown')}** ({req_boat_data.get('cost', 0):,} 💰)")
                     
                     if not unlocked and area_iter.get("unlock_cost", 0) > 0:
-                        requirements.append(f"💰 Unlock cost: **{area_iter['unlock_cost']:,} PsyCoins**")
+                        requirements.append(f"� Unlock cost: **{area_iter['unlock_cost']:,} FishCoins**")
                     
                     req_text = "\n".join(requirements) if requirements else "✅ Ready to explore!"
                     
@@ -1938,7 +1938,7 @@ class FishingHelpView(discord.ui.View):
         for rod_id, rod in self.fishing_cog.rods.items():
             page2.add_field(
                 name=f"{rod['name']}",
-                value=f"**Cost:** {rod['cost']:,} PsyCoins\n"
+                value=f"**Cost:** {rod['cost']:,} 🐟 FishCoins\n"
                      f"**Catch Bonus:** +{rod['catch_bonus']}%\n"
                      f"**Rare Bonus:** +{rod['rare_bonus']}%\n"
                      f"*{rod['description']}*",
@@ -2123,7 +2123,7 @@ class FishingHelpView(discord.ui.View):
             name="🏆 Rewards",
             value="**Victory:**\n"
                  "• 🦑 THE KRAKEN added to collection\n"
-                 "• 💰 5,000-10,000 PsyCoins\n"
+                 "• 💰 5,000-10,000 FishCoins\n"
                  "• 🏆 Achievement: Kraken Slayer\n"
                  "• Eternal glory!\n\n"
                  "*Only the strongest will prevail...*",
@@ -2873,11 +2873,11 @@ class Fishing(commands.Cog):
         try:
             user_data = self.get_user_data(interaction.user.id)
             economy_cog = self.bot.get_cog("Economy")
-            balance = economy_cog.get_balance(interaction.user.id) if economy_cog else 0
+            balance = economy_cog.get_fish_coins(interaction.user.id) if economy_cog else 0
             
             embed = discord.Embed(
                 title="🪙 Fishing Shop",
-                description=f"**Your Balance:** {balance} PsyCoins\n\n"
+                description=f"**Your Balance:** {balance} 🐟 FishCoins\n\n"
                             f"**Current Equipment:**\n"
                             f"🎣 Rod: {self.rods[user_data['rod']]['name']}\n"
                             f"🛶 Boat: {self.boats[user_data['boat']]['name']}\n\n"
@@ -2889,20 +2889,20 @@ class Fishing(commands.Cog):
             rods_text = ""
             for rod_id, rod in self.rods.items():
                 owned = "✅" if rod_id == user_data["rod"] else ""
-                rods_text += f"{rod['name']} - **{rod['cost']} PsyCoins** {owned}\n"
+                rods_text += f"{rod['name']} - **{rod['cost']} 🐟 FishCoins** {owned}\n"
             embed.add_field(name="🎣 Fishing Rods", value=rods_text, inline=False)
             
             # Boats section
             boats_text = ""
             for boat_id, boat in self.boats.items():
                 owned = "✅" if boat_id == user_data["boat"] else ""
-                boats_text += f"{boat['name']} - **{boat['cost']} PsyCoins** {owned}\n"
+                boats_text += f"{boat['name']} - **{boat['cost']} 🐟 FishCoins** {owned}\n"
             embed.add_field(name="🛶 Boats", value=boats_text, inline=False)
             
             # Bait section
             bait_text = ""
             for bait_id, bait in self.baits.items():
-                bait_text += f"{bait['name']} - **{bait['cost']} PsyCoins** (x1)\n"
+                bait_text += f"{bait['name']} - **{bait['cost']} 🐟 FishCoins** (x1)\n"
             embed.add_field(name="🪱 Bait", value=bait_text, inline=False)
             
             embed.set_footer(text="💡 Select from dropdowns below to buy items!")
@@ -2926,11 +2926,11 @@ class Fishing(commands.Cog):
             current_area = self.areas[user_data['current_area']]
             current_boat_data = self.boats[user_data.get("boat", "none")]
             economy_cog = self.bot.get_cog("Economy")
-            balance = economy_cog.get_balance(interaction.user.id) if economy_cog else 0
+            balance = economy_cog.get_fish_coins(interaction.user.id) if economy_cog else 0
             
             embed = discord.Embed(
                 title="🗺️ Fishing Areas",
-                description=f"💰 **Balance:** {balance:,} PsyCoins\n"
+                description=f"🐟 **Balance:** {balance:,} FishCoins\n"
                             f"📍 **Current Location:** {current_area['name']}\n"
                             f"🛶 **Your Boat:** {current_boat_data['name']}\n"
                             f"✅ **Unlocked:** {len(user_data['unlocked_areas'])}/{len(self.areas)}\n\n"
@@ -2969,7 +2969,7 @@ class Fishing(commands.Cog):
                     requirements.append(f"🛶 Requires: **{req_boat_data.get('name', 'Unknown')}** ({req_boat_data.get('cost', 0):,} 💰)")
                 
                 if not unlocked and area.get("unlock_cost", 0) > 0:
-                    requirements.append(f"💰 Unlock cost: **{area['unlock_cost']:,} PsyCoins**")
+                    requirements.append(f"💰 Unlock cost: **{area['unlock_cost']:,} FishCoins**")
                 
                 req_text = "\n".join(requirements) if requirements else "✅ Ready to explore!"
                 
@@ -3232,13 +3232,13 @@ class Fishing(commands.Cog):
             
             embed.add_field(
                 name=f"{medal} {user.display_name}",
-                value=f"**Score:** {score}\n**Prize:** {prizes[idx]} coins",
+                value=f"**Score:** {score}\n**Prize:** {prizes[idx]} 🐟 FishCoins",
                 inline=False
             )
             
             # Award coins
             if economy_cog:
-                economy_cog.add_coins(int(user_id), prizes[idx], "fishing_tournament")
+                economy_cog.add_fish_coins(int(user_id), prizes[idx])
         
         # Send results
         channel = self.bot.get_channel(tournament['channel_id'])
