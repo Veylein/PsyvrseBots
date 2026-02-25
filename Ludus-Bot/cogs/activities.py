@@ -38,6 +38,7 @@ class Activities(commands.Cog):
             await interaction.response.send_message(
                 f"🚀 **Ludus Games** started in {channel.mention}!\n\n"
                 f"Play Arcade, Board Games, Cards, and more here:\n"
+                f"-# Currently only the App version(Desktop and Mobile) works due to a rendering error\n"
                 f"👉 **[Click to Join Activity](<{invite.url}>)**"
             )
         except discord.Forbidden:
