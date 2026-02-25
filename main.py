@@ -19,7 +19,7 @@ Bots are started one-by-one with a short delay to avoid rate-limit spikes.
 """
 
 BASE_DIR = Path(__file__).parent.resolve()
-START_DELAY = int(os.environ.get("START_DELAY", 10))  # seconds between bot startups
+START_DELAY = int(os.environ.get("START_DELAY", 30))  # seconds between bot startups
 
 BOT_ORDER = [ 
     "PsySource",
@@ -202,7 +202,15 @@ async def main():
     print("\nAll bots launched. Monitoring...\n")
 
     try:
+        # Wait for all processes to finish
         await asyncio.gather(*(p.wait() for p in processes))
+        
+        # If we reach here, all bots have stopped (crashed or exited).
+        # We should sleep before exiting to prevent tight restart loops on the platform
+        # which would hammer the API if we're rate-limited.
+        print("\nAll bots have stopped. Sleeping for 5 minutes before exiting to prevent rate-limit loops...")
+        await asyncio.sleep(300)
+
     except KeyboardInterrupt:
         print("\nShutdown signal received. Terminating bots...")
         for p in processes:

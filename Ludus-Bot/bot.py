@@ -78,19 +78,6 @@ if log_file_path:
 logging.basicConfig(level=logging.INFO, handlers=handlers_list)
 logger = logging.getLogger("ludus")
 
-# Ensure asyncio unhandled exceptions are routed to our logger
-def handle_asyncio_exception(loop, context):
-    err = context.get("exception") or context.get("message")
-    try:
-        logger.exception("Unhandled async exception: %s", err)
-    except Exception:
-        print("Unhandled async exception:", err)
-
-try:
-    loop = asyncio.get_event_loop()
-    loop.set_exception_handler(handle_asyncio_exception)
-except Exception:
-    pass
 if not os.environ.get("LUDUS_TOKEN"):
         print("LUDUS_TOKEN not set!")
         sys.exit(1)
