@@ -13,11 +13,6 @@ import logging.handlers
 from pathlib import Path
 import ludus_logging
 from utils import user_storage
-try:
-    from utils import persist
-except Exception as _persist_import_err:
-    print(f"[BOT] utils.persist unavailable: {_persist_import_err}")
-    persist = None
 from datetime import datetime
 import aiofiles
 from googletrans import Translator
@@ -45,21 +40,6 @@ dotenv.load_dotenv()
 # Configure logging
 # Fallback logic: Try RENDER_DISK_PATH, then local logs, then no file logging (console only)
 RENDER_DISK_PATH = os.getenv("RENDER_DISK_PATH")
-# Validate the disk path is actually mounted and writable.
-# If not (e.g. Render env var set but no disk provisioned), clear it so
-# every cog falls back to its local-data default instead of crashing.
-if RENDER_DISK_PATH:
-    _rdp_test = os.path.join(RENDER_DISK_PATH, ".write_test")
-    try:
-        os.makedirs(RENDER_DISK_PATH, exist_ok=True)
-        with open(_rdp_test, "w") as _f:
-            _f.write("ok")
-        os.remove(_rdp_test)
-    except (PermissionError, OSError) as _rdp_err:
-        print(f"[BOT] RENDER_DISK_PATH '{RENDER_DISK_PATH}' not writable ({_rdp_err}), ignoring")
-        os.environ.pop("RENDER_DISK_PATH", None)
-        RENDER_DISK_PATH = None
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 handlers_list = [logging.StreamHandler()]
 
 log_file_path = None
@@ -251,22 +231,6 @@ except Exception:
 # Setup hook to load UNO emoji before cogs initialize
 @bot.event
 async def setup_hook():
-    # ── Restore dynamic JSON data from PostgreSQL before any cog loads ──
-    _db_url = os.getenv("DATABASE_URL", "")
-    if persist and _db_url:
-        print(f"[BOT] DATABASE_URL configured — DB persistence active")
-    elif persist:
-        print("[BOT] DATABASE_URL not set — running without DB persistence (data will reset on redeploy)")
-    if persist:
-        try:
-            restored = await persist.restore_all(DATA_DIR)
-            if restored:
-                print(f"[BOT] Restored {restored} data files from database")
-            else:
-                print("[BOT] persist: DATABASE_URL not set or DB empty — using local files")
-        except Exception as _pe:
-            print(f"[BOT] persist.restore_all error: {_pe}")
-
     try:
         from cogs.uno import uno_logic
         # Load emoji mapping and get back emoji
@@ -284,23 +248,7 @@ async def setup_hook():
     
     # Now load all cogs
     await load_cogs()
-
-    # ── Immediately back up current disk state to DB (seeds DB on first deploy) ──
-    if persist:
-        try:
-            seeded = await persist.sync_now(DATA_DIR)
-            print(f"[BOT] Initial DB sync complete: {seeded} files backed up")
-        except Exception as _se:
-            print(f"[BOT] Initial DB sync failed: {_se}")
-
-    # ── Start background DB sync (every 60 seconds) ──
-    if persist:
-        try:
-            bot.loop.create_task(persist.periodic_sync(DATA_DIR, interval=60))
-            print("[BOT] Periodic DB sync task started (every 60s)")
-        except Exception as _pe:
-            print(f"[BOT] Failed to start persist sync task: {_pe}")
-
+    
     # Initialize user storage batch worker
     try:
         from utils import user_storage
@@ -794,32 +742,6 @@ if not TOKEN:
     sys.exit(1)
 
 print("[MAIN] Starting Ludus Bot...")
-
-# Register SIGTERM handler so Render's graceful shutdown triggers a final DB sync
-import signal
-def _on_sigterm(signum, frame):
-    print("[BOT] SIGTERM received — syncing data to DB before shutdown...")
-    if persist and os.getenv("DATABASE_URL"):
-        import threading
-        def _run_sync():
-            import asyncio
-            try:
-                loop = asyncio.new_event_loop()
-                loop.run_until_complete(persist.sync_now(DATA_DIR))
-                loop.close()
-                print("[BOT] Shutdown sync complete")
-            except Exception as _e:
-                print(f"[BOT] Shutdown sync failed: {_e}")
-        t = threading.Thread(target=_run_sync, daemon=False)
-        t.start()
-        t.join(timeout=15)
-    raise SystemExit(0)
-
-try:
-    signal.signal(signal.SIGTERM, _on_sigterm)
-except Exception:
-    pass
-
 try:
     bot.run(TOKEN)
 except Exception as e:
