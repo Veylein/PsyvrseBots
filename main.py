@@ -22,9 +22,9 @@ BASE_DIR = Path(__file__).parent.resolve()
 START_DELAY = int(os.environ.get("START_DELAY", 30))  # seconds between bot startups
 
 BOT_ORDER = [ 
-    "PsySource",
-    "Pax-Bot",
     "Ludus-Bot",
+    "Pax-Bot",
+    "PsySource",
 ]
 
 ENTRY_CANDIDATES = [
