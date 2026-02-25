@@ -84,6 +84,8 @@ class Quests(commands.Cog):
 
     def save_quests(self):
         try:
+            # Ensure directory exists before saving
+            os.makedirs(os.path.dirname(self.quests_file), exist_ok=True)
             with open(self.quests_file, 'w') as f:
                 json.dump(self.quests_data, f, indent=2)
         except Exception as e:
