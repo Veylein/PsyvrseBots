@@ -38,7 +38,7 @@ class Activities(commands.Cog):
             await interaction.response.send_message(
                 f"🚀 **Ludus Games** started in {channel.mention}!\n\n"
                 f"Play Arcade, Board Games, Cards, and more here:\n"
-                f"👉 **[Click to Join Activity]({invite.url})**"
+                f"👉 **[Click to Join Activity](<{invite.url}>)**"
             )
         except discord.Forbidden:
             await interaction.response.send_message(
