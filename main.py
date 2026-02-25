@@ -206,16 +206,16 @@ async def main():
             name_l = folder.name.lower()
             if name_l in started:
                 continue
-        # skip hidden or git/venv folders
-        if folder.name.startswith('.') or folder.name.lower() in ('.git', '.venv', 'venv'):
-            continue
+            # skip hidden or git/venv folders
+            if folder.name.startswith('.') or folder.name.lower() in ('.git', '.venv', 'venv'):
+                continue
 
-        entry = find_entry(folder)
-        if not entry:
-            # nothing to start here
-            continue
+            entry = find_entry(folder)
+            if not entry:
+                # nothing to start here
+                continue
 
-        print(f"[info] Starting extra folder: {folder.name}")
+            print(f"[info] Starting extra folder: {folder.name}")
         proc = await run_bot(folder, entry)
         processes.append(proc)
         started.add(name_l)
