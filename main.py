@@ -19,12 +19,12 @@ Bots are started one-by-one with a short delay to avoid rate-limit spikes.
 """
 
 BASE_DIR = Path(__file__).parent.resolve()
-START_DELAY = int(os.environ.get("START_DELAY", 30))  # seconds between bot startups
+START_DELAY = int(os.environ.get("START_DELAY", 120))  # seconds between bot startups (bumped to 120s for safety)
 
 BOT_ORDER = [ 
     "Ludus-Bot",
     "Pax-Bot",
-    "PsySource",
+    # "PsySource", # Disabled in launcher: Run as separate Web Service if needed
 ]
 
 ENTRY_CANDIDATES = [
@@ -178,8 +178,8 @@ async def main():
         started.add(folder.name.lower())
 
         # Check for early crash (e.g. Rate Limit / 429)
-        # Give the bot a few seconds to initialize
-        check_delay = 20
+        # Give the bot a few seconds to initialize (increased to catch delayed start failures)
+        check_delay = 40
         try:
             await asyncio.wait_for(proc.wait(), timeout=check_delay)
             # If we get here, the process exited (crashed) within check_delay seconds
