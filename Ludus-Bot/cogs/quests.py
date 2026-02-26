@@ -34,15 +34,26 @@ class Quests(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        # Determine data directory with proper failover
+        
+        # Get the environment variable
         render_path = os.getenv("RENDER_DISK_PATH")
+        
         if render_path:
-             data_dir = os.path.join(render_path, "data")
-             # Ensure the subdirectory exists inside the persistent disk
-             os.makedirs(data_dir, exist_ok=True)
+            # If on Render with a disk, use the mount path directly
+            # Ensure we use the absolute path provided by Render
+            data_dir = render_path 
         else:
-             data_dir = "data"
-             os.makedirs(data_dir, exist_ok=True)
+            # Local development fallback
+            data_dir = os.path.join(os.getcwd(), "data")
+        
+        # Create the directory only if it doesn't exist
+        # If using Render Disk, /var/data usually exists, but this is a safe check
+        try:
+            os.makedirs(data_dir, exist_ok=True)
+        except PermissionError:
+            # Fallback to local 'data' if the disk path is misconfigured/inaccessible
+            data_dir = "data"
+            os.makedirs(data_dir, exist_ok=True)
              
         self.quests_file = os.path.join(data_dir, "quests_data.json")
         self.achievements_file = os.path.join(data_dir, "achievements_data.json")

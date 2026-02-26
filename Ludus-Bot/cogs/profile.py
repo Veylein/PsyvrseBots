@@ -13,29 +13,39 @@ class ProfileManager:
     """Manages comprehensive user profiles tracking ALL activities"""
 
     def __init__(self, data_dir):
+        # --- PERMISSION CHECK ---
+        # If we can't write to the provided directory, fallback to local 'data'
+        if not os.access(data_dir, os.W_OK):
+            print(f"⚠️ Warning: {data_dir} is not writable. Falling back to local storage.")
+            data_dir = os.path.join(os.getcwd(), "data")
+            os.makedirs(data_dir, exist_ok=True)
+        # -------------------------
+
         self.data_dir = data_dir
         self.profiles_file = os.path.join(data_dir, "profiles.json")
         self.fishing_data_file = os.path.join(data_dir, "fishing_data.json")
         self.gambling_stats_file = os.path.join(data_dir, "gambling_stats.json")
-        self.farming_profile_file = os.path.join(data_dir, "profiles.json")  # farming uses same file
-        # Load user profile template for default profile structure
+        self.farming_profile_file = os.path.join(data_dir, "profiles.json")
+
+        # Template loading (This is usually fine as it's read-only)
         template_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "profile_template.json")
         try:
             with open(template_path, 'r') as f:
                 self._template = json.load(f)
         except Exception:
             self._template = {}
+
         self.profiles = self.load_profiles()
-    
-    def load_profiles(self):
-        """Load profiles from JSON"""
-        if os.path.exists(self.profiles_file):
-            try:
-                with open(self.profiles_file, 'r') as f:
-                    return json.load(f)
-            except Exception:
-                return {}
-        return {}
+        
+        def load_profiles(self):
+            """Load profiles from JSON"""
+            if os.path.exists(self.profiles_file):
+                try:
+                    with open(self.profiles_file, 'r') as f:
+                        return json.load(f)
+                except Exception:
+                    return {}
+            return {}
     
     def save_profiles(self):
         """Save profiles to JSON"""

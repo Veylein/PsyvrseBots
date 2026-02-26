@@ -5,6 +5,7 @@ venv/
 
 *.json
 !data/uno_emoji_mapping.json
+!data/cards_emoji_mapping.json
 !language/*.json
 !config.json
 !data/minesweeper_emoji_mapping.json
