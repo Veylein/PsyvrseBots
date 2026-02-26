@@ -37,15 +37,15 @@ class ProfileManager:
 
         self.profiles = self.load_profiles()
         
-        def load_profiles(self):
-            """Load profiles from JSON"""
-            if os.path.exists(self.profiles_file):
-                try:
-                    with open(self.profiles_file, 'r') as f:
-                        return json.load(f)
-                except Exception:
-                    return {}
-            return {}
+    def load_profiles(self):
+        """Load profiles from JSON"""
+        if os.path.exists(self.profiles_file):
+            try:
+                with open(self.profiles_file, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
     
     def save_profiles(self):
         """Save profiles to JSON"""
