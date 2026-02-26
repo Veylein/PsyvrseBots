@@ -1,7 +1,12 @@
-# Render service definitions: split into a Python launcher and a Node service
-# Deploy this repository to Render and Render will create two services:
-#  - psyvrse-launcher (Python) runs the unified launcher
-#  - psy-source (Node) runs the PsySource webhook bot
+# Render service definitions: Unified Monorepo Deployment
+# 
+# This configuration defines a single service (psyvrse-launcher) that manages all bots.
+# Previously, this file defined multiple services which caused duplicate bot instances
+# and rate-limiting (429) issues.
+#
+# To use this updated configuration:
+# 1. Update your Render Blueprint or manually delete the extra services (pax-bot, ludus-bot, psy-source).
+# 2. Ensure `psyvrse-launcher` has all necessary environment variables for all bots.
 
 services:
   - type: worker
@@ -13,6 +18,12 @@ services:
     startCommand: python main.py
     autoDeploy: true
 
+  # COMMENTED OUT TO PREVENT DUPLICATE INSTANCES OF WORKER BOTS (Managed by psyvrse-launcher)
+  # - type: worker
+  #   name: pax-bot
+  #   ...
+
+  # PsySource: Keep as separate Web Service for webhooks/HTTP
   - type: web
     name: psy-source
     env: node
@@ -24,23 +35,21 @@ services:
     startCommand: npm start
     autoDeploy: true
 
-  # Pax and Ludus are lightweight worker bots; install dependencies from
-  # the repository `requirements.txt` if available and run their start scripts.
-  - type: worker
-    name: pax-bot
-    env: python
-    plan: free
-    root: Pax-Bot
-    buildCommand: pip install -r requirements.txt || pip install -r ../requirements.txt || true
-    startCommand: python start.py
-    autoDeploy: true
+  # - type: worker
+  #   name: pax-bot
+  #   env: python
+  #   plan: free
+  #   root: Pax-Bot
+  #   buildCommand: pip install -r requirements.txt || pip install -r ../requirements.txt || true
+  #   startCommand: python start.py
+  #   autoDeploy: true
 
-  - type: worker
-    name: ludus-bot
-    env: python
-    plan: free
-    root: Ludus-Bot
-    buildCommand: pip install -r requirements.txt || pip install -r ../requirements.txt || true
-    startCommand: python start.py
-    autoDeploy: true
-    
+  # - type: worker
+  #   name: ludus-bot
+  #   env: python
+  #   plan: free
+  #   root: Ludus-Bot
+  #   buildCommand: pip install -r requirements.txt || pip install -r ../requirements.txt || true
+  #   startCommand: python start.py
+  #   autoDeploy: true
+
