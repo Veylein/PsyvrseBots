@@ -3,8 +3,16 @@ from discord.ext import commands
 from discord import app_commands
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class Reputation(commands.Cog):
     """Global reputation system that affects prices and rewards"""
@@ -81,8 +89,8 @@ class Reputation(commands.Cog):
         cooldown_key = f"{giver_id}_{receiver_id}"
         
         if cooldown_key in self.rep_cooldowns:
-            last_time = datetime.fromisoformat(self.rep_cooldowns[cooldown_key])
-            time_diff = datetime.now() - last_time
+            last_time = _parse_ts(self.rep_cooldowns[cooldown_key])
+            time_diff = discord.utils.utcnow() - last_time
             
             if time_diff < timedelta(hours=24):
                 time_left = timedelta(hours=24) - time_diff
@@ -170,12 +178,12 @@ class Reputation(commands.Cog):
             "giver_id": ctx.author.id,
             "giver_name": str(ctx.author),
             "reason": reason,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": discord.utils.utcnow().isoformat()
         })
         
         # Record cooldown
         cooldown_key = f"{ctx.author.id}_{member.id}"
-        self.rep_cooldowns[cooldown_key] = datetime.now().isoformat()
+        self.rep_cooldowns[cooldown_key] = discord.utils.utcnow().isoformat()
         
         self.save_data()
         
@@ -219,12 +227,12 @@ class Reputation(commands.Cog):
             "giver_id": ctx.author.id,
             "giver_name": str(ctx.author),
             "reason": reason,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": discord.utils.utcnow().isoformat()
         })
         
         # Record cooldown
         cooldown_key = f"{ctx.author.id}_{member.id}"
-        self.rep_cooldowns[cooldown_key] = datetime.now().isoformat()
+        self.rep_cooldowns[cooldown_key] = discord.utils.utcnow().isoformat()
         
         self.save_data()
         
@@ -315,7 +323,7 @@ class Reputation(commands.Cog):
         recent = user_rep["rep_history"][-10:]
         for i, entry in enumerate(reversed(recent), 1):
             rep_type = "+1" if entry['type'] == 'positive' else "-1"
-            timestamp = datetime.fromisoformat(entry['timestamp']).strftime('%Y-%m-%d %H:%M')
+            timestamp = _parse_ts(entry['timestamp']).strftime('%Y-%m-%d %H:%M')
             
             embed.add_field(
                 name=f"{rep_type} from {entry['giver_name']}",

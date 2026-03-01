@@ -3,8 +3,16 @@ from discord.ext import commands
 import json
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class Marriage(commands.Cog):
     """Marry other users and complete couple quests"""
@@ -119,7 +127,7 @@ class Marriage(commands.Cog):
         self.active_proposals[ctx.author.id] = {
             "partner": partner.id,
             "channel_id": ctx.channel.id,
-            "expires": datetime.utcnow() + timedelta(minutes=5)
+            "expires": discord.utils.utcnow() + timedelta(minutes=5)
         }
         
         embed = discord.Embed(
@@ -160,7 +168,7 @@ class Marriage(commands.Cog):
             return
         
         # Check if expired
-        if datetime.utcnow() > proposal["expires"]:
+        if discord.utils.utcnow() > proposal["expires"]:
             del self.active_proposals[proposer_id]
             await ctx.send("❌ The proposal has expired!")
             return
@@ -185,7 +193,7 @@ class Marriage(commands.Cog):
         economy_cog.remove_coins(proposer_id, marriage_cost, "marriage")
         
         # Create marriage
-        marriage_date = datetime.utcnow().isoformat()
+        marriage_date = discord.utils.utcnow().isoformat()
         
         proposer_marriage = self.get_marriage(proposer_id)
         proposer_marriage["spouse"] = ctx.author.id
@@ -213,7 +221,7 @@ class Marriage(commands.Cog):
         embed.add_field(name="Benefits Unlocked", value="✅ Shared bank\n✅ Couple quests\n✅ Daily bonuses", inline=True)
         embed.add_field(name="Commands", value="`L!spouse` - View info\n`L!bank` - Shared bank\n`L!couplequests` - Quests", inline=True)
         
-        embed.set_footer(text=f"Married since {datetime.utcnow().strftime('%B %d, %Y')}")
+        embed.set_footer(text=f"Married since {discord.utils.utcnow().strftime('%B %d, %Y')}")
         
         await ctx.send(embed=embed)
     
@@ -304,8 +312,8 @@ class Marriage(commands.Cog):
         marriage = self.get_marriage(target.id)
         spouse = await self.bot.fetch_user(marriage["spouse"])
         
-        married_since = datetime.fromisoformat(marriage["married_since"])
-        days_married = (datetime.utcnow() - married_since).days
+        married_since = _parse_ts(marriage["married_since"])
+        days_married = (discord.utils.utcnow() - married_since).days
         
         embed = discord.Embed(
             title=f"💑 {target.display_name}'s Marriage",

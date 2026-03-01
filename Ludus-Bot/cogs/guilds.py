@@ -45,7 +45,7 @@ class GuildManager:
             "leader_id": str(leader_id),
             "officers": [],
             "members": [str(leader_id)],
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": discord.utils.utcnow().isoformat(),
             "level": 1,
             "xp": 0,
             "bank": 0,

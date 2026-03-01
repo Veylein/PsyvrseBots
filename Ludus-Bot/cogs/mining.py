@@ -5,13 +5,21 @@ import json
 import os
 import random
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from PIL import Image, ImageDraw, ImageFont
 import io
 try:
     from utils.stat_hooks import us_inc as _m_inc
 except Exception:
     _m_inc = None
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class MiningGame:
     """Represents a single mining game session"""
@@ -105,7 +113,7 @@ class MiningGame:
         # Energy system
         self.energy = 60
         self.max_energy = 60
-        self.last_energy_regen = datetime.utcnow()
+        self.last_energy_regen = discord.utils.utcnow()
         
         # Equipment
         self.pickaxe_level = 1
@@ -148,7 +156,7 @@ class MiningGame:
         self.width = 11  # View width
         self.height = 10  # View height
         self.map_data = {}  # {(x, y): block_type}
-        self.last_map_regen = datetime.utcnow()
+        self.last_map_regen = discord.utils.utcnow()
         
         # Placed structures
         self.ladders = {}  # {(x, y): True} - placed ladders
@@ -601,7 +609,7 @@ class MiningGame:
     
     def regenerate_energy(self):
         """Regenerate energy over time (1 per 30 seconds)"""
-        now = datetime.utcnow()
+        now = discord.utils.utcnow()
         elapsed = (now - self.last_energy_regen).total_seconds()
         regen_count = int(elapsed // 30)
         
@@ -627,7 +635,7 @@ class MiningGame:
                         if not config.get("mining_map_reset", True):
                             return False  # Map reset disabled for this server
         
-        now = datetime.utcnow()
+        now = discord.utils.utcnow()
         elapsed = (now - self.last_map_regen).total_seconds()
         hours_elapsed = elapsed / 3600
         
@@ -974,7 +982,7 @@ class MiningGame:
             earned = self.stats["chests_found"] >= 5
         
         if earned:
-            self.achievements[achievement_key] = datetime.utcnow().isoformat()
+            self.achievements[achievement_key] = discord.utils.utcnow().isoformat()
             
             # Grant reward
             if bot:
@@ -1543,7 +1551,7 @@ class MiningGame:
         if not reset_enabled:
             reset_text = "reset is off"
         else:
-            now = datetime.utcnow()
+            now = discord.utils.utcnow()
             elapsed = (now - self.last_map_regen).total_seconds()
             hours_left = 12 - (elapsed / 3600)
             
@@ -1647,13 +1655,13 @@ class MiningGame:
         game.depth = data["depth"]
         game.energy = data["energy"]
         game.max_energy = data["max_energy"]
-        game.last_energy_regen = datetime.fromisoformat(data["last_energy_regen"])
+        game.last_energy_regen = _parse_ts(data["last_energy_regen"])
         game.pickaxe_level = data["pickaxe_level"]
         game.pickaxe_speed = 1.0
         game.backpack_capacity = data["backpack_capacity"]
         game.inventory = data["inventory"]
         game.coins = data["coins"]
-        game.last_map_regen = datetime.fromisoformat(data["last_map_regen"])
+        game.last_map_regen = _parse_ts(data["last_map_regen"])
         game.width = 11
         game.height = 10
         game.other_players = data.get("other_players", {})
@@ -2364,7 +2372,7 @@ class MiningView(discord.ui.LayoutView):
                         "inventory": self.game.inventory,
                         "coins": self.game.coins,
                         "items": self.game.items,  # Save personal items
-                        "last_update": datetime.utcnow().isoformat()
+                        "last_update": discord.utils.utcnow().isoformat()
                     }
                     
                     # Update world data (shared map and structures)
@@ -2389,7 +2397,7 @@ class MiningView(discord.ui.LayoutView):
                             self.game.other_players[other_user_id] = {
                                 "x": other_data["x"],
                                 "y": other_data["y"],
-                                "last_update": other_data.get("last_update", datetime.utcnow().isoformat()),
+                                "last_update": other_data.get("last_update", discord.utils.utcnow().isoformat()),
                                 "username": username
                             }
             
@@ -2891,7 +2899,7 @@ class OwnerMiningView(discord.ui.LayoutView):
             # Force regenerate entire map - clear map_data first!
             self.game.map_data = {}
             self.game.generate_world(regenerate=True)
-            self.game.last_map_regen = datetime.utcnow()
+            self.game.last_map_regen = discord.utils.utcnow()
             self.game.x = 5  # Reset to centerL!ownermine
             self.game.y = -1  # Reset to surface
             await self.refresh(interaction, f"Force Reset! World regenerated with seed {self.game.seed}")
@@ -2914,7 +2922,7 @@ class OwnerMiningView(discord.ui.LayoutView):
                     self.game.rng = random.Random(new_seed)
                     self.game.map_data = {}  # Clear map first!
                     self.game.generate_world(regenerate=True)
-                    self.game.last_map_regen = datetime.utcnow()
+                    self.game.last_map_regen = discord.utils.utcnow()
                     self.game.x = 5
                     self.game.y = -1
                     await self.refresh(modal_interaction, f"Custom Seed {new_seed} Applied! World regenerated")
@@ -3717,7 +3725,7 @@ class OwnerMiningView(discord.ui.LayoutView):
                         "inventory": self.game.inventory,
                         "coins": self.game.coins,
                         "items": self.game.items,  # Save personal items
-                        "last_update": datetime.utcnow().isoformat()
+                        "last_update": discord.utils.utcnow().isoformat()
                     }
                     
                     # Synchronize world data and structures
@@ -3740,7 +3748,7 @@ class OwnerMiningView(discord.ui.LayoutView):
                             self.game.other_players[other_user_id] = {
                                 "x": other_data["x"],
                                 "y": other_data["y"],
-                                "last_update": other_data.get("last_update", datetime.utcnow().isoformat()),
+                                "last_update": other_data.get("last_update", discord.utils.utcnow().isoformat()),
                                 "username": username
                             }
             
@@ -3755,7 +3763,11 @@ class Mining(commands.Cog):
         self.active_games = {}  # Personal mode: {user_id: MiningGame}
         self.active_sessions = {}  # Track active mining sessions: {user_id: timestamp}
         self.shared_worlds = {}  # Shared mode: {guild_id: {world_data: MiningGame, players: {user_id: player_data}}}
-        self.data_file = "data/mining_data.json"
+        _data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        if not os.access(_data_dir, os.W_OK):
+            _data_dir = os.path.join(os.getcwd(), "data")
+        os.makedirs(_data_dir, exist_ok=True)
+        self.data_file = os.path.join(_data_dir, "mining_data.json")
         self.load_data()
     
     def load_data(self):
@@ -3828,7 +3840,7 @@ class Mining(commands.Cog):
             )
             return
         
-        self.active_sessions[interaction.user.id] = datetime.utcnow()
+        self.active_sessions[interaction.user.id] = discord.utils.utcnow()
         
         await self.start_mining(interaction, interaction.user.id, interaction.guild.id if interaction.guild else None)
     
@@ -3871,7 +3883,7 @@ class Mining(commands.Cog):
                 world_info["players"][str(user_id)] = {
                     "x": 1, "y": -1, "depth": 0,
                     "energy": 60, "max_energy": 60,
-                    "last_energy_regen": datetime.utcnow().isoformat(),
+                    "last_energy_regen": discord.utils.utcnow().isoformat(),
                     "pickaxe_level": 1, "backpack_capacity": 20,
                     "inventory": {}, "coins": economy_balance,
                     "items": {"ladder": 5, "portal": 2, "torch": 10}  # Personal items per player
@@ -3897,7 +3909,7 @@ class Mining(commands.Cog):
             game.depth = player_data["depth"]
             game.energy = player_data["energy"]
             game.max_energy = player_data["max_energy"]
-            game.last_energy_regen = datetime.fromisoformat(player_data["last_energy_regen"])
+            game.last_energy_regen = _parse_ts(player_data["last_energy_regen"])
             game.pickaxe_level = player_data["pickaxe_level"]
             game.backpack_capacity = player_data["backpack_capacity"]
             game.inventory = player_data["inventory"]
@@ -3926,7 +3938,7 @@ class Mining(commands.Cog):
                         game.other_players[other_user_id] = {
                             "x": other_data.get("x", 1),
                             "y": other_data.get("y", -1),
-                            "last_update": other_data.get("last_update", datetime.utcnow().isoformat()),
+                            "last_update": other_data.get("last_update", discord.utils.utcnow().isoformat()),
                             "username": username
                         }
             except Exception:

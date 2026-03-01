@@ -3,12 +3,20 @@ from discord.ext import commands
 from discord import app_commands
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 try:
     from utils.stat_hooks import us_inc as _dr_inc, us_set as _dr_set
 except Exception:
     _dr_inc = _dr_set = None
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class DailyRewards(commands.Cog):
     """Enhanced daily login rewards with milestones"""
@@ -77,8 +85,8 @@ class DailyRewards(commands.Cog):
         if not user_data["last_claim"]:
             return True, None
         
-        last_claim = datetime.fromisoformat(user_data["last_claim"])
-        now = datetime.now()
+        last_claim = _parse_ts(user_data["last_claim"])
+        now = discord.utils.utcnow()
         time_diff = now - last_claim
         
         if time_diff.days >= 1:
@@ -121,7 +129,7 @@ class DailyRewards(commands.Cog):
             user_data["current_streak"] = 1
         
         user_data["total_days"] += 1
-        user_data["last_claim"] = datetime.now().isoformat()
+        user_data["last_claim"] = discord.utils.utcnow().isoformat()
         
         # Update best streak
         if user_data["current_streak"] > user_data["best_streak"]:
@@ -238,7 +246,7 @@ class DailyRewards(commands.Cog):
         
         # Last claim time
         if user_data["last_claim"]:
-            last_claim = datetime.fromisoformat(user_data["last_claim"])
+            last_claim = _parse_ts(user_data["last_claim"])
             embed.set_footer(text=f"Last claim: {last_claim.strftime('%Y-%m-%d %H:%M')}")
         
         await ctx.send(embed=embed)

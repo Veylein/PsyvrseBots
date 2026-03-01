@@ -4,7 +4,11 @@ from discord import app_commands
 import json
 import os
 
-STARBOARD_FILE = "data/starboard.json"
+_STARBOARD_DATA_DIR = os.getenv("RENDER_DISK_PATH", "data")
+if not os.access(_STARBOARD_DATA_DIR, os.W_OK):
+    _STARBOARD_DATA_DIR = os.path.join(os.getcwd(), "data")
+os.makedirs(_STARBOARD_DATA_DIR, exist_ok=True)
+STARBOARD_FILE = os.path.join(_STARBOARD_DATA_DIR, "starboard.json")
 
 def load_starboards():
     if not os.path.exists(STARBOARD_FILE):

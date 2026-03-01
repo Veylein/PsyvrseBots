@@ -10,7 +10,11 @@ from datetime import datetime
 
 # ==================== CUSTOM ROLE MANAGER ====================
 
-CUSTOM_ROLES_FILE = "data/custom_roles.json"
+_OWNER_DATA_DIR = os.getenv("RENDER_DISK_PATH", "data")
+if not os.access(_OWNER_DATA_DIR, os.W_OK):
+    _OWNER_DATA_DIR = os.path.join(os.getcwd(), "data")
+os.makedirs(_OWNER_DATA_DIR, exist_ok=True)
+CUSTOM_ROLES_FILE = os.path.join(_OWNER_DATA_DIR, "custom_roles.json")
 
 def load_custom_roles():
     """Load custom roles from JSON file"""
@@ -119,7 +123,7 @@ async def create_role_with_data(interaction, manager_view, name_en, name_pl, the
         "desc_en": desc_en,
         "desc_pl": desc_pl,
         "creator": interaction.user.id,
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": discord.utils.utcnow().isoformat()
     }
     
     # Save
@@ -1299,7 +1303,7 @@ class Owner(commands.Cog):
             title="📊 LUDUS BOT STATISTICS",
             description="**Real-time bot analytics and metrics**",
             color=discord.Color.purple(),
-            timestamp=datetime.utcnow()
+            timestamp=discord.utils.utcnow()
         )
         
         # ===== SERVER STATS =====
@@ -1502,7 +1506,7 @@ class Owner(commands.Cog):
                     }
                 
                 # Update timestamp
-                global_cog.data[guild_id]["last_updated"] = datetime.utcnow().isoformat()
+                global_cog.data[guild_id]["last_updated"] = discord.utils.utcnow().isoformat()
                 updated_count += 1
             
             global_cog.save_data()
@@ -1511,7 +1515,7 @@ class Owner(commands.Cog):
                 title="✅ Global Leaderboard Updated",
                 description=f"Recalculated scores for **{updated_count} servers**\n\n"
                            f"Updated by: {ctx.author.mention}\n"
-                           f"Timestamp: <t:{int(datetime.utcnow().timestamp())}:F>",
+                           f"Timestamp: <t:{int(discord.utils.utcnow().timestamp())}:F>",
                 color=discord.Color.green()
             )
             
@@ -1765,6 +1769,7 @@ class Owner(commands.Cog):
                   "L!reload <cog> - Reload specific cog\n"
                   "L!reloadall - Reload all cogs\n"
                   "L!ownermine - Developer mining mode with testing features\n"
+                  "L!synclb - Sync global leaderboard data\n"
                   "```",
             inline=False
         )

@@ -4,9 +4,17 @@ from discord import app_commands
 import json
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class PassiveBusinesses(commands.Cog):
     """Buy and manage businesses for passive income"""
@@ -179,7 +187,7 @@ class PassiveBusinesses(commands.Cog):
         user_businesses["businesses"][business_id] = {
             "type": business_type,
             "level": 1,
-            "last_collect": datetime.utcnow().isoformat(),
+            "last_collect": discord.utils.utcnow().isoformat(),
             "total_earned": 0
         }
         
@@ -229,8 +237,8 @@ class PassiveBusinesses(commands.Cog):
             total_hourly_income += income
             
             # Calculate pending income
-            last_collect = datetime.fromisoformat(biz_data["last_collect"])
-            hours_passed = (datetime.utcnow() - last_collect).total_seconds() / 3600
+            last_collect = _parse_ts(biz_data["last_collect"])
+            hours_passed = (discord.utils.utcnow() - last_collect).total_seconds() / 3600
             pending = int(income * hours_passed)
             
             embed.add_field(
@@ -251,9 +259,9 @@ class PassiveBusinesses(commands.Cog):
         
         # Protection status
         if user_businesses["protection"]:
-            protection_expires = datetime.fromisoformat(user_businesses["protection"])
-            if datetime.utcnow() < protection_expires:
-                time_left = protection_expires - datetime.utcnow()
+            protection_expires = _parse_ts(user_businesses["protection"])
+            if discord.utils.utcnow() < protection_expires:
+                time_left = protection_expires - discord.utils.utcnow()
                 hours = int(time_left.total_seconds() // 3600)
                 embed.add_field(name="🛡️ Protection", value=f"{hours}h remaining", inline=False)
         
@@ -290,13 +298,13 @@ class PassiveBusinesses(commands.Cog):
             income = self.calculate_income(biz_type, level)
             
             # Calculate pending income
-            last_collect = datetime.fromisoformat(biz_data["last_collect"])
-            hours_passed = (datetime.utcnow() - last_collect).total_seconds() / 3600
+            last_collect = _parse_ts(biz_data["last_collect"])
+            hours_passed = (discord.utils.utcnow() - last_collect).total_seconds() / 3600
             pending = int(income * hours_passed)
             
             if pending > 0:
                 economy_cog.add_coins(ctx.author.id, pending, "business_income")
-                biz_data["last_collect"] = datetime.utcnow().isoformat()
+                biz_data["last_collect"] = discord.utils.utcnow().isoformat()
                 biz_data["total_earned"] += pending
                 user_businesses["total_earned"] += pending
                 total_collected += pending
@@ -382,9 +390,9 @@ class PassiveBusinesses(commands.Cog):
         
         # Check if already protected
         if user_businesses["protection"]:
-            protection_expires = datetime.fromisoformat(user_businesses["protection"])
-            if datetime.utcnow() < protection_expires:
-                time_left = protection_expires - datetime.utcnow()
+            protection_expires = _parse_ts(user_businesses["protection"])
+            if discord.utils.utcnow() < protection_expires:
+                time_left = protection_expires - discord.utils.utcnow()
                 hours = int(time_left.total_seconds() // 3600)
                 await ctx.send(f"🛡️ Your businesses are already protected for {hours} more hours!")
                 return
@@ -399,7 +407,7 @@ class PassiveBusinesses(commands.Cog):
         
         # Buy protection
         economy_cog.remove_coins(ctx.author.id, protection_cost, "business_protection")
-        user_businesses["protection"] = (datetime.utcnow() + timedelta(hours=24)).isoformat()
+        user_businesses["protection"] = (discord.utils.utcnow() + timedelta(hours=24)).isoformat()
         self.save_data()
         
         await ctx.send(f"🛡️ Your businesses are now protected from robberies for 24 hours!")

@@ -9,7 +9,11 @@ class Confessions(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        self.config_file = "data/confession_config.json"
+        _data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        if not os.access(_data_dir, os.W_OK):
+            _data_dir = os.path.join(os.getcwd(), "data")
+        os.makedirs(_data_dir, exist_ok=True)
+        self.config_file = os.path.join(_data_dir, "confession_config.json")
         self.load_config()
     
     def load_config(self):
@@ -203,7 +207,7 @@ class Confessions(commands.Cog):
             title=f"🔒 CONFESSION #{confession_num}",
             description=message.content,
             color=discord.Color.purple(),
-            timestamp=datetime.utcnow()
+            timestamp=discord.utils.utcnow()
         )
         confession_embed.set_footer(text="Anonymous Confession")
         
@@ -214,7 +218,7 @@ class Confessions(commands.Cog):
             log_embed = discord.Embed(
                 title=f"📋 Confession Log #{confession_num}",
                 color=discord.Color.orange(),
-                timestamp=datetime.utcnow()
+                timestamp=discord.utils.utcnow()
             )
             
             log_embed.add_field(

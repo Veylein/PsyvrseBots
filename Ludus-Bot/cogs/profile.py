@@ -9,6 +9,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
 import copy
 
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
+
 class ProfileManager:
     """Manages comprehensive user profiles tracking ALL activities"""
 
@@ -289,7 +297,7 @@ class ProfileManager:
             profile.setdefault('fishing_stats', {'fish_caught': 0, 'rare_fish': 0, 'legendary_fish': 0, 'biggest_fish': 0})
             profile.setdefault('farming_stats', {'crops_planted': 0, 'crops_harvested': 0, 'level': 1})
         # Always stamp created_at for brand-new profiles
-        profile['created_at'] = datetime.utcnow().isoformat()
+        profile['created_at'] = discord.utils.utcnow().isoformat()
         return profile
 
     def _create_default_profile_legacy(self):
@@ -784,7 +792,7 @@ class ProfileView(discord.ui.LayoutView):
         if raw_ts:
             try:
                 from datetime import datetime, timezone
-                dt = datetime.fromisoformat(raw_ts.replace('Z', '+00:00'))
+                dt = _parse_ts(raw_ts.replace('Z', '+00:00'))
                 last_active = dt.strftime('%Y-%m-%d %H:%M UTC')
             except Exception:
                 last_active = raw_ts[:16]

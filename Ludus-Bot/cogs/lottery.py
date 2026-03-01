@@ -4,15 +4,27 @@ from discord import app_commands
 import json
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class Lottery(commands.Cog):
     """Daily lottery system with growing jackpots"""
     
     def __init__(self, bot):
         self.bot = bot
-        self.file_path = "data/lottery.json"
+        _data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        if not os.access(_data_dir, os.W_OK):
+            _data_dir = os.path.join(os.getcwd(), "data")
+        os.makedirs(_data_dir, exist_ok=True)
+        self.file_path = os.path.join(_data_dir, "lottery.json")
         self.load_data()
         
         # Ticket price
@@ -43,7 +55,7 @@ class Lottery(commands.Cog):
     
     def get_next_drawing_time(self):
         """Get the next drawing time (daily at midnight UTC)"""
-        now = datetime.utcnow()
+        now = discord.utils.utcnow()
         next_drawing = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         return next_drawing
     
@@ -54,8 +66,8 @@ class Lottery(commands.Cog):
     @tasks.loop(hours=1)
     async def daily_drawing(self):
         """Check if it's time for the daily drawing"""
-        now = datetime.utcnow()
-        next_drawing = datetime.fromisoformat(self.lottery_data["next_drawing"])
+        now = discord.utils.utcnow()
+        next_drawing = _parse_ts(self.lottery_data["next_drawing"])
         
         if now >= next_drawing:
             await self.conduct_drawing()
@@ -93,7 +105,7 @@ class Lottery(commands.Cog):
             "user_id": winner_user_id,
             "jackpot": jackpot,
             "ticket": winning_ticket,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": discord.utils.utcnow().isoformat()
         })
         
         # Keep only last 10 winners
@@ -127,7 +139,7 @@ class Lottery(commands.Cog):
         self.lottery_data["tickets"] = {}
         self.lottery_data["ticket_counter"] = 1
         self.lottery_data["current_jackpot"] = 10000  # Reset to starting amount
-        self.lottery_data["last_drawing"] = datetime.utcnow().isoformat()
+        self.lottery_data["last_drawing"] = discord.utils.utcnow().isoformat()
         self.lottery_data["next_drawing"] = self.get_next_drawing_time().isoformat()
         self.save_data()
     
@@ -149,8 +161,8 @@ class Lottery(commands.Cog):
         embed.add_field(name="🎫 Your Tickets", value=user_tickets, inline=True)
         
         # Next drawing time
-        next_drawing = datetime.fromisoformat(self.lottery_data["next_drawing"])
-        time_until = next_drawing - datetime.utcnow()
+        next_drawing = _parse_ts(self.lottery_data["next_drawing"])
+        time_until = next_drawing - discord.utils.utcnow()
         hours = int(time_until.total_seconds() // 3600)
         minutes = int((time_until.total_seconds() % 3600) // 60)
         
@@ -290,7 +302,7 @@ class Lottery(commands.Cog):
             except:
                 username = f"User {winner_data['user_id']}"
             
-            timestamp = datetime.fromisoformat(winner_data["timestamp"]).strftime("%Y-%m-%d")
+            timestamp = _parse_ts(winner_data["timestamp"]).strftime("%Y-%m-%d")
             
             embed.add_field(
                 name=f"#{i}. {username}",

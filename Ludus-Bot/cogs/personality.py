@@ -817,7 +817,7 @@ class LudusPersonality(commands.Cog):
                 "answer": answer_text.strip(),
                 # Never store or post user ID
                 "taught_by": None,
-                "taught_at": datetime.utcnow().isoformat()
+                "taught_at": discord.utils.utcnow().isoformat()
             }
             self._save_knowledge()
         # Immediately flush to disk for persistence
@@ -857,7 +857,10 @@ class LudusPersonality(commands.Cog):
     
     def _load_server_config(self, guild_id):
         """Load server configuration"""
-        config_file = "data/server_configs.json"
+        _d = os.getenv("RENDER_DISK_PATH", "data")
+        if not os.access(_d, os.W_OK):
+            _d = os.path.join(os.getcwd(), "data")
+        config_file = os.path.join(_d, "server_configs.json")
         try:
             with open(config_file, 'r') as f:
                 configs = json.load(f)
@@ -866,7 +869,10 @@ class LudusPersonality(commands.Cog):
             return {"personality_reactions": True, "personality_channels": []}
 
     def _save_server_config(self, guild_id, config):
-        config_file = "data/server_configs.json"
+        _d = os.getenv("RENDER_DISK_PATH", "data")
+        if not os.access(_d, os.W_OK):
+            _d = os.path.join(os.getcwd(), "data")
+        config_file = os.path.join(_d, "server_configs.json")
         try:
             with open(config_file, 'r') as f:
                 configs = json.load(f)
@@ -878,7 +884,7 @@ class LudusPersonality(commands.Cog):
     
     def _check_cooldown(self, user_id):
         """Check if user is on cooldown for reactions"""
-        now = datetime.now().timestamp()
+        now = discord.utils.utcnow().timestamp()
         if user_id in self.last_reaction_time:
             if now - self.last_reaction_time[user_id] < self.cooldown_seconds:
                 return False
@@ -1132,7 +1138,7 @@ class LudusPersonality(commands.Cog):
             # NYT uses local dates but publishes globally around midnight local time?
             # Actually the JSON is keyed by YYYY-MM-DD.
             # Using current UTC date is a safe bet as it covers most of the world.
-            today_str = datetime.utcnow().strftime("%Y-%m-%d")
+            today_str = discord.utils.utcnow().strftime("%Y-%m-%d")
             url = f"https://www.nytimes.com/svc/wordle/v2/{today_str}.json"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:

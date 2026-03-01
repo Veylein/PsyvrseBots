@@ -49,7 +49,7 @@ class Dueling(commands.Cog):
         duel_id = str(len(self.duel_history) + 1)
         self.duel_history[duel_id] = {
             **duel_data,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': discord.utils.utcnow().isoformat()
         }
         self.save_history()
     
@@ -63,7 +63,7 @@ class Dueling(commands.Cog):
             self.channel = None
             self.active = True
             self.spectators_can_bet = True
-            self.start_time = datetime.now()
+            self.start_time = discord.utils.utcnow()
         
         def get_embed(self, status="waiting"):
             """Create duel status embed"""

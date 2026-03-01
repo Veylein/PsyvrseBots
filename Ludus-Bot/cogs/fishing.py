@@ -2541,7 +2541,7 @@ class Fishing(commands.Cog):
     
     def get_current_time_period(self):
         """Get current time period"""
-        hour = datetime.now().hour
+        hour = discord.utils.utcnow().hour
         for period, data in self.time_periods.items():
             if hour in data["hours"]:
                 return period
@@ -3315,7 +3315,7 @@ class Fishing(commands.Cog):
             duration = random.randint(30, 180)  # 30min-3h for auto tournaments (rare!)
         
         # Create tournament
-        end_time = datetime.now() + timedelta(minutes=duration)
+        end_time = discord.utils.utcnow() + timedelta(minutes=duration)
         tournament_data = {
             'mode': mode_value,
             'mode_name': mode_name,

@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from discord import app_commands
@@ -15,6 +15,14 @@ try:
 except Exception:
     tcg_manager = None
     CARD_DATABASE = {}
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class Quests(commands.Cog):
     """Quest and achievement system"""
@@ -126,7 +134,7 @@ class Quests(commands.Cog):
                 "active_quests": [daily_quest],
                 "completed_today": 0,
                 "total_completed": 0,
-                "last_reset": datetime.now().isoformat(),
+                "last_reset": discord.utils.utcnow().isoformat(),
                 "progress": {daily_quest["id"]: 0}
             }
             self.save_quests()
@@ -253,10 +261,10 @@ class Quests(commands.Cog):
     @tasks.loop(hours=24)
     async def check_daily_reset(self):
         """Reset daily quests at midnight"""
-        now = datetime.now()
+        now = discord.utils.utcnow()
         
         for user_id, data in self.quests_data.items():
-            last_reset = datetime.fromisoformat(data["last_reset"])
+            last_reset = _parse_ts(data["last_reset"])
             
             if now.date() > last_reset.date():
                 # Reset daily quests

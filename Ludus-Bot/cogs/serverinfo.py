@@ -39,7 +39,7 @@ class ServerInfo(commands.Cog):
         embed = discord.Embed(
             title=f"📊 {guild.name} - Server Information",
             color=discord.Color.blurple(),
-            timestamp=datetime.utcnow()
+            timestamp=discord.utils.utcnow()
         )
         
         # Set server icon

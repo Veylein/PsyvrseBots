@@ -254,7 +254,7 @@ class AchievementManager:
         achievement = self.achievements[achievement_id]
         user_data["unlocked"].append(achievement_id)
         user_data["points"] += achievement["points"]
-        user_data["unlocked_at"][achievement_id] = datetime.utcnow().isoformat()
+        user_data["unlocked_at"][achievement_id] = discord.utils.utcnow().isoformat()
         
         self.save_achievements()
         # Track in data/users/{id}.json

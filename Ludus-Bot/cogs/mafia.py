@@ -1899,7 +1899,7 @@ class MafiaCog(commands.Cog):
             "custom_roles": [],
             "started": False,
             "channel_id": interaction.channel.id,
-            "created_at": datetime.utcnow()
+            "created_at": discord.utils.utcnow()
         }
         
         view = MafiaLobbyView(self, lobby_id)

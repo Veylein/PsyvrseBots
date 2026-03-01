@@ -5,7 +5,15 @@ import asyncio
 import random
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class Simulations(commands.Cog):
     """Simulation games like farming and ice cream maker"""
@@ -155,7 +163,7 @@ class Simulations(commands.Cog):
                 "plots": {},
                 "inventory": {},
                 "season": "spring",
-                "season_change": (datetime.now() + timedelta(days=1)).isoformat(),
+                "season_change": (discord.utils.utcnow() + timedelta(days=1)).isoformat(),
                 "tools": ["basic_hoe"],  # Start with basic hoe
                 "animals": {},
                 "animal_products": {},
@@ -170,12 +178,12 @@ class Simulations(commands.Cog):
                 "beauty_points": 0,
                 "daily_quest": None,
                 "quest_progress": 0,
-                "quest_reset": (datetime.now() + timedelta(days=1)).isoformat(),
+                "quest_reset": (discord.utils.utcnow() + timedelta(days=1)).isoformat(),
                 "achievements": [],
                 "genetics_lab": False,  # Unlock at level 10
                 "market_status": {},
                 "harvests_today": 0,
-                "last_reset": datetime.now().isoformat(),
+                "last_reset": discord.utils.utcnow().isoformat(),
                 "breeding_pairs": {}
             }
             self.save_data()
@@ -183,26 +191,26 @@ class Simulations(commands.Cog):
     
     def get_current_season(self, farm):
         """Get current season and rotate if needed"""
-        season_change = datetime.fromisoformat(farm["season_change"])
-        if datetime.now() >= season_change:
+        season_change = _parse_ts(farm["season_change"])
+        if discord.utils.utcnow() >= season_change:
             seasons_list = list(self.seasons.keys())
             current_idx = seasons_list.index(farm["season"])
             farm["season"] = seasons_list[(current_idx + 1) % len(seasons_list)]
-            farm["season_change"] = (datetime.now() + timedelta(days=1)).isoformat()
+            farm["season_change"] = (discord.utils.utcnow() + timedelta(days=1)).isoformat()
             self.save_data()
         return farm["season"]
     
     def check_daily_reset(self, farm):
         """Reset daily counters"""
-        last_reset = datetime.fromisoformat(farm.get("last_reset", datetime.now().isoformat()))
-        if (datetime.now() - last_reset).days >= 1:
+        last_reset = _parse_ts(farm.get("last_reset", discord.utils.utcnow().isoformat()))
+        if (discord.utils.utcnow() - last_reset).days >= 1:
             farm["harvests_today"] = 0
-            farm["last_reset"] = datetime.now().isoformat()
+            farm["last_reset"] = discord.utils.utcnow().isoformat()
             # Assign new daily quest
             quest_id = random.choice(list(self.daily_quests.keys()))
             farm["daily_quest"] = quest_id
             farm["quest_progress"] = 0
-            farm["quest_reset"] = (datetime.now() + timedelta(days=1)).isoformat()
+            farm["quest_reset"] = (discord.utils.utcnow() + timedelta(days=1)).isoformat()
             self.save_data()
     
     def check_pest_attack(self):
@@ -326,8 +334,8 @@ class Simulations(commands.Cog):
         plot_status = []
         for plot_num, plot_data in farm["plots"].items():
             crop = self.crops[plot_data["crop"]]
-            plant_time = datetime.fromisoformat(plot_data["planted"])
-            elapsed = (datetime.now() - plant_time).total_seconds() / 60  # minutes
+            plant_time = _parse_ts(plot_data["planted"])
+            elapsed = (discord.utils.utcnow() - plant_time).total_seconds() / 60  # minutes
             
             # Show watered/fertilized status
             status_icons = ""
@@ -469,7 +477,7 @@ class Simulations(commands.Cog):
         # Plant crop
         farm["plots"][str(plot_num)] = {
             "crop": crop.lower(),
-            "planted": datetime.now().isoformat(),
+            "planted": discord.utils.utcnow().isoformat(),
             "watered": False,
             "fertilized": False
         }
@@ -518,8 +526,8 @@ class Simulations(commands.Cog):
         
         for plot_num, plot_data in list(farm["plots"].items()):
             crop = self.crops[plot_data["crop"]]
-            plant_time = datetime.fromisoformat(plot_data["planted"])
-            elapsed = (datetime.now() - plant_time).total_seconds() / 60
+            plant_time = _parse_ts(plot_data["planted"])
+            elapsed = (discord.utils.utcnow() - plant_time).total_seconds() / 60
             
             if elapsed >= crop["grow_time"]:
                 crop_name = plot_data["crop"]
@@ -764,7 +772,7 @@ class Simulations(commands.Cog):
             farm.setdefault("breeding_pairs", []).append({
                 "parents": [parent1, parent2],
                 "result": hybrid_choice,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": discord.utils.utcnow().isoformat()
             })
             
             # Check achievement

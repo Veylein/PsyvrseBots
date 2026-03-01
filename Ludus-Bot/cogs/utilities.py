@@ -7,12 +7,20 @@ import asyncio
 import json
 import os
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Optional: Import your embed styles if you have them
 # from utils.embed_styles import EmbedBuilder, Colors, Emojis
 
 # Fallbacks if you don’t have custom embed styles
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
+
 class Colors: 
     PRIMARY = discord.Color.blue()
     SECONDARY = discord.Color.green()
@@ -93,11 +101,11 @@ class Utilities(commands.Cog):
     # ---------- Reminders ----------
     @tasks.loop(seconds=60)
     async def check_reminders(self):
-        now = datetime.utcnow()
+        now = discord.utils.utcnow()
         updated = False
         for user_id, reminders in list(self.reminders.items()):
             for reminder in reminders[:]:
-                remind_time = datetime.fromisoformat(reminder['time'])
+                remind_time = _parse_ts(reminder['time'])
                 if now >= remind_time:
                     try:
                         user = await self.bot.fetch_user(int(user_id))

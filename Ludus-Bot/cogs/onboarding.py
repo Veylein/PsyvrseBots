@@ -74,7 +74,7 @@ class FirstExperience(commands.Cog):
         """Mark user as onboarded"""
         self.onboarding_data[str(user_id)] = {
             "completed": True,
-            "date": datetime.now().isoformat(),
+            "date": discord.utils.utcnow().isoformat(),
             "steps_completed": []
         }
         self._save_data()
