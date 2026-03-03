@@ -1,7 +1,7 @@
 # 📦 PART 3: SIMULATION SYSTEMS - COMPLETE DOCUMENTATION
 
 > **Coverage:** Fishing, Farming, Zoo Collection, Mining Adventure
-> **Total Lines:** 7,499 lines (fishing.py: 3,472, mining.py: 3,254, farming.py: 773)
+> **Total Lines:** 8,298 lines (fishing.py: 3,472+, mining.py: 4,053, farming.py: 773+)
 > **Completion Status:** ✅ 100% COMPLETE - All files read and documented
 > **Last Updated:** 2024
 
@@ -27,7 +27,7 @@
    - [Animal Encounters](#zoo-encounters)
    - [Collection Management](#zoo-collection)
 
-4. [Mining Adventure System (3,254 lines)](#4-mining-system)
+4. [Mining Adventure System (4,053 lines)](#4-mining-system)
    - [Overview & Architecture](#mining-overview)
    - [World Generation](#mining-world)
    - [Gameplay Mechanics](#mining-gameplay)
@@ -2312,10 +2312,12 @@ def can_plant_crop(self, crop_id, season, has_greenhouse):
 
 ### Total Coverage
 
-**Lines Documented:** 4,245 lines  
-**Files Covered:** 3 files
+**Lines Documented:** 8,298 lines  
+**Files Covered:** 4 files
 - fishing.py: 3,472 lines
 - farming.py: 773 lines
+- zoo.py: ~800 lines (Zoo collection system)
+- mining.py: 4,053 lines
 
 ### Key Systems
 
@@ -2340,11 +2342,25 @@ def can_plant_crop(self, crop_id, season, has_greenhouse):
 
 **Zoo:**
 - 60+ animals across 8 game sources
-- 15% encounter chance
+- 15% encounter chance after games
 - 3 rarity tiers
-- Collection tracking
-- Filtering system
+- Collection tracking, filtering, release system
 - Integration with all minigames
+
+**Mining (4,053 lines — 2D Minecraft-style):**
+- Procedural world generation (seed-based, 100×150 world)
+- Real-time PNG rendering via PIL (352×320px viewport)
+- 6 biomes (Surface → Abyss) with full depth progression
+- `CREATURE_TYPES` — 7 underground creatures (zombie, skeleton, spider, creeper, enderman, mole, worm) with unique stats/drops/behavior
+- `ORE_STATES` — cracked (50% yield penalty) / irradiated (energy penalty)
+- `BLOCK_REQUIREMENTS` — minimum pickaxe level enforced per block type
+- `MINING_ACHIEVEMENTS` — 12 achievements with coin/XP rewards
+- Energy system (1 energy per 30 s), upgradeable equipment (pickaxe, backpack)
+- Item placement: ladders, torches, portals
+- Mineshaft structures with loot chests
+- Gravity physics, darkness system
+- Singleplayer & multiplayer modes (per-server `shared_mining_world` toggle)
+- Developer mode (`L!ownermine`) with debug tools, teleport, infinite energy/backpack
 
 ### Command Reference
 
@@ -2382,7 +2398,7 @@ def can_plant_crop(self, crop_id, season, has_greenhouse):
 
 # 4. MINING ADVENTURE SYSTEM
 
-**File:** `cogs/mining.py` (3,254 lines)  
+**File:** `cogs/mining.py` (4,053 lines)  
 **Class:** `Mining(commands.Cog)`
 
 ## Mining Overview
@@ -2401,6 +2417,10 @@ The **Mining Adventure** system is a **2D procedurally generated Minecraft-style
 - **Gravity physics** (fall damage, auto-descent)
 - **Portal teleportation** (public/private)
 - **12-hour map reset** system (configurable)
+- **Creature & combat system** (7 mob types: zombie, skeleton, spider, creeper, enderman, mole, worm)
+- **Ore states** (cracked / irradiated variants with special effects)
+- **Block pickaxe requirements** (level 1–5 to mine each block type)
+- **Mining achievements** (12 in-game milestones)
 - **Developer mode** with debug tools (owner only)
 
 **Key Technical Features:**
@@ -2446,6 +2466,78 @@ BLOCK_VALUES = {
     "mineshaft_entrance": 0, "chest": 0  # Chests contain loot, not value
 }
 ```
+
+### Block Pickaxe Requirements (Lines 97-110)
+
+Each block has a minimum pickaxe level required to mine it. Trying to mine a block below the required level fails silently.
+
+```python
+BLOCK_REQUIREMENTS = {
+    "dirt": 1, "grass": 1, "coal": 1,
+    "stone": 2, "iron": 2, "redstone": 2, "lapis": 2,
+    "gold": 3, "deepslate": 3,
+    "diamond": 4, "emerald": 4,
+    "netherite": 5, "ancient_debris": 5,
+    "bedrock": 999,  # Cannot be mined
+    "mineshaft_wood": 1, "mineshaft_support": 1, "mineshaft_rail": 1, "chest": 1
+}
+```
+
+### Ore States (Lines 32-38)
+
+Ores can occasionally spawn in special states, adding risk/reward variance:
+
+```python
+ORE_STATES = {
+    "cracked":    {"multiplier": 0.5, "emoji": "🪨"},          # 50% yield
+    "irradiated": {"energy_cost": "half",  "emoji": "☢️"},  # Costs half of *current* energy
+}
+```
+
+- **Cracked**: Yields half the normal MineCoins for that ore.
+- **Irradiated**: Mining costs half the player's *current* energy (not a fixed amount), adding pressure at low energy.
+
+### Creature System (Lines 40-55)
+
+Seven creature types spawn underground, with varying health, damage, movement patterns, and tunnel-digging abilities:
+
+```python
+CREATURE_TYPES = {
+    "zombie":   {"emoji": "🧟", "health": 3, "damage": 2, "tunnel": False, "speed": 1},
+    "skeleton": {"emoji": "💀", "health": 2, "damage": 1, "tunnel": False, "speed": 2},
+    "spider":   {"emoji": "🕷️", "health": 2, "damage": 2, "tunnel": False, "speed": 3},
+    "creeper":  {"emoji": "💥", "health": 2, "damage": 5, "tunnel": True,  "speed": 1,
+                 "penalty": "explosion"},   # Explodes and damages nearby area
+    "enderman": {"emoji": "👾", "health": 4, "damage": 3, "tunnel": False, "speed": 4},
+    "mole":     {"emoji": "🦦", "health": 1, "damage": 0, "tunnel": True,  "speed": 1},  # Harmless
+    "worm":     {"emoji": "🪱", "health": 5, "damage": 4, "tunnel": True,  "speed": 1},
+}
+```
+
+**Combat loop**: When encountered, a creature blocks movement. The player attacks (dealing 1 base damage per click) and the creature retaliates (dealing `damage` energy). Speed affects how often the creature attacks first. Tunnel creatures can carve new air blocks into the map as they move.
+
+**Creature drops**: Each mob has a `drops` dict — e.g. zombie drops `{"coal": (2,5), "iron": (1,2)}` (random range). A creeper's explosion skips drops and instead converts nearby blocks to air.
+
+### Mining Achievements (Lines 56-72)
+
+Twelve milestones tracked per-player, each rewarding PsyCoins on first completion:
+
+| Key | Name | Condition | Reward |
+|-----|------|-----------|--------|
+| `first_mine` | First Steps | Mine any block | 50 💰 |
+| `depth_10` | Going Deeper | Reach depth 10 | 100 💰 |
+| `depth_50` | Deep Diver | Reach depth 50 | 500 💰 |
+| `depth_100` | Abyss Walker | Reach the Abyss | 1,000 💰 |
+| `diamond_find` | Diamonds! | Find first diamond | 200 💰 |
+| `emerald_find` | Emerald Hunter | Find first emerald | 300 💰 |
+| `netherite_find` | Netherite | Find netherite | 1,000 💰 |
+| `rich_miner` | Rich Miner | Earn 10,000 coins from mining | 500 💰 |
+| `explosion_expert` | Demolitionist | Use 10 dynamites | 300 💰 |
+| `creature_hunter` | Monster Hunter | Defeat 10 creatures | 400 💰 |
+| `tunnel_rat` | Tunnel Rat | Mine 1,000 blocks | 600 💰 |
+| `chest_finder` | Treasure Hunter | Find 5 loot chests | 250 💰 |
+
+Achievements are stored in `profiles.json` under each user's mining subsection.
 
 ### Procedural Generation Algorithm (Lines 109-155)
 

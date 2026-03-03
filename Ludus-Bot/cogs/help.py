@@ -91,30 +91,24 @@ class Help(commands.Cog):
                     ("/arcade bombdefuse", "Cut the right wire!"),
                 ]
             },
-            "🎣 Fishing+": {
-                "key": "fishing",
-                "desc": "Enhanced fishing empire",
-                "commands": [
-                    (f"fish", "Cast your line and go fishing!"),
-                    (f"/fish cast", "Cast your line with advanced options"),
-                    (f"/fish inventory", "View your catches and equipment"),
-                    (f"/fish shop", "Buy rods, bait, and boats"),
-                    (f"/fish craft", "Craft special items"),
-                    (f"/fish areas", "Explore fishing locations"),
-                    (f"/fish encyclopedia", "View all available fish"),
-                    (f"/fish stats", "Check your fishing statistics"),
-                ]
-            },
-            "🚜 Farm & Sims": {
+            "🚜🎣⛏️ Simulators": {
                 "key": "sims",
-                "desc": "Farming and simulations",
+                "desc": "Farming, fishing, mining",
                 "commands": [
                     ("/farm view", "Check your farm"),
                     ("/farm plant <crop>", "Plant crops"),
                     ("/farm harvest", "Harvest ready crops"),
                     ("/farm sell", "Sell your harvest"),
                     ("/icecream", "Build custom sundae"),
-                    ("/akinator start", "Mind-reading game"),
+                    ("fish", "Cast your line and go fishing!"),
+                    ("/fish cast", "Cast your line with advanced options"),
+                    ("/fish inventory", "View your catches and equipment"),
+                    ("/fish shop", "Buy rods, bait, and boats"),
+                    ("/fish craft", "Craft special items"),
+                    ("/fish areas", "Explore fishing locations"),
+                    ("/fish encyclopedia", "View all available fish"),
+                    ("/fish stats", "Check your fishing statistics"),
+                    ("/mine", "Launch mining game and dig for ores!"),
                 ]
             },
             "🧡 Social": {
@@ -130,6 +124,8 @@ class Help(commands.Cog):
                     ("compliment @user", "Compliment someone nicely"),
                     ("pray @user", "Pray for someone (+coins blessing)"),
                     ("curse @user", "Curse someone (may backfire!)"),
+                    ("marry @user", "Propose marriage to someone (10000 coins)"),
+                    ("divorce", "End your marriage"),
                 ]
             },
             "🌍 Global Events": {

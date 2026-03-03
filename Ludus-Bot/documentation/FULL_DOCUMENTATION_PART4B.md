@@ -2,8 +2,7 @@
 
 **Project:** Ludus Bot  
 **Coverage:** Daily Lottery, Co-op Heist System  
-**Total Lines:** 815 lines of code  
-**Status:** ✅ COMPLETE  
+**Total Lines:** 945 lines of code  
 **Date:** February 2026
 
 ---
@@ -662,7 +661,7 @@ async def lottery_draw_manual(self, ctx):
 
 ## 4. HEIST SYSTEM OVERVIEW
 
-**File:** `cogs/heist.py` (502 lines)
+**File:** `cogs/heist.py` (621 lines)
 
 The Heist system is a cooperative multiplayer game where 2-6 players team up to rob banks or other players' businesses. Success depends on crew size, with larger crews having higher success rates but splitting rewards more ways.
 
@@ -682,13 +681,15 @@ The Heist system is a cooperative multiplayer game where 2-6 players team up to 
    - Requires target to own businesses
    - Target's business income timers reset
 
-**Crew System:**
-- Leader starts heist with bet amount
-- Other players join with same bet
-- All crew members must wager equally
-- 60 seconds to recruit (bank) or 45 seconds (business)
+**Crew System (Interactive UI):**
+- Leader starts heist with bet amount — bot posts a `HeistJoinView` embed with buttons
+- Other players click **⚔️ Join Heist!** button (deducts their bet immediately)
+- Leader can click **🚀 Launch Now!** once 2+ crew are ready (no need to wait full timer)
+- Leader can click **❌ Cancel** to abort and refund all bets
+- Auto-launches when crew reaches max size
+- Timeout (60 s bank / 45 s business) triggers heist automatically
 - Minimum 2 players to execute
-- Refund if not enough players
+- Refund if leader cancels
 
 **Success Rates (Crew Size):**
 ```
@@ -789,20 +790,14 @@ async def heist_bank(self, ctx, bet: int):
     
     embed.add_field(
         name="Join Now!",
-        value=f"Type `L!heist join` to join the crew!\n"
-              f"You need {bet:,} coins to join.\n\n"
-              f"⏰ Heist starts in 60 seconds!",
-        inline=False
-    )
-    
     await ctx.send(embed=embed)
     
-    # Wait 60 seconds for crew recruitment
-    await asyncio.sleep(60)
-    
-    # Execute heist (if not cancelled)
-    if ctx.channel.id in self.active_heists:
-        await self.execute_heist(ctx)
+    # Note: recruitment is now handled by HeistJoinView (interactive buttons)
+    # Players click "⚔️ Join Heist!" to join — no L!heist join command needed
+    view = HeistJoinView(self, ctx.channel.id, max_crew=6, timeout_secs=60)
+    view.message = await ctx.send(embed=view._build_embed(), view=view)
+    # Heist is executed automatically when crew is full, leader launches,
+    # or the 60-second timeout fires (view.on_timeout → view._execute)
 ```
 
 **Bank Heist Parameters:**
@@ -819,10 +814,11 @@ Player A: L!heist bank 5000
 
 [Bot announces recruitment - 60 second timer starts]
 
-Player B: L!heist join  (pays 5,000 coins)
-Player C: L!heist join  (pays 5,000 coins)
+Player B: clicks ⚔️ Join Heist! button  (pays 5,000 coins)
+Player C: clicks ⚔️ Join Heist! button  (pays 5,000 coins)
+Player A: clicks 🚀 Launch Now! (skips remaining wait)
 
-[60 seconds pass]
+[or waits 60 seconds — HeistJoinView.on_timeout fires automatically]
 
 Crew size: 3 players
 Success rate: 55%
@@ -919,20 +915,12 @@ async def heist_business(self, ctx, target: discord.Member, bet: int):
     
     embed.add_field(
         name="Join Now!",
-        value=f"Type `L!heist join` to join the crew!\n"
-              f"You need {bet:,} coins to join.\n\n"
-              f"⏰ Heist starts in 45 seconds!",
-        inline=False
-    )
-    
     await ctx.send(embed=embed)
     
-    # Wait 45 seconds
-    await asyncio.sleep(45)
-    
-    # Execute heist
-    if ctx.channel.id in self.active_heists:
-        await self.execute_heist(ctx)
+    # Recruitment via interactive buttons (HeistJoinView, 45-second timeout)
+    view = HeistJoinView(self, ctx.channel.id, max_crew=4, timeout_secs=45)
+    view.message = await ctx.send(embed=view._build_embed(), view=view)
+    # Buttons: ⚔️ Join Heist! / 🚀 Launch Now! / ❌ Cancel
 ```
 
 **Business Heist Parameters:**
@@ -1443,7 +1431,7 @@ Net Profit
 | `L!heist` | View heist info & rules | None | None |
 | `L!heist bank <bet>` | Start bank heist | 1k-10k coins | 30 min |
 | `L!heist business <@user> <bet>` | Start business heist | User, 500-5k coins | 30 min |
-| `L!heist join` | Join active heist | None | None |
+| `L!heist join` | ~~Deprecated~~ — joining is now via button on the `HeistJoinView` embed | — | — |
 | `L!heist stats [@user]` | View heist statistics | Optional: user | None |
 
 **Heist Restrictions:**
@@ -1477,21 +1465,23 @@ Net Profit
 - 30-minute cooldown per player
 - Statistics tracking (wins, losses, profit)
 - Business protection system integration
-- Recruitment period (60s bank, 45s business)
+- Interactive `HeistJoinView` lobby (buttons: join / launch / cancel)
+  - Recruitment period (60s bank, 45s business) — leader can launch early
 
 **Key Technical Details:**
-- Task loops for automated systems
-- Cooldown management with timestamps
-- Fair random selection algorithms
+- Task loops for automated lottery drawings
+- `HeistJoinView` (discord.ui.View) — interactive lobby with join/launch/cancel buttons; `on_timeout` fires heist automatically; `_execute()` prevents double-execution
+- Cooldown management with timestamps (`_parse_ts` handles both naive and tz-aware ISO strings)
+- Fair random selection algorithm (weighted by ticket count)
 - Economy integration (bets, payouts, sinks)
-- Business system integration
-- Multi-guild announcements
+- Business system integration (pending income theft, timer reset, protection check)
+- Multi-guild lottery announcements
 - Atomic data persistence
 
 **File Statistics:**
-- lottery.py: 313 lines
-- heist.py: 502 lines
-- **Total:** 815 lines of code
+- lottery.py: 324 lines
+- heist.py: 621 lines
+- **Total:** 945 lines of code
 - **Documentation:** ~12,000 words
 
 **Economic Impact:**

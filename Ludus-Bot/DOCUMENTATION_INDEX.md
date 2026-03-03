@@ -2,7 +2,7 @@
 
 > **COMPLETE ENGLISH DOCUMENTATION** for the entire Ludus Discord Bot project  
 > 50,000+ lines of code | 90+ Python files | 600+ commands | 450+ games  
-> **Parts 1-7 Complete** ✅ | ~58,500 words documented
+> **Parts 1-7, 9 Complete** ✅ | ~70,000 words documented
 
 ---
 
@@ -11,23 +11,24 @@
 This documentation is divided into comprehensive parts for easier navigation:
 
 #### **[📘 PART 1: Core Architecture](/documentation/FULL_DOCUMENTATION_PART1.md)**
-Complete analysis of bot.py (475 lines):
-- Bot initialization & configuration
-- Event system (on_ready, on_command, on_interaction)
-- Cog loading mechanism
-- Command synchronization (global + dev guild)
+Complete analysis of bot.py (315 lines):
+- Bot initialization & configuration (`BotCommandTree` subclass)
+- `activity_worker` — async batch-saves to user_activity.json
+- `setup_hook` — loads UNO emojis, all cogs, starts storage worker
+- Simplified `on_ready` (global command sync only)
 - Blacklist system
 - Server configuration loader
 - Error handling
 - **Line-by-line code walkthrough**
 
 #### **[💰 PART 2: Economy System](/documentation/FULL_DOCUMENTATION_PART2.md)** 
-Complete analysis of economy.py (918 lines):
+Complete analysis of economy.py (1,206 lines):
 - PsyCoin currency system
-- Shop & inventory management
+- Shop & inventory management (incl. `card_box`, `card_decks`)
 - Daily rewards with streak bonuses
 - Boost system (double_coins, xp_boost, luck_charm)
-- Currency conversion (WW Gold, Farm Tokens, etc.)
+- Currency conversion: `/convert` — FishCoins, MineCoins, FarmCoins ↔ PsyCoins
+- `/currencies` display command; `/equipdeck` for cosmetic card decks
 - Leaderboards & rankings
 - Atomic write system & data persistence
 - All 15+ commands documented
@@ -38,7 +39,7 @@ Complete analysis of economy.py (918 lines):
 ### Game Systems
 
 #### **[🎣 PART 3: Simulation Games](documentation/FULL_DOCUMENTATION_PART3.md)**
-Complete analysis of fishing.py, mining.py, farming.py, zoo.py (7,499 lines total):
+Complete analysis of fishing.py, mining.py, farming.py, zoo.py (8,298 lines total):
 - **Fishing System (3,472 lines - LARGEST FILE):**
   - 8 interactive UI view classes
   - 50+ fish species across 6 rarity tiers
@@ -49,11 +50,14 @@ Complete analysis of fishing.py, mining.py, farming.py, zoo.py (7,499 lines tota
   - Weather & time multipliers
   - Crafting system
   - 8-page in-game help system
-- **Mining Adventure (3,254 lines - 2D MINECRAFT-STYLE):**
+- **Mining Adventure (4,053 lines - 2D MINECRAFT-STYLE):**
   - Procedural world generation (seed-based, 100x150 world)
   - Real-time PNG rendering (PIL, 352x320px viewport)
   - 6 biomes with depth progression (Surface → Abyss)
-  - 25+ block types (ores, terrain, structures)
+  - 25+ block types; `BLOCK_REQUIREMENTS` (min pickaxe level per block)
+  - `ORE_STATES` system: cracked (50% yield) / irradiated (energy penalty)
+  - `CREATURE_TYPES` — 7 underground creatures (zombie, skeleton, spider, creeper, enderman, mole, worm) each with stats, drops, and behavior
+  - 12 mining achievements (`MINING_ACHIEVEMENTS`) with coin/XP rewards
   - Energy system (1 per 30 seconds)
   - Shop upgrades (pickaxe, backpack, energy)
   - Item placement (ladders, torches, portals)
@@ -70,9 +74,11 @@ Complete analysis of fishing.py, mining.py, farming.py, zoo.py (7,499 lines tota
 
 
 #### **[🎰 PART 4A: Gambling & Arcade Games](documentation/FULL_DOCUMENTATION_PART4A.md)** 
-Complete analysis of gambling.py, arcadegames.py, game_challenges.py (2,600 lines total):
-- **Gambling System (1,671 lines):**
-  - 8 casino games (slots, poker, roulette, higher/lower, dice, crash, mines, coinflip)
+Complete analysis of gambling.py (1,404 lines) + blackjack.py (2,001 lines) + poker.py (2,824 lines) + arcadegames.py + game_challenges.py:
+- **Gambling System (1,404 lines):**
+  - 7 casino games in gambling.py (slots, roulette, higher/lower, dice, crash, mines, coinflip)
+  - **Blackjack — dedicated `blackjack.py` cog (2,001 lines):** two modes — **Fast** (instant solo vs dealer, hit/stand/double, 2.5× blackjack payout, custom card deck) and **Long** (multiplayer lobby, 1-10 players, COOP or PVP mode); imports visual helpers from `poker.py`
+  - **Poker — dedicated `poker.py` cog (2,824 lines):** full Texas Hold'em, 2-8 players, `PokerGame`/`PokerGameView`/`PokerActionView`, settings lobby, custom card deck support
   - Comprehensive statistics tracking (per-user, per-game)
   - Win/loss ratios, biggest wins, net profit
   - Responsible gaming disclaimer system
@@ -96,8 +102,8 @@ Complete analysis of gambling.py, arcadegames.py, game_challenges.py (2,600 line
 - **~20,000 words of documentation**
 
 #### **[🏴‍☠️ PART 4B: Lottery & Heist Systems](documentation/FULL_DOCUMENTATION_PART4B.md)** 
-Complete analysis of lottery.py, heist.py (815 lines total):
-- **Lottery System (313 lines):**
+Complete analysis of lottery.py, heist.py (945 lines total):
+- **Lottery System (324 lines):**
   - Daily automated drawings at midnight UTC
   - Sequential ticket numbering (100 coins each, 1-100 max)
   - Growing jackpot system (50% of sales + 5k if no tickets)
@@ -105,13 +111,14 @@ Complete analysis of lottery.py, heist.py (815 lines total):
   - History tracking (last 10 winners)
   - Fair probability (more tickets = higher chance)
   - Major coin sink (50% of sales removed)
-- **Heist System (502 lines):**
+- **Heist System (621 lines):**
   - Bank heists (2-6 players, 10k-50k reward)
   - Business heists (2-4 players, steal pending income)
+  - `HeistJoinView` interactive lobby — join / launch / cancel buttons
+  - Auto-launch when crew full; leader can launch early; timeout fires heist
   - Success rates scale with crew (40%-90%)
   - Equal bet requirement (1k-10k bank, 500-5k business)
   - 30-minute cooldown per player
-  - Recruitment timers (60s bank, 45s business)
   - Statistics tracking (wins, losses, profit, success rate)
   - Business protection system integration
 - **~12,000 words of documentation**
@@ -191,12 +198,12 @@ Complete analysis of mafia.py, multiplayer_games.py, dueling.py, monopoly.py (4,
   - Bilingual support (PL/EN)
   - 26/26 features complete
 - **Other Multiplayer Systems:**
-  - Secret Hitler, Spyfall, Resistance
+  - clue, murder mystery
   - PvP dueling system
   - Monopoly board game (1,000 lines)
 - **~15,000 words of documentation**
 
-#### **[🎮 PART 7: Minigames System](documentation/FULL_DOCUMENTATION_PART7.md)** ⭐ **NEW**
+#### **[🎮 PART 7: Minigames System](documentation/FULL_DOCUMENTATION_PART7.md)**
 Complete analysis of minigames.py (1,070 lines):
 - **300+ Interactive Mini-Games:**
   - 50 base games (coinflip, roll, guess_number, rps, memory, reaction_time, typing_race, hangman, unscramble, quick_math, trivia, etc.)
@@ -238,7 +245,57 @@ Complete analysis of minigames.py (1,070 lines):
 - **PART 8: RPG Systems** (D&D, Wizard Wars, Quests)
 
 ### Social & Utility Systems
-- **PART 9: Social Features** (Pets, Marriage, Reputation, Profiles)
+
+#### **[🐾 PART 9: Social Features](documentation/FULL_DOCUMENTATION_PART9.md)**
+Complete analysis of pets.py, marriage.py, reputation.py, profile.py, social.py, actions.py, trading.py (5,102 lines total):
+- **Pets System (pets.py — 741 lines):**
+  - 16 pets across 5 rarities (Common 55% / Uncommon 28% / Rare 12% / Epic 4% / Legendary 1%)
+  - Weighted random adoption — first pet FREE, subsequent 10,000 PsyCoins
+  - **14 perk types:** `gambling_mult`, `gambling_loss_red`, `gambling_jackpot`, `fishing_mult`, `fishing_rare`, `fishing_value`, `mining_speed`, `mining_rare`, `mining_xp`, `farm_yield`, `farm_auto_tend`, `coins_mult`, `daily_bonus`, `xp_mult`
+  - `PetDashboardView` — Components V2 LayoutView with feed/play/walk/release buttons
+  - Auto-disables buttons when stats at limits (hunger ≥ 90, energy < 20)
+  - Farm damage system: hungry pets (<40 hunger) may trample/burn/eat/dig crops
+  - Full inter-cog API: provides multipliers to fishing, mining, farming, gambling, economy, daily
+  - `/pet` slash command
+- **Marriage System (marriage.py — 456 lines):**
+  - Proposal system with 5-minute timeout and 10,000-coin cost
+  - Shared bank (deposit/withdraw, mirrored on both spouses)
+  - Couple quests: 4 quests (5k–10k rewards + love points)
+  - Divorce: 5,000 coins, shared bank lost
+  - Commands: `L!marry`, `L!divorce`, `L!spouse`, `L!bank`, `L!couplequests`
+- **Reputation System (reputation.py — 396 lines):**
+  - 8 tiers: 👤 Neutral → 🌟 Legendary /// ⚠️ Questionable → ☠️ Notorious
+  - 24h cooldown per user pair (in-memory, resets on restart)
+  - Shop price modifier ±20%, reward modifier ±10%
+  - History tracking, leaderboard, tier explanations
+- **Profile System (profile.py — 911 lines):**
+  - `ProfileManager` — aggregates stats from 5 files: profiles.json + users/{id}.json + economy.json + fishing_data.json + gambling_stats.json
+  - `ProfileView` — Components V2 LayoutView, 4 pages: **Overview** (level, energy, pet, top activities) / **Gaming** (W/L/D for 10+ games) / **Economy** (balances, gambling ROI, business) / **Social** (pet care, events, last active)
+  - Card deck selector embedded in profile (equip cosmetic decks)
+  - 60+ tracked stats across gambling, minigames, board games, cards, TCG, fishing, farming, pets, social, quests, events, business, combat, music
+  - `L!profile` / `/profile` / `L!energy`
+- **Social System (social.py — 998 lines):**
+  - 59 roasts + 54 compliments with coin rewards and achievement hooks
+  - Would You Rather: community-sourced questions, 10-coin play reward, 25-coin contribute reward
+  - Story Maker: `on_message` listener, per-word 5-coin reward on story end
+  - GIF reaction commands via nekos.best API: `/hug`, `/kiss`, `/slap`, `/petpet` (some-random-api), `/ship`
+  - `/ship` — deterministic `(id1+id2) % 101` score, 6 tiers, animated GIF
+  - `L!pray` (+10–50 coins blessing), `L!curse` (10% backfire), `L!avatar`
+- **Action Commands (actions.py — 311 lines):**
+  - 7 actions: slap, punch, kick, kiss, dance, stab, shoot
+  - 10 GIFs + 10 message templates per action type
+  - Auto-embed via Discord link preview (no explicit Embed object)
+- **Trading System (trading.py — 1,289 lines):**
+  - P2P `TradeSession` with add/remove/confirm/cancel flow
+  - Confirmation resets on any offer change (bait-and-switch prevention)
+  - Pre-flight validation before execution
+  - `L!sell` — 85–90% value for shop items, crops, wizard spells, pets (pets require confirmation)
+  - Anonymous gift system via DM: coins, items, crops, spells
+  - Block/unblock system; gift enable/disable settings
+  - `L!admire` and `L!encourage` — anonymous DM messages
+  - Trade history logged to `data/trade_history.json` + `data/users/{id}.json`
+- **~11,500 words of documentation**
+
 - **PART 10: Server Management** (Starboard, Counting, Confessions, Events)
 - **PART 11: Utility Commands** (Help, Info, Utilities)
 
@@ -258,7 +315,7 @@ Complete analysis of minigames.py (1,070 lines):
 Ludus-Bot/ (50,000+ lines total)
 │
 ├── 📄 Core Files (4 files, ~1,500 lines)
-│   ├── bot.py (475 lines) - Main bot entry point
+│   ├── bot.py (315 lines) - Main bot entry point
 │   ├── start.py (50 lines) - Production launcher  
 │   ├── constants.py (100 lines) - Global constants
 │   └── config.json - Bot configuration
@@ -266,7 +323,7 @@ Ludus-Bot/ (50,000+ lines total)
 ├── 🎯 Cogs/ (70+ files, 45,000+ lines)
 │   │
 │   ├── 💰 Economy & Core (8 files, ~5,000 lines)
-│   │   ├── economy.py (918 lines) - Currency system
+│   │   ├── economy.py (1,206 lines) - Currency system
 │   │   ├── achievements.py (600 lines) - Achievement tracking
 │   │   ├── daily_rewards.py (400 lines) - Daily claims
 │   │   ├── profile.py (600 lines) - User profiles
@@ -278,17 +335,19 @@ Ludus-Bot/ (50,000+ lines total)
 │   ├── 🎣 Simulation Games (5 files, ~10,000 lines)
 │   │   ├── fishing.py (3472 lines) - **BIGGEST FILE**
 │   │   ├── farming.py (1200 lines) - Farm simulator
-│   │   ├── mining.py (3249 lines) - **2nd BIGGEST**
+│   │   ├── mining.py (4,053 lines) - **2nd BIGGEST**
 │   │   ├── zoo.py (800 lines) - Animal collection
 │   │   └── farmshop.py (300 lines) - Farming marketplace
 │   │
-│   ├── 🎰 Gambling & Casino (3 files, ~3,000 lines)
-│   │   ├── gambling.py (1200 lines) - Blackjack, Slots, Roulette
-│   │   ├── lottery.py (400 lines) - Lottery system
-│   │   └── heist.py (700 lines) - Bank heist co-op
+│   ├── 🎰 Gambling & Casino (5 files, ~7,200 lines)
+│   │   ├── gambling.py (1,404 lines) - Slots, Roulette, Higher/Lower, Dice, Crash, Mines, Coinflip
+│   │   ├── blackjack.py (2,001 lines) - Blackjack: Fast mode (solo) + Long mode (multiplayer lobby)
+│   │   ├── poker.py (2,824 lines) - Texas Hold'em full implementation
+│   │   ├── lottery.py (324 lines) - Lottery system
+│   │   └── heist.py (621 lines) - Bank heist co-op
 │   │
 │   ├── 🎮 Card & Board Games (6 files, ~5,000 lines)
-│   │   ├── cardgames.py (900 lines) - Poker, Blackjack
+│   │   ├── cardgames.py (900 lines) - Go Fish, War, Blackjack (classic prefix commands)
 │   │   ├── cards_enhanced.py (600 lines) - Advanced cards
 │   │   ├── boardgames.py (1000 lines) - Chess, Checkers
 │   │   ├── boardgames_enhanced.py (800 lines) - Advanced boards
@@ -320,13 +379,15 @@ Ludus-Bot/ (50,000+ lines total)
 │   │   ├── wizardwars.py (800 lines) - Wizard dueling RPG
 │   │   └── guilds.py (400 lines) - Guild/clan system
 │   │
-│   ├── 🐾 Social & Collection (6 files, ~3,000 lines)
-│   │   ├── pets.py (800 lines) - Pet ownership system
-│   │   ├── marriage.py (400 lines) - Marriage feature
-│   │   ├── social.py (500 lines) - Social interactions
-│   │   ├── actions.py (400 lines) - Action commands
-│   │   ├── trading.py (500 lines) - Player trading
-│   │   └── psyvrse_tcg.py (600 lines) - Trading card game
+│   ├── 🐾 Social & Collection (7 files, ~5,100 lines)
+│   │   ├── pets.py (741 lines) - 16 pets, 14 perk types, inter-cog multiplier API
+│   │   ├── profile.py (911 lines) - 4-page Components V2 profile, 60+ stats
+│   │   ├── trading.py (1,289 lines) - P2P trades, gifts, sell, block system
+│   │   ├── social.py (998 lines) - Roasts, WYR, story maker, GIF reactions
+│   │   ├── marriage.py (456 lines) - Proposals, shared bank, couple quests
+│   │   ├── reputation.py (396 lines) - Rep tiers, price/reward modifiers
+│   │   ├── actions.py (311 lines) - GIF action commands (slap/punch/kick/etc.)
+│   │   └── psyvrse_tcg.py (~600 lines) - Trading card game
 │   │
 │   ├── 🔧 Utility & Fun (8 files, ~3,000 lines)
 │   │   ├── funcommands.py (600 lines) - Fun commands
@@ -880,7 +941,7 @@ This project is proprietary. All rights reserved.
 
 **This documentation is a living document and will be updated as the project evolves.**
 
-Last Updated: 06.02.2026
+Last Updated: 03.03.2026
 Total Documentation Size: 58,500+ words across 7 completed parts (Parts 1-7)
 Documentation Status: ✅ Parts 1-7 Complete | 🚧 Parts 8-15 Planned
 The documentation was written by wilczek80.

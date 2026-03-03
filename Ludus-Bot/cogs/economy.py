@@ -1167,40 +1167,6 @@ class Economy(commands.Cog):
         )
 
         await interaction.response.send_message(embed=embed)
-    
-    @app_commands.command(name="equipdeck", description="Equip a card deck for poker games")
-    @app_commands.describe(deck="Card deck to equip (classic/dark/platinum)")
-    @app_commands.choices(deck=[
-        app_commands.Choice(name="🃏 Classic Deck", value="classic"),
-        app_commands.Choice(name="🖤 Dark Deck", value="dark"),
-        app_commands.Choice(name="💎 Platinum Deck", value="platinum")
-    ])
-    async def equipdeck_slash(self, interaction: discord.Interaction, deck: app_commands.Choice[str]):
-        deck_name = deck.value if isinstance(deck, app_commands.Choice) else deck
-        
-        # Check if user owns the deck
-        owned_decks = self.get_owned_decks(interaction.user.id)
-        
-        if deck_name not in owned_decks:
-            await interaction.response.send_message(
-                f"❌ You don't own the **{deck_name}** deck!\n"
-                f"Purchase a 🎴 Card Box from the shop to unlock new decks!",
-                ephemeral=True
-            )
-            return
-        
-        # Equip the deck
-        self.set_user_card_deck(interaction.user.id, deck_name)
-        
-        deck_info = self.card_decks.get(deck_name, {"name": deck_name.title(), "rarity": "Unknown"})
-        
-        embed = EmbedBuilder.success(
-            "Deck Equipped!",
-            f"You equipped **{deck_info['name']}** ({deck_info.get('rarity', 'Common')})\n\n"
-            f"This deck will be used in all your poker games!"
-        )
-        
-        await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Economy(bot))
