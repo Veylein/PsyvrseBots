@@ -1,7 +1,7 @@
 # 🐾 PART 9: Social Features
 
-> **Documentation for:** pets.py, marriage.py, reputation.py, profile.py, social.py, actions.py, trading.py  
-> **Total Lines:** 5,102 | **Files:** 7 | **Date:** March 2026
+> **Documentation for:** pets.py, marriage.py, reputation.py, profile.py, social.py, trading.py  
+> **Total Lines:** ~5,021 | **Files:** 6 | **Date:** March 2026
 
 ---
 
@@ -27,20 +27,19 @@ Part 9 covers all player-to-player social and relationship systems. These cogs b
 
 | File | Lines | Role |
 |------|-------|------|
-| `cogs/pets.py` | 741 | Virtual pet companions with gameplay perks across all activity systems |
-| `cogs/marriage.py` | 456 | Marriage proposals, shared bank, couple quests, divorce |
-| `cogs/reputation.py` | 396 | Community rep system: price/reward modifiers, tier ladder |
-| `cogs/profile.py` | 911 | Comprehensive 4-page user profile (Components V2), stat aggregation |
-| `cogs/social.py` | 998 | Roasts, compliments, WYR, story maker, GIF reactions (/hug, /kiss, /ship) |
-| `cogs/actions.py` | 311 | Prefix GIF action commands (slap, punch, kick, dance, etc.) |
-| `cogs/trading.py` | 1,289 | Full P2P trading, anonymous gifts, sell system, block lists |
-| **TOTAL** | **5,102** | |
+| `cogs/pets.py` | 740 | Virtual pet companions with gameplay perks across all activity systems |
+| `cogs/marriage.py` | 783 | Marriage proposals (buttons), shared bank (modal buttons), 15 couple quests, divorce |
+| `cogs/reputation.py` | 303 | Community rep system: price/reward modifiers, tier ladder |
+| `cogs/profile.py` | 910 | Comprehensive 4-page user profile (Components V2), stat aggregation |
+| `cogs/social.py` | 997 | Roasts, compliments, WYR, story maker, GIF reactions + action commands (slap/punch/etc.) |
+| `cogs/trading.py` | 1,288 | Full P2P trading, anonymous gifts, sell system, block lists |
+| **TOTAL** | **~5,021** | |
 
 **Data files used:**
 - `data/pets.json` — all pet ownership records + `__adoptions__` counter
 - `data/profiles.json` — user profiles (60+ stats per user)
-- `cogs/marriages.json` — marriage records (note: stored in cogs/, not data/)
-- `cogs/reputation.json` — reputation records (stored in cogs/)
+- `data/marriages.json` — marriage records (migrated from cogs/ on first run)
+- `data/reputation.json` — reputation records (migrated from cogs/ on first run)
 - `data/trade_history.json`, `data/blocks.json`, `data/gift_settings.json`
 
 ---
@@ -234,40 +233,33 @@ On successful adoption, the cog increments `leaderboard_manager.increment_stat(g
 
 ---
 
-## 3. Marriage System (`cogs/marriage.py` — 456 lines)
+## 3. Marriage System (`cogs/marriage.py` — 783 lines)
 
 ### Overview
 
-A relationship system allowing two users to get married, share a bank account, and complete couple quests together.
+A relationship system allowing two users to get married, share a bank account, and complete couple quests together. Proposals and the shared bank use interactive **Discord UI buttons and modals** — no typing commands to accept/decline.
 
 ### Marriage Flow
 
 ```
 1. L!marry @user
    └── Author pays 10,000 coins
-   └── Bot sends embed + instructions for L!marry accept/decline
-   └── Proposal stored in self.active_proposals with 5-minute expiry
+   └── Bot pings partner + sends embed with Accept 💍 / Decline 💔 buttons
+   └── Only the target partner can click (5-minute timeout)
+   └── On accept: marriage processed immediately via button callback
+   └── On timeout: proposal auto-expires, embed updated
 
-2. L!marry accept
-   └── Economy charge validated again (proposer must still have 10k)
-   └── Both users get marriage_data entry:
-       {spouse, married_since, shared_bank, completed_quests, love_points, divorces}
-   └── Proposal removed
-
-3. L!marry decline
-   └── Proposal removed, no cost
-
-4. L!divorce
+2. L!divorce
    └── Cost: 5,000 PsyCoins
    └── Shared bank balance is LOST
    └── Both users' marriage data reset
-   └── divorce counter incremented on both
+   └── divorce counter incremented on both (synced to profiles.json)
 ```
 
 ### Data Structure
 
 ```python
-# cogs/marriages.json
+# data/marriages.json
 {
   "123456789": {
     "spouse": 987654321,
@@ -282,25 +274,27 @@ A relationship system allowing two users to get married, share a bank account, a
 
 ### Shared Bank
 
-Both spouses share a single `shared_bank` value — depositing updates both records simultaneously. There is **no separation** between who deposited what.
+Both spouses share a single `shared_bank` value. `L!bank` sends an embed with **Deposit 💰** and **Withdraw 💸** buttons — clicking either opens a Discord modal asking for the amount. Both partners can use the buttons (guarded by `interaction_check`). Depositing/withdrawing updates both records simultaneously.
 
 ```python
-# L!bank deposit 1000
-economy_cog.remove_coins(ctx.author.id, 1000)
-marriage["shared_bank"] += 1000
-spouse_marriage["shared_bank"] += 1000  # Mirrors on both sides
+# Modal submit → remove_coins / add_coins
+economy_cog.remove_coins(user_id, amount)      # deposit
+economy_cog.add_coins(user_id, amount, ...)    # withdraw
+marriage["shared_bank"] += amount              # mirrors on both sides
+spouse_marriage["shared_bank"] += amount
 ```
 
 ### Couple Quests
 
-4 quests with weekly reset (reset logic tracked externally):
+15 quests across 3 tiers with weekly reset:
 
-| Quest ID | Name | Description | Reward | Love Points |
-|----------|------|-------------|--------|-------------|
-| `date_night` | 💑 Date Night | Both partners say 'I love you' in chat | 5,000 coins | 10 |
-| `gift_exchange` | 🎁 Gift Exchange | Send each other items worth 1,000+ coins | 3,000 coins | 5 |
-| `adventure` | 🗺️ Adventure Together | Both complete a quest same day | 10,000 coins | 20 |
-| `fortune` | 🎰 Fortune Hunters | Win 5,000+ coins from gambling together | 7,500 coins | 15 |
+| Tier | Quests | Rewards |
+|------|--------|---------|
+| ⭐ Easy (5) | Date Night, Sweet Words, Heads or Tails, Daily Duo, Fishing Date | 1,000–3,000 coins · 3–6 ❤️ |
+| ⭐⭐ Medium (5) | Gift Exchange, Fortune Hunters, Mining Duo, Harvest Season, Trivia Night | 4,000–7,500 coins · 8–12 ❤️ |
+| ⭐⭐⭐ Hard (5) | Adventure Together, Heist Partners, Card Champions, Wealthy Couple, One Month Strong | 10,000–25,000 coins · 20–50 ❤️ |
+
+`L!couplequests` sends 3 separate embeds (one per tier) with completed/total counter.
 
 ### Reputation Tier Effects
 
@@ -310,19 +304,16 @@ The `_parse_ts()` helper handles both naive (old data) and timezone-aware ISO ti
 
 | Command | Description |
 |---------|-------------|
-| `L!marry @user` | Propose marriage (costs 10,000 coins) |
-| `L!marry accept` | Accept a pending proposal |
-| `L!marry decline` | Decline a pending proposal |
+| `L!marry @user` | Propose marriage — pings partner, sends Accept 💍/Decline 💔 buttons (costs 10,000 coins) |
+| `L!marry accept/decline` | Fallback prefix commands (buttons preferred) |
 | `L!divorce` | Divorce your spouse (costs 5,000 coins) |
 | `L!spouse [@user]` | View marriage info (spouse, days married, love points, shared bank) |
-| `L!bank` | View shared bank balance |
-| `L!bank deposit <amount>` | Deposit coins into shared bank |
-| `L!bank withdraw <amount>` | Withdraw coins from shared bank |
-| `L!couplequests` | View available couple quests and completion status |
+| `L!bank` | View shared bank + Deposit 💰 / Withdraw 💸 modal buttons |
+| `L!couplequests` | View 15 couple quests in 3 tier embeds |
 
 ---
 
-## 4. Reputation System (`cogs/reputation.py` — 396 lines)
+## 4. Reputation System (`cogs/reputation.py` — 303 lines)
 
 ### Overview
 
@@ -374,10 +365,12 @@ def can_give_rep(self, giver_id, receiver_id):
 
 Cooldowns are stored in `self.rep_cooldowns` (in-memory dict), **not in the JSON file**. This means cooldowns reset on bot restart.
 
+`rep_give` and `rep_remove` both call `profile_cog.increment_stat()` to sync `reputation_given` / `reputation_received` into `profiles.json` — this powers the server leaderboard and the profile Social page.
+
 ### Data Structure
 
 ```python
-# cogs/reputation.json
+# data/reputation.json
 {
   "123456789": {
     "total_rep": 15,
@@ -404,13 +397,12 @@ Cooldowns are stored in `self.rep_cooldowns` (in-memory dict), **not in the JSON
 | `L!rep [@user]` | View reputation (tier, score, +/- breakdown, recent history, effects) |
 | `L!rep give @user [reason]` | Give +1 rep (aliases: `add`, `+`) |
 | `L!rep remove @user [reason]` | Give -1 rep (aliases: `take`, `-`) |
-| `L!rep leaderboard` | Top 10 most reputable users (aliases: `lb`, `top`) |
 | `L!rep history [@user]` | View recent rep events (last 5 shown) |
-| `L!rep info` | Explain the system, tiers, effects |
+| `/leaderboard` | Server & global reputation rankings (via leaderboard cog) |
 
 ---
 
-## 5. Profile System (`cogs/profile.py` — 911 lines)
+## 5. Profile System (`cogs/profile.py` — 910 lines)
 
 ### Overview
 
@@ -521,11 +513,11 @@ Profiles are built from `data/profile_template.json`. If the template file fails
 
 ---
 
-## 6. Social System (`cogs/social.py` — 998 lines)
+## 6. Social System (`cogs/social.py` — 997 lines)
 
 ### Overview
 
-Social interaction commands: random roasts & compliments with coin rewards, Would You Rather game, collaborative story maker, GIF reaction slash commands, and various fun utility commands.
+Social interaction commands: random roasts & compliments with coin rewards, Would You Rather game, collaborative story maker, GIF reaction slash commands, prefix action GIF commands (slap/punch/kick/etc.), and various fun utility commands.
 
 ### Roasts & Compliments
 
@@ -631,23 +623,23 @@ Ship tiers:
 
 ---
 
-## 7. Action Commands (`cogs/actions.py` — 311 lines)
+## 7. Action Commands (in `cogs/social.py`)
 
 ### Overview
 
-Simple prefix commands that send a random GIF + formatted message for a given action. 7 action types, each with 10 GIF URLs and 10 message templates.
+Prefix GIF action commands are part of `social.py` (not a separate file). 7 action types, each with multiple GIF URLs and message templates.
 
 ### Action Types
 
-| Command | Emoji | GIF Source | Self-Action Response |
-|---------|-------|------------|---------------------|
-| `L!slap @user` | 🤚 | Tenor links | "Here, have a hug instead! 🤗" |
-| `L!punch @user` | 👊 | Tenor links | "Maybe try a workout instead? 💪" |
-| `L!kick @user` | 🦵 | Tenor links | "That's some impressive flexibility! 🤸" |
-| `L!kiss @user` | 💋 | Imgur GIFs | "Self-love is important! 💖" |
-| `L!dance @user` | 💃 | Imgur GIFs | "Dancing solo! You've got the moves!" |
-| `L!stab @user` | 🔪 | Imgur GIFs | "Someone get this person some help!" |
-| `L!shoot @user` | 🔫 | Imgur GIFs | "That's not very wise..." |
+| Command | Emoji | Self-Action Response |
+|---------|-------|---------------------|
+| `L!slap @user` | 🤚 | "Here, have a hug instead! 🤗" |
+| `L!punch @user` | 👊 | "Maybe try a workout instead? 💪" |
+| `L!kick @user` | 🦵 | "That's some impressive flexibility! 🤸" |
+| `L!kiss @user` | 💋 | "Self-love is important! 💖" |
+| `L!dance @user` | 💃 | "Dancing solo! You've got the moves!" |
+| `L!stab @user` | 🔪 | "Someone get this person some help!" |
+| `L!shoot @user` | 🔫 | "That's not very wise..." |
 
 **Message template system:**
 ```python
@@ -666,7 +658,7 @@ await ctx.send(f"{message}\n{gif}")
 
 ---
 
-## 8. Trading System (`cogs/trading.py` — 1,289 lines)
+## 8. Trading System (`cogs/trading.py` — 1,288 lines)
 
 ### Overview
 
@@ -879,21 +871,20 @@ reputation.py ──────────────────────
 ### Marriage
 | Command | Type | Cost |
 |---------|------|------|
-| `L!marry @user` | Prefix | 10,000 coins |
-| `L!marry accept/decline` | Prefix | Free |
+| `L!marry @user` | Prefix | 10,000 coins — sends Accept/Decline buttons |
+| `L!marry accept/decline` | Prefix | Fallback (buttons preferred) |
 | `L!divorce` | Prefix | 5,000 coins |
 | `L!spouse [@user]` | Prefix | Free |
-| `L!bank [deposit/withdraw]` | Prefix | Free |
-| `L!couplequests` | Prefix | Free |
+| `L!bank` | Prefix | Free — Deposit 💰 / Withdraw 💸 modals |
+| `L!couplequests` | Prefix | Free — 3-tier embed (15 quests) |
 
 ### Reputation
 | Command | Type | Notes |
 |---------|------|-------|
 | `L!rep [@user]` | Prefix | View |
 | `L!rep give/remove @user [reason]` | Prefix | 24hr cooldown |
-| `L!rep leaderboard` | Prefix | Top 10 |
 | `L!rep history [@user]` | Prefix | Last 5 events |
-| `L!rep info` | Prefix | Help text |
+| `/leaderboard` | Slash | ❤️ Server Reputation + 🌍 Global Reputation |
 
 ### Profile
 | Command | Type | Notes |
@@ -907,21 +898,20 @@ reputation.py ──────────────────────
 
 ---
 
-## 11. Part 9 Summary
+**11. Part 9 Summary**
 
-**7 files · 5,102 total lines · March 2026**
+**6 files · ~5,021 total lines · March 2026**
 
 ### System Coverage
 
 | System | File | Lines | Complexity |
 |--------|------|-------|------------|
-| Pets | pets.py | 741 | High — 16 pets, 14 perk types, cross-cog API |
-| Profile | profile.py | 911 | High — Components V2, 5-file stat aggregation |
-| Trading | trading.py | 1,289 | High — P2P sessions, gifts, sell, blocks |
-| Social | social.py | 998 | Medium — GIF API, story listener, ship |
-| Marriage | marriage.py | 456 | Medium — shared bank, quests, proposals |
-| Reputation | reputation.py | 396 | Low-Medium — tier ladder, cooldowns |
-| Actions | actions.py | 311 | Low — GIF library, message templates |
+| Pets | pets.py | 740 | High — 16 pets, 14 perk types, cross-cog API |
+| Profile | profile.py | 910 | High — Components V2, 5-file stat aggregation |
+| Trading | trading.py | 1,288 | High — P2P sessions, gifts, sell, blocks |
+| Social + Actions | social.py | 997 | Medium — GIF API, story listener, ship, action commands |
+| Marriage | marriage.py | 783 | Medium — button proposals, modal bank, 15 quests |
+| Reputation | reputation.py | 303 | Low-Medium — tier ladder, cooldowns, profile sync |
 
 ### Key Technical Features
 

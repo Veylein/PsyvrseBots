@@ -315,9 +315,24 @@
             "inline": true
           },
           {
-            "name": "⭐ Reputation",
-            "value": "`L!reputation` — Check your rep score\n`L!rep @user` — Give reputation\nHigh rep → bonus drops & perks!",
+            "name": "⭐ Reputation System",
+            "value": "Give `+1` or `-1` rep to other users (24h cooldown per pair).\nRep affects prices and rewards across the whole bot!",
+            "inline": false
+          },
+          {
+            "name": "📊 Tiers",
+            "value": "🌟 Legendary `100+` · ⭐ Excellent `50+` · 💎 Great `25+`\n✨ Good `10+` · 👤 Neutral · ⚠️ Questionable `-10`\n❌ Bad `-25` · ☠️ Notorious `-100`",
             "inline": true
+          },
+          {
+            "name": "💡 Effects",
+            "value": "**High rep**: up to -20% shop prices, +10% rewards\n**Low rep**: up to +20% prices, -10% rewards\n`/leaderboard` → Server & Global Reputation",
+            "inline": true
+          },
+          {
+            "name": "💬 Rep Commands",
+            "value": "`L!rep @user` — View score\n`L!rep give @user [reason]` — Give +1\n`L!rep remove @user [reason]` — Give -1\n`L!rep history [@user]` — Recent events",
+            "inline": false
           },
           {
             "name": "🤗 Social Actions (Slash)",

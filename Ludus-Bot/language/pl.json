@@ -315,9 +315,24 @@
             "inline": true
           },
           {
-            "name": "⭐ Reputacja",
-            "value": "`L!reputation` — Sprawdź swój wynik rep\n`L!rep @user` — Daj reputację\nWysoka rep → bonusowe dropy i perki!",
+            "name": "⭐ System Reputacji",
+            "value": "Dawaj `+1` lub `-1` rep innym użytkownikom (cooldown 24h).\nReputacja wpływa na ceny i nagrody w całym bocie!",
+            "inline": false
+          },
+          {
+            "name": "📊 Poziomy",
+            "value": "🌟 Legendarny `100+` · ⭐ Doskonały `50+` · 💎 Świetny `25+`\n✨ Dobry `10+` · 👤 Neutralny · ⚠️ Wątpliwy `-10`\n❌ Zły `-25` · ☠️ Notorycznie Zły `-100`",
             "inline": true
+          },
+          {
+            "name": "💡 Efekty",
+            "value": "**Wysoka rep**: do -20% cen w sklepie, +10% nagród\n**Niska rep**: do +20% cen, -10% nagród\n`/leaderboard` → Reputacja serwera i globalna",
+            "inline": true
+          },
+          {
+            "name": "💬 Komendy rep",
+            "value": "`L!rep @user` — Sprawdź wynik\n`L!rep give @user [powód]` — Daj +1\n`L!rep remove @user [powód]` — Daj -1\n`L!rep history [@user]` — Historia",
+            "inline": false
           },
           {
             "name": "🤗 Akcje Społeczne (Slash)",

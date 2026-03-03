@@ -125,7 +125,13 @@ class Help(commands.Cog):
                     ("pray @user", "Pray for someone (+coins blessing)"),
                     ("curse @user", "Curse someone (may backfire!)"),
                     ("marry @user", "Propose marriage to someone (10000 coins)"),
-                    ("divorce", "End your marriage"),
+                    ("spouse [@user]", "View marriage info (spouse, days married, love points, shared bank"),
+                    ("L!bank @user", "View your shared bank with your spouse"),
+                    ("divorce", "End your marriage (5000 coins)"),
+                    ("rep @user", "View reputation (tier, score, +/- breakdown, recent history, effects)"),
+                    ("rep give @user [reason]", "Give reputation to someone (1 rep per 24 hours)"),
+                    ("L!rep remove @user [reason]", "Give negative reputation to someone (1 rep per 24 hours)"),
+
                 ]
             },
             "🌍 Global Events": {

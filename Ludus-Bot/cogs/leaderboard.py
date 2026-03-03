@@ -76,6 +76,7 @@ LB_CATEGORIES: List[Tuple[str, str, str]] = [
     ("🌍 Global – Duels",        "g_duels",      "Most duels won across all servers"),
     ("🌍 Global – Quests",       "g_quests",     "Most quests completed across all servers"),
     ("🌍 Global – Level / XP",   "g_xp",         "Highest XP across all servers"),
+    ("🌍 Global – Reputation",    "g_reputation", "Highest reputation across all servers"),
 ]
 
 
@@ -321,8 +322,9 @@ class Leaderboard(commands.Cog):
                 guild, "quests_completed", "📜 Quests – " + guild.name, "quests")
 
         if category == "s_reputation":
-            return await self._local_from_profile(
-                guild, "reputation_received", "❤️ Reputation – " + guild.name, "rep")
+            return await self._local_from_file(
+                guild, "reputation.json", "total_rep",
+                "❤️ Reputation – " + guild.name, "rep")
 
         if category == "s_streak":
             return await self._local_from_profile(
@@ -356,6 +358,9 @@ class Leaderboard(commands.Cog):
         if category == "g_xp":
             return await self._global_users(
                 "profiles.json", "xp", "⭐ Global – Level/XP", "XP")
+        if category == "g_reputation":
+            return await self._global_users(
+                "reputation.json", "total_rep", "❤️ Global – Reputation", "rep")
 
         return "❓ Unknown category."
 

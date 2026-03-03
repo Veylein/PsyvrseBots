@@ -19,11 +19,22 @@ class Reputation(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        self.file_path = "cogs/reputation.json"
+        data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        os.makedirs(data_dir, exist_ok=True)
+        self.file_path = os.path.join(data_dir, "reputation.json")
+        self._migrate_old_file()
         self.load_data()
-        
+
         # Cooldown for giving rep (24 hours per user pair)
         self.rep_cooldowns = {}
+
+    def _migrate_old_file(self):
+        """Move legacy cogs/reputation.json → data/reputation.json on first run."""
+        import shutil
+        old = os.path.join("cogs", "reputation.json")
+        if os.path.exists(old) and not os.path.exists(self.file_path):
+            shutil.copy2(old, self.file_path)
+            print(f"[REPUTATION] Migrated data: {old} → {self.file_path}")
     
     def load_data(self):
         """Load reputation data"""
@@ -186,10 +197,16 @@ class Reputation(commands.Cog):
         self.rep_cooldowns[cooldown_key] = discord.utils.utcnow().isoformat()
         
         self.save_data()
-        
+
+        # sync profile stats
+        profile_cog = self.bot.get_cog("Profile")
+        if profile_cog:
+            profile_cog.increment_stat(ctx.author.id, "reputation_given")
+            profile_cog.increment_stat(member.id, "reputation_received")
+
         new_total = user_rep["total_rep"]
         tier, color = self.get_rep_tier(new_total)
-        
+
         embed = discord.Embed(
             title="👍 Reputation Given!",
             description=f"{ctx.author.mention} gave +1 rep to {member.mention}",
@@ -235,10 +252,15 @@ class Reputation(commands.Cog):
         self.rep_cooldowns[cooldown_key] = discord.utils.utcnow().isoformat()
         
         self.save_data()
-        
+
+        # sync profile stats
+        profile_cog = self.bot.get_cog("Profile")
+        if profile_cog:
+            profile_cog.increment_stat(ctx.author.id, "reputation_given")
+
         new_total = user_rep["total_rep"]
         tier, color = self.get_rep_tier(new_total)
-        
+
         embed = discord.Embed(
             title="👎 Reputation Removed",
             description=f"{ctx.author.mention} gave -1 rep to {member.mention}",
@@ -247,54 +269,6 @@ class Reputation(commands.Cog):
         
         embed.add_field(name="Reason", value=reason, inline=False)
         embed.add_field(name=f"{member.display_name}'s New Rep", value=f"{new_total:+d} ({tier})", inline=False)
-        
-        await ctx.send(embed=embed)
-    
-    @rep.command(name="leaderboard", aliases=['lb', 'top'])
-    async def rep_leaderboard(self, ctx):
-        """View the reputation leaderboard"""
-        # Sort users by total rep
-        sorted_users = sorted(
-            self.rep_data.items(),
-            key=lambda x: x[1].get('total_rep', 0),
-            reverse=True
-        )[:10]
-        
-        if not sorted_users:
-            await ctx.send("📊 No reputation data yet!")
-            return
-        
-        embed = discord.Embed(
-            title="🏆 Reputation Leaderboard",
-            description="Most reputable users!",
-            color=discord.Color.gold()
-        )
-        
-        leaderboard = []
-        for rank, (user_id, user_data) in enumerate(sorted_users, 1):
-            try:
-                user = await self.bot.fetch_user(int(user_id))
-                username = user.name
-            except:
-                username = f"User {user_id}"
-            
-            total_rep = user_data.get('total_rep', 0)
-            tier, _ = self.get_rep_tier(total_rep)
-            
-            medal = ""
-            if rank == 1:
-                medal = "🥇"
-            elif rank == 2:
-                medal = "🥈"
-            elif rank == 3:
-                medal = "🥉"
-            else:
-                medal = f"`{rank}.`"
-            
-            leaderboard.append(f"{medal} **{username}** - {total_rep:+d} ({tier.split()[1]})")
-        
-        embed.description = "\n".join(leaderboard)
-        embed.set_footer(text="Give rep to helpful users with L!rep give @user")
         
         await ctx.send(embed=embed)
     
@@ -336,60 +310,5 @@ class Reputation(commands.Cog):
         
         await ctx.send(embed=embed)
     
-    @rep.command(name="info")
-    async def rep_info(self, ctx):
-        """Learn about the reputation system"""
-        embed = discord.Embed(
-            title="ℹ️ Reputation System",
-            description="Build your reputation through community interactions!",
-            color=discord.Color.blue()
-        )
-        
-        embed.add_field(
-            name="How It Works",
-            value="• Users can give you +1 or -1 rep\n"
-                  "• 24-hour cooldown per user pair\n"
-                  "• Reputation affects shop prices and rewards\n"
-                  "• Climb the leaderboard!",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="Commands",
-            value="```\n"
-                  "L!rep @user - View reputation\n"
-                  "L!rep give @user [reason] - Give +1 rep\n"
-                  "L!rep remove @user [reason] - Give -1 rep\n"
-                  "L!rep leaderboard - Top users\n"
-                  "L!rep history [@user] - Rep history\n"
-                  "```",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="Tiers",
-            value="```\n"
-                  "100+  : 🌟 Legendary\n"
-                  "50+   : ⭐ Excellent\n"
-                  "25+   : 💎 Great\n"
-                  "10+   : ✨ Good\n"
-                  "0 to 9: 👤 Neutral\n"
-                  "-10+  : ⚠️ Questionable\n"
-                  "-25+  : ❌ Bad\n"
-                  "-100+ : ☠️ Notorious\n"
-                  "```",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="Benefits",
-            value="• **High rep**: Cheaper shop prices, better rewards\n"
-                  "• **Low rep**: More expensive prices, worse rewards\n"
-                  "• Max effects: ±20% prices, ±10% rewards",
-            inline=False
-        )
-        
-        await ctx.send(embed=embed)
-
 async def setup(bot):
     await bot.add_cog(Reputation(bot))
