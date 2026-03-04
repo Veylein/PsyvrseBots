@@ -89,7 +89,7 @@ class Trading(commands.Cog):
         trade_id = str(len(self.trade_history) + 1)
         self.trade_history[trade_id] = {
             **trade_data,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': discord.utils.utcnow().isoformat()
         }
         self.save_history()
 
@@ -105,8 +105,8 @@ class Trading(commands.Cog):
             recent.insert(0, trade_summary)
             if len(recent) > 50:
                 recent[:] = recent[:50]
-            user.setdefault("meta", {})["updated_at"] = datetime.utcnow().isoformat() + "Z"
-            user["meta"]["last_active"] = datetime.utcnow().isoformat() + "Z"
+            user.setdefault("meta", {})["updated_at"] = discord.utils.utcnow().isoformat() + "Z"
+            user["meta"]["last_active"] = discord.utils.utcnow().isoformat() + "Z"
             if username:
                 user["username"] = username
             await user_storage.enqueue_user_storage(user_storage.save_user, user)
@@ -517,7 +517,7 @@ class Trading(commands.Cog):
             
             trade_summary = {
                 "trade_id": trade_id,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": discord.utils.utcnow().isoformat() + "Z",
                 "user1_id": trade.user1.id,
                 "user1_name": str(trade.user1),
                 "user1_coins": trade.user1_coins,

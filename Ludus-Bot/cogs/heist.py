@@ -4,7 +4,7 @@ import json
 import os
 import random
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 try:
     from utils.stat_hooks import us_inc as _h_inc, us_mg as _h_mg
@@ -15,6 +15,14 @@ except Exception:
 # ─────────────────────────────────────────────────────────────────────────────
 #  Discord V2 interactive lobby view
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class HeistJoinView(discord.ui.View):
     """Interactive heist lobby with join/launch buttons."""
@@ -231,9 +239,9 @@ class Heist(commands.Cog):
         if not stats["last_heist"]:
             return True, None
         
-        last_heist = datetime.fromisoformat(stats["last_heist"])
+        last_heist = _parse_ts(stats["last_heist"])
         cooldown = timedelta(minutes=30)
-        time_passed = datetime.utcnow() - last_heist
+        time_passed = discord.utils.utcnow() - last_heist
         
         if time_passed < cooldown:
             time_left = cooldown - time_passed
@@ -340,7 +348,7 @@ class Heist(commands.Cog):
             "bet_amount": bet,
             "target": None,
             "target_name": None,
-            "started": datetime.utcnow().isoformat()
+            "started": discord.utils.utcnow().isoformat()
         }
 
         view = HeistJoinView(self, ctx.channel.id, max_crew=6, timeout_secs=60)
@@ -378,8 +386,8 @@ class Heist(commands.Cog):
         
         # Check protection
         if target_businesses["protection"]:
-            protection_expires = datetime.fromisoformat(target_businesses["protection"])
-            if datetime.utcnow() < protection_expires:
+            protection_expires = _parse_ts(target_businesses["protection"])
+            if discord.utils.utcnow() < protection_expires:
                 await ctx.send(f"🛡️ {target.mention}'s businesses are protected!")
                 return
         
@@ -415,7 +423,7 @@ class Heist(commands.Cog):
             "bet_amount": bet,
             "target": target.id,
             "target_name": target.display_name,
-            "started": datetime.utcnow().isoformat()
+            "started": discord.utils.utcnow().isoformat()
         }
 
         view = HeistJoinView(self, ctx.channel.id, max_crew=4, timeout_secs=45)
@@ -468,7 +476,7 @@ class Heist(commands.Cog):
                     stats["total_heists"] += 1
                     stats["successful"] += 1
                     stats["total_stolen"] += reward_per_person
-                    stats["last_heist"] = datetime.utcnow().isoformat()
+                    stats["last_heist"] = discord.utils.utcnow().isoformat()
                     if _h_mg:
                         try:
                             _h_mg(uid, "heist", "win", reward_per_person)
@@ -494,10 +502,10 @@ class Heist(commands.Cog):
                         biz_type = biz_data["type"]
                         level = biz_data["level"]
                         income = business_cog.calculate_income(biz_type, level)
-                        last_collect = datetime.fromisoformat(biz_data["last_collect"])
-                        hours_passed = (datetime.utcnow() - last_collect).total_seconds() / 3600
+                        last_collect = _parse_ts(biz_data["last_collect"])
+                        hours_passed = (discord.utils.utcnow() - last_collect).total_seconds() / 3600
                         total_stolen += int(income * hours_passed)
-                        biz_data["last_collect"] = datetime.utcnow().isoformat()
+                        biz_data["last_collect"] = discord.utils.utcnow().isoformat()
                     business_cog.save_data()
 
                 if total_stolen == 0:
@@ -521,7 +529,7 @@ class Heist(commands.Cog):
                     stats["total_heists"] += 1
                     stats["successful"] += 1
                     stats["total_stolen"] += reward_per_person
-                    stats["last_heist"] = datetime.utcnow().isoformat()
+                    stats["last_heist"] = discord.utils.utcnow().isoformat()
                     if _h_mg:
                         try:
                             _h_mg(uid, "heist", "win", reward_per_person)
@@ -554,7 +562,7 @@ class Heist(commands.Cog):
                 stats["total_heists"] += 1
                 stats["failed"] += 1
                 stats["total_lost"] += heist["crew"][user_id]
-                stats["last_heist"] = datetime.utcnow().isoformat()
+                stats["last_heist"] = discord.utils.utcnow().isoformat()
                 if _h_mg:
                     try:
                         _h_mg(uid, "heist", "loss", 0)

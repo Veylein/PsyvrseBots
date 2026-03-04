@@ -1,10 +1,10 @@
 # FULL DOCUMENTATION - PART 5A: CARD GAMES
 
 **Project:** Ludus Bot  
-**Coverage:** Card Games (Go Fish, Blackjack Fast/Long, Poker Fast/Long, War, Solitaire, Spades, Crazy Eights, Bullshit)  
-**Total Lines:** 5,829 lines of code  
-**Status:** ✅ COMPLETE (Updated with Fast Modes & Custom Decks)  
-**Date:** May 2025
+**Coverage:** Card Games (Go Fish, Blackjack Fast/Long, Poker Texas Hold'em, War, Solitaire, Spades, Crazy Eights, Bullshit)  
+**Total Lines:** 5,856 lines of code  
+**Status:** ✅ COMPLETE (Updated March 2026)  
+**Date:** March 2026
 
 ---
 
@@ -16,10 +16,8 @@
 4. [Blackjack System](#4-blackjack-system)
    - [Blackjack Fast](#blackjack-fast-1v1-dealer)
    - [Blackjack Long](#blackjack-long-multiplayer-lobby)
-   - [Blackjack Simple](#blackjack-simple-dm-based)
 5. [Poker System](#5-poker-system)
-   - [Poker Fast](#poker-fast-5-card-vs-dealer)
-   - [Poker Long](#poker-long-texas-holdem)
+   - [Poker (Texas Hold'em)](#poker-long-texas-holdem)
 6. [War Card Game](#6-war-card-game)
 7. [Enhanced Card Games](#7-enhanced-card-games)
    - [Solitaire](#solitaire)
@@ -36,10 +34,10 @@
 ## 1. CARD GAMES OVERVIEW
 
 **Files:**  
-- `cogs/cardgames.py` (1,098 lines) - Go Fish, War, enhanced game menus
-- `cogs/blackjack.py` (1,944 lines) - Blackjack Fast/Long/Simple with custom decks
-- `cogs/poker.py` (2,787 lines) - Poker Fast/Long with Texas Hold'em
-- `cogs/cards_enhanced.py` (283 lines) - Solitaire, Spades, Crazy Eights, Bullshit
+- `cogs/cardgames.py` (725 lines) - Go Fish, War
+- `cogs/blackjack.py` (2,001 lines) - Blackjack Fast/Long with custom decks
+- `cogs/poker.py` (2,824 lines) - Texas Hold'em lobby
+- `cogs/cards_enhanced.py` (305 lines) - Solitaire, Spades, Crazy Eights, Bullshit
 
 The Card Games system provides both **classic single-player** and **multiplayer card games** with:
 - **Custom visual card decks** (Classic, Dark, Platinum)
@@ -74,10 +72,10 @@ The Card Games system provides both **classic single-player** and **multiplayer 
 
 **Game Types:**
 1. **Blackjack Fast** - 1v1 vs dealer, instant gameplay, custom player deck
-2. **Blackjack Long** - Multiplayer lobby (COOP/PVP), shared deck
-3. **Poker Fast** - 5-card vs dealer, instant gameplay
-4. **Poker Long** - Texas Hold'em multiplayer
-5. **Go Fish** - Multiplayer (vs bot or player), collect sets of 4
+2. **Blackjack Long** - Multiplayer lobby (COOP/PVP), up to 10 players
+3. **Poker (Texas Hold'em)** - Full multiplayer lobby with pre-flop → river betting
+4. **Go Fish** - vs bot, in-channel, PIL hand images, rank-select dropdown
+5. **War** - instant single-card flip comparison, no betting
 6. **War** - Instant comparison game, highest card wins
 7. **Solitaire** - Single-player classic patience game
 8. **Spades** - 4-player team trick-taking game
@@ -415,7 +413,7 @@ L!gofish ask 5
 
 ## 4. BLACKJACK SYSTEM
 
-**File:** `cogs/blackjack.py` (1,944 lines)  
+**File:** `cogs/blackjack.py` (2,001 lines)  
 **Players:** 1-8 (varies by mode)  
 **Goal:** Get closer to 21 than dealer without busting (going over 21)
 
@@ -835,29 +833,9 @@ class BlackjackLobbyView(discord.ui.View):
 
 ---
 
-### Blackjack Simple (DM-Based)
-
-**File:** `cogs/cardgames.py` Lines 432-685  
-**Players:** 1 vs dealer (legacy mode)  
-**Style:** DM-based commands, text-only
-
-**Features:**
-- ✅ Classic blackjack rules
-- ✅ Hands sent via DM
-- ✅ Text-based gameplay (no images)
-- ✅ Prefix commands (L!blackjack)
-- ✅ Simple embed displays
-
-**Commands:**
-```
-L!blackjack start  - Start game
-L!blackjack hit    - Draw card
-L!blackjack stand  - End turn
-L!blackjack hand   - View hand
-L!blackjack stop   - Forfeit game
-```
-
-**Note:** This mode is legacy and lacks modern features (no deck customization, no economy integration, no visual rendering). Use **Fast mode** for enhanced experience.
+> **⚠️ Blackjack Simple (DM-Based) — REMOVED**
+>
+> This mode (`L!blackjack start` / hit / stand via prefix commands, DM-based hands) was removed during the blackjack.py rewrite (now 2,001 lines). Only **Fast** and **Long** modes remain. The legacy `cardgames.py` blackjack handler was also removed — `cardgames.py` is now exclusively **Go Fish** (`/gofish`) and **War** (`L!war`).
 
 ---
 
@@ -925,23 +903,25 @@ def calculate_hand(hand: List[str]) -> int:
 
 ## 5. POKER SYSTEM
 
-**File:** `cogs/poker.py` (2,787 lines)  
-**Players:** 2-10 (varies by mode)  
-**Goal:** Build the best 5-card poker hand
+**File:** `cogs/poker.py` (2,824 lines)  
+**Players:** 2-8  
+**Type:** Texas Hold'em only
 
-The Poker system offers **two distinct gameplay modes**:
-1. **Fast** - Instant 5-card poker vs dealer
-2. **Long** - Texas Hold'em multiplayer tournaments
+Poker is a **dedicated cog** (`poker.py`) implementing full **Texas Hold'em** only. The "Poker Fast" 5-card draw mode was removed when the system was rewritten. Full poker documentation is in **[Part 4A](FULL_DOCUMENTATION_PART4A.md)**.
+
+> **⚠️ Note:** Only one mode remains — Texas Hold'em (previously called "Poker Long"). The "Poker Fast" 5-card vs dealer mode no longer exists.
 
 ---
 
-### Poker Fast (5-Card vs Dealer)
+### ⚠️ Poker Fast (5-Card vs Dealer) — REMOVED
 
-**Lines:** 1304-1570  
-**Players:** 1 vs dealer (bot)  
-**Style:** Simple 5-card draw, instant results
+> This mode (`/poker fast`, `play_fast_poker`) **no longer exists** in the codebase. The `/poker` command now launches a Texas Hold'em lobby directly. The code samples below are preserved for historical reference only.
 
-**Features:**
+**Lines:** 1304-1570 *(historical — removed)*  
+**Players:** 1 vs dealer (bot) *(removed)*  
+**Style:** Simple 5-card draw, instant results *(removed)*
+
+**Features (historical):**
 - ✅ Custom player deck (classic/dark/platinum)
 - ✅ Dealer uses classic deck
 - ✅ Instant hand evaluation
@@ -1141,10 +1121,10 @@ class SameBetPokerView(discord.ui.View):
 
 ---
 
-### Poker Long (Texas Hold'em)
+### Poker Long (Texas Hold'em) — Current Active Mode
 
-**Lines:** 200-1300  
-**Players:** 2-10 (multiplayer)  
+**Lines:** 1-2,824 (entire `poker.py`)  
+**Players:** 2-8 (multiplayer lobby)  
 **Style:** Full Texas Hold'em with community cards
 
 **Features:**
@@ -1713,17 +1693,12 @@ class CardGameSelector(discord.ui.View):
 |---------|-------------|---------|---------|
 | `/cardsmenu` | Choose card game | Varies | Ephemeral |
 | **Blackjack** | | | |
-| `/blackjack fast` | Instant 1v1 vs dealer with custom deck | 1 | Public |
-| `/blackjack long <mode> <buy_in>` | Multiplayer lobby (COOP/PVP) | 2-8 | Public |
-| `L!blackjack start` | Simple DM-based blackjack (legacy) | 1 | DM hands |
+| `/blackjack` | Blackjack (choice: fast/long) | 1-10 | Public |
 | **Poker** | | | |
-| `/poker fast` | Instant 5-card vs dealer | 1 | Public |
-| `/poker long <buy_in>` | Texas Hold'em tournament | 2-10 | Public |
+| `/poker` | Texas Hold'em lobby | 2-8 | Public |
 | **Other Games** | | | |
-| `L!gofish start [@user]` | Start Go Fish | 1-2 | DM hands |
-| `/gofish start` | Start Go Fish (slash) | 1-2 | DM hands |
+| `/gofish` | Go Fish vs bot | 1-2 | DM hands |
 | `L!war [@user]` | Play War round | 1-2 | Public |
-| `/war [@user]` | Play War round (slash) | 1-2 | Public |
 | `/cardshelp` | View all card commands | - | Ephemeral |
 
 ### Blackjack Fast Commands
@@ -1750,16 +1725,7 @@ class CardGameSelector(discord.ui.View):
 | **Kick Player** | Button (Host) | Remove player from lobby |
 | **Game Actions** | Buttons | Same as Fast mode (Hit/Stand/Double/etc) |
 
-### Poker Fast Commands
-
-| Action | Type | Description |
-|--------|------|-------------|
-| **Bet Selection** | Ephemeral Menu | Select deck + enter bet amount |
-| **Instant Deal** | Automatic | Deals 5 cards to player & dealer, evaluates winner |
-| **Same Bet** | Button (End) | Replay with same bet and deck |
-| **⚠️ Gambling Info** | Button | View responsible gambling disclaimer |
-
-### Poker Long Commands
+### Poker Commands
 
 | Action | Type | Description |
 |--------|------|-------------|
@@ -1778,80 +1744,59 @@ class CardGameSelector(discord.ui.View):
 | `L!gofish stop` | End current game |
 | `/gofish` (dropdown) | Use action menu for all Go Fish actions |
 
-### Blackjack Simple Commands (Legacy)
+### Blackjack Simple Commands
 
-| Command | Description |
-|---------|-------------|
-| `L!blackjack hit` | Draw another card |
-| `L!blackjack stand` | End turn, dealer plays |
-| `L!blackjack hand` | View your hand |
-| `L!blackjack stop` | Forfeit game |
-| `/blackjack` (dropdown) | Use action menu for all Blackjack actions |
-
-**Note:** Use **Blackjack Fast** for modern experience with visual rendering and deck customization.
+> **⚠️ REMOVED** — `L!blackjack` prefix commands (start/hit/stand/hand/stop) have been removed. Use `/blackjack` instead.
 
 ---
 
 ## 11. SUMMARY
 
-**Part 5A Coverage:**
-- **10 card games** across 4 files (updated May 2025)
-- **Fully implemented:** Go Fish, Blackjack Fast/Long/Simple, Poker Fast/Long, War, Solitaire
-- **Partially implemented:** Spades, Crazy Eights, Bullshit (recruitment only)
+**Part 5A Coverage (March 2026):**
+- **8 card games** across 4 files
+- **Fully implemented:** Go Fish, Blackjack Fast/Long, Poker Texas Hold'em, War, Solitaire
+- **Partially implemented:** Spades, Crazy Eights, Bullshit (recruitment UI only)
+- **Removed:** Blackjack Simple (DM-based prefix), Poker Fast (5-card vs dealer)
 
 **Major Features:**
 
 **🎨 Visual Card Rendering:**
-- 3 custom deck styles (classic, dark, platinum)
-- 156 PNG card assets (52 cards × 3 decks)
-- Real-time image generation with Pillow
-- Player vs dealer visual separation
+- 3 custom deck styles (classic, dark, platinum) unlocked via `card_box` shop + `/equipdeck`
+- 156 PNG card assets (52 cards × 3 decks) in `assets/cards/{deck}/`
+- Real-time image generation with Pillow — `create_blackjack_image`, `create_blackjack_table_image`; shared visual helpers imported from `poker.py`
+- Player deck vs dealer (always `classic`) separation in Fast mode
 
 **🎮 Game Modes:**
-- **Fast:** Instant 1v1 games with custom decks (Blackjack, Poker)
-- **Long:** Multiplayer lobbies with turn-based gameplay
-- **Simple:** Legacy DM-based games (Go Fish, Blackjack Simple)
+- **Blackjack Fast:** Instant 1v1 vs dealer, `BetSelectView` (ephemeral), hit/stand/double, 2.5× blackjack payout, custom player deck
+- **Blackjack Long:** Multiplayer lobby (`BlackjackLobbyView`), up to 10 players, host-configurable bet/max/mode (COOP or PVP), `BlackjackGame` handles deal → turn → result
+- **Poker (Texas Hold'em):** Dedicated `poker.py` cog, settings lobby, pre-flop → flop → turn → river, `PokerGame` / `PokerGameView` / `PokerActionView` (see Part 4A)
+- **Go Fish:** vs bot, in-channel PIL hand image, rank-select dropdown, auto Go Fish draw, book completion
+- **War:** instant single-card flip comparison, PIL war image via `utils/card_visuals.py`
 
 **💰 Economy Integration:**
-- Betting system with balance checking
-- Standard payouts: 2x win, 2.5x blackjack, 1x push
+- Betting with balance check; standard payouts: 2× win, 2.5× blackjack, 1× push
 - Same Bet button for instant replay
 - Economy file: `data/economy.json`
+- Deck unlock via `card_box` item + `/equipdeck` in `economy.py`
 
 **🛡️ Responsible Gambling:**
-- Always-visible ⚠️ disclaimer button
+- Always-visible ⚠️ disclaimer button (timeout=None)
 - NCPG hotline (1-800-522-4700)
 - Educational content on house edge
-- Persistent buttons (timeout=None)
-
-**🎯 Lobby Systems:**
-- Host controls (start/kick/bot management)
-- Real player count validation
-- Dynamic button state updates
-- Buy-in balance verification
 
 **Technical Highlights:**
+- Dual command system: slash (`/blackjack`, `/poker`, `/gofish`) + prefix (`L!war`)
+- `blackjack.py` imports card rendering helpers directly from `poker.py` (shared PIL constants)
+- View persistence with `timeout=None` for post-game buttons
+- Bot opponent AI in Long mode, auto-play bot turns
+- `_parse_ts` / `calculate_hand_value` utilities shared across modes
 
-**Code Structure:**
-- Dual command system (prefix + slash)
-- Type-safe state management
-- Async/await game loops
-- Error handling for DM failures
-- View persistence with timeout=None
-- Separate player/dealer deck rendering
-
-**State Management:**
-- Active game tracking per player
-- Prevention of multiple simultaneous games
-- Automatic cleanup on game end
-- Bot opponent AI for single-player
-
-**File Statistics:**
-- `cogs/blackjack.py`: **1,944 lines** (Fast/Long/Simple modes)
-- `cogs/poker.py`: **2,787 lines** (Fast/Long Texas Hold'em)
-- `cogs/cardgames.py`: **1,098 lines** (Go Fish, War, game menus)
-- `cogs/cards_enhanced.py`: **283 lines** (Solitaire, Spades, etc)
-- **Total:** **6,112 lines** across 4 files
+**File Statistics (March 2026):**
+- `cogs/blackjack.py`: **2,001 lines** (Fast/Long modes)
+- `cogs/poker.py`: **2,824 lines** (Texas Hold'em lobby)
+- `cogs/cardgames.py`: **725 lines** (Go Fish, War)
+- `cogs/cards_enhanced.py`: **305 lines** (Solitaire, Spades, Crazy Eights, Bullshit)
+- **Total:** **5,856 lines** across 4 files
 
 **Asset Files:**
 - `assets/cards/classic/`: 52 PNG files
@@ -1859,36 +1804,8 @@ class CardGameSelector(discord.ui.View):
 - `assets/cards/platinum/`: 52 PNG files
 - **Total:** **156 card images**
 
-**Recent Updates (May 2025):**
-- ✅ Custom deck system (3 visual styles)
-- ✅ Blackjack Fast mode with image rendering
-- ✅ Poker Fast mode with instant evaluation
-- ✅ Same Bet button for quick replay
-- ✅ Gambling disclaimer system
-- ✅ Persistent buttons (never expire)
-- ✅ Separate player/dealer deck rendering
-- ✅ Lobby system improvements
-- ✅ Non-ephemeral gameplay
-- ✅ Proper casino payouts (2x/2.5x)
-
-**Next Steps:**
-- Implement card deck packs (themed sets)
-- Add player statistics tracking
-- Leaderboards for Fast mode wins
-- Tournament brackets for Long mode
-- More poker variants (Omaha, 7-Card Stud)
-- Card animation effects
-- Sound effects for cards/wins
-
 ---
 
 **Documentation Complete** ✅  
-For implementation details, see individual game sections above.
-- **Total:** 1,014 lines of code
-- **Documentation:** ~8,000 words
-
-**Integration Points:**
-- Profile system (game stats tracking)
-- Economy system (future: betting on games)
-- Leaderboards (game wins/losses)
+For blackjack/poker implementation details see individual game sections above; for poker Texas Hold'em full flow see **[Part 4A](FULL_DOCUMENTATION_PART4A.md)**.
 

@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord.ui import View, Button
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import random
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,6 +18,14 @@ try:
     from utils.stat_hooks import us_inc as _farm_inc
 except Exception:
     _farm_inc = None
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class FarmingManager:
     """Manages farming system with crops, harvesting, and seasons"""
@@ -213,7 +221,7 @@ class FarmingManager:
     
     def get_current_season(self):
         """Get current season based on month"""
-        month = datetime.utcnow().month
+        month = discord.utils.utcnow().month
         if month in [3, 4, 5]:
             return "spring"
         elif month in [6, 7, 8]:
@@ -263,8 +271,8 @@ class FarmingManager:
         # Plant the crop
         farm["crops_planted"][str(plot_id)] = {
             "crop_id": crop_id,
-            "planted_at": datetime.utcnow().isoformat(),
-            "ready_at": (datetime.utcnow() + timedelta(minutes=crop["grow_time"])).isoformat()
+            "planted_at": discord.utils.utcnow().isoformat(),
+            "ready_at": (discord.utils.utcnow() + timedelta(minutes=crop["grow_time"])).isoformat()
         }
 
         # Consume one seed
@@ -281,10 +289,10 @@ class FarmingManager:
             return False, "Nothing planted there!", None
         
         plant_data = farm["crops_planted"][str(plot_id)]
-        ready_time = datetime.fromisoformat(plant_data["ready_at"])
+        ready_time = _parse_ts(plant_data["ready_at"])
         
-        if datetime.utcnow() < ready_time:
-            time_left = ready_time - datetime.utcnow()
+        if discord.utils.utcnow() < ready_time:
+            time_left = ready_time - discord.utils.utcnow()
             minutes = int(time_left.total_seconds() / 60)
             return False, f"Not ready yet! {minutes} minutes remaining.", None
         
@@ -338,14 +346,14 @@ class FarmingManager:
             if str(i) in farm["crops_planted"]:
                 plant_data = farm["crops_planted"][str(i)]
                 crop = self.crops[plant_data["crop_id"]]
-                ready_time = datetime.fromisoformat(plant_data["ready_at"])
+                ready_time = _parse_ts(plant_data["ready_at"])
                 
-                if datetime.utcnow() >= ready_time:
+                if discord.utils.utcnow() >= ready_time:
                     status = "ready"
                     time_info = "Ready to harvest!"
                 else:
                     status = "growing"
-                    time_left = ready_time - datetime.utcnow()
+                    time_left = ready_time - discord.utils.utcnow()
                     minutes = int(time_left.total_seconds() / 60)
                     time_info = f"{minutes}m remaining"
                 

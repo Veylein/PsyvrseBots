@@ -5,11 +5,19 @@ import aiohttp
 import random
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from discord import app_commands
 from discord.ui import View, Button
 from cogs.minigames import PaginatedHelpView
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class Fun(commands.Cog):
     """Fun and random commands!"""
@@ -429,11 +437,11 @@ class Fun(commands.Cog):
         # ── Card of the Day ─────────────────────────────────────────────────
         elif choice == "daily":
             uid    = str(interaction.user.id)
-            now    = datetime.utcnow()
+            now    = discord.utils.utcnow()
             record = self._tarot_daily.get(uid)
 
             if record:
-                last = datetime.fromisoformat(record["last"])
+                last = _parse_ts(record["last"])
                 diff = now - last
                 if diff < timedelta(hours=24):
                     remaining  = timedelta(hours=24) - diff

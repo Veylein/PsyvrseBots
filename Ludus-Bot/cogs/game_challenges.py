@@ -68,7 +68,7 @@ class GameChallenges(commands.Cog):
         """Generate default challenge structure"""
         return {
             "daily": {
-                "date": datetime.now().strftime("%Y-%m-%d"),
+                "date": discord.utils.utcnow().strftime("%Y-%m-%d"),
                 "challenges": random.sample(self.all_challenges["daily"], 3),
                 "completed": {}
             },
@@ -81,11 +81,11 @@ class GameChallenges(commands.Cog):
     
     def _get_week_number(self):
         """Get current week number"""
-        return datetime.now().isocalendar()[1]
+        return discord.utils.utcnow().isocalendar()[1]
     
     def _check_and_reset_challenges(self):
         """Check if challenges need to be reset"""
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = discord.utils.utcnow().strftime("%Y-%m-%d")
         current_week = self._get_week_number()
 
         # Reset daily challenges
@@ -544,7 +544,7 @@ class GameChallenges(commands.Cog):
             self.personal_bests[user_id][game_name] = {
                 'score': score,
                 'time': time,
-                'date': datetime.now().strftime("%Y-%m-%d")
+                'date': discord.utils.utcnow().strftime("%Y-%m-%d")
             }
             self._save_data(self.personal_bests_file, self.personal_bests)
             return True  # New record!
@@ -580,7 +580,7 @@ class GameChallenges(commands.Cog):
             self.streaks[user_id]["combo"] = 1.0
         
         self.streaks[user_id]["games_today"] += 1
-        self.streaks[user_id]["last_game"] = datetime.now().isoformat()
+        self.streaks[user_id]["last_game"] = discord.utils.utcnow().isoformat()
         self._save_data(self.streaks_file, self.streaks)
         
         return self.streaks[user_id]["combo"]

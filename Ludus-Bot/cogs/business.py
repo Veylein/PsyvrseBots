@@ -4,10 +4,18 @@ from discord.ui import View, Button, Select, Modal, TextInput
 import json
 import os
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class BusinessManager:
     """Manages user businesses, NPC shops, and cross-server marketplace"""
@@ -119,7 +127,7 @@ class BusinessManager:
             "name": name,
             "description": description,
             "owner_id": user_id,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": discord.utils.utcnow().isoformat(),
             "inventory": {},  # item_id: {name, price, quantity, emoji}
             "employees": {},
             "sales": 0,
@@ -138,7 +146,7 @@ class BusinessManager:
             return False, "Owner has no business"
 
         shipments = business.get('incoming_shipments', [])
-        deliver_at = (datetime.utcnow() + timedelta(minutes=eta_minutes)).isoformat()
+        deliver_at = (discord.utils.utcnow() + timedelta(minutes=eta_minutes)).isoformat()
         shipments.append({
             'from': str(from_user),
             'item': item_data,
@@ -229,7 +237,7 @@ class BusinessManager:
         employees = business.get('employees', {})
         if worker_id not in employees:
             return False
-        employees[worker_id]['last_shift'] = datetime.utcnow().isoformat()
+        employees[worker_id]['last_shift'] = discord.utils.utcnow().isoformat()
         business['revenue'] = business.get('revenue', 0) - amount
         self.save_businesses()
         return True
@@ -951,7 +959,7 @@ class Business(commands.Cog):
         worker_id = str(ctx.author.id)
         owner_id = str(owner.id)
         employees = business.get('employees', {})
-        now = datetime.utcnow()
+        now = discord.utils.utcnow()
 
         if worker_id not in employees:
             # Join as employee
@@ -964,7 +972,7 @@ class Business(commands.Cog):
         last = employees[worker_id].get('last_shift')
         if last:
             try:
-                last_dt = datetime.fromisoformat(last)
+                last_dt = _parse_ts(last)
                 secs = (now - last_dt).total_seconds()
                 if secs < 3600:
                     await ctx.send(f"⏳ You recently worked. Try again in {int((3600-secs)/60)}m")
@@ -1204,13 +1212,13 @@ class Business(commands.Cog):
     async def process_shipments_task(self):
         """Background task to process due shipments."""
         try:
-            now = datetime.utcnow()
+            now = discord.utils.utcnow()
             changed = False
             for owner_id, business in list(self.manager.get_all_businesses().items()):
                 shipments = business.get('incoming_shipments', [])
                 for shipment in list(shipments):
                     try:
-                        deliver_at = datetime.fromisoformat(shipment['deliver_at'])
+                        deliver_at = _parse_ts(shipment['deliver_at'])
                     except Exception:
                         continue
                     if deliver_at <= now:

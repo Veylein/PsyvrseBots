@@ -91,30 +91,24 @@ class Help(commands.Cog):
                     ("/arcade bombdefuse", "Cut the right wire!"),
                 ]
             },
-            "🎣 Fishing+": {
-                "key": "fishing",
-                "desc": "Enhanced fishing empire",
-                "commands": [
-                    (f"fish", "Cast your line and go fishing!"),
-                    (f"/fish cast", "Cast your line with advanced options"),
-                    (f"/fish inventory", "View your catches and equipment"),
-                    (f"/fish shop", "Buy rods, bait, and boats"),
-                    (f"/fish craft", "Craft special items"),
-                    (f"/fish areas", "Explore fishing locations"),
-                    (f"/fish encyclopedia", "View all available fish"),
-                    (f"/fish stats", "Check your fishing statistics"),
-                ]
-            },
-            "🚜 Farm & Sims": {
+            "🚜🎣⛏️ Simulators": {
                 "key": "sims",
-                "desc": "Farming and simulations",
+                "desc": "Farming, fishing, mining",
                 "commands": [
                     ("/farm view", "Check your farm"),
                     ("/farm plant <crop>", "Plant crops"),
                     ("/farm harvest", "Harvest ready crops"),
                     ("/farm sell", "Sell your harvest"),
                     ("/icecream", "Build custom sundae"),
-                    ("/akinator start", "Mind-reading game"),
+                    ("fish", "Cast your line and go fishing!"),
+                    ("/fish cast", "Cast your line with advanced options"),
+                    ("/fish inventory", "View your catches and equipment"),
+                    ("/fish shop", "Buy rods, bait, and boats"),
+                    ("/fish craft", "Craft special items"),
+                    ("/fish areas", "Explore fishing locations"),
+                    ("/fish encyclopedia", "View all available fish"),
+                    ("/fish stats", "Check your fishing statistics"),
+                    ("/mine", "Launch mining game and dig for ores!"),
                 ]
             },
             "🧡 Social": {
@@ -130,18 +124,40 @@ class Help(commands.Cog):
                     ("compliment @user", "Compliment someone nicely"),
                     ("pray @user", "Pray for someone (+coins blessing)"),
                     ("curse @user", "Curse someone (may backfire!)"),
+                    ("marry @user", "Propose marriage to someone (10000 coins)"),
+                    ("spouse [@user]", "View marriage info (spouse, days married, love points, shared bank"),
+                    ("bank @user", "View your shared bank with your spouse"),
+                    ("couplequests", "View couple quests you can do with your spouse"),
+                    ("divorce", "End your marriage (5000 coins)"),
+                    ("rep @user", "View reputation (tier, score, +/- breakdown, recent history, effects)"),
+                    ("rep give @user [reason]", "Give reputation to someone (1 rep per 24 hours)"),
+                    ("rep remove @user [reason]", "Give negative reputation to someone (1 rep per 24 hours)"),
+                    ("rep history [@user]", "View reputation history for a user")
+
                 ]
             },
             "🌍 Global Events": {
                 "key": "events",
-                "desc": "Server vs Server competitions (Owner starts)",
+                "desc": "Cross-server events — Owner starts, everyone joins",
                 "commands": [
-                    ("event war <hours>", "Server faction war"),
-                    ("joinfaction <name>", "Join faction"),
-                    ("warleaderboard", "War standings"),
-                    ("pet play", "Play with pet"),
-                    ("pet walk", "Walk your pet"),
-                    ("pet rename <name>", "Rename pet"),
+                    ("— WAR EVENT —", "Faction-based server competition"),
+                    ("event war [hours]", "🔴 Start a global faction war (Owner only, default 24h)"),
+                    ("joinfaction <iron/ash/void/sky>", "Join a faction: ⚔️ Iron Legion · 🔥 Ashborn · 🌑 Voidwalkers · 🌬️ Skybound"),
+                    ("warleaderboard", "View live faction standings & member/server counts"),
+                    ("— WORLD BOSS —", "Cross-server raid on a giant boss"),
+                    ("event worldboss [boss]", "🔴 Spawn a world boss (Owner only)  •  bosses: void_titan · storm_king · shadow_lord · chaos_beast"),
+                    ("attack", "⚔️ Attack the active World Boss (30s cooldown) — or click the Attack button"),
+                    ("bossstats", "View boss HP bar, top damage servers & total attacker count"),
+                    ("— TARGET HUNT —", "Speed challenges broadcast to all servers"),
+                    ("event hunt [minutes]", "🔴 Start a global scavenger hunt (Owner only, default 30min)"),
+                    ("— ADMIN —", "Owner-only management commands (🔴 = owner only)"),
+                    ("event list", "🔴 List all currently active global events"),
+                    ("event end <type>", "🔴 Force-end an event (war / worldboss / hunt / chaos)"),
+                    ("— REWARDS —", "Coins awarded at event end"),
+                    ("war victory", "🏆 10 000 coins for winning faction members"),
+                    ("worldboss participation", "5 000 coins base + bonus per damage dealt"),
+                    ("worldboss top 10", "Up to +10 000 coins extra for top damage dealers"),
+                    ("worldboss last hit", "15 000 coin bonus for the killing blow"),
                 ]
             },
             "📜 Quests": {
@@ -196,7 +212,6 @@ class Help(commands.Cog):
                 "key": "utility",
                 "desc": "Helpful tools",
                 "commands": [
-                    ("guide [category]", "This help menu"),
                     ("about", "Full bot guide (DM)"),
                     ("setup", "Bot setup guide"),
                     ("ping", "Check bot latency"),
@@ -214,6 +229,7 @@ class Help(commands.Cog):
                     ("/starboard <emoji> <channel> <amt>", "Setup starboard"),
                     ("serverconfig", "Configuration menu"),
                     ("purge <amount>", "Delete messages"),
+                    ("confession", "Setup anonymous confession channel"),
                 ]
             },
         }
@@ -304,6 +320,7 @@ class Help(commands.Cog):
                        "Select a category to view detailed commands:\n"
                        "Usage: `L!help <category>` or `/help <category>`\n\n"
                        "**Quick Start:**\n"
+                       "• `L!tutorial` - Start the tutorial\n"
                        "• `L!daily` - Claim daily reward\n"
                        "• `L!balance` - Check coins\n"
                        "• `L!slots 100` - Try your luck!",
@@ -415,6 +432,14 @@ class Help(commands.Cog):
         
         # Add commands
         for cmd, desc in category_data['commands']:
+            # Section header rows: name starts with — (separator / category header)
+            if cmd.startswith('—'):
+                embed.add_field(
+                    name=f"▸ {cmd.strip('— ').strip()}",
+                    value=desc if desc else "\u200b",
+                    inline=False
+                )
+                continue
             # Format command with proper prefix
             if cmd.startswith('/'):
                 cmd_display = cmd
@@ -423,7 +448,7 @@ class Help(commands.Cog):
             
             embed.add_field(
                 name=cmd_display,
-                value=desc,
+                value=desc if desc else "\u200b",
                 inline=False
             )
         

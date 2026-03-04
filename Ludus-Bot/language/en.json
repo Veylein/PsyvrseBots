@@ -14,6 +14,7 @@
       "business":     "🏪 Business",
       "social":       "❤️ Social & Marriage",
       "achievements": "🏆 Achievements",
+      "wizardwars":   "🧙 Wizard Wars",
       "profile":      "📊 Profile & Stats",
       "quickstart":   "🚀 Quick Start"
     },
@@ -28,6 +29,7 @@
       "business":     "Create your cross-server shop",
       "social":       "Guilds, pets, marriage, reputation",
       "achievements": "200+ goals to unlock",
+      "wizardwars":   "Spell-based MMO strategy",
       "profile":      "Track your progress",
       "quickstart":   "Get started now!"
     },
@@ -315,9 +317,24 @@
             "inline": true
           },
           {
-            "name": "⭐ Reputation",
-            "value": "`L!reputation` — Check your rep score\n`L!rep @user` — Give reputation\nHigh rep → bonus drops & perks!",
+            "name": "⭐ Reputation System",
+            "value": "Give `+1` or `-1` rep to other users (24h cooldown per pair).\nRep affects prices and rewards across the whole bot!",
+            "inline": false
+          },
+          {
+            "name": "📊 Tiers",
+            "value": "🌟 Legendary `100+` · ⭐ Excellent `50+` · 💎 Great `25+`\n✨ Good `10+` · 👤 Neutral · ⚠️ Questionable `-10`\n❌ Bad `-25` · ☠️ Notorious `-100`",
             "inline": true
+          },
+          {
+            "name": "💡 Effects",
+            "value": "**High rep**: up to -20% shop prices, +10% rewards\n**Low rep**: up to +20% prices, -10% rewards\n`/leaderboard` → Server & Global Reputation",
+            "inline": true
+          },
+          {
+            "name": "💬 Rep Commands",
+            "value": "`L!rep @user` — View score\n`L!rep give @user [reason]` — Give +1\n`L!rep remove @user [reason]` — Give -1\n`L!rep history [@user]` — Recent events",
+            "inline": false
           },
           {
             "name": "🤗 Social Actions (Slash)",
@@ -374,6 +391,44 @@
           }
         ],
         "footer": "Pro Tip: Every action auto-tracks — achievements unlock without doing anything special!"
+      },
+      "wizardwars": {
+        "title": "🧙 Wizard Wars — Spell-Based MMO",
+        "color": "PURPLE",
+        "description": "**Build your wizard. Master spells. Conquer territories.**\n\nWizard Wars is a full MMO-lite system inside Ludus. Use `/ww` or `/wizardwars` to get started.",
+        "fields": [
+          {
+            "name": "🧙 Getting Started",
+            "value": "`/ww create` — Create your wizard\n`/ww profile` — View your stats, rank & gold\n`/ww spellbook` — See all your spells\n\nNew wizards start with **3 starter spells** and rank **Apprentice**.",
+            "inline": false
+          },
+          {
+            "name": "💰 Spell Shop",
+            "value": "`/ww shop` — Opens the interactive spell shop\n\nSpells grouped by school:\n🌊 **Elemental** — Fire, Water, Thunder, Ice, Wind, Earth\n🌌 **Cosmic** — Gravity, Space, Time\n☠️ **Forbidden** — Blood, Shadow, Curse\n✨ **Divine** — Light, Holy\n\nPrices = Power × 100 Gold",
+            "inline": true
+          },
+          {
+            "name": "⚔️ Combat & Dueling",
+            "value": "`/ww duel` — Fight an AI wizard\nChoose **2 equipped spells** each turn\nLand **Spell Combos** for bonus damage\n\nWin → earn Gold + XP\nLose → lose a little Gold",
+            "inline": true
+          },
+          {
+            "name": "🔮 Spell Combos",
+            "value": "Use 2 spells together for devastating effects:\n🔥+💨 Flame Burst + Gale Twist → **Inferno Cyclone** (×12)\n❄️+⚡ Frost Nova + Lightning Strike → **Glacial Shock** (×11)\n🌑+🩸 Shadow Veil + Blood Drain → **Vampiric Shadow** (×10)\n🌀+⚫ Gravity Well + Black Hole → **Singularity** (×15)\n⭐ 6 combos total — discover them all!",
+            "inline": false
+          },
+          {
+            "name": "🏰 Guilds & Territories",
+            "value": "`/ww guild` — Join or create a wizard guild\n`/ww territories` — View & conquer territories\n\n12 territories including Crystal Peaks, Void Nexus & Arcane Citadel\nGuild members share territory bonuses!",
+            "inline": true
+          },
+          {
+            "name": "📊 Ranks & Progression",
+            "value": "Apprentice → Mage → Sorcerer → Archmage\n\nGain XP by winning duels\nLevel up = more spell slots + bonus stats\n`/ww leaderboard` — Top wizards server-wide",
+            "inline": true
+          }
+        ],
+        "footer": "Pro Tip: Equip your strongest combo spells before a duel — Singularity (×15) is the most powerful!"
       },
       "profile": {
         "title": "📊 Profile & Stats Guide",

@@ -9,24 +9,42 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
 import copy
 
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
+
 class ProfileManager:
     """Manages comprehensive user profiles tracking ALL activities"""
 
     def __init__(self, data_dir):
+        # --- PERMISSION CHECK ---
+        # If we can't write to the provided directory, fallback to local 'data'
+        if not os.access(data_dir, os.W_OK):
+            print(f"⚠️ Warning: {data_dir} is not writable. Falling back to local storage.")
+            data_dir = os.path.join(os.getcwd(), "data")
+            os.makedirs(data_dir, exist_ok=True)
+        # -------------------------
+
         self.data_dir = data_dir
         self.profiles_file = os.path.join(data_dir, "profiles.json")
         self.fishing_data_file = os.path.join(data_dir, "fishing_data.json")
         self.gambling_stats_file = os.path.join(data_dir, "gambling_stats.json")
-        self.farming_profile_file = os.path.join(data_dir, "profiles.json")  # farming uses same file
-        # Load user profile template for default profile structure
+        self.farming_profile_file = os.path.join(data_dir, "profiles.json")
+
+        # Template loading (This is usually fine as it's read-only)
         template_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "profile_template.json")
         try:
             with open(template_path, 'r') as f:
                 self._template = json.load(f)
         except Exception:
             self._template = {}
+
         self.profiles = self.load_profiles()
-    
+        
     def load_profiles(self):
         """Load profiles from JSON"""
         if os.path.exists(self.profiles_file):
@@ -279,7 +297,7 @@ class ProfileManager:
             profile.setdefault('fishing_stats', {'fish_caught': 0, 'rare_fish': 0, 'legendary_fish': 0, 'biggest_fish': 0})
             profile.setdefault('farming_stats', {'crops_planted': 0, 'crops_harvested': 0, 'level': 1})
         # Always stamp created_at for brand-new profiles
-        profile['created_at'] = datetime.utcnow().isoformat()
+        profile['created_at'] = discord.utils.utcnow().isoformat()
         return profile
 
     def _create_default_profile_legacy(self):
@@ -774,7 +792,7 @@ class ProfileView(discord.ui.LayoutView):
         if raw_ts:
             try:
                 from datetime import datetime, timezone
-                dt = datetime.fromisoformat(raw_ts.replace('Z', '+00:00'))
+                dt = _parse_ts(raw_ts.replace('Z', '+00:00'))
                 last_active = dt.strftime('%Y-%m-%d %H:%M UTC')
             except Exception:
                 last_active = raw_ts[:16]

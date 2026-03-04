@@ -12,12 +12,16 @@ class ServerConfig(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        self.config_file = "data/server_configs.json"
+        _data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        if not os.access(_data_dir, os.W_OK):
+            _data_dir = os.path.join(os.getcwd(), "data")
+        os.makedirs(_data_dir, exist_ok=True)
+        self.config_file = os.path.join(_data_dir, "server_configs.json")
         self.configs = self._load_configs()
 
     def _load_configs(self):
         """Load server configurations"""
-        os.makedirs("data", exist_ok=True)
+        os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
         try:
             with open(self.config_file, 'r') as f:
                 return json.load(f)
@@ -40,7 +44,6 @@ class ServerConfig(commands.Cog):
                 "mod_roles": [],
                 "log_channel": None,
                 "rate_limit_enabled": True,
-                "nsfw_filter": True,
                 "shared_mining_world": False,
                 "mining_map_reset": True
             }
@@ -67,6 +70,12 @@ class ServerConfig(commands.Cog):
         if fishing_cog:
             guild_config = fishing_cog.get_guild_config(ctx.guild.id)
             tournament_channel = guild_config.get("tournament_channel")
+
+        # Get global leaderboard consent status
+        lb_cog = self.bot.get_cog("Leaderboard")
+        lb_consent = False
+        if lb_cog:
+            lb_consent = lb_cog._consented(ctx.guild.id)
         
         embed = EmbedBuilder.create(
             title=f"{Emojis.TOOLS} Server Configuration",
@@ -81,7 +90,7 @@ class ServerConfig(commands.Cog):
                 f"**Welcome DM:** {'✅ Enabled' if config['welcome_dm'] else '❌ Disabled'}\n"
                 f"**Personality Reactions:** {'✅ Enabled' if config['personality_reactions'] else '❌ Disabled'}\n"
                 f"**Rate Limiting:** {'✅ Enabled' if config['rate_limit_enabled'] else '❌ Disabled'}\n"
-                f"**NSFW Filter:** {'✅ Enabled' if config['nsfw_filter'] else '❌ Disabled'}\n"
+                f"**🌍 Global Leaderboard:** {'✅ Visible' if lb_consent else '❌ Hidden'}\n"
                 f"**⛏️ Shared Mining World:** {'✅ Enabled' if config.get('shared_mining_world', False) else '❌ Disabled'}\n"
                 f"**⛏️ Mining Map Reset:** {'✅ Enabled' if config.get('mining_map_reset', True) else '❌ Disabled'}\n"
                 f"**Disabled Commands:** {len(config['disabled_commands'])} commands\n"
@@ -96,6 +105,7 @@ class ServerConfig(commands.Cog):
             value="`L!toggle welcomedm` - Toggle welcome DMs\n"
                   "`L!toggle personality` - Toggle bot reactions\n"
                   "`L!toggle ratelimit` - Toggle spam protection\n"
+                  "`L!lbconsent on/off` - Toggle global leaderboard visibility\n"
                   "`L!toggle sharedmining` - Toggle shared mining world\n"
                   "`L!toggle miningreset` - Toggle mining map reset (12h)\n"
                   "`L!disablecmd <command>` - Disable a command\n"
@@ -171,13 +181,12 @@ class ServerConfig(commands.Cog):
             "welcomedm": "welcome_dm",
             "personality": "personality_reactions",
             "ratelimit": "rate_limit_enabled",
-            "nsfw": "nsfw_filter",
             "sharedmining": "shared_mining_world",
             "miningreset": "mining_map_reset"
         }
         
         if setting not in setting_map:
-            await ctx.send(f"❌ Unknown setting! Options: `welcomedm`, `personality`, `ratelimit`, `nsfw`, `sharedmining`, `miningreset`")
+            await ctx.send(f"❌ Unknown setting! Options: `welcomedm`, `personality`, `ratelimit`, `sharedmining`, `miningreset`")
             return
         
         key = setting_map[setting]

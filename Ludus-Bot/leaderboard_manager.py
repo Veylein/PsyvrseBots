@@ -4,8 +4,11 @@ from typing import Dict, List, Tuple
 
 class LeaderboardManager:
     def __init__(self, filename: str = "leaderboard_stats.json"):
-        # Use persistent directory if available
+        # Use persistent directory if available, fallback to ./data if not writable
         data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        if not os.access(data_dir, os.W_OK):
+            data_dir = os.path.join(os.getcwd(), "data")
+        os.makedirs(data_dir, exist_ok=True)
         self.filename = os.path.join(data_dir, filename)
         print(f"[LeaderboardManager] Loading stats from: {self.filename}")
         self.stats = self.load_stats()

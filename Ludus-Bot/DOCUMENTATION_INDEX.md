@@ -2,7 +2,7 @@
 
 > **COMPLETE ENGLISH DOCUMENTATION** for the entire Ludus Discord Bot project  
 > 50,000+ lines of code | 90+ Python files | 600+ commands | 450+ games  
-> **Parts 1-7 Complete** ✅ | ~58,500 words documented
+> **Parts 1-15 + Utils Reference Complete** ✅ | ~145,000+ words documented
 
 ---
 
@@ -11,23 +11,24 @@
 This documentation is divided into comprehensive parts for easier navigation:
 
 #### **[📘 PART 1: Core Architecture](/documentation/FULL_DOCUMENTATION_PART1.md)**
-Complete analysis of bot.py (475 lines):
-- Bot initialization & configuration
-- Event system (on_ready, on_command, on_interaction)
-- Cog loading mechanism
-- Command synchronization (global + dev guild)
+Complete analysis of bot.py (315 lines):
+- Bot initialization & configuration (`BotCommandTree` subclass)
+- `activity_worker` — async batch-saves to user_activity.json
+- `setup_hook` — loads UNO emojis, all cogs, starts storage worker
+- Simplified `on_ready` (global command sync only)
 - Blacklist system
 - Server configuration loader
 - Error handling
 - **Line-by-line code walkthrough**
 
 #### **[💰 PART 2: Economy System](/documentation/FULL_DOCUMENTATION_PART2.md)** 
-Complete analysis of economy.py (918 lines):
+Complete analysis of economy.py (1,206 lines):
 - PsyCoin currency system
-- Shop & inventory management
+- Shop & inventory management (incl. `card_box`, `card_decks`)
 - Daily rewards with streak bonuses
 - Boost system (double_coins, xp_boost, luck_charm)
-- Currency conversion (WW Gold, Farm Tokens, etc.)
+- Currency conversion: `/convert` — FishCoins, MineCoins, FarmCoins ↔ PsyCoins
+- `/currencies` display command; `/equipdeck` for cosmetic card decks
 - Leaderboards & rankings
 - Atomic write system & data persistence
 - All 15+ commands documented
@@ -38,7 +39,7 @@ Complete analysis of economy.py (918 lines):
 ### Game Systems
 
 #### **[🎣 PART 3: Simulation Games](documentation/FULL_DOCUMENTATION_PART3.md)**
-Complete analysis of fishing.py, mining.py, farming.py, zoo.py (7,499 lines total):
+Complete analysis of fishing.py, mining.py, farming.py, zoo.py (8,298 lines total):
 - **Fishing System (3,472 lines - LARGEST FILE):**
   - 8 interactive UI view classes
   - 50+ fish species across 6 rarity tiers
@@ -49,11 +50,14 @@ Complete analysis of fishing.py, mining.py, farming.py, zoo.py (7,499 lines tota
   - Weather & time multipliers
   - Crafting system
   - 8-page in-game help system
-- **Mining Adventure (3,254 lines - 2D MINECRAFT-STYLE):**
+- **Mining Adventure (4,053 lines - 2D MINECRAFT-STYLE):**
   - Procedural world generation (seed-based, 100x150 world)
   - Real-time PNG rendering (PIL, 352x320px viewport)
   - 6 biomes with depth progression (Surface → Abyss)
-  - 25+ block types (ores, terrain, structures)
+  - 25+ block types; `BLOCK_REQUIREMENTS` (min pickaxe level per block)
+  - `ORE_STATES` system: cracked (50% yield) / irradiated (energy penalty)
+  - `CREATURE_TYPES` — 7 underground creatures (zombie, skeleton, spider, creeper, enderman, mole, worm) each with stats, drops, and behavior
+  - 12 mining achievements (`MINING_ACHIEVEMENTS`) with coin/XP rewards
   - Energy system (1 per 30 seconds)
   - Shop upgrades (pickaxe, backpack, energy)
   - Item placement (ladders, torches, portals)
@@ -70,9 +74,11 @@ Complete analysis of fishing.py, mining.py, farming.py, zoo.py (7,499 lines tota
 
 
 #### **[🎰 PART 4A: Gambling & Arcade Games](documentation/FULL_DOCUMENTATION_PART4A.md)** 
-Complete analysis of gambling.py, arcadegames.py, game_challenges.py (2,600 lines total):
-- **Gambling System (1,671 lines):**
-  - 8 casino games (slots, poker, roulette, higher/lower, dice, crash, mines, coinflip)
+Complete analysis of gambling.py (1,404 lines) + blackjack.py (2,001 lines) + poker.py (2,824 lines) + arcadegames.py + game_challenges.py:
+- **Gambling System (1,404 lines):**
+  - 7 casino games in gambling.py (slots, roulette, higher/lower, dice, crash, mines, coinflip)
+  - **Blackjack — dedicated `blackjack.py` cog (2,001 lines):** two modes — **Fast** (instant solo vs dealer, hit/stand/double, 2.5× blackjack payout, custom card deck) and **Long** (multiplayer lobby, 1-10 players, COOP or PVP mode); imports visual helpers from `poker.py`
+  - **Poker — dedicated `poker.py` cog (2,824 lines):** full Texas Hold'em, 2-8 players, `PokerGame`/`PokerGameView`/`PokerActionView`, settings lobby, custom card deck support
   - Comprehensive statistics tracking (per-user, per-game)
   - Win/loss ratios, biggest wins, net profit
   - Responsible gaming disclaimer system
@@ -96,8 +102,8 @@ Complete analysis of gambling.py, arcadegames.py, game_challenges.py (2,600 line
 - **~20,000 words of documentation**
 
 #### **[🏴‍☠️ PART 4B: Lottery & Heist Systems](documentation/FULL_DOCUMENTATION_PART4B.md)** 
-Complete analysis of lottery.py, heist.py (815 lines total):
-- **Lottery System (313 lines):**
+Complete analysis of lottery.py, heist.py (945 lines total):
+- **Lottery System (324 lines):**
   - Daily automated drawings at midnight UTC
   - Sequential ticket numbering (100 coins each, 1-100 max)
   - Growing jackpot system (50% of sales + 5k if no tickets)
@@ -105,13 +111,14 @@ Complete analysis of lottery.py, heist.py (815 lines total):
   - History tracking (last 10 winners)
   - Fair probability (more tickets = higher chance)
   - Major coin sink (50% of sales removed)
-- **Heist System (502 lines):**
+- **Heist System (621 lines):**
   - Bank heists (2-6 players, 10k-50k reward)
   - Business heists (2-4 players, steal pending income)
+  - `HeistJoinView` interactive lobby — join / launch / cancel buttons
+  - Auto-launch when crew full; leader can launch early; timeout fires heist
   - Success rates scale with crew (40%-90%)
   - Equal bet requirement (1k-10k bank, 500-5k business)
   - 30-minute cooldown per player
-  - Recruitment timers (60s bank, 45s business)
   - Statistics tracking (wins, losses, profit, success rate)
   - Business protection system integration
 - **~12,000 words of documentation**
@@ -191,12 +198,12 @@ Complete analysis of mafia.py, multiplayer_games.py, dueling.py, monopoly.py (4,
   - Bilingual support (PL/EN)
   - 26/26 features complete
 - **Other Multiplayer Systems:**
-  - Secret Hitler, Spyfall, Resistance
+  - clue, murder mystery
   - PvP dueling system
   - Monopoly board game (1,000 lines)
 - **~15,000 words of documentation**
 
-#### **[🎮 PART 7: Minigames System](documentation/FULL_DOCUMENTATION_PART7.md)** ⭐ **NEW**
+#### **[🎮 PART 7: Minigames System](documentation/FULL_DOCUMENTATION_PART7.md)**
 Complete analysis of minigames.py (1,070 lines):
 - **300+ Interactive Mini-Games:**
   - 50 base games (coinflip, roll, guess_number, rps, memory, reaction_time, typing_race, hangman, unscramble, quick_math, trivia, etc.)
@@ -235,18 +242,209 @@ Complete analysis of minigames.py (1,070 lines):
 
 ---
 
-- **PART 8: RPG Systems** (D&D, Wizard Wars, Quests)
+#### **[⚔️ PART 8: RPG Systems](documentation/FULL_DOCUMENTATION_PART8.md)**
+Complete analysis of dnd.py, dnd_gate1_fantasy.py, wizardwars.py, quests.py (~13,386 lines total — **LARGEST PART BY FAR**):
+- **Infinity Adventure (dnd.py — 2,229 lines + dnd_gate1_fantasy.py — 9,902 lines):**
+  - Bilingual RPG (EN/PL) — 80+ UI strings in `TRANSLATIONS` dict, `t(lang, key, **kwargs)` helper
+  - `PlayerData` class — cosmic stats (influence, deaths, worlds_changed), dimension states, NPC relationships, artefacts (survive death)
+  - `CurrentCharacter` class — name + class + combat stats (HP/mana/stamina) + D&D attributes (STR/INT/CHR/LCK)
+  - `InfinityView` — `discord.ui.LayoutView` state machine (7 states: language → mode → tutorial → cape → char_creation → story → death)
+  - 9 gate dimensions with unique themes, rulers, and class lists (Fantasy, Steampunk, Dieselpunk, Cyberpunk, Post-Apocalypse, Sci-Fi, Space Opera, Surreal, Cosmic Horror)
+  - Party mode: multi-user sessions, turn-based action system, join-lobby UI
+  - Save/Load: `data/saves/infinity_adventure.json` (keyed by user_id)
+  - **Gate 1 Fantasy (9,902 lines — LARGEST FILE IN PROJECT):** `Gate1WorldState` (4 faction HP bars, 25+ quest flags, NPC alive/dead), 50+ branching scenes, `get_gate1_scene()` engine, 5 entry points, full consequence system
+  - Anti-cheat death tracking
+- **Wizard Wars (wizardwars.py — 855 lines):**
+  - 32 spells across 4 schools (Elemental 14 / Cosmic 6 / Forbidden 6 / Divine 6)
+  - 14 spell types with distinct effects (damage, shield, heal, freeze, lifesteal, execute, revive…)
+  - 6 spell combos (e.g. Gravity Well + Black Hole = Singularity, power 15)
+  - 12 territories for guild conquest
+  - `ShopView` — dropdown preview + buy button; auto-refreshes after purchase; shows remaining unowned spells
+  - AI duel: random AI wizard ±1 level, 20-turn combat loop, XP + Gold rewards, TCG card drop on win
+  - Gold economy separate from PsyCoins (spells cost `power × 100` Gold)
+  - `/wizardwars` + `/ww` (alias) slash commands, 10 action choices each
+- **Quests & Achievements (quests.py — ~400 lines):**
+  - 5 daily quest types (random assigned, 24h reset via `@tasks.loop(hours=24)`)
+  - 10 permanent achievements (first_win → millionaire, 50–500 coin rewards)
+  - `update_quest_progress(user_id, quest_type, amount)` — API for other cogs to report events
+  - TCG card reward on quest completion AND achievement unlock (via DM)
+  - Progress bar renderer (`_create_progress_bar` — `█░` blocks)
+  - `L!quests` / `L!achievements [member]` / `/questshelp` (PaginatedHelpView)
+- **~15,000 words of documentation**
 
 ### Social & Utility Systems
-- **PART 9: Social Features** (Pets, Marriage, Reputation, Profiles)
-- **PART 10: Server Management** (Starboard, Counting, Confessions, Events)
-- **PART 11: Utility Commands** (Help, Info, Utilities)
+
+#### **[🐾 PART 9: Social Features](documentation/FULL_DOCUMENTATION_PART9.md)**
+Complete analysis of pets.py, marriage.py, reputation.py, profile.py, social.py, trading.py (5,102 lines total):
+- **Pets System (pets.py — 741 lines):**
+  - 16 pets across 5 rarities (Common 55% / Uncommon 28% / Rare 12% / Epic 4% / Legendary 1%)
+  - Weighted random adoption — first pet FREE, subsequent 10,000 PsyCoins
+  - **14 perk types:** `gambling_mult`, `gambling_loss_red`, `gambling_jackpot`, `fishing_mult`, `fishing_rare`, `fishing_value`, `mining_speed`, `mining_rare`, `mining_xp`, `farm_yield`, `farm_auto_tend`, `coins_mult`, `daily_bonus`, `xp_mult`
+  - `PetDashboardView` — Components V2 LayoutView with feed/play/walk/release buttons
+  - Auto-disables buttons when stats at limits (hunger ≥ 90, energy < 20)
+  - Farm damage system: hungry pets (<40 hunger) may trample/burn/eat/dig crops
+  - Full inter-cog API: provides multipliers to fishing, mining, farming, gambling, economy, daily
+  - `/pet` slash command
+- **Marriage System (marriage.py — 456 lines):**
+  - Proposal system with 5-minute timeout and 10,000-coin cost
+  - Shared bank (deposit/withdraw, mirrored on both spouses)
+  - Couple quests: 4 quests (5k–10k rewards + love points)
+  - Divorce: 5,000 coins, shared bank lost
+  - Commands: `L!marry`, `L!divorce`, `L!spouse`, `L!bank`, `L!couplequests`
+- **Reputation System (reputation.py — 396 lines):**
+  - 8 tiers: 👤 Neutral → 🌟 Legendary /// ⚠️ Questionable → ☠️ Notorious
+  - 24h cooldown per user pair (in-memory, resets on restart)
+  - Shop price modifier ±20%, reward modifier ±10%
+  - History tracking, leaderboard, tier explanations
+- **Profile System (profile.py — 911 lines):**
+  - `ProfileManager` — aggregates stats from 5 files: profiles.json + users/{id}.json + economy.json + fishing_data.json + gambling_stats.json
+  - `ProfileView` — Components V2 LayoutView, 4 pages: **Overview** (level, energy, pet, top activities) / **Gaming** (W/L/D for 10+ games) / **Economy** (balances, gambling ROI, business) / **Social** (pet care, events, last active)
+  - Card deck selector embedded in profile (equip cosmetic decks)
+  - 60+ tracked stats across gambling, minigames, board games, cards, TCG, fishing, farming, pets, social, quests, events, business, combat, music
+  - `L!profile` / `/profile` / `L!energy`
+- **Social System (social.py — 998 lines):**
+  - 59 roasts + 54 compliments with coin rewards and achievement hooks
+  - Would You Rather: community-sourced questions, 10-coin play reward, 25-coin contribute reward
+  - Story Maker: `on_message` listener, per-word 5-coin reward on story end
+  - GIF reaction commands via nekos.best API: `/hug`, `/kiss`, `/slap`, `/petpet` (some-random-api), `/ship`
+  - `/ship` — deterministic `(id1+id2) % 101` score, 6 tiers, animated GIF
+  - `L!pray` (+10–50 coins blessing), `L!curse` (10% backfire), `L!avatar`
+- **Trading System (trading.py — 1,289 lines):**
+  - P2P `TradeSession` with add/remove/confirm/cancel flow
+  - Confirmation resets on any offer change (bait-and-switch prevention)
+  - Pre-flight validation before execution
+  - `L!sell` — 85–90% value for shop items, crops, wizard spells, pets (pets require confirmation)
+  - Anonymous gift system via DM: coins, items, crops, spells
+  - Block/unblock system; gift enable/disable settings
+  - `L!admire` and `L!encourage` — anonymous DM messages
+  - Trade history logged to `data/trade_history.json` + `data/users/{id}.json`
+- **~11,500 words of documentation**
+
+#### **[🛡️ PART 10: Server Management](documentation/FULL_DOCUMENTATION_PART10.md)**
+Complete analysis of starboard.py, counting.py, confessions.py, globalevents.py (~1,700 lines total):
+- **Starboard System (starboard.py — 449 lines):**
+  - Up to 5 independent starboards per server (each tracks a different emoji)
+  - Configurable reaction threshold, self-star prevention, per-emoji channel
+  - Visual scaling: color `gold → orange → red` and icon `✨ → ⭐ → 🌟` based on popularity ratio
+  - Rich embeds: image relay, attachment links, reply context, jump-to-message
+  - `/starboard create/edit/remove/list` slash group + `L!starboard` prefix group
+  - Uses raw reaction events so old (uncached) messages are handled correctly
+  - In-place editing of existing posts; posts removed when reactions drop below threshold
+- **Counting Game (counting.py — ~350 lines):**
+  - Designated counting channel per guild; non-numeric messages deleted silently
+  - Anti-consecutive rule: same user can't count twice in a row
+  - PsyCoins: 2 coins per 4 counts + milestone bonuses (25→1000 counts: 10–500 coins)
+  - Milestone roles auto-created: `Counter 25`, `Counter 50`, …, `Counter 25000`
+  - Delete detection: bot announces when a user deletes their counted number
+  - Leaderboard integration: `counting_peak` tracked via `leaderboard_manager`
+- **Confessions System (confessions.py — ~230 lines):**
+  - Users type in confession channel; bot deletes original and reposts anonymously
+  - Sequential numbering: `🔒 CONFESSION #X`
+  - Admin log channel records username, user ID, avatar, and full message content
+  - Commands pass-through guard (L!, /, ! prefixes skip the confession flow)
+  - Atomic `save_config()` with `.tmp` + `os.replace()` pattern
+- **Global Events (globalevents.py — 675 lines):**
+  - Owner-only event launcher; broadcasts to all guilds simultaneously
+  - **WAR Event:** 4 factions (Iron Legion, Ashborn, Voidwalkers, Skybound); users join with `L!joinfaction`; winning faction earns 10,000 coins each; `add_war_points()` API for other cogs
+  - **World Boss:** 4 bosses (50M–100M HP); button + prefix attack; 30s per-user cooldown; enrage at 75% HP lost (×1.5 dmg); top 10 + last-hit bonuses; `L!bossstats` for live HP
+  - **Target Hunt:** Background task fires challenges every 1–3 minutes across all servers
+  - **Chaos Festival:** Stub (planned for future update)
+  - Economy integration: `add_coins()` for all reward payouts; BotLogger integration for spawn/end events
+- **~8,500 words of documentation**
+
+#### **[📚 PART 11: Utility & Help Systems](documentation/FULL_DOCUMENTATION_PART11.md)**
+Complete analysis of help.py, help_system.py, about.py, utilities.py, serverinfo.py (~1,325 lines total):
+- **Help System (help.py — 466 lines):**
+  - 16 manually curated categories + 1 owner-only category (17 total)
+  - `CategorySelect` dropdown — `discord.ui.Select` with key-based values, shown on main help page
+  - Fuzzy category matching: exact key, substring, normalized text
+  - `FakeCtx` bridge: wraps slash `Interaction` so prefix-based `owner_help` can be called from `/help owner`
+  - Section-header rows: entries starting with `—` render as `▸ SECTION HEADER` dividers
+  - Both `L!help [category]` and `/help [category]` fully supported
+  - `CategoryView` timeout: 60 seconds
+- **Help Framework (help_system.py — ~115 lines):**
+  - `HelpView` — reusable paginator (Prev/Next, modulo wrap, 120s timeout) used by `minigames.py`
+  - `CAT_LIST` — 14-entry `(name, emoji)` list drives `/help_cat main` autocomplete
+  - `/help_cat main [category]` with `@autocomplete` for the category parameter
+  - Delegation bridge: `help_prefix()` hands off to `Help._send_category_help()` when richer cog is loaded
+  - Setup guard prevents double-registration on cog reload
+- **About Guide (about.py — 258 lines):**
+  - 9 curated pages covering every major system (Economy, Gambling, Simulators, Board/Card Games, RPG, Global Events, Pets/Social, Tips)
+  - `AboutView` — requester-only checks, Prev/Next/Close buttons, auto-disables at start/end
+  - DM delivery: `_send_dm()` opens DM channel, sends paginator, replies ephemeral in server
+  - `discord.Forbidden` handler tells user to enable DMs
+  - `L!about` + `/about`; both slash and prefix supported
+- **Utilities (utilities.py — ~220 lines):**
+  - `Paginator` view — requester-only ◀️/▶️/❌ pagination with author check
+  - `check_reminders` background task (60s loop) — delivers DM reminder embeds, `_parse_ts()` for tz-safe comparison
+  - `L!ping` — WebSocket heartbeat latency in ms
+  - `L!setup` — multi-section quick-start guide embed (6 fields: Quick Start / Economy / Games / Simulators / Events / Admin)
+  - `L!say` — echo command restricted to 3 hardcoded user IDs (`ALLOWED_SAY_USER_ID`)
+  - `L!feedback` — posts to hardcoded channel, omits user ID for privacy
+- **Server & User Info (serverinfo.py — 267 lines):**
+  - `BADGE_MAP` — 11 Discord badges mapped from `public_flags` attribute names to `(emoji, label)` pairs
+  - `VERIFICATION_LABELS` / `STATUS_ICONS` — display maps for guild security levels and presence status
+  - `_build_serverinfo_embed()` — members (humans/bots/online/total), channels, boosts, security, guild features (up to 8 with emoji, `+N more`)
+  - `_build_userinfo_embed()` — account created/joined dates, status+activity type detection (Spotify/Game/Streaming/Custom), badges, roles (sorted by position, cap 20), **Ludus Stats** from direct JSON reads (`economy.json` + `profiles.json` — no cog dependency)
+  - Commands: `L!serverinfo` (aliases: server, si), `L!userinfo` (aliases: ui, whois, memberinfo), `/serverinfo`, `/userinfo [member]`; all `@guild_only()`
+- **~7,500 words of documentation**
 
 ### Technical Reference
-- **PART 12: Admin & Owner Commands**
-- **PART 13: Data Structures** (JSON files, data schemas)
-- **PART 14: Integration Guide** (How cogs interact)
-- **PART 15: Deployment** (Docker, Render.com, setup)
+#### **[🔐 PART 12: Admin & Owner Commands](documentation/FULL_DOCUMENTATION_PART12.md)** — 4 cogs: `owner.py`, `blacklist.py`, `gamecontrol.py`, `bot_logger.py`
+  - `owner.py` (1784 lines): Custom Role Manager subsystem (CUSTOM_ROLES_FILE, `load/save_custom_roles`, `apply_custom_roles_to_database` via `sys.modules`, `CustomRoleManagerView` 3-button UI, 2-step creation modal with 65+ valid powers, default faction emojis)
+  - Economy management: `L!godmode` (max 999M coins + all items × 99), `L!setcoins`, `L!addcoins`, `L!removecoins`, `L!resetcoins`, `L!giveitem`
+  - Bot status: `L!status` (playing/watching/listening/competing), `L!presence`, `L!nickname`
+  - Server management: `L!serverlist` (paginated, with invite URLs), `L!restart` (os.execv graceful), `L!leave`, `L!purge`, `L!announce`, `L!dm`, `L!countset`, `L!stats` (7-section analytics), `L!update`
+  - Fishing management: `L!fishing_tournament`, `L!give_fish/bait/rod/boat`, `L!unlock_area`
+  - Fun/chaos: `L!raincoins`, `L!chaos` (100–10k random + 30% item), `L!spinlottery`, `L!spawn` (30s raid boss), `L!cursed` (Zalgo text), `L!hack` (animated), `L!roastme`, `L!vibecheck`
+  - TCG: `L!give_tc`, `L!remove_tc` (legacy TCG cog → psyvrse_tcg fallback)
+  - Debug: `L!eval`, `L!reload`, `L!reloadall`, `L!ownertest`; help: `L!ownerhelp` (`👑` / `owner` / `helpowner`)
+  - `blacklist.py`: BLACKLIST_FILE via RENDER_DISK_PATH, atomic `_load()`/`_save()`, `_build_overview_embed()`, `BlacklistView` (5 buttons), `_InputModal` (4 actions: ban/unban user/server), enforcement via `on_command` + `on_interaction` listeners (fresh read per check)
+  - `gamecontrol.py`: `L!stop` / `/stop` — checks 6 in-memory dicts across 4 cogs (CardGames, FishingAkinatorFun, MiniGames, BoardGames); dict deletion as complete cleanup
+  - `bot_logger.py` (512 lines): `StreamInterceptor(io.TextIOBase)` mirrors stdout/stderr to Discord console channel; `BotLogger` with `log(title, desc, color, fields)` base method; 20+ error type mappings in `on_command_error`; helpers: `log_owner_command`, `log_admin_command`, `log_event_spawn/end`, `log_moderation`, `log_economy` (threshold 1000 coins); lifecycle: `on_ready`, `on_guild_join` (creates invite), `on_guild_remove`, shard events; global `sys.excepthook` patch via `cog_load/unload`
+  - **~12,000 words of documentation**
+#### **[📦 PART 13: Data Structures](documentation/FULL_DOCUMENTATION_PART13.md)** — 25+ JSON files fully documented with field-level schemas, types, defaults, and cross-file relationships
+
+#### **[🛠️ UTILS REFERENCE: Shared Library](documentation/FULL_DOCUMENTATION_UTILS.md)** — Complete reference for all 6 files in `utils/` (~1,922 lines)
+  - **`user_storage.py`** (421 lines): Per-user JSON files at `data/users/{user_id}.json`; full async API (`get_user`, `touch_user`, `record_activity`, `record_minigame_result`, `increment_stat`, `set_stat`, `record_game_state`); per-user `threading.Lock`; `_atomic_write` (.tmp → `os.replace`); backwards-compat stubs (`load_user`, `save_user`, etc.); auto back-fills new template keys
+  - **`stat_hooks.py`** (145 lines): Fire-and-forget stat wrappers safe to call from sync code — `us_touch`, `us_inc`, `us_mg`, `us_set`; `us_set_bot` registers bot instance; `us_challenge` notifies `GameChallenges` cog with 10 event type strings (`game_win`, `coin_earn`, `trivia_correct`, `board_game_win`, etc.); silently drops calls if no running event loop
+  - **`database.py`** (270 lines): Opt-in SQLite singleton (`DatabaseManager`) — `RENDER_DISK_PATH`-aware path; 4 tables (`users`, `stats`, `activity`, `game_states`); methods: `initialize_schema`, `upsert_user`, `update_stat`, `increment_stat`, `log_activity`, `save_game_state`, `get_user_data`; errors logged not re-raised; `get_user_data` returns dict mirroring `user_storage` format
+  - **`embed_styles.py`** (380 lines): `Colors` (25+ hex constants + tier colours), `Emojis` (40+ named emoji), `EmbedBuilder` static factory — typed shortcuts: `success`, `error`, `warning`, `info`, `economy`, `game`, `leveling`, `music`; `leaderboard` (medals + top-10), `profile`, `progress_bar`, `format_number`, `tier_color`; module-level quick-access functions
+  - **`performance.py`** (~60 lines): `ConfigCache` with 5-minute TTL; methods `get`, `invalidate`, `clear`; global `config_cache` singleton; caches parsed dict (not mtime-based)
+  - **`card_visuals.py`** (646 lines): PIL card renderer; assets at `assets/cards/{deck}/{rank}_{suit}.png` (Polish filenames); `CARD_IMAGE_CACHE` dict; low-level: `get_font`, `parse_card`, `draw_card`, `draw_card_string`; high-level renderers returning `discord.File`: `create_hand_image`, `create_table_image`, `create_comparison_image`, `create_blackjack_image`, `create_war_image`, `create_poker_table_image` (full Hold'em table with player boxes, status colours, pot display)
+  - **~12,000 words of documentation**
+#### **[🔗 PART 14: Integration Guide](documentation/FULL_DOCUMENTATION_PART14.md)** — How all cogs connect: bot.py startup, inter-cog communication, shared state, and data-flow
+  - `bot.py` (316 lines): startup sequence (`setup_hook` → `load_cogs` → slash sync), shared bot-level state (`bot.data_dir`, `bot.owner_ids`, `bot.active_games/lobbies/minigames/pending_rematches`), `BotCommandTree.interaction_check` (ServerConfig gate for all slash commands), `activity_worker` (BATCH_SIZE=50, BATCH_INTERVAL=2s batch-saves to `user_activity.json`)
+  - `get_cog()` pattern: per-call lookup (never cached at `__init__`), graceful degradation on `None`, fallback chains (e.g. TCG cog → psyvrse_tcg module)
+  - **Economy as central hub**: `add_coins`, `remove_coins`, `add_item`, `remove_item`, `get_balance`, `economy_data`, `shop_items`, `save_economy()` — called by 20+ cogs; sole authoritative source for PsyCoin balances
+  - **Profile as display layer**: per-user metadata written by gambling/reputation/farming/marriage; read by serverinfo via direct JSON bypass (no cog dependency)
+  - **BotLogger as passive observer**: `on_command_error` + `on_application_command_error` + `on_error` listeners catch all cog errors; active calls from globalevents + owner only
+  - **ServerConfig as permission gate**: `BotCommandTree` checks `disabled_commands[]` per-guild before every slash command; mining/farming read per-guild channel config
+  - **Blacklist as access gate**: fresh `_load()` on every `on_command` + `on_interaction`; gates all prefix and slash commands centrally
+  - **GameControl as cleanup**: reaches 6 in-memory dicts across 4 cogs via `get_cog()`; dict deletion = complete cleanup
+  - **GlobalEvents → Economy flow**: defeat_worldboss (tiers: 15k/7.5k/2.5k coins), war victory (10k/2k), hunt rewards; all via `add_coins(user_id, amount, source)`
+  - **Achievements**: triggered by boardgames + social; purely reactive (Achievements cog owns grant logic + deduplication)
+  - **GameStats**: recorded by chess_checkers + boardgames at every game conclusion path
+  - **GlobalLeaderboard**: calculated on-demand from Economy + LeaderboardManager + GlobalEvents + MiniGames; opt-in consent required
+  - **Farming ↔ FarmShop**: FarmShop bridges Farming inventory + Economy payments; neither maintains own coin state
+  - **Mafia custom roles bridge**: `apply_custom_roles_to_database()` uses `sys.modules['cogs.mafia']` to inject into module-level `ROLES_DATABASE` directly
+  - **utils/**: `user_storage` (per-user JSON, touched on every message), `database.py` (SQLite singleton, opt-in), `stat_hooks` (fire-and-forget recording), `card_visuals` (PIL card rendering for blackjack/poker), `embed_styles` (themed embed factory), `performance` (FileCache with mtime validation)
+  - Data file sharing risks: `serverinfo.py` direct reads of `economy.json` + `profiles.json` may lag behind cog in-memory state; `custom_roles.json` injected out-of-band via `sys.modules`
+  - Complete 18-section cross-cog dependency map
+  - **~14,000 words of documentation**
+#### **[🚀 PART 15: Deployment](documentation/FULL_DOCUMENTATION_PART15.md)** — All deployment methods, configuration, persistence, and operational procedures
+  - Prerequisites: Python 3.11, FFmpeg (system), 12 Python packages (`discord.py ≥2.6.4`, `yt-dlp`, `PyNaCl`, `aiohttp`, `python-dotenv`, `Pillow`, `aiofiles`, `chess`, `googletrans`, `fuzzywuzzy`, `python-Levenshtein`, `psycopg2-binary`)
+  - `config.json`: `prefix`, `owner_ids[]`, `emojiServerId[]`; `.env`: `LUDUS_TOKEN` (required), `RENDER_DISK_PATH` (optional)
+  - Local dev: `python start.py` or `python bot.py`; `start.py` validates token then subprocess-launches `bot.py`; data → `./data/`
+  - Docker: `python:3.11-slim` + FFmpeg install + `pip install --no-cache-dir`; `CMD ["python", "bot.py"]`; volume mount + `RENDER_DISK_PATH=/data` for persistence; docker-compose example
+  - Render.com: `render.yaml` (`type: web`, `region: oregon`, `plan: free`, `buildCommand` installs pip + ffmpeg, `startCommand: python bot.py`); set `LUDUS_TOKEN` manually in dashboard; attach persistent disk at `/var/data` → `RENDER_DISK_PATH` auto-set
+  - `start.sh`: pre-initializes 10 critical JSON files as `{}` before launching `bot.py`; use as `startCommand: bash start.sh` alternative
+  - Data persistence: 20 files must persist (economy, inventory, profiles, fishing, mining, pets, farms, gambling_stats, leaderboard_stats, quests, achievements, blacklist, confession_config, server_configs, custom_roles, stories, lottery, counting, starboard, global_consent); atomic write pattern via `.tmp` + `os.replace()`
+  - Discord setup: Message Content Intent (privileged, required), Server Members Intent (privileged, required), Presence Intent (optional); OAuth2 scope: `bot applications.commands`; 4 emoji server IDs for UNO/TCG asset hosting
+  - Full startup sequence diagram (process launch → `setup_hook` → cog loading → `on_ready` → slash sync)
+  - Operations: `L!reload <cog>` / `L!reloadall` for hot-reload; `L!restart` uses `os.execv` → `os._exit(0)` fallback; `migrate_users.py` for schema migrations; backup procedures for Render disk / Docker volumes
+  - Troubleshooting: offline bot, slash commands not appearing, cog load failures, data not persisting, Opus missing, fuzzywuzzy warnings
+  - **~12,000 words of documentation**
 
 ---
 
@@ -258,7 +456,7 @@ Complete analysis of minigames.py (1,070 lines):
 Ludus-Bot/ (50,000+ lines total)
 │
 ├── 📄 Core Files (4 files, ~1,500 lines)
-│   ├── bot.py (475 lines) - Main bot entry point
+│   ├── bot.py (315 lines) - Main bot entry point
 │   ├── start.py (50 lines) - Production launcher  
 │   ├── constants.py (100 lines) - Global constants
 │   └── config.json - Bot configuration
@@ -266,7 +464,7 @@ Ludus-Bot/ (50,000+ lines total)
 ├── 🎯 Cogs/ (70+ files, 45,000+ lines)
 │   │
 │   ├── 💰 Economy & Core (8 files, ~5,000 lines)
-│   │   ├── economy.py (918 lines) - Currency system
+│   │   ├── economy.py (1,206 lines) - Currency system
 │   │   ├── achievements.py (600 lines) - Achievement tracking
 │   │   ├── daily_rewards.py (400 lines) - Daily claims
 │   │   ├── profile.py (600 lines) - User profiles
@@ -278,17 +476,19 @@ Ludus-Bot/ (50,000+ lines total)
 │   ├── 🎣 Simulation Games (5 files, ~10,000 lines)
 │   │   ├── fishing.py (3472 lines) - **BIGGEST FILE**
 │   │   ├── farming.py (1200 lines) - Farm simulator
-│   │   ├── mining.py (3249 lines) - **2nd BIGGEST**
+│   │   ├── mining.py (4,053 lines) - **2nd BIGGEST**
 │   │   ├── zoo.py (800 lines) - Animal collection
 │   │   └── farmshop.py (300 lines) - Farming marketplace
 │   │
-│   ├── 🎰 Gambling & Casino (3 files, ~3,000 lines)
-│   │   ├── gambling.py (1200 lines) - Blackjack, Slots, Roulette
-│   │   ├── lottery.py (400 lines) - Lottery system
-│   │   └── heist.py (700 lines) - Bank heist co-op
+│   ├── 🎰 Gambling & Casino (5 files, ~7,200 lines)
+│   │   ├── gambling.py (1,404 lines) - Slots, Roulette, Higher/Lower, Dice, Crash, Mines, Coinflip
+│   │   ├── blackjack.py (2,001 lines) - Blackjack: Fast mode (solo) + Long mode (multiplayer lobby)
+│   │   ├── poker.py (2,824 lines) - Texas Hold'em full implementation
+│   │   ├── lottery.py (324 lines) - Lottery system
+│   │   └── heist.py (621 lines) - Bank heist co-op
 │   │
 │   ├── 🎮 Card & Board Games (6 files, ~5,000 lines)
-│   │   ├── cardgames.py (900 lines) - Poker, Blackjack
+│   │   ├── cardgames.py (900 lines) - Go Fish, War, Blackjack (classic prefix commands)
 │   │   ├── cards_enhanced.py (600 lines) - Advanced cards
 │   │   ├── boardgames.py (1000 lines) - Chess, Checkers
 │   │   ├── boardgames_enhanced.py (800 lines) - Advanced boards
@@ -320,13 +520,14 @@ Ludus-Bot/ (50,000+ lines total)
 │   │   ├── wizardwars.py (800 lines) - Wizard dueling RPG
 │   │   └── guilds.py (400 lines) - Guild/clan system
 │   │
-│   ├── 🐾 Social & Collection (6 files, ~3,000 lines)
-│   │   ├── pets.py (800 lines) - Pet ownership system
-│   │   ├── marriage.py (400 lines) - Marriage feature
-│   │   ├── social.py (500 lines) - Social interactions
-│   │   ├── actions.py (400 lines) - Action commands
-│   │   ├── trading.py (500 lines) - Player trading
-│   │   └── psyvrse_tcg.py (600 lines) - Trading card game
+│   ├── 🐾 Social & Collection (7 files, ~5,100 lines)
+│   │   ├── pets.py (741 lines) - 16 pets, 14 perk types, inter-cog multiplier API
+│   │   ├── profile.py (911 lines) - 4-page Components V2 profile, 60+ stats
+│   │   ├── trading.py (1,289 lines) - P2P trades, gifts, sell, block system
+│   │   ├── social.py (998 lines) - Roasts, WYR, story maker, GIF reactions
+│   │   ├── marriage.py (456 lines) - Proposals, shared bank, couple quests
+│   │   ├── reputation.py (396 lines) - Rep tiers, price/reward modifiers
+│   │   └── psyvrse_tcg.py (~600 lines) - Trading card game
 │   │
 │   ├── 🔧 Utility & Fun (8 files, ~3,000 lines)
 │   │   ├── funcommands.py (600 lines) - Fun commands
@@ -368,10 +569,13 @@ Ludus-Bot/ (50,000+ lines total)
 │       ├── perimeter_explicit.py (300 lines) - Explicit content
 │       └── professional_info.py (300 lines) - Professional data
 │
-├── 📦 Utils/ (3 files, ~500 lines)
-│   ├── embed_styles.py (200 lines) - Consistent embeds
-│   ├── user_storage.py (150 lines) - User data storage
-│   └── performance.py (150 lines) - Performance monitoring
+├── 📦 Utils/ (6 files, ~1,922 lines)
+│   ├── user_storage.py (421 lines) - Per-user JSON storage (async + thread-safe)
+│   ├── database.py     (270 lines) - SQLite singleton (opt-in alternative backend)
+│   ├── embed_styles.py (380 lines) - Colors / Emojis / EmbedBuilder factory
+│   ├── card_visuals.py (646 lines) - PIL card game image renderer
+│   ├── stat_hooks.py   (145 lines) - Fire-and-forget stat recording helpers
+│   └── performance.py  ( ~60 lines) - 5-minute JSON config cache
 │
 ├── 💾 Data/ (20+ JSON files)
 │   ├── economy.json - User balances
@@ -880,7 +1084,7 @@ This project is proprietary. All rights reserved.
 
 **This documentation is a living document and will be updated as the project evolves.**
 
-Last Updated: 06.02.2026
-Total Documentation Size: 58,500+ words across 7 completed parts (Parts 1-7)
-Documentation Status: ✅ Parts 1-7 Complete | 🚧 Parts 8-15 Planned
+Last Updated: 04.03.2026
+Total Documentation Size: 145,000+ words across 15 parts + Utils Reference
+Documentation Status: ✅ All 15 Parts + Utils Reference Complete
 The documentation was written by wilczek80.

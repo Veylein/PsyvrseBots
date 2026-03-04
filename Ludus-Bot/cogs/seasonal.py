@@ -46,7 +46,7 @@ class Seasonal(commands.Cog):
     
     def get_current_month(self):
         """Get current month for seasonal content"""
-        return datetime.now().month
+        return discord.utils.utcnow().month
     
     @app_commands.command(name="seasonal", description="Seasonal event - Currently: Thanksgiving Dinner!")
     async def seasonal_slash(self, interaction: discord.Interaction):

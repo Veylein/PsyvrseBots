@@ -537,13 +537,12 @@ class CurrentCharacter:
 
 # ==================== SAVE/LOAD SYSTEM ====================
 
-SAVE_DIR = "./data/saves"
+SAVE_DIR = os.path.join(os.getenv("RENDER_DISK_PATH", "data"), "saves")
 SAVE_FILE = os.path.join(SAVE_DIR, "infinity_adventure.json")
 
 def ensure_save_dir():
     """Create saves directory if it doesn't exist"""
-    if not os.path.exists(SAVE_DIR):
-        os.makedirs(SAVE_DIR)
+    os.makedirs(SAVE_DIR, exist_ok=True)
 
 def save_player(player: PlayerData) -> bool:
     """Save player data to disk"""

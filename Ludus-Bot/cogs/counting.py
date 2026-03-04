@@ -4,11 +4,17 @@ from discord import app_commands
 import json
 import os
 from typing import Optional
+from leaderboard_manager import leaderboard_manager
 
 class Counting(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.file_path = "data/counting.json"
+        _data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        if not os.access(_data_dir, os.W_OK):
+            _data_dir = os.path.join(os.getcwd(), "data")
+        os.makedirs(_data_dir, exist_ok=True)
+        self.data_dir = _data_dir
+        self.file_path = os.path.join(_data_dir, "counting.json")
         self.load_data()
 
         # Milestone rewards: count -> PsyCoins bonus
@@ -35,7 +41,7 @@ class Counting(commands.Cog):
     
     def load_user_counts(self):
         """Load user count tracking for rewards"""
-        counts_file = "data/counting_user_counts.json"
+        counts_file = os.path.join(self.data_dir, "counting_user_counts.json")
         if os.path.exists(counts_file):
             with open(counts_file, "r") as f:
                 return json.load(f)
@@ -43,7 +49,7 @@ class Counting(commands.Cog):
     
     def save_user_counts(self):
         """Save user count tracking"""
-        counts_file = "data/counting_user_counts.json"
+        counts_file = os.path.join(self.data_dir, "counting_user_counts.json")
         with open(counts_file, "w") as f:
             json.dump(self.user_counts, f, indent=4)
 
@@ -61,6 +67,9 @@ class Counting(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
+            return
+
+        if not message.guild:
             return
 
         guild_id = str(message.guild.id)
@@ -100,6 +109,9 @@ class Counting(commands.Cog):
         server_data["current_count"] = number
         server_data["last_user"] = message.author.id
         self.save_data()
+
+        # Update global server peak for leaderboard
+        leaderboard_manager.update_peak(message.guild.id, "counting_peak", number, server_name=message.guild.name)
 
         self.message_numbers[message.id] = {
             "number": number,

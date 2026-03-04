@@ -384,7 +384,7 @@ class PetDashboardView(discord.ui.LayoutView):
             "hunger":      50,
             "happiness":   50,
             "energy":      50,
-            "adopted":     str(datetime.now()),
+            "adopted":     str(discord.utils.utcnow()),
             "behavior":    tmpl["behavior"],
             "farm_impact": tmpl["farm_impact"],
         }

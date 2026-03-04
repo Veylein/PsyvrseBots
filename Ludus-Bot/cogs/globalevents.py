@@ -5,10 +5,18 @@ import json
 import os
 import asyncio
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 # ─── V2 Attack Button ────────────────────────────────────────────────────────
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class AttackView(discord.ui.View):
     """Persistent ⚔️ Attack button shown while world boss is alive."""
@@ -29,10 +37,10 @@ class AttackView(discord.ui.View):
 
         # Per-user cooldown (30 s)
         user_id = str(interaction.user.id)
-        now = datetime.utcnow()
+        now = discord.utils.utcnow()
         last = boss_data.get("cooldowns", {}).get(user_id)
         if last:
-            diff = (now - datetime.fromisoformat(last)).total_seconds()
+            diff = (now - _parse_ts(last)).total_seconds()
             if diff < 30:
                 remaining = int(30 - diff)
                 await interaction.response.send_message(
@@ -158,7 +166,7 @@ class GlobalEvents(commands.Cog):
             
             embed = discord.Embed(title="🌐 Active Global Events", color=discord.Color.gold())
             for evt_type, evt_data in self.active_events.items():
-                end_time = datetime.fromisoformat(evt_data["end_time"])
+                end_time = _parse_ts(evt_data["end_time"])
                 embed.add_field(
                     name=evt_type.upper(),
                     value=f"Ends: <t:{int(end_time.timestamp())}:R>",
@@ -201,7 +209,7 @@ class GlobalEvents(commands.Cog):
             await ctx.send("❌ A WAR event is already running!")
             return
         
-        end_time = datetime.now() + timedelta(hours=hours)
+        end_time = discord.utils.utcnow() + timedelta(hours=hours)
         
         self.active_events["war"] = {
             "end_time": end_time.isoformat(),
@@ -304,7 +312,7 @@ class GlobalEvents(commands.Cog):
             return
         
         war_data = self.active_events["war"]
-        end_time = datetime.fromisoformat(war_data["end_time"])
+        end_time = _parse_ts(war_data["end_time"])
         
         # Sort factions by points
         sorted_factions = sorted(
@@ -351,7 +359,7 @@ class GlobalEvents(commands.Cog):
             "server_damage": {},
             "cooldowns": {},
             "last_hit": None,
-            "started": datetime.now().isoformat()
+            "started": discord.utils.utcnow().isoformat()
         }
         
         embed = discord.Embed(
@@ -531,7 +539,7 @@ class GlobalEvents(commands.Cog):
             await ctx.send("❌ A Target Hunt is already running!")
             return
         
-        end_time = datetime.now() + timedelta(minutes=minutes)
+        end_time = discord.utils.utcnow() + timedelta(minutes=minutes)
         
         self.active_events["hunt"] = {
             "end_time": end_time.isoformat(),
@@ -565,9 +573,9 @@ class GlobalEvents(commands.Cog):
     
     async def run_hunt_challenges(self, ctx, duration_minutes):
         """Run random hunt challenges"""
-        end_time = datetime.now() + timedelta(minutes=duration_minutes)
+        end_time = discord.utils.utcnow() + timedelta(minutes=duration_minutes)
         
-        while datetime.now() < end_time and "hunt" in self.active_events:
+        while discord.utils.utcnow() < end_time and "hunt" in self.active_events:
             await asyncio.sleep(random.randint(60, 180))  # 1-3 minutes between challenges
             
             if "hunt" not in self.active_events:

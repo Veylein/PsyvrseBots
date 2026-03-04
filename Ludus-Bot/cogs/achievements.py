@@ -216,12 +216,18 @@ class AchievementManager:
         return {}
     
     def save_achievements(self):
-        """Save achievements to JSON"""
+        """Save achievements to JSON (atomic write)"""
+        tmp = self.achievements_file + ".tmp"
         try:
-            with open(self.achievements_file, 'w') as f:
+            with open(tmp, 'w', encoding='utf-8') as f:
                 json.dump(self.user_achievements, f, indent=4)
+            os.replace(tmp, self.achievements_file)
         except Exception as e:
-            print(f"Error saving achievements: {e}")
+            print(f"[Achievements] Save error: {e}")
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
     
     def get_user_achievements(self, user_id):
         """Get or create user achievement data"""
@@ -254,7 +260,7 @@ class AchievementManager:
         achievement = self.achievements[achievement_id]
         user_data["unlocked"].append(achievement_id)
         user_data["points"] += achievement["points"]
-        user_data["unlocked_at"][achievement_id] = datetime.utcnow().isoformat()
+        user_data["unlocked_at"][achievement_id] = discord.utils.utcnow().isoformat()
         
         self.save_achievements()
         # Track in data/users/{id}.json

@@ -5,13 +5,21 @@ import json
 import os
 import random
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 import sys
 from utils import user_storage
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embed_styles import EmbedBuilder, Colors, Emojis
 from utils import user_storage
+
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
 
 
 class ShopView(discord.ui.View):
@@ -285,8 +293,8 @@ class Economy(commands.Cog):
         
         boosts = self.economy_data[user_key].get("active_boosts", {})
         if boost_type in boosts:
-            expiry = datetime.fromisoformat(boosts[boost_type])
-            if datetime.utcnow() < expiry:
+            expiry = _parse_ts(boosts[boost_type])
+            if discord.utils.utcnow() < expiry:
                 return True
             else:
                 # Remove expired boost
@@ -310,16 +318,16 @@ class Economy(commands.Cog):
         
         if extend and boost_type in boosts:
             # Extend existing boost
-            existing_expiry = datetime.fromisoformat(boosts[boost_type])
-            if existing_expiry > datetime.utcnow():
+            existing_expiry = _parse_ts(boosts[boost_type])
+            if existing_expiry > discord.utils.utcnow():
                 # Add time to existing boost
                 new_expiry = existing_expiry + timedelta(hours=duration_hours)
             else:
                 # Boost expired, start fresh
-                new_expiry = datetime.utcnow() + timedelta(hours=duration_hours)
+                new_expiry = discord.utils.utcnow() + timedelta(hours=duration_hours)
         else:
             # New boost or replace existing
-            new_expiry = datetime.utcnow() + timedelta(hours=duration_hours)
+            new_expiry = discord.utils.utcnow() + timedelta(hours=duration_hours)
         
         self.economy_data[user_key]["active_boosts"][boost_type] = new_expiry.isoformat()
         self.economy_dirty = True
@@ -520,9 +528,9 @@ class Economy(commands.Cog):
         boosts = data.get("active_boosts", {})
         active_boost_list = []
         for boost_type, expiry_str in boosts.items():
-            expiry = datetime.fromisoformat(expiry_str)
-            if datetime.utcnow() < expiry:
-                time_left = expiry - datetime.utcnow()
+            expiry = _parse_ts(expiry_str)
+            if discord.utils.utcnow() < expiry:
+                time_left = expiry - discord.utils.utcnow()
                 hours = int(time_left.total_seconds() // 3600)
                 minutes = int((time_left.total_seconds() % 3600) // 60)
                 
@@ -570,11 +578,11 @@ class Economy(commands.Cog):
         
         last_daily = user_data.get("last_daily")
         
-        now = datetime.utcnow()
+        now = discord.utils.utcnow()
         
         # Check if user can claim daily
         if last_daily:
-            last_claim = datetime.fromisoformat(last_daily)
+            last_claim = _parse_ts(last_daily)
             time_diff = now - last_claim
             
             if time_diff.total_seconds() < 86400:  # 24 hours
@@ -907,7 +915,7 @@ class Economy(commands.Cog):
         """View the PsyCoin leaderboard"""
         await self._show_leaderboard(ctx.guild, ctx, None)
 
-    @app_commands.command(name="leaderboard", description="View the PsyCoin leaderboard")
+    @app_commands.command(name="coinleaderboard", description="View the PsyCoin leaderboard")
     async def leaderboard_slash(self, interaction: discord.Interaction):
         await interaction.response.defer()
         await self._show_leaderboard(interaction.guild, None, interaction)
@@ -1158,40 +1166,6 @@ class Economy(commands.Cog):
             inline=False
         )
 
-        await interaction.response.send_message(embed=embed)
-    
-    @app_commands.command(name="equipdeck", description="Equip a card deck for poker games")
-    @app_commands.describe(deck="Card deck to equip (classic/dark/platinum)")
-    @app_commands.choices(deck=[
-        app_commands.Choice(name="🃏 Classic Deck", value="classic"),
-        app_commands.Choice(name="🖤 Dark Deck", value="dark"),
-        app_commands.Choice(name="💎 Platinum Deck", value="platinum")
-    ])
-    async def equipdeck_slash(self, interaction: discord.Interaction, deck: app_commands.Choice[str]):
-        deck_name = deck.value if isinstance(deck, app_commands.Choice) else deck
-        
-        # Check if user owns the deck
-        owned_decks = self.get_owned_decks(interaction.user.id)
-        
-        if deck_name not in owned_decks:
-            await interaction.response.send_message(
-                f"❌ You don't own the **{deck_name}** deck!\n"
-                f"Purchase a 🎴 Card Box from the shop to unlock new decks!",
-                ephemeral=True
-            )
-            return
-        
-        # Equip the deck
-        self.set_user_card_deck(interaction.user.id, deck_name)
-        
-        deck_info = self.card_decks.get(deck_name, {"name": deck_name.title(), "rarity": "Unknown"})
-        
-        embed = EmbedBuilder.success(
-            "Deck Equipped!",
-            f"You equipped **{deck_info['name']}** ({deck_info.get('rarity', 'Common')})\n\n"
-            f"This deck will be used in all your poker games!"
-        )
-        
         await interaction.response.send_message(embed=embed)
 
 async def setup(bot):

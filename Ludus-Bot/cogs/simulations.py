@@ -5,15 +5,25 @@ import asyncio
 import random
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
+
+
+def _parse_ts(s):
+    """Parse ISO timestamp – handles both naive (old data) and tz-aware strings."""
+    from datetime import datetime as _dt, timezone as _tz
+    d = _dt.fromisoformat(str(s))
+    return d if d.tzinfo else d.replace(tzinfo=_tz.utc)
+
 
 class Simulations(commands.Cog):
     """Simulation games like farming and ice cream maker"""
     
     def __init__(self, bot):
         self.bot = bot
-        data_dir = os.getenv("RENDER_DISK_PATH", ".")
+        data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        os.makedirs(data_dir, exist_ok=True)
         self.farm_data_file = os.path.join(data_dir, "farms.json")
+        self._migrate_farms(data_dir)
         self.farm_data = self.load_data()
         
         self.crops = {
@@ -120,6 +130,13 @@ class Simulations(commands.Cog):
                                     "🍒 Cherry", "🍪 Cookie Crumbs", "🍬 Candy", "🌰 Almonds"]
         self.ice_cream_sauces = ["🍫 Chocolate Sauce", "🍯 Caramel", "🍓 Strawberry Syrup", "🍦 Hot Fudge"]
     
+    def _migrate_farms(self, data_dir: str):
+        """Migrate farms.json from cwd root to data/ on first run."""
+        old = "farms.json"
+        if not os.path.exists(self.farm_data_file) and os.path.exists(old):
+            import shutil
+            shutil.copy2(old, self.farm_data_file)
+
     def load_data(self):
         """Load farm data"""
         if os.path.exists(self.farm_data_file):
@@ -155,7 +172,7 @@ class Simulations(commands.Cog):
                 "plots": {},
                 "inventory": {},
                 "season": "spring",
-                "season_change": (datetime.now() + timedelta(days=1)).isoformat(),
+                "season_change": (discord.utils.utcnow() + timedelta(days=1)).isoformat(),
                 "tools": ["basic_hoe"],  # Start with basic hoe
                 "animals": {},
                 "animal_products": {},
@@ -170,12 +187,12 @@ class Simulations(commands.Cog):
                 "beauty_points": 0,
                 "daily_quest": None,
                 "quest_progress": 0,
-                "quest_reset": (datetime.now() + timedelta(days=1)).isoformat(),
+                "quest_reset": (discord.utils.utcnow() + timedelta(days=1)).isoformat(),
                 "achievements": [],
                 "genetics_lab": False,  # Unlock at level 10
                 "market_status": {},
                 "harvests_today": 0,
-                "last_reset": datetime.now().isoformat(),
+                "last_reset": discord.utils.utcnow().isoformat(),
                 "breeding_pairs": {}
             }
             self.save_data()
@@ -183,26 +200,26 @@ class Simulations(commands.Cog):
     
     def get_current_season(self, farm):
         """Get current season and rotate if needed"""
-        season_change = datetime.fromisoformat(farm["season_change"])
-        if datetime.now() >= season_change:
+        season_change = _parse_ts(farm["season_change"])
+        if discord.utils.utcnow() >= season_change:
             seasons_list = list(self.seasons.keys())
             current_idx = seasons_list.index(farm["season"])
             farm["season"] = seasons_list[(current_idx + 1) % len(seasons_list)]
-            farm["season_change"] = (datetime.now() + timedelta(days=1)).isoformat()
+            farm["season_change"] = (discord.utils.utcnow() + timedelta(days=1)).isoformat()
             self.save_data()
         return farm["season"]
     
     def check_daily_reset(self, farm):
         """Reset daily counters"""
-        last_reset = datetime.fromisoformat(farm.get("last_reset", datetime.now().isoformat()))
-        if (datetime.now() - last_reset).days >= 1:
+        last_reset = _parse_ts(farm.get("last_reset", discord.utils.utcnow().isoformat()))
+        if (discord.utils.utcnow() - last_reset).days >= 1:
             farm["harvests_today"] = 0
-            farm["last_reset"] = datetime.now().isoformat()
+            farm["last_reset"] = discord.utils.utcnow().isoformat()
             # Assign new daily quest
             quest_id = random.choice(list(self.daily_quests.keys()))
             farm["daily_quest"] = quest_id
             farm["quest_progress"] = 0
-            farm["quest_reset"] = (datetime.now() + timedelta(days=1)).isoformat()
+            farm["quest_reset"] = (discord.utils.utcnow() + timedelta(days=1)).isoformat()
             self.save_data()
     
     def check_pest_attack(self):
@@ -326,8 +343,8 @@ class Simulations(commands.Cog):
         plot_status = []
         for plot_num, plot_data in farm["plots"].items():
             crop = self.crops[plot_data["crop"]]
-            plant_time = datetime.fromisoformat(plot_data["planted"])
-            elapsed = (datetime.now() - plant_time).total_seconds() / 60  # minutes
+            plant_time = _parse_ts(plot_data["planted"])
+            elapsed = (discord.utils.utcnow() - plant_time).total_seconds() / 60  # minutes
             
             # Show watered/fertilized status
             status_icons = ""
@@ -365,10 +382,10 @@ class Simulations(commands.Cog):
             quest_info = self.daily_quests.get(farm["daily_quest"])
             if quest_info:
                 progress = farm.get("quest_progress", 0)
-                target = quest_info["target"]
+                target = quest_info.get("requirement", quest_info.get("target", 1))
                 reward = quest_info["reward"]
                 status = "✅ COMPLETE!" if progress >= target else f"{progress}/{target}"
-                quest_str = f"{quest_info['description']} - {status} (Reward: {reward} 🌾)"
+                quest_str = f"{quest_info.get('description', quest_info.get('name', '?'))} - {status} (Reward: {reward} 🌾)"
         
         # Beauty & level info
         level = farm.get("level", 1)
@@ -469,7 +486,7 @@ class Simulations(commands.Cog):
         # Plant crop
         farm["plots"][str(plot_num)] = {
             "crop": crop.lower(),
-            "planted": datetime.now().isoformat(),
+            "planted": discord.utils.utcnow().isoformat(),
             "watered": False,
             "fertilized": False
         }
@@ -518,8 +535,8 @@ class Simulations(commands.Cog):
         
         for plot_num, plot_data in list(farm["plots"].items()):
             crop = self.crops[plot_data["crop"]]
-            plant_time = datetime.fromisoformat(plot_data["planted"])
-            elapsed = (datetime.now() - plant_time).total_seconds() / 60
+            plant_time = _parse_ts(plot_data["planted"])
+            elapsed = (discord.utils.utcnow() - plant_time).total_seconds() / 60
             
             if elapsed >= crop["grow_time"]:
                 crop_name = plot_data["crop"]
@@ -764,11 +781,11 @@ class Simulations(commands.Cog):
             farm.setdefault("breeding_pairs", []).append({
                 "parents": [parent1, parent2],
                 "result": hybrid_choice,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": discord.utils.utcnow().isoformat()
             })
             
             # Check achievement
-            unlocked, achievement = self.check_achievement(interaction.user.id, "genetic_engineer")
+            unlocked, achievement = self.check_achievement(interaction.user.id, "hybrid_creator")
             achievement_msg = ""
             if unlocked:
                 achievement_msg = f"\n\n🏆 **{achievement['name']}** unlocked! +{achievement['reward']} 🌾"
@@ -801,7 +818,7 @@ class Simulations(commands.Cog):
         for deco_name, deco_data in self.decorations.items():
             owned = farm.get("decorations", {}).get(deco_name, 0)
             embed.add_field(
-                name=f"{deco_data['name']} {deco_data['emoji']}",
+                name=f"{deco_data['name']}",
                 value=f"Cost: {deco_data['cost']} 🌾 | Beauty: +{deco_data['beauty']}\n"
                       f"Owned: {owned}",
                 inline=True
@@ -847,7 +864,7 @@ class Simulations(commands.Cog):
             farm["beauty_points"] = farm.get("beauty_points", 0) + deco_data["beauty"]
             
             # Check achievement
-            unlocked, achievement = self.check_achievement(interaction.user.id, "decorator")
+            unlocked, achievement = self.check_achievement(interaction.user.id, "beautiful_farm")
             achievement_msg = ""
             if unlocked:
                 achievement_msg = f"\n\n🏆 **{achievement['name']}** unlocked! +{achievement['reward']} 🌾"
@@ -856,7 +873,7 @@ class Simulations(commands.Cog):
             
             await interaction.followup.send(
                 f"✨ **Decoration Placed!**\n\n"
-                f"{deco_data['emoji']} {deco_data['name']}\n"
+                f"{deco_data['name']}\n"
                 f"Beauty: +{deco_data['beauty']} (Total: {farm['beauty_points']})"
                 f"{achievement_msg}"
             )
@@ -876,7 +893,7 @@ class Simulations(commands.Cog):
         
         quest_data = self.daily_quests[quest_id]
         progress = farm.get("quest_progress", 0)
-        target = quest_data["target"]
+        target = quest_data.get("requirement", quest_data.get("target", 1))
         reward = quest_data["reward"]
         
         # Check if complete
@@ -899,7 +916,7 @@ class Simulations(commands.Cog):
             
             embed = discord.Embed(
                 title="🎉 Quest Complete!",
-                description=f"**{quest_data['description']}**\n\n"
+                description=f"**{quest_data.get('description', quest_data.get('name', '?'))}**\n\n"
                            f"Progress: {progress}/{target} ✅\n"
                            f"Reward: +{reward} 🌾 Farm Tokens!",
                 color=discord.Color.gold()
@@ -910,7 +927,7 @@ class Simulations(commands.Cog):
             # Show progress
             embed = discord.Embed(
                 title="📋 Daily Quest",
-                description=f"**{quest_data['description']}**\n\n"
+                description=f"**{quest_data.get('description', quest_data.get('name', '?'))}**\n\n"
                            f"Progress: {progress}/{target}\n"
                            f"Reward: {reward} 🌾 Farm Tokens",
                 color=discord.Color.blue()
@@ -970,7 +987,7 @@ class Simulations(commands.Cog):
             status = "✅" if achievement_id in earned else "🔒"
             embed.add_field(
                 name=f"{status} {achievement_data['name']}",
-                value=f"{achievement_data['description']}\n"
+                value=f"{achievement_data.get('description', achievement_data.get('desc', '?'))}\n"
                       f"Reward: {achievement_data['reward']} 🌾",
                 inline=False
             )

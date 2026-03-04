@@ -2,8 +2,7 @@
 
 **Project:** Ludus Bot  
 **Coverage:** Gambling System, Arcade Games, Game Challenges  
-**Total Lines:** 2,600 lines of code  
-**Status:** ✅ COMPLETE  
+**Total Lines:** ~7,160 lines of code (gambling.py: 1,404 + blackjack.py: 2,001 + poker.py: 2,824 + arcadegames.py + game_challenges.py)    
 **Date:** February 2026
 
 ---
@@ -13,7 +12,8 @@
 1. [Gambling System Overview](#1-gambling-system-overview)
 2. [Gambling Game Mechanics](#2-gambling-game-mechanics)
    - [Slots Machine](#slots-machine)
-   - [Poker (Five Card Draw)](#poker-five-card-draw)
+   - [Poker — Moved to cogs/poker.py](#poker--moved-to-cogspokery)
+   - [Blackjack — cogs/blackjack.py](#blackjack--cogsbljackpy)
    - [Roulette](#roulette)
    - [Higher or Lower](#higher-or-lower)
    - [Dice Roll](#dice-roll)
@@ -35,21 +35,24 @@
 
 ## 1. GAMBLING SYSTEM OVERVIEW
 
-**File:** `cogs/gambling.py` (1,671 lines)
+**File:** `cogs/gambling.py` (1,404 lines)
 
 The Gambling system provides a casino experience with 8 different games of chance, all using PsyCoins as currency. The system includes comprehensive statistics tracking, responsible gaming disclaimers, and integration with the economy, profile, and zoo encounter systems.
 
 ### Core Features
 
-**8 Casino Games:**
+**7 Casino Games in `gambling.py`:**
 - **Slots** - Classic 3-reel slot machine with 10 symbols
-- **Poker** - Five Card Draw with standard poker hands
 - **Roulette** - European-style (no 00) with multiple bet types
 - **Higher/Lower** - Guess if next card beats current card
 - **Dice** - Roll 2 dice, win on 7/11, lose on 2/3/12
 - **Crash** - Cash out before random crash multiplier
 - **Minesweeper** - Grid-based mine avoidance game
 - **Coinflip** - Simple heads or tails bet
+
+> **Note**: Poker and Blackjack each have their own dedicated cogs:
+> - `cogs/poker.py` (2,824 lines) — full Texas Hold'em, 2-8 players, lobby-based. See poker.py section below.
+> - `cogs/blackjack.py` (2,001 lines) — **two modes**: Fast (instant solo vs dealer) and Long (multiplayer lobby, COOP/PVP). See blackjack.py section below.
 
 **Statistics Tracking:**
 - Per-user stats: total wagered, total won, games played, win/loss ratio
@@ -78,14 +81,14 @@ The Gambling system provides a casino experience with 8 different games of chanc
 ### Game Balance Design
 
 **House Edge by Game:**
-1. **Slots** - ~95% RTP (5% house edge) - heavily nerfed
+1. **Slots** - ~95% RTP (5% house edge)
 2. **Roulette** - ~50% house edge (intentionally harsh)
-3. **Poker** - Skill-based, depends on hand quality
-4. **Higher/Lower** - ~50/50 odds per round
-5. **Dice** - Realistic craps odds (~44% win rate)
-6. **Crash** - Variable, depends on cash-out timing
-7. **Minesweeper** - Strategic, scales with grid size
-8. **Coinflip** - True 50/50 odds (2x payout)
+3. **Higher/Lower** - ~50/50 odds per round
+4. **Dice** - Realistic craps odds (~44% win rate)
+5. **Crash** - Variable, depends on cash-out timing
+6. **Minesweeper** - Strategic, scales with grid size
+7. **Coinflip** - True 50/50 odds (2x payout)
+8. **Texas Hold'em Poker** - Skill-based, in `poker.py` (see dedicated section)
 
 The games are intentionally balanced to make the economy challenging while still being fun. Slots and roulette have particularly harsh odds to prevent easy coin farming.
 
@@ -171,162 +174,89 @@ Balance: 75,000 PsyCoins
 
 ---
 
-### Poker (Five Card Draw)
+### Poker — Moved to `cogs/poker.py`
 
-**Command:** `/poker <wager>`  
-**File Location:** Lines 264-529  
-**Min Wager:** 100 PsyCoins
+> **⚠️ The old Five Card Draw poker has been replaced.**
+>
+> Poker is now a fully featured **Texas Hold'em** implementation in a dedicated cog: **`cogs/poker.py`** (2,824 lines).
+>
+> **Key features of the new poker system:**
+> - Full Texas Hold'em with pre-flop → flop → turn → river betting rounds
+> - 2–8 players per game (human or bot opponents with owner-named bots)
+> - Configurable buy-in, small/big blind, and stack sizes via lobby settings
+> - `PokerGame` class handles deck management, hand evaluation, side pots
+> - `PokerGameView` + `PokerActionView` (discord.ui.View) for interactive play
+> - Cosmetic card deck support — reads user's `equipped_deck` from `economy.py`
+> - Custom emoji card rendering via `data/cards_emoji_mapping.json`
+> - `/poker` slash command — starts a lobby with configurable settings dropdown
+>
+> The `gambling.py` file retains a stub comment marking where the old `PokerPlayAgainView` was removed (line 1399–1401), and the `/odds` and `/strategy` commands still list poker for reference.
 
-**Hand Rankings (Standard Poker):**
-1. **Royal Flush** - 100x multiplier (A♠ K♠ Q♠ J♠ 10♠)
-2. **Straight Flush** - 50x multiplier (consecutive suited)
-3. **Four of a Kind** - 25x multiplier
-4. **Full House** - 10x multiplier (three + pair)
-5. **Flush** - 7x multiplier (all same suit)
-6. **Straight** - 5x multiplier (consecutive ranks)
-7. **Three of a Kind** - 3x multiplier
-8. **Two Pair** - 2x multiplier
-9. **Pair of Jacks or Better** - 1x multiplier (returns wager)
-10. **High Card** - Loss
+---
 
-**Game Flow:**
-```python
-# 1. Initial Deal (5 cards)
-deck = [f"{rank}{suit}" for suit in ['♠','♥','♦','♣'] 
-        for rank in ['A','2','3','4','5','6','7','8','9','10','J','Q','K']]
-random.shuffle(deck)
-hand = deck[:5]
+### Blackjack — `cogs/blackjack.py`
 
-# 2. Player chooses cards to keep (buttons 1-5)
-# Discord UI with PokerView class (lines 447-529)
+**File:** `cogs/blackjack.py` (2,001 lines — dedicated cog)  
+**Command:** `/blackjack [mode]` — two modes selectable via `app_commands.Choice`
 
-# 3. Replace discarded cards
-for i in selected_to_discard:
-    hand[i] = deck.pop()
+Blackjack lives in its own dedicated cog that imports visual helpers directly from `poker.py` (shared `create_deck`, `get_card_image`, PIL constants, etc.).
 
-# 4. Evaluate final hand
-result = evaluate_hand(hand)  # Lines 375-445
+#### Two Modes
 
-# 5. Pay according to hand rank
-if result["rank"] >= 9:  # Jacks or Better
-    multiplier = POKER_PAYOUTS[result["rank"]]
-    payout = wager * multiplier
-```
+| Mode | Value | Description |
+|------|-------|-------------|
+| 🎯 Fast Blackjack | `fast` (default) | Instant solo game vs dealer — no lobby, bet chosen via ephemeral `BetSelectView` |
+| 🎲 Long Blackjack Lobby | `long` | Full multiplayer lobby (mirrors poker lobby structure) up to 10 players |
 
-**Hand Evaluation Algorithm (Lines 375-445):**
-```python
-def evaluate_hand(hand):
-    ranks = [card[:-1] for card in hand]  # "A♠" -> "A"
-    suits = [card[-1] for card in hand]   # "A♠" -> "♠"
-    
-    # Convert face cards to numeric
-    rank_values = {'A': 14, 'K': 13, 'Q': 12, 'J': 11}
-    numeric_ranks = [rank_values.get(r, int(r)) for r in ranks]
-    numeric_ranks.sort(reverse=True)
-    
-    # Check flush (all same suit)
-    is_flush = len(set(suits)) == 1
-    
-    # Check straight (consecutive)
-    is_straight = all(numeric_ranks[i] - numeric_ranks[i+1] == 1 
-                      for i in range(4))
-    # Special case: A-2-3-4-5 (wheel)
-    if numeric_ranks == [14, 5, 4, 3, 2]:
-        is_straight = True
-        numeric_ranks = [5, 4, 3, 2, 1]  # Ace low
-    
-    # Count frequencies
-    counts = Counter(numeric_ranks)
-    sorted_counts = sorted(counts.values(), reverse=True)
-    
-    # Royal Flush check
-    if is_straight and is_flush and numeric_ranks[0] == 14:
-        return {"rank": 10, "name": "Royal Flush", "multiplier": 100}
-    
-    # Straight Flush
-    if is_straight and is_flush:
-        return {"rank": 9, "name": "Straight Flush", "multiplier": 50}
-    
-    # Four of a Kind
-    if sorted_counts == [4, 1]:
-        return {"rank": 8, "name": "Four of a Kind", "multiplier": 25}
-    
-    # Full House
-    if sorted_counts == [3, 2]:
-        return {"rank": 7, "name": "Full House", "multiplier": 10}
-    
-    # Flush
-    if is_flush:
-        return {"rank": 6, "name": "Flush", "multiplier": 7}
-    
-    # Straight
-    if is_straight:
-        return {"rank": 5, "name": "Straight", "multiplier": 5}
-    
-    # Three of a Kind
-    if sorted_counts == [3, 1, 1]:
-        return {"rank": 4, "name": "Three of a Kind", "multiplier": 3}
-    
-    # Two Pair
-    if sorted_counts == [2, 2, 1]:
-        return {"rank": 3, "name": "Two Pair", "multiplier": 2}
-    
-    # Pair (Jacks or Better)
-    if sorted_counts == [2, 1, 1, 1]:
-        pair_rank = [r for r, c in counts.items() if c == 2][0]
-        if pair_rank >= 11:  # J, Q, K, A
-            return {"rank": 2, "name": "Jacks or Better", "multiplier": 1}
-    
-    # High Card (loss)
-    return {"rank": 1, "name": "High Card", "multiplier": 0}
-```
+---
 
-**Interactive UI (PokerView Class):**
-```python
-class PokerView(discord.ui.View):
-    def __init__(self, hand, deck, wager, user_id):
-        super().__init__(timeout=60)
-        self.hand = hand
-        self.deck = deck
-        self.wager = wager
-        self.user_id = user_id
-        self.selected = []  # Cards to discard (indices)
-        
-        # Create 5 buttons (one per card)
-        for i in range(5):
-            button = discord.ui.Button(
-                label=f"Card {i+1}: {hand[i]}",
-                style=discord.ButtonStyle.secondary,
-                custom_id=f"card_{i}"
-            )
-            button.callback = self.make_callback(i)
-            self.add_item(button)
-        
-        # Add "Keep All" and "Draw" buttons
-        # Lines 490-529
-    
-    def make_callback(self, index):
-        async def callback(interaction):
-            if interaction.user.id != self.user_id:
-                await interaction.response.send_message("Not your game!", ephemeral=True)
-                return
-            
-            if index in self.selected:
-                self.selected.remove(index)
-                # Change button to secondary (unselected)
-            else:
-                self.selected.append(index)
-                # Change button to danger (selected)
-            
-            await interaction.response.edit_message(view=self)
-        return callback
-```
+#### Fast Mode (`play_fast_blackjack`)
 
-**Strategy Tips (Built into embed):**
-- Always keep pairs, trips, or better
-- Keep 4-card straights/flushes (drawing 1)
-- Discard high cards unless drawing to royal
-- Maximum 5 cards can be replaced
+- **No lobby** — starts immediately
+- Bet selected via ephemeral `BetSelectView` (preset amounts + custom modal) or passed as `preset_bet` for "Same Bet" replay
+- Cards are rendered as a table image using `create_blackjack_image` / `create_blackjack_table_image` (PIL, felt-green background, same visual style as poker)
+- **Player** uses their equipped card deck (`economy.get_user_card_deck()`); **dealer always uses `classic`**
+- Actions via `BlackjackActionView` buttons: **Hit / Stand / Double Down** (double only on first two cards if balance allows)
+- Dealer draws until value ≥ 17 (standard rules)
+- **Blackjack pays 2.5×** (not 2×)
+- After the round: **Play Again** / **Same Bet (`{amount}`)** / **⚠️ Responsible Gaming** buttons
+
+**Payouts:**
+| Result | Payout |
+|--------|--------|
+| Blackjack (natural 21) | 2.5× bet |
+| Win | 2× bet |
+| Push | Bet returned |
+| Lose | Bet lost |
+
+---
+
+#### Long Mode (`play_long_blackjack`)
+
+- **Lobby-based** — same architecture as `poker.py`'s lobby
+- Host opens lobby → players join → host launches game
+- **Settings** (configurable by host, editable via `BlackjackCog.handle_blackjack_settings`):
+
+| Setting | Default | Range |
+|---------|---------|-------|
+| Bet amount | 100 | 50+ |
+| Max players | 6 | 1–10 |
+| Game mode | COOP | COOP / PVP |
+
+- **COOP mode** — all players face the same dealer; players act in turn
+- **PVP mode** — no dealer hand dealt initially; competitive scoring among players
+
+**Key Classes:**
+- `BlackjackLobbyView` (line 850) — join/start/cancel lobby UI, `create_lobby_embed()`
+- `BlackjackGame` (line 1042) — game state; `start_game()` deals cards, resolves blackjacks, runs player turns
+- `BlackjackActionView` (line 159) — hit/stand/double buttons per player turn
+- `BetSelectView` (line 103) — preset bet amounts + `CustomBetModal` for custom value
+- `BlackjackPlayAgainView` (line 1420) — post-game replay buttons
+
+**Card Deck Integration:**
+- Each player's cosmetic deck fetched via `economy.get_user_card_deck(user_id)` (classic / dark / platinum)
+- Deck unlocked via `card_box` shop item + `/equipdeck` in `economy.py`
+- Dealer always renders with `classic` deck in Fast mode; per-player in Long mode
 
 ---
 
@@ -2397,7 +2327,8 @@ Triggered after:
 | Command | Description | Min Wager | Notes |
 |---------|-------------|-----------|-------|
 | `/slots <wager>` | Play slot machine | 100 | 3-reel, 10 symbols |
-| `/poker <wager>` | Five Card Draw poker | 100 | Interactive card selection |
+| `/blackjack [mode]` | Blackjack vs dealer or lobby | 50 | **Fast** (solo) or **Long** (multiplayer lobby, COOP/PVP) — dedicated `blackjack.py` cog |
+| `/poker` | Texas Hold'em poker | — | Dedicated cog (`poker.py`), lobby-based |
 | `/roulette <wager> <bet> [number]` | European roulette | 100 | Multiple bet types |
 | `/higherlowell <wager>` | Card guessing game | 50 | Streak multiplier |
 | `/dice <wager>` | Craps-style dice | 50 | Point system |
@@ -2428,7 +2359,9 @@ Triggered after:
 ## 9. SUMMARY
 
 **Part 4A Coverage:**
-- **Gambling System:** 8 games (slots, poker, roulette, higher/lower, dice, crash, minesweeper, coinflip)
+- **Gambling System:** 7 games in gambling.py (slots, roulette, higher/lower, dice, crash, minesweeper, coinflip)
+- **Blackjack:** Dedicated `blackjack.py` cog (2,001 lines) — Fast mode (solo vs dealer) + Long mode (multiplayer lobby, COOP/PVP)
+- **Poker:** Dedicated `poker.py` cog (2,824 lines) — Texas Hold'em lobby
 - **Arcade Games:** 3 games (PacMan, Math Quiz, Bomb Defusal)
 - **Game Challenges:** Daily/weekly challenges with streaks
 - **Statistics Tracking:** Comprehensive per-user and per-game stats
@@ -2437,7 +2370,9 @@ Triggered after:
 **Key Technical Features:**
 - Real-time game updates (crash multiplier, PacMan movement)
 - Interactive Discord UI (buttons, dropdowns, modals)
-- Sophisticated game logic (poker hand evaluation, roulette wheel, ghost AI)
+- Sophisticated game logic (Texas Hold'em hand evaluation, roulette wheel, ghost AI)
+- PIL image rendering for card table display (`create_blackjack_image`, `create_blackjack_table_image`) — shared visual helpers between `blackjack.py` and `poker.py`
+- Blackjack two-mode architecture: Fast (instant ephemeral lobby, `BetSelectView`) and Long (persistent multiplayer lobby, `BlackjackLobbyView`, COOP/PVP)
 - Economy integration (wagers, payouts, transaction logging)
 - Profile integration (most played games)
 - Zoo encounter system (random animals after games)
@@ -2446,9 +2381,11 @@ Triggered after:
 - Global leaderboard integration
 
 **File Statistics:**
-- gambling.py: 1,671 lines
+- gambling.py: 1,404 lines
+- blackjack.py: 2,001 lines
+- poker.py: 2,824 lines
 - arcadegames.py: 429 lines
 - game_challenges.py: 500 lines
-- **Total:** 2,600 lines of code
+- **Total:** ~7,160 lines of code
 - **Documentation:** ~20,000 words
 

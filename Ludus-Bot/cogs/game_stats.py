@@ -93,8 +93,8 @@ class GameStats(commands.Cog):
                 "perfect_games": 0,
                 "comeback_wins": 0,
                 "speedrun_wins": 0,
-                "first_game_date": datetime.now().strftime("%Y-%m-%d"),
-                "last_game_date": datetime.now().strftime("%Y-%m-%d"),
+                "first_game_date": discord.utils.utcnow().strftime("%Y-%m-%d"),
+                "last_game_date": discord.utils.utcnow().strftime("%Y-%m-%d"),
                 "daily_streak": 0,
                 "best_daily_streak": 0,
                 "categories": {
@@ -122,7 +122,7 @@ class GameStats(commands.Cog):
         
         stats["total_coins_earned"] += coins_earned
         stats["total_playtime_minutes"] += playtime_seconds / 60
-        stats["last_game_date"] = datetime.now().strftime("%Y-%m-%d")
+        stats["last_game_date"] = discord.utils.utcnow().strftime("%Y-%m-%d")
         
         # Track game counts
         if game_name not in stats["game_counts"]:

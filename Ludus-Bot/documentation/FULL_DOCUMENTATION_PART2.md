@@ -1,19 +1,20 @@
 # 🎮 Ludus Bot - Complete Technical Documentation (Part 2: Economy System)
 ---
 
-## 3. ECONOMY SYSTEM (`cogs/economy.py` - 918 lines)
+## 3. ECONOMY SYSTEM (`cogs/economy.py` — 1,206 lines)
 
 ### 3.1 System Overview
 
 The Economy system is the **backbone of Ludus Bot**, powering rewards for every activity. It manages:
 
 - **PsyCoins**: Universal currency earned from all activities
-- **Shop System**: Purchase boosts, items, and power-ups
+- **Shop System**: Purchase boosts, items, power-ups, and card decks
 - **Daily Rewards**: Claim rewards with streak bonuses
 - **Inventory Management**: Store and use purchased items
 - **Boost System**: Temporary multipliers for earnings/XP
-- **Currency Conversion**: Convert PsyCoins to specialized currencies
-- **Leaderboard**: Global wealth rankings
+- **Currency Conversion**: Exchange PsyCoins ⇄ FishCoins / MineCoins / FarmCoins
+- **Card Deck System**: Unlock cosmetic card decks for poker via Card Boxes
+- **Leaderboard**: Per-server coin leaderboard (`coinleaderboard`); full multi-category leaderboard in `leaderboard.py`
 
 **Integration**: Every cog (fishing, gambling, minigames, etc.) uses this economy system to reward players.
 
@@ -105,7 +106,7 @@ def cog_load(self):
         },
         "mystery_box": {
             "name": "🎁 Mystery Box",
-            "description": "Contains a random amount of PsyCoins (100-5000)!",
+            "description": "Random reward - could be anything!",
             "price": 1000
         },
         "streak_shield": {
@@ -117,6 +118,11 @@ def cog_load(self):
             "name": "💰 Double Coins",
             "description": "Earn 2x PsyCoins from all sources for 24 hours!",
             "price": 1500
+        },
+        "card_box": {
+            "name": "🎴 Card Box",
+            "description": "Random card deck (Classic/Dark/Platinum) for poker games!",
+            "price": 2500
         }
     }
 ```
@@ -138,7 +144,13 @@ def cog_load(self):
    - `streak_shield`: 800 coins, prevents streak loss
 
 5. **Loot Boxes**:
-   - `mystery_box`: 1000 coins, random 100-5000 reward
+   - `mystery_box`: 1000 coins, random reward
+   - `card_box`: 2500 coins, random poker card deck (Classic/Dark/Platinum)
+
+6. **Card Decks** (unlocked via card_box):
+   - `classic`: Common (50% chance)
+   - `dark`: Rare (30% chance)
+   - `platinum`: Legendary (20% chance)
 
 **Design Philosophy**:
 - Items are **consumable** (single-use)
@@ -764,13 +776,14 @@ Your inventory is empty!
 ✅ You gave 1,000 PsyCoins to @FriendName!
 ```
 
-#### 3.4.7 Leaderboard Command (Lines 691-759)
+#### 3.4.7 Leaderboard Command (Lines 913-975)
 
 **Commands**:
-- `L!leaderboard`
-- `/leaderboard`
+- `L!leaderboard` / `/coinleaderboard` — coin-only leaderboard (top 10 richest in the server)
 
-**Sorting** (Line 711):
+> **Note**: The multi-category interactive leaderboard (server + global rankings for fishing, mining, farming, duels, quests, XP, reputation, etc.) is implemented in the separate **`cogs/leaderboard.py`** cog. See the leaderboard cog documentation for details.
+
+**Sorting**:
 ```python
 sorted_users = sorted(
     self.economy_data.items(),
@@ -810,105 +823,81 @@ Top 10 richest users
 
 ### 3.5 Currency Conversion System
 
-#### 3.5.1 Convert Command (Lines 761-862)
+#### 3.5.1 `/convert` Command (Lines 976–1095)
 
-**Command**: `/convert <currency> <amount>`
+**Command**: `/convert <direction> <amount>`
 
-**Supported Currencies**:
+Converts between PsyCoins and game-specific sub-currencies. All sub-currencies are stored in `economy.json` per user.
 
-1. **Wizard Wars Gold** (100 PsyCoins → 1 Gold)
-   - Used in RPG dueling system
-   - Buy spells, upgrade wizard
-   - Stored in separate `wizard_wars_data.json`
+**Supported Conversions** (with drop-down choices in Discord UI):
 
-2. **Farming Tokens** (50 PsyCoins → 1 Token)
-   - Used in farming simulator
-   - Buy seeds, tools, animals
-   - Stored in economy data
+| Direction | Rate |
+|-----------|------|
+| PsyCoin → FishCoin | 4 PSY = 1 FISH |
+| FishCoin → PsyCoin | 1 FISH = 2 PSY |
+| PsyCoin → MineCoin | 5 PSY = 1 MINE |
+| MineCoin → PsyCoin | 1 MINE = 3 PSY |
+| PsyCoin → FarmCoin | 4 PSY = 1 FARM |
+| FarmCoin → PsyCoin | 1 FARM = 2 PSY |
 
-3. **Arcade Tickets** (25 PsyCoins → 1 Ticket)
-   - Used in arcade games
-   - Play special games, buy prizes
-   - Stored in economy data
+**Design**: Converting TO a sub-currency has an exchange loss (to incentivize earning them in-game rather than buying).
 
-4. **Fishing Tokens** (30 PsyCoins → 1 Token)
-   - Used in fishing system
-   - Buy bait, upgrade rod
-   - Stored in economy data
-
-**Conversion Logic** (Lines 777-846):
+**Conversion Logic** (Lines 1040–1080):
 
 ```python
-rates = {
-    "ww_gold": {
-        "rate": 100,
-        "name": "WW Gold",
-        "emoji": "💎",
-        "file": "wizard_wars_data.json",
-        "key": "gold"
-    },
-    "farm_token": {
-        "rate": 50,
-        "name": "Farming Tokens",
-        "emoji": "🌾",
-        "field": "farm_tokens"
-    },
-    # ... etc
-}
+cost     = amount
+received = (amount // src_per_unit) * tgt_per_unit
+# e.g. 400 PSY -> FISH: received = (400 // 4) * 1 = 100 FISH
 ```
-
-**Wizard Wars Special Handling** (Lines 809-836):
-- Checks if user has created a wizard
-- If not, refunds coins and shows error
-- Loads external `wizard_wars_data.json`
-- Updates wizard's gold balance
-- Saves back to file
 
 **Error Cases**:
-1. **Insufficient PsyCoins**: Shows needed amount
-2. **No Wizard Created**: Refunds + error message
-3. **System Not Initialized**: Refunds + error message
+1. `amount <= 0`: Rejected immediately
+2. **Insufficient source currency**: Shows deficit and current balance
+3. **received = 0**: At least `src_per_unit` needed for 1 unit back
 
-**Response Embed**:
-```
-Currency Converted!
-━━━━━━━━━━━━━━━━━━━━━
-Successfully converted PsyCoins
-to Wizard Wars Gold
-
-💸 Cost: 1,000 PsyCoins
-💎 Received: 10 WW Gold
-💰 Remaining: 4,500 PsyCoins
-
-Conversion Rate: 100 PsyCoins = 1 WW Gold
-```
-
-#### 3.5.2 View All Currencies (Lines 864-918)
+#### 3.5.2 `/currencies` Command (Lines 1097–1170)
 
 **Command**: `/currencies`
 
-**Display**:
+Shows all currency balances for the invoking user.
+
 ```
 💰 PlayerName's Currencies
-━━━━━━━━━━━━━━━━━━━━━
 
-💰 PsyCoins: 5,500
-💎 Wizard Wars Gold: 25
-🌾 Farming Tokens: 100
-🎮 Arcade Tickets: 50
-🎣 Fishing Tokens: 75
+💰 PsyCoins (main):   5,000
+🐟 FishCoins:           250  (Earned from fishing)
+⛏️ MineCoins:          1,000  (Earned from mining)
+🌾 FarmCoins:             80  (Earned from farming)
+💎 Wizard Wars Gold:      10  (Earned in Wizard Wars)
 
-📊 Conversion Rates
-100 💰 = 1 💎
-50 💰 = 1 🌾
-25 💰 = 1 🎮
-30 💰 = 1 🎣
+📊 Conversion Rates  (use /convert)
+  💰→🐟 4 PSY = 1 FISH  |  🐟→💰 1 FISH = 2 PSY
+  💰→⛏️ 5 PSY = 1 MINE  |  ⛏️→💰 1 MINE = 3 PSY
+  💰→🌾 4 PSY = 1 FARM  |  🌾→💰 1 FARM = 2 PSY
 ```
 
-**Cross-System Integration**:
-- Loads Wizard Wars data from external file
-- Shows all currencies in one place
-- Helps users plan conversions
+Wizard Wars Gold sourced from `wizard_wars_data.json` (falls back to 0 if unavailable).
+
+#### 3.5.3 Card Box & Deck System (Lines 1171–1206)
+
+**Shop item**: `card_box` (2,500 PsyCoins) — opens into a random poker card deck.
+
+| Deck | Rarity | Drop Weight |
+|------|--------|-------------|
+| 🃏 Classic Deck | Common | 50% |
+| 🖤 Dark Deck | Rare | 30% |
+| 💎 Platinum Deck | Legendary | 20% |
+
+**`/equipdeck <deck>`** — equip an owned deck for all poker games.
+
+```python
+if deck_name not in self.get_owned_decks(user_id):
+    # ❌ You don't own this deck
+self.set_user_card_deck(user_id, deck_name)
+# ✅ Deck equipped — used in all poker games.
+```
+
+The `poker.py` cog reads each user's equipped deck to select which card sprite assets to render.
 
 ### 3.6 Integration with Other Systems
 
@@ -980,9 +969,11 @@ if economy_cog.remove_coins(user.id, bet_amount):
       "luck_charm": "2024-01-16T10:30:00"
     },
     "username": "PlayerName",
-    "farm_tokens": 100,
-    "arcade_tickets": 50,
-    "fish_tokens": 75
+    "fish_coins": 250,
+    "mine_coins": 1000,
+    "farm_coins": 80,
+    "owned_decks": ["classic"],
+    "equipped_deck": "classic"
   },
   "987654321": {
     "balance": 1500,

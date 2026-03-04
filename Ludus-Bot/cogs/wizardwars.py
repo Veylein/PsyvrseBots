@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import json
+import os
 import random
 import asyncio
 from datetime import datetime, timedelta
@@ -14,12 +15,140 @@ except Exception:
     tcg_manager = None
     CARD_DATABASE = {}
 
+SCHOOL_EMOJIS = {
+    "Elemental": "🌊",
+    "Cosmic": "🌌",
+    "Forbidden": "☠️",
+    "Divine": "✨",
+}
+
+TYPE_EMOJIS = {
+    "fire": "🔥", "water": "💧", "thunder": "⚡", "ice": "❄️",
+    "wind": "🌀", "earth": "🌍", "gravity": "⚫", "space": "🌌",
+    "time": "⏳", "blood": "🩸", "shadow": "🌑", "curse": "👁️",
+    "light": "🌟", "holy": "✨",
+}
+
+
+class ShopView(discord.ui.View):
+    """Interactive spell shop with dropdown select + buy button."""
+
+    def __init__(self, cog, user_id: str, available_spells: list):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.user_id = user_id
+        self.selected_spell: str | None = None
+
+        options = []
+        for spell_name in available_spells[:25]:
+            spell = cog.spells[spell_name]
+            price = spell['power'] * 100
+            te = TYPE_EMOJIS.get(spell['type'], "✨")
+            options.append(discord.SelectOption(
+                label=spell_name,
+                value=spell_name,
+                description=f"{price} Gold | {spell['school']} | Power: {spell['power']}",
+                emoji=te,
+            ))
+
+        self.spell_select = discord.ui.Select(
+            placeholder="Choose a spell to preview...",
+            options=options,
+            custom_id="spell_select",
+        )
+        self.spell_select.callback = self.spell_selected
+        self.add_item(self.spell_select)
+
+    async def spell_selected(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != self.user_id:
+            return await interaction.response.send_message("❌ This shop isn't yours!", ephemeral=True)
+
+        self.selected_spell = self.spell_select.values[0]
+        spell = self.cog.spells[self.selected_spell]
+        price = spell['power'] * 100
+        wizard = self.cog.wizards[self.user_id]
+        te = TYPE_EMOJIS.get(spell['type'], "✨")
+        se = SCHOOL_EMOJIS.get(spell['school'], "🔮")
+
+        embed = discord.Embed(
+            title=f"{te} {self.selected_spell}",
+            description=f"**School:** {se} {spell['school']} | **Type:** {spell['type'].title()}",
+            color=discord.Color.gold(),
+        )
+        embed.add_field(name="⚡ Power", value=str(spell['power']), inline=True)
+        embed.add_field(name="🔮 Mana Cost", value=str(spell['mana']), inline=True)
+        embed.add_field(name="💰 Price", value=f"{price} Gold", inline=True)
+        embed.add_field(name="✨ Effect", value=spell['effect'].replace('_', ' ').title(), inline=True)
+
+        if self.selected_spell in wizard['spells']:
+            embed.set_footer(text="✅ You already own this spell!")
+        elif wizard['gold'] >= price:
+            embed.set_footer(text=f"Your Gold: {wizard['gold']} | Click 💰 Buy Spell to purchase!")
+        else:
+            embed.set_footer(text=f"❌ Not enough gold! You have {wizard['gold']}, need {price}")
+
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="💰 Buy Spell", style=discord.ButtonStyle.success, custom_id="ww_buy_btn", row=1)
+    async def buy_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.user_id:
+            return await interaction.response.send_message("❌ This shop isn't yours!", ephemeral=True)
+
+        if not self.selected_spell:
+            return await interaction.response.send_message("⚠️ Select a spell from the dropdown first!", ephemeral=True)
+
+        wizard = self.cog.wizards[self.user_id]
+        spell = self.cog.spells[self.selected_spell]
+        price = spell['power'] * 100
+
+        if self.selected_spell in wizard['spells']:
+            return await interaction.response.send_message("✅ You already own this spell!", ephemeral=True)
+
+        if wizard['gold'] < price:
+            return await interaction.response.send_message(
+                f"❌ Not enough gold! Need **{price}**, you have **{wizard['gold']}**.", ephemeral=True
+            )
+
+        # Process purchase
+        wizard['gold'] -= price
+        wizard['spells'].append(self.selected_spell)
+        self.cog.save_data()
+
+        te = TYPE_EMOJIS.get(spell['type'], "✨")
+        available_spells = [s for s in self.cog.spells.keys() if s not in wizard['spells']]
+
+        new_embed = discord.Embed(
+            title="💰 Spell Shop",
+            description=f"Your Gold: **{wizard['gold']}**\nSelect a spell from the dropdown to preview it, then click **💰 Buy Spell** to purchase.",
+            color=discord.Color.gold(),
+        )
+        by_school: dict = {}
+        for s in available_spells:
+            sp = self.cog.spells[s]
+            by_school.setdefault(sp['school'], []).append((s, sp))
+        for school, spells in by_school.items():
+            se = SCHOOL_EMOJIS.get(school, "🔮")
+            lines = [f"{TYPE_EMOJIS.get(sp['type'], '✨')} **{sn}** — {sp['power'] * 100} Gold" for sn, sp in spells]
+            new_embed.add_field(name=f"{se} {school}", value="\n".join(lines), inline=True)
+        if not available_spells:
+            new_embed.add_field(name="🎉 Collection Complete!", value="You own all available spells!", inline=False)
+
+        new_view = ShopView(self.cog, self.user_id, available_spells) if available_spells else None
+        await interaction.response.edit_message(
+            content=f"✅ Purchased **{te} {self.selected_spell}** for **{price} Gold**!",
+            embed=new_embed,
+            view=new_view,
+        )
+
+
 class WizardWars(commands.Cog):
     """Wizard Wars - Spell-Based MMO Strategy System"""
     
     def __init__(self, bot):
         self.bot = bot
-        self.data_file = "wizard_wars_data.json"
+        _data_dir = os.getenv("RENDER_DISK_PATH", "data")
+        os.makedirs(_data_dir, exist_ok=True)
+        self.data_file = os.path.join(_data_dir, "wizard_wars_data.json")
         self.load_data()
         
         # Spell Database
@@ -100,7 +229,7 @@ class WizardWars(commands.Cog):
             self.leaderboards = {}
     
     def save_data(self):
-        """Save wizard wars data to JSON"""
+        """Save wizard wars data to JSON (atomic write)"""
         data = {
             'wizards': self.wizards,
             'guilds': self.guilds,
@@ -108,8 +237,17 @@ class WizardWars(commands.Cog):
             'events': self.active_events,
             'leaderboards': self.leaderboards
         }
-        with open(self.data_file, 'w') as f:
-            json.dump(data, f, indent=4)
+        tmp = self.data_file + ".tmp"
+        try:
+            with open(tmp, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4)
+            os.replace(tmp, self.data_file)
+        except Exception as e:
+            print(f"[WizardWars] Save error: {e}")
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
     
     def create_wizard(self, user_id: str, username: str) -> dict:
         """Create a new wizard profile"""
@@ -645,39 +783,39 @@ class WizardWars(commands.Cog):
     async def shop_action(self, interaction: discord.Interaction):
         """Spell shop"""
         user_id = str(interaction.user.id)
-        
+
         if user_id not in self.wizards:
             await interaction.response.send_message(
                 "🧙 You need to create a wizard first! Use `/ww create`",
                 ephemeral=True
             )
             return
-        
+
         wizard = self.wizards[user_id]
-        
+        available_spells = [s for s in self.spells.keys() if s not in wizard['spells']]
+
         embed = discord.Embed(
             title="💰 Spell Shop",
-            description=f"Your Gold: **{wizard['gold']}**",
-            color=discord.Color.gold()
+            description=f"Your Gold: **{wizard['gold']}**\nSelect a spell from the dropdown to preview it, then click **💰 Buy Spell** to purchase.",
+            color=discord.Color.gold(),
         )
-        
-        # Show some available spells
-        available_spells = [s for s in self.spells.keys() if s not in wizard['spells']][:10]
-        
-        shop_text = ""
+
+        # Group by school
+        by_school: dict = {}
         for spell_name in available_spells:
             spell = self.spells[spell_name]
-            price = spell['power'] * 100
-            shop_text += f"**{spell_name}** - {price} Gold\n"
-        
-        embed.add_field(name="🔮 Available Spells", value=shop_text or "You own all spells!", inline=False)
-        embed.add_field(
-            name="🔧 Coming Soon",
-            value="Interactive spell purchasing system!",
-            inline=False
-        )
-        
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+            by_school.setdefault(spell['school'], []).append((spell_name, spell))
+
+        for school, spells in by_school.items():
+            se = SCHOOL_EMOJIS.get(school, "🔮")
+            lines = [f"{TYPE_EMOJIS.get(sp['type'], '✨')} **{sn}** — {sp['power'] * 100} Gold" for sn, sp in spells]
+            embed.add_field(name=f"{se} {school}", value="\n".join(lines), inline=True)
+
+        if not available_spells:
+            embed.add_field(name="🎉 Collection Complete!", value="You own all available spells!", inline=False)
+
+        view = ShopView(self, user_id, available_spells) if available_spells else None
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
     async def profile_action(self, interaction: discord.Interaction):
         """View wizard profile"""

@@ -1,209 +1,258 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
+
+
+PAGES = [
+    {
+        "title": "\U0001f3ae Welcome to Ludus \u2014 The Ultimate Discord MMO",
+        "description": (
+            "Ludus is a full-featured Discord bot packed with games, economy, social systems, and server-wide events.\n\n"
+            "**What's inside:**\n"
+            "\U0001f4b0 Deep economy with coins, shops & sub-currencies\n"
+            "\U0001f3b2 50+ games \u2014 board, card, casino, arcade, puzzle\n"
+            "\U0001f3a3\u26cf\ufe0f\U0001f69c Fishing, Mining & Farming simulators\n"
+            "\U0001f43e Adoptable pets with real gameplay bonuses\n"
+            "\u2694\ufe0f DnD-style RPG (Infinity Adventure)\n"
+            "\U0001f30d Cross-server Global Events\n"
+            "\U0001f4dc Daily quests & achievement system\n\n"
+            "Use `L!help` or `/help` to explore all commands."
+        ),
+        "color": discord.Color.gold(),
+    },
+    {
+        "title": "\U0001f4b0 Economy & Shop",
+        "description": (
+            "**Earning PsyCoins:**\n"
+            "\u2022 `L!daily` \u2014 300\u20132000+ coins + streak bonus + pet bonus\n"
+            "\u2022 Win minigames, gambling, fishing, farming, mining\n"
+            "\u2022 Complete quests and achievements\n"
+            "\u2022 Participate in global events\n\n"
+            "**Spending:**\n"
+            "\u2022 `L!shop` \u2014 Browse the item shop\n"
+            "\u2022 Upgrade fishing rods, mining pickaxes, farm tools\n"
+            "\u2022 Buy card deck cosmetics, boosts, pet access\n\n"
+            "**Sub-currencies:** FishCoins \U0001f41f, MineCoins \u26cf\ufe0f, FarmCoins \U0001f33e\n"
+            "Convert them: `L!convert <amount> <currency>`\n\n"
+            "\U0001f4ca `L!balance` \u00b7 `L!leaderboard` \u00b7 `L!inventory`"
+        ),
+        "color": discord.Color.green(),
+    },
+    {
+        "title": "\U0001f3b0 Gambling & Casino",
+        "description": (
+            "All games support bets from **10 to 10,000** coins.\n\n"
+            "**Games:**\n"
+            "\u2022 `/slots` \u2014 Spin the slot machine\n"
+            "\u2022 `/blackjack` \u2014 Beat the dealer at 21\n"
+            "\u2022 `/poker` \u2014 Texas Hold'em vs dealer\n"
+            "\u2022 `/crash` \u2014 Cash out before it crashes\n"
+            "\u2022 `/mines` \u2014 Minesweeper gambling (1\u201324 mines)\n"
+            "\u2022 `/roulette` \u2014 Red, black, or number\n"
+            "\u2022 `/coinflip` \u2014 50/50 double-or-nothing\n"
+            "\u2022 `/dice` \u2014 Bet on a number\n\n"
+            "\U0001f4c8 `/odds` \u2014 See win rates   \u2022   `/gambling_stats` \u2014 Your history\n"
+            "\u26a0\ufe0f Gamble responsibly!"
+        ),
+        "color": discord.Color.from_rgb(255, 165, 0),
+    },
+    {
+        "title": "\U0001f3a3\u26cf\ufe0f\U0001f69c Fishing \u00b7 Mining \u00b7 Farming",
+        "description": (
+            "**\U0001f3a3 Fishing:**\n"
+            "Cast your line across 5 areas (pond \u2192 ocean \u2192 trench).\n"
+            "Upgrade rods, unlock bait, collect rare fish.\n"
+            "`/fish cast` \u00b7 `/fish shop` \u00b7 `/fish stats`\n\n"
+            "**\u26cf\ufe0f Mining:**\n"
+            "Explore a 2D world map. Dig for coal, iron, gold, diamond, emerald.\n"
+            "Upgrade pickaxes, sell ores, share world with server.\n"
+            "`/mine` \u00b7 guild config: `shared_mining_world`\n\n"
+            "**\U0001f69c Farming:**\n"
+            "Plant, water, harvest crops across seasons.\n"
+            "Keep animals, breed hybrids, decorate your farm.\n"
+            "`/farm view` \u00b7 `/farm plant <crop>` \u00b7 `/farm harvest`\n\n"
+            "\U0001f43e **Pets boost all three!** Hungry pets can damage crops."
+        ),
+        "color": discord.Color.from_rgb(139, 195, 74),
+    },
+    {
+        "title": "\U0001f3b2 Board & Card Games",
+        "description": (
+            "**Board Games:**\n"
+            "\u2022 Tic-Tac-Toe (minimax AI, 3x3/4x4/5x5)\n"
+            "\u2022 Connect 4, Hangman, Scrabble, Backgammon, Tetris\n"
+            "\u2022 Chess \u265f\ufe0f (PIL rendered, 6 themes, bot AI)\n"
+            "\u2022 Checkers (king moves, multi-jump)\n"
+            "\u2022 Monopoly \U0001f3a9 (28 properties, houses/hotels, 2\u20136 players)\n\n"
+            "**Card Games:**\n"
+            "\u2022 UNO \U0001f0cf (Classic, Flip, No Mercy, 2\u201310 players)\n"
+            "\u2022 Blackjack, Poker, Go Fish, War, Solitaire, Crazy Eights\n\n"
+            "**Prefix:** `L!chess @user` \u00b7 `L!ttt` \u00b7 `/monopoly start`\n"
+            "All games award **PsyCoins** on win!"
+        ),
+        "color": discord.Color.blue(),
+    },
+    {
+        "title": "\u2694\ufe0f RPG \u2014 Infinity Adventure & Wizard Wars",
+        "description": (
+            "**\U0001f5fa\ufe0f Infinity Adventure (DnD-style):**\n"
+            "A full narrative RPG with 9 gate dimensions.\n"
+            "Create a character (Warrior/Mage/Rogue/Healer), explore rooms,\n"
+            "fight enemies, find artefacts, survive death.\n"
+            "Bilingual (EN/PL) \u2014 persistent save per user.\n"
+            "`/dnd start`\n\n"
+            "**\U0001f9d9 Wizard Wars:**\n"
+            "32 spells across 4 schools (Elemental, Cosmic, Forbidden, Divine).\n"
+            "6 spell combos \u2014 e.g. Gravity Well + Black Hole \u2192 Singularity.\n"
+            "Duel other wizards, conquer territories, earn Gold.\n"
+            "`/wizardwars`\n\n"
+            "**\U0001f4dc Daily Quests & Achievements:**\n"
+            "`L!quests` \u00b7 `L!achievements` \u2014 earn coins + TCG card rewards"
+        ),
+        "color": discord.Color.dark_purple(),
+    },
+    {
+        "title": "\U0001f30d Global Events",
+        "description": (
+            "Events are **cross-server** \u2014 all guilds participate at once!\n\n"
+            "**\u2694\ufe0f Faction War** `L!event war [hours]`\n"
+            "Join one of 4 factions (iron/ash/void/sky).\n"
+            "Earn war points by winning games. Winning faction: **10k coins**.\n"
+            "`L!joinfaction <name>` \u00b7 `L!warleaderboard`\n\n"
+            "**\U0001f409 World Boss** `L!event worldboss [boss]`\n"
+            "Shared global HP across ALL servers.\n"
+            "Click \u2694\ufe0f Attack! or `L!attack` (30s cooldown).\n"
+            "Rewards: 5k base + damage bonus + top-10 bonus + 15k last-hit.\n"
+            "`L!bossstats`\n\n"
+            "**\U0001f3af Target Hunt** `L!event hunt [minutes]`\n"
+            "Random challenges broadcast to every server.\n"
+            "Speed completions = points for your server."
+        ),
+        "color": discord.Color.red(),
+    },
+    {
+        "title": "\U0001f43e Pets & Social",
+        "description": (
+            "**Pets (16 species, 5 rarities):**\n"
+            "Adopt a pet with `L!pet adopt` (first one free).\n"
+            "Feed, play, walk \u2014 neglect causes hunger & sadness.\n"
+            "Pets provide real bonuses: fishing multiplier, mining XP,\n"
+            "farm yield, daily coins bonus, gambling luck, and more.\n"
+            "Hungry pets (<40%) can **damage your farm crops**!\n\n"
+            "**Social:**\n"
+            "\u2022 `L!marry @user` \u2014 Propose (10k coins)\n"
+            "\u2022 `L!bank` \u2014 Shared bank with spouse\n"
+            "\u2022 `L!rep give @user` \u2014 Give reputation (24h cooldown)\n"
+            "\u2022 `/hug` `/kiss` `/slap` `/ship` \u2014 Anime GIF reactions\n"
+            "\u2022 `L!roast` \u00b7 `L!compliment` \u00b7 `L!pray` \u00b7 `L!curse`\n\n"
+            "\U0001f4ca `L!profile` \u2014 4-page stats: Overview/Gaming/Economy/Social"
+        ),
+        "color": discord.Color.from_rgb(255, 100, 150),
+    },
+    {
+        "title": "\U0001f4a1 Tips & Quick Start",
+        "description": (
+            "**First 5 minutes:**\n"
+            "1. `L!daily` \u2014 grab your free daily coins\n"
+            "2. `L!balance` \u2014 check your wallet\n"
+            "3. `L!shop` \u2014 browse what you can buy\n"
+            "4. `/fish cast` \u2014 try fishing (free to start)\n"
+            "5. `L!quests` \u2014 pick up a daily quest\n\n"
+            "**Efficient earning:**\n"
+            "\u2022 Daily streak bonus doubles at 7 days\n"
+            "\u2022 Fish in higher areas for rare catches\n"
+            "\u2022 Participate in every global event\n"
+            "\u2022 Pets multiply almost every reward type\n\n"
+            "**Commands:** `L!help` \u00b7 `/help [category]`\n"
+            "**Prefix:** `L!`  \u00b7  **Slash:** `/`\n\n"
+            "\U0001f31f **Have fun \u2014 that's what Ludus is about!**"
+        ),
+        "color": discord.Color.gold(),
+    },
+]
+
+
+class AboutView(discord.ui.View):
+    def __init__(self, author_id: int):
+        super().__init__(timeout=120)
+        self.author_id = author_id
+        self.page = 0
+
+    def build_embed(self) -> discord.Embed:
+        p = PAGES[self.page]
+        embed = discord.Embed(
+            title=p["title"],
+            description=p["description"],
+            color=p["color"]
+        )
+        embed.set_footer(text=f"Page {self.page + 1} / {len(PAGES)}  \u00b7  Ludus Bot")
+        self._update_buttons()
+        return embed
+
+    def _update_buttons(self):
+        self.prev_btn.disabled = self.page == 0
+        self.next_btn.disabled = self.page == len(PAGES) - 1
+
+    async def _check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("This isn't your guide!", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="\u25c4 Prev", style=discord.ButtonStyle.secondary)
+    async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._check(interaction):
+            return
+        self.page -= 1
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(label="Next \u25ba", style=discord.ButtonStyle.primary)
+    async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._check(interaction):
+            return
+        self.page += 1
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(label="\u2715 Close", style=discord.ButtonStyle.danger)
+    async def close_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._check(interaction):
+            return
+        await interaction.message.delete()
+        self.stop()
+
 
 class About(commands.Cog):
-    """About command - Learn about the bot"""
-    
     def __init__(self, bot):
         self.bot = bot
-    
-    @commands.command(name="about")
-    async def about(self, ctx):
-        """Learn everything about Ludus - The Ultimate Minigame Bot!"""
-        
-        pages = []
-        
-        # Page 1: Welcome
-        page1 = discord.Embed(
-            title="🎮 Welcome to LUDUS - The Ultimate Minigame Bot! 🎮",
-            description="**Your all-in-one entertainment powerhouse!**\n\n"
-                       "Ludus isn't just a bot... it's an **EXPERIENCE**!\n\n"
-                       "💰 Economy System\n"
-                       "🎲 Epic Minigames\n"
-                       "🌍 Global Server Events\n"
-                       "🐟 Fishing & Farming\n"
-                       "🎪 Fun Commands\n"
-                       "⚔️ PvP Battles\n\n"
-                       "**Ready to dive in? Let's go!** →",
-            color=discord.Color.gold()
-        )
-        page1.set_footer(text="Page 1/8 • React with ➡️ to continue")
-        pages.append(page1)
-        
-        # Page 2: Economy
-        page2 = discord.Embed(
-            title="💰 ECONOMY SYSTEM",
-            description="**Earn, save, and flex your PsyCoins!**\n\n"
-                       "**💸 Earn Money:**\n"
-                       "• `/work` - Get a job and earn coins\n"
-                       "• `/daily` - Claim daily rewards\n"
-                       "• `/fish` - Catch valuable fish\n"
-                       "• `/slots` - Try your luck at the casino\n"
-                       "• Win minigames for BIG payouts!\n\n"
-                       "**📊 Check Stats:**\n"
-                       "• `/balance` - See your wealth\n"
-                       "• `/leaderboard` - Who's the richest?\n\n"
-                       "**Pro Tip:** Save coins for fishing equipment and farm upgrades! 🎣🚜",
-            color=discord.Color.green()
-        )
-        page2.set_footer(text="Page 2/8")
-        pages.append(page2)
-        
-        # Page 3: Puzzle & Arcade Games
-        page3 = discord.Embed(
-            title="🎯 PUZZLE & ARCADE GAMES",
-            description="**Brain teasers and fast-paced action!**\n\n"
-                       "**🧩 Puzzle Games:**\n"
-                       "• `/game minesweeper` - Click and pray! 💣\n"
-                       "• `/game memory` - Remember the pattern 🧠\n"
-                       "• `/game codebreaker` - Crack the code 🔐\n"
-                       "• `/game clue` - Solve murder mysteries 🕵️\n\n"
-                       "**🎮 Arcade Games:**\n"
-                       "• `/arcade pacman` - Eat pellets, dodge ghosts! 👾\n"
-                       "• `/arcade mathgame` - Speed math challenges 🧮\n"
-                       "• `/arcade bombdefuse` - Cut the right wire! 💣\n\n"
-                       "**Rewards:** Big coin payouts for winners! 💰",
-            color=discord.Color.purple()
-        )
-        page3.set_footer(text="Page 3/8")
-        pages.append(page3)
-        
-        # Page 4: Board & Card Games
-        page4 = discord.Embed(
-            title="🎲 BOARD & CARD GAMES",
-            description="**Classic games with friends!**\n\n"
-                       "**🎯 Board Games:**\n"
-                       "• `/ttt start` - Tic-Tac-Toe\n"
-                       "• `/connect4 start` - Connect Four\n"
-                       "• `/chess` - Full chess game! ♟️\n"
-                       "• `/checkers` - Classic checkers\n\n"
-                       "**🃏 Card Games:**\n"
-                       "• `/blackjack` - Beat the dealer! 21\n"
-                       "• `/poker` - Texas Hold'em\n"
-                       "• `/uno` - UNO! Say it loud! 🎉\n\n"
-                       "**🎰 Casino:**\n"
-                       "• `/slots` - Spin to win!\n"
-                       "• `/roulette` - Red or black?\n\n"
-                       "**Note:** Use command groups for efficiency!",
-            color=discord.Color.blue()
-        )
-        page4.set_footer(text="Page 4/8")
-        pages.append(page4)
-        
-        # Page 5: Fishing & Farming
-        page5 = discord.Embed(
-            title="🎣 FISHING & FARMING EMPIRE",
-            description="**Build your aquatic & agricultural empire!**\n\n"
-                       "**🐟 FISHING SYSTEM:**\n"
-                       "• `/fish` - Cast your line! (30s cooldown)\n"
-                       "• `/fishzone <zone>` - Travel to special zones:\n"
-                       "  - 🌿 Pond (free) - Common fish\n"
-                       "  - 🌊 Ocean (50 coins) - Better catches\n"
-                       "  - ❄️ Arctic (100 coins) - Rare creatures\n"
-                       "  - 🏝️ Tropical (75 coins) - Exotic fish\n"
-                       "  - 🌑 Abyss (200 coins) - LEGENDARY fish!\n"
-                       "• `/aquarium` - View your collection\n"
-                       "• `/sellfish` - Convert to cash\n"
-                       "• `/fishingrod` - Upgrade equipment\n"
-                       "• `/fishingtournament` - Server competitions!\n\n"
-                       "**🌾 FARMING:**\n"
-                       "• `/farm view` - Check your farm\n"
-                       "• `/farm plant <crop>` - Grow crops\n"
-                       "• `/farm harvest` - Collect your harvest\n"
-                       "• `/farm sell` - Profit! 💰\n"
-                       "**Seasons** change daily with bonuses!",
-            color=discord.Color.green()
-        )
-        page5.set_footer(text="Page 5/8")
-        pages.append(page5)
-        
-        # Page 6: Fun & Social
-        page6 = discord.Embed(
-            title="🎪 FUN & SOCIAL COMMANDS",
-            description="**Entertainment and laughs!**\n\n"
-                       "**🎭 Fun Commands:**\n"
-                       "• `/animal` - Random animal pics 🐶🐱\n"
-                       "• `/fact <category>` - Cool facts!\n"
-                       "  Categories: animal, car, human, history, random\n"
-                       "• `/meme` - Browse meme templates\n"
-                       "• `/guessthesong` - Music quiz! 🎵\n"
-                       "• `/joke` - Get a random joke\n"
-                       "• `/eightball <question>` - Ask the magic 8-ball\n"
-                       "• `/akinator start` - Mind-reading game!\n"
-                       "• `/icecream` - Build custom sundaes 🍦\n\n"
-                       "**😎 Social:**\n"
-                       "• `/profile` - Your stats\n"
-                       "• `/marry` - Propose to someone!\n"
-                       "• `/pet` - Adopt virtual pets\n\n"
-                       "**Pro Tip:** Daily interaction = more coins!",
-            color=discord.Color.orange()
-        )
-        page6.set_footer(text="Page 6/8")
-        pages.append(page6)
-        
-        # Page 7: Global Events
-        page7 = discord.Embed(
-            title="🌍 GLOBAL SERVER EVENTS (Epic!)",
-            description="**The ULTIMATE competitive experience!**\n\n"
-                       "**⚔️ SERVER VS SERVER WAR:**\n"
-                       "• Owner starts with `L!event war [hours]`\n"
-                       "• Choose a faction: Iron Legion, Ashborn, Voidwalkers, Skybound\n"
-                       "• Earn war points by winning games!\n"
-                       "• `L!joinfaction <name>` to join\n"
-                       "• `L!warleaderboard` to check standings\n"
-                       "• **Winner takes all!** 💰👑\n\n"
-                       "**🐉 WORLD BOSS RAIDS:**\n"
-                       "• Owner spawns with `L!event worldboss`\n"
-                       "• **GLOBAL HP** shared across ALL servers!\n"
-                       "• `L!attack` to deal damage (30s cooldown)\n"
-                       "• `L!bossstats` to check progress\n"
-                       "• Top damage dealers + last hit = HUGE rewards!\n"
-                       "• Everyone who participates gets paid! 💎\n\n"
-                       "**🎯 TARGET HUNT:**\n"
-                       "• Global scavenger hunt\n"
-                       "• Random challenges appear\n"
-                       "• First to complete = points!\n"
-                       "• Server with most points wins\n\n"
-                       "**More events coming soon!**",
-            color=discord.Color.red()
-        )
-        page7.set_footer(text="Page 7/8")
-        pages.append(page7)
-        
-        # Page 8: Tips & Help
-        page8 = discord.Embed(
-            title="💡 PRO TIPS & GETTING HELP",
-            description="**Master the bot like a pro!**\n\n"
-                       "**💰 Money Making Tips:**\n"
-                       "1. Do your `/daily` EVERY DAY\n"
-                       "2. Fish in better zones for rare catches\n"
-                       "3. Upgrade your fishing rod ASAP\n"
-                       "4. Plant high-value crops during bonus seasons\n"
-                       "5. Participate in global events for MASSIVE payouts\n"
-                       "6. Win minigames = instant cash!\n\n"
-                       "**🎮 Gaming Tips:**\n"
-                       "• Use command groups: `/ttt start` instead of separate commands\n"
-                       "• Join tournaments for extra rewards\n"
-                       "• Play different games to discover what you're best at!\n\n"
-                       "**📚 Need Help?**\n"
-                       "• `/help` - See all commands by category\n"
-                       "• `/help <category>` - Detailed command info\n"
-                       "• `L!help` - Prefix commands\n\n"
-                       "**🌟 HAVE FUN! That's what Ludus is all about! 🎉**",
-            color=discord.Color.gold()
-        )
-        page8.set_footer(text="Page 8/8 • You're ready to dominate!")
-        pages.append(page8)
-        
-        # Send all pages sequentially in DMs
+
+    async def _send_dm(self, user: discord.User | discord.Member, ctx_or_interaction):
+        view = AboutView(user.id)
+        embed = view.build_embed()
+        is_slash = isinstance(ctx_or_interaction, discord.Interaction)
         try:
-            for page in pages:
-                await ctx.author.send(embed=page)
-            
-            await ctx.send(f"📬 Check your DMs! I sent you the full guide (8 pages)! 🎮")
-        
+            dm = await user.create_dm()
+            await dm.send(embed=embed, view=view)
+            msg = "\U0001f4ec Check your DMs for the interactive Ludus guide!"
+            if is_slash:
+                await ctx_or_interaction.response.send_message(msg, ephemeral=True)
+            else:
+                await ctx_or_interaction.send(msg)
         except discord.Forbidden:
-            await ctx.send(f"❌ I couldn't DM you! Please enable DMs from server members.")
+            msg = "\u274c I couldn't DM you! Please enable DMs from server members, then try again."
+            if is_slash:
+                await ctx_or_interaction.response.send_message(msg, ephemeral=True)
+            else:
+                await ctx_or_interaction.send(msg)
+
+    @commands.command(name="about")
+    async def about_prefix(self, ctx):
+        """Interactive guide to Ludus sent to your DMs."""
+        await self._send_dm(ctx.author, ctx)
+
+    @app_commands.command(name="about", description="Get an interactive guide to everything Ludus has to offer (sent to DMs)")
+    async def about_slash(self, interaction: discord.Interaction):
+        await self._send_dm(interaction.user, interaction)
+
 
 async def setup(bot):
     await bot.add_cog(About(bot))
