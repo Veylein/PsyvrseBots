@@ -455,6 +455,7 @@ Complete analysis of help.py, help_system.py, about.py, utilities.py, serverinfo
   - Rare event system: 1% per-command chance, 5 event types (Lucky Day, Mystical Shroom, Ludus Blessing, Cosmic Key, Cloud Nine) — economy integration pending
   - Slash `/personality` + prefix `L!setpersonalitychannels`, `L!personality`, `L!vibe`, `L!easter`, `L!mood`
   - `Intelligence` cog (disabled): flat knowledge base, `googletrans` multilingual support, `fuzzywuzzy` matching — superseded by `LudusPersonality`
+  - **`knowledge.json` deep-dive** (1,263 lines): 5 sections — `identity` (~90 favorites, full persona), `faq` (~150+ Q&A pairs: elements, world capitals, literature, Discord usage, capabilities), `general_knowledge` (formulas, lists, physics/chemistry/biology), `user_taught` (runtime-learned, starts empty, async-locked writes), `conversations` (greeting pools); hot-reload via mtime check; JSON syntax bug identified on line ~128
   - **Undocumented cogs audit**: `simulations.py`, `onboarding.py`, `perimeter_explicit.py`, `professional_info.py` identified as missing from Parts 1–15
   - **~8,000 words of documentation**
 

@@ -565,35 +565,217 @@ Simple inline statement learning was also supported: `"X is Y"` → automaticall
 ## Shared Data: knowledge.json
 
 **File:** `knowledge.json` (project root)  
-**Used by:** Both `LudusPersonality` (active) and `Intelligence` (disabled)
+**Total lines:** 1,263  
+**Used by:** `LudusPersonality` (active) · `Intelligence` (disabled, reads same file)  
+**Written by:** `LudusPersonality._save_knowledge()` (runtime user-taught entries)
 
-The active format used by `LudusPersonality`:
+This is the brain of the bot's conversational AI. It is a single JSON file with five top-level sections, each serving a different role in the answer lookup chain.
+
+---
+
+### Top-level structure
+
+```
+knowledge.json
+├── identity          — Who Ludus is (persona, favorites)
+├── faq               — Pre-written Q&A pairs (~150+ entries)
+├── general_knowledge — Facts, lists, formulas (~50+ entries)
+├── user_taught       — Answers learned at runtime from users (starts empty)
+└── conversations     — Greeting/farewell phrase pools
+```
+
+---
+
+### 1. `identity`
+
+Defines the bot's full persona, referenced when users ask identity questions.
+
+| Sub-key | Content |
+|---------|---------|
+| `name` | `"Ludus"` |
+| `creator` | `"Psyvrse Development"` |
+| `personality` | Long narrative description of Ludus's character |
+| `favorites` | Nested object with ~90 typed favorite entries |
+
+#### `favorites` — full category list
+
+The `favorites` sub-object has ~90 keys covering virtually every pop-culture and knowledge domain. Selected examples:
+
+| Key | Value |
+|-----|-------|
+| `color` | `"Moonstone adularescence, it isn't exactly a color but it is beautiful"` |
+| `game` | `"UNO, chess, Dungeons & Dragons, Portal 2, Tetris"` |
+| `animal` | `"Red Panda (Pax is my best friend)"` |
+| `number` | `"42"` |
+| `programming_language` | `"Python"` |
+| `app` | `"Discord"` |
+| `music` | `"Lo-fi beats, synthwave, jazz, classical"` |
+| `movie` | `"The Matrix, Spirited Away, Interstellar, Inception"` |
+| `book` | `"The Hitchhiker's Guide to the Galaxy, Sapiens, Dune"` |
+| `scientist` | `"Albert Einstein, Ada Lovelace, Marie Curie"` |
+| `dinosaur` | `"Tyrannosaurus Rex, fun fact: the name means 'Tyrant Lizard King'!"` |
+| `joke` | `"Why did the computer go to art school? Because it had a lot of bytes to express!"` |
+| `dance` | `"Robot"` |
+| `paradox` | `"Ship of Theseus"` |
+
+Full category list: `color`, `city`, `country`, `continent`, `planet`, `star`, `constellation`, `element`, `animal`, `bird`, `fish`, `insect`, `reptile`, `amphibian`, `mammal`, `dinosaur`, `mythical_creature`, `game`, `sport`, `hobby`, `food`, `drink`, `fruit`, `vegetable`, `dessert`, `snack`, `season`, `weather`, `flower`, `tree`, `music`, `song`, `genre_of_music`, `band`, `singer`, `composer`, `show`, `movie`, `book`, `author`, `poet`, `artist`, `scientist`, `mathematician`, `philosopher`, `historical_figure`, `inventor`, `explorer`, `actor`, `actress`, `comedian`, `superhero`, `villain`, `video_game_character`, `cartoon_character`, `anime`, `manga`, `comic`, `board_game`, `card_game`, `puzzle`, `riddle`, `joke`, `quote`, `language`, `subject`, `school_subject`, `holiday`, `festival`, `myth`, `legend`, `fairy_tale`, `fable`, `animal_sound`, `emoji`, `color_palette`, `shape`, `number`, `prime_number`, `math_constant`, `science_field`, `technology`, `invention`, `tool`, `app`, `website`, `platform`, `operating_system`, `programming_language`, `algorithm`, `data_structure`, `font`, `meme`, `dance`, `sport_team`, `car`, `transport`, `spacecraft`, `planetary_feature`, `star_cluster`, `galaxy`, `black_hole`, `quantum_particle`, `chemical_reaction`, `experiment`, `paradox`, `riddle_type`, `board_game_piece`, `card_suit`, `dice`, `superpower`, `dream_job`, `favorite_quote`
+
+---
+
+### 2. `faq`
+
+Pre-written conversational question-answer pairs. **~150+ entries** covering:
+
+#### Discord / bot usage
+
+| Question | Answer (summary) |
+|----------|-----------------|
+| `"how do i use the bot"` | Explains `Hey Ludus`, `@mention`, and `L!` prefix |
+| `"how do i get currency"` | Explains games, daily rewards, trading |
+| `"what are psycoins"` | Main server currency description |
+| `"how do i teach you"` | Explains the learning system |
+| `"can you play chess"` | Yes, also UNO, trivia, etc. |
+| `"can you explain roles in discord"` | Full explanation of role system |
+| `"can you explain channels in discord"` | Text/voice channels, permissions |
+| `"can you explain bots in discord"` | What bots are and how they work |
+| `"can you explain how to make a bot for discord"` | Full guide (Developer Portal, discord.py) |
+
+#### Science & knowledge
+
+| Question | Answer (summary) |
+|----------|-----------------|
+| `"What is pi?"` | `"Pi is approximately 3.14159..."` |
+| `"What is the meaning of life?"` | `"42 (according to HHGTTG)..."` |
+| `"What two colors create red?"` | Explains primary color in RGB/CMYK |
+| World capitals (20+ countries) | e.g. `"What is the capital of Japan?" → "Tokyo"` |
+| `"Who is the president of the United States?"` | `"As of 2026, the president is Joe Biden."` |
+| `"What is the largest country in the world?"` | `"Russia"` |
+| Chemical elements (~90 entries) | Symbol + usage for every element in the periodic table |
+
+#### Literature
+
+50+ entries: `"Who wrote Hamlet?"`, `"What is 1984 about?"`, `"Who wrote The Lord of the Rings?"`, etc. — covers major classics from Shakespeare to Tolstoy to Tolkien to Rowling.
+
+#### Capabilities / personality
+
+~50 entries prefixed with `"can you help me with..."`:  
+`homework`, `coding`, `math`, `science`, `history`, `geography`, `trivia`, `philosophy`, `writing`, `music`, `cooking`, `health`, `memes`, `fashion`, `travel`, `languages`, `relationships`, `pets`, `gardening`, `finance`, `careers`, `goals`, `motivation`, `organization`, `time management`, `leadership`, `teamwork`, `creativity`, `critical thinking`, `emotional intelligence`, `public speaking`, `negotiation`, `conflict resolution`, `mindfulness`, `gratitude`, `happiness`, `resilience`, `decision making`, `memory`, `learning`, `fun`, and more.
+
+#### Easter egg entry
 
 ```json
-{
-  "identity": {
-    "name": "Ludus",
-    "creator": "Psyvrse Development",
-    "favorites": {
-      "color": "purple",
-      "game": "Minecraft"
-    }
-  },
-  "faq": { },
-  "general_knowledge": { },
-  "user_taught": {
-    "normalized question key": {
-      "question": "original question text",
-      "answer": "answer text",
-      "taught_by": null,
-      "taught_at": "ISO8601 timestamp"
-    }
-  },
-  "conversations": { }
+"Who discovered the first bug with Ludus?": "nat_is_real did."
+```
+
+---
+
+### 3. `general_knowledge`
+
+Flat key→value store for encyclopedic facts that don't fit the FAQ format:
+
+| Key | Content |
+|-----|---------|
+| `abcs` | Full alphabet string |
+| `colors` | 200+ color names including neon variants |
+| `numbers 1 to 100` | Full numeric sequence |
+| `prime_numbers_1_to_100` | All primes 2–97 |
+| `fibonacci_1_to_21` | First 21 Fibonacci numbers |
+| `greek_alphabet` | Full Greek alphabet |
+| `planets` | Solar system planets (including Pluto as dwarf) |
+| `continents` | All 7 continents |
+| `elements` | All ~118 elements by name |
+| Chemical formulas | `h2o`, `co2`, `nacl`, `o2`, `c6h12o6`, `ch4`, `nh3`, `hcl`, `h2so4`, `naoh`, `caffeine formula` |
+| Physics equations | `e=mc2`, `force equation`, `velocity equation`, `density equation`, `pythagorean theorem`, `area of a circle`, `circumference of a circle`, `photosynthesis equation`, `cellular respiration equation` |
+| Biology | `mitosis`, `meiosis`, `big bang theory`, `evolution`, `natural selection` |
+| Literary devices | `haiku`, `sonnet`, `alliteration`, `hyperbole`, `personification`, `onomatopoeia` |
+
+---
+
+### 4. `user_taught`
+
+**Empty on first run.** Filled at runtime as users teach Ludus new answers.
+
+```json
+"user_taught": {
+  "normalized question text": {
+    "question": "original question as asked",
+    "answer": "answer provided by user",
+    "taught_by": null,
+    "taught_at": "2026-03-05T14:23:11.000000+00:00"
+  }
 }
 ```
 
-> `taught_by` is always `null` — user IDs are **never stored** for privacy.
+Key format: normalized via `_normalize_question_text()` — lowercased, punctuation stripped except apostrophes, whitespace collapsed.
+
+> `taught_by` is always stored as `null` — user IDs are **never persisted** for privacy.
+
+Writes are protected by `asyncio.Lock` (`knowledge_lock`) to prevent race conditions when multiple users trigger learning simultaneously. The file is immediately flushed to disk after every new entry.
+
+---
+
+### 5. `conversations`
+
+Pools of random phrases used for greetings and farewells. The `LudusPersonality` cog does not directly use this section (it handles greetings through trigger-based responses), but the legacy `Intelligence` cog read these lists for `on_message` greeting detection.
+
+```json
+"conversations": {
+  "greetings": [
+    "Hello!", "Hi there!", "Hey!", "Greetings, friend!",
+    "Yo!", "What's up?", "Howdy!", "Salutations!",
+    "Ahoy!", "Bonjour!", "Hola!", "Ciao!", "Kon'nichiwa!",
+    "Hey, legend!", "Hey, superstar!", "Hey, genius!",
+    ... (~55 entries total)
+  ],
+  "farewells": [ ... ]
+}
+```
+
+---
+
+### Hot-reload mechanism
+
+The cog does not lock `knowledge.json` between requests — instead, it uses mtime-based cache invalidation:
+
+```python
+def _refresh_knowledge_if_needed(self):
+    current_mtime = os.path.getmtime(self.knowledge_path)
+    if current_mtime != self.knowledge_mtime:
+        self.knowledge_data = self._load_knowledge()
+```
+
+This means `knowledge.json` can be **edited manually on disk** while the bot is running, and changes will be picked up automatically on the next message event.
+
+---
+
+### Lookup priority order
+
+When Ludus receives a question, `_get_known_answer()` searches in this order:
+
+```
+1. identity.favorites  ← "what is your favorite X"
+2. user_taught         ← user-taught answers (runtime)
+3. faq                 ← pre-written Q&A pairs
+4. identity            ← identity keys (name, creator, personality)
+5. general_knowledge   ← encyclopedic facts
+```
+
+Earlier sections take priority. User-taught answers (section 2) intentionally override `faq` (section 3) if they conflict, allowing the community to update stale answers.
+
+---
+
+### Known issue: JSON syntax error in faq
+
+Line ~128 of `knowledge.json` contains a missing comma between two FAQ entries:
+
+```json
+"Ludus who is your daddy": "I don't have a daddy, but I guess Psyvrse would be... Odd question to ask an API, woudln't you agree?"
+"how do i get currency": "Earn currency..."
+```
+
+The missing comma between these entries is a JSON syntax error. Python's `json.load()` will raise a `json.JSONDecodeError` when loading the file. The `_load_knowledge()` method handles this gracefully by falling back to the default empty structure — but this means **all knowledge.json content is silently lost** until the syntax error is fixed.
+
+> **Fix required:** Add a comma after the `"Ludus who is your daddy"` entry's closing quote.
 
 ---
 
