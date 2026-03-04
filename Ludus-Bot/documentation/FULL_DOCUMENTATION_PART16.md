@@ -764,18 +764,16 @@ Earlier sections take priority. User-taught answers (section 2) intentionally ov
 
 ---
 
-### Known issue: JSON syntax error in faq
+### Fixed: JSON syntax error in faq (resolved 2026-03-05)
 
-Line ~128 of `knowledge.json` contains a missing comma between two FAQ entries:
+Line ~128 of `knowledge.json` had a missing comma between two FAQ entries:
 
 ```json
 "Ludus who is your daddy": "I don't have a daddy, but I guess Psyvrse would be... Odd question to ask an API, woudln't you agree?"
 "how do i get currency": "Earn currency..."
 ```
 
-The missing comma between these entries is a JSON syntax error. Python's `json.load()` will raise a `json.JSONDecodeError` when loading the file. The `_load_knowledge()` method handles this gracefully by falling back to the default empty structure — but this means **all knowledge.json content is silently lost** until the syntax error is fixed.
-
-> **Fix required:** Add a comma after the `"Ludus who is your daddy"` entry's closing quote.
+The missing comma caused a `json.JSONDecodeError` on load, silently falling back to the empty default structure — all 874 FAQ entries and all knowledge were lost at runtime. **Fixed by adding the missing comma.** File now loads correctly (validated: 874 faq entries, 41 general_knowledge entries).
 
 ---
 
