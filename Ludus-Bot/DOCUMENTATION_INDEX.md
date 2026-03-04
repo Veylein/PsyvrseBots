@@ -2,7 +2,7 @@
 
 > **COMPLETE ENGLISH DOCUMENTATION** for the entire Ludus Discord Bot project  
 > 50,000+ lines of code | 90+ Python files | 600+ commands | 450+ games  
-> **Parts 1-11, 13 Complete** ✅ | ~95,000+ words documented
+> **Parts 1-15 + Utils Reference Complete** ✅ | ~145,000+ words documented
 
 ---
 
@@ -390,10 +390,61 @@ Complete analysis of help.py, help_system.py, about.py, utilities.py, serverinfo
 - **~7,500 words of documentation**
 
 ### Technical Reference
-- **PART 12: Admin & Owner Commands**
-- **[📦 PART 13: Data Structures](documentation/FULL_DOCUMENTATION_PART13.md)** — 25+ JSON files fully documented with field-level schemas, types, defaults, and cross-file relationships
-- **PART 14: Integration Guide** (How cogs interact)
-- **PART 15: Deployment** (Docker, Render.com, setup)
+#### **[🔐 PART 12: Admin & Owner Commands](documentation/FULL_DOCUMENTATION_PART12.md)** — 4 cogs: `owner.py`, `blacklist.py`, `gamecontrol.py`, `bot_logger.py`
+  - `owner.py` (1784 lines): Custom Role Manager subsystem (CUSTOM_ROLES_FILE, `load/save_custom_roles`, `apply_custom_roles_to_database` via `sys.modules`, `CustomRoleManagerView` 3-button UI, 2-step creation modal with 65+ valid powers, default faction emojis)
+  - Economy management: `L!godmode` (max 999M coins + all items × 99), `L!setcoins`, `L!addcoins`, `L!removecoins`, `L!resetcoins`, `L!giveitem`
+  - Bot status: `L!status` (playing/watching/listening/competing), `L!presence`, `L!nickname`
+  - Server management: `L!serverlist` (paginated, with invite URLs), `L!restart` (os.execv graceful), `L!leave`, `L!purge`, `L!announce`, `L!dm`, `L!countset`, `L!stats` (7-section analytics), `L!update`
+  - Fishing management: `L!fishing_tournament`, `L!give_fish/bait/rod/boat`, `L!unlock_area`
+  - Fun/chaos: `L!raincoins`, `L!chaos` (100–10k random + 30% item), `L!spinlottery`, `L!spawn` (30s raid boss), `L!cursed` (Zalgo text), `L!hack` (animated), `L!roastme`, `L!vibecheck`
+  - TCG: `L!give_tc`, `L!remove_tc` (legacy TCG cog → psyvrse_tcg fallback)
+  - Debug: `L!eval`, `L!reload`, `L!reloadall`, `L!ownertest`; help: `L!ownerhelp` (`👑` / `owner` / `helpowner`)
+  - `blacklist.py`: BLACKLIST_FILE via RENDER_DISK_PATH, atomic `_load()`/`_save()`, `_build_overview_embed()`, `BlacklistView` (5 buttons), `_InputModal` (4 actions: ban/unban user/server), enforcement via `on_command` + `on_interaction` listeners (fresh read per check)
+  - `gamecontrol.py`: `L!stop` / `/stop` — checks 6 in-memory dicts across 4 cogs (CardGames, FishingAkinatorFun, MiniGames, BoardGames); dict deletion as complete cleanup
+  - `bot_logger.py` (512 lines): `StreamInterceptor(io.TextIOBase)` mirrors stdout/stderr to Discord console channel; `BotLogger` with `log(title, desc, color, fields)` base method; 20+ error type mappings in `on_command_error`; helpers: `log_owner_command`, `log_admin_command`, `log_event_spawn/end`, `log_moderation`, `log_economy` (threshold 1000 coins); lifecycle: `on_ready`, `on_guild_join` (creates invite), `on_guild_remove`, shard events; global `sys.excepthook` patch via `cog_load/unload`
+  - **~12,000 words of documentation**
+#### **[📦 PART 13: Data Structures](documentation/FULL_DOCUMENTATION_PART13.md)** — 25+ JSON files fully documented with field-level schemas, types, defaults, and cross-file relationships
+
+#### **[🛠️ UTILS REFERENCE: Shared Library](documentation/FULL_DOCUMENTATION_UTILS.md)** — Complete reference for all 6 files in `utils/` (~1,922 lines)
+  - **`user_storage.py`** (421 lines): Per-user JSON files at `data/users/{user_id}.json`; full async API (`get_user`, `touch_user`, `record_activity`, `record_minigame_result`, `increment_stat`, `set_stat`, `record_game_state`); per-user `threading.Lock`; `_atomic_write` (.tmp → `os.replace`); backwards-compat stubs (`load_user`, `save_user`, etc.); auto back-fills new template keys
+  - **`stat_hooks.py`** (145 lines): Fire-and-forget stat wrappers safe to call from sync code — `us_touch`, `us_inc`, `us_mg`, `us_set`; `us_set_bot` registers bot instance; `us_challenge` notifies `GameChallenges` cog with 10 event type strings (`game_win`, `coin_earn`, `trivia_correct`, `board_game_win`, etc.); silently drops calls if no running event loop
+  - **`database.py`** (270 lines): Opt-in SQLite singleton (`DatabaseManager`) — `RENDER_DISK_PATH`-aware path; 4 tables (`users`, `stats`, `activity`, `game_states`); methods: `initialize_schema`, `upsert_user`, `update_stat`, `increment_stat`, `log_activity`, `save_game_state`, `get_user_data`; errors logged not re-raised; `get_user_data` returns dict mirroring `user_storage` format
+  - **`embed_styles.py`** (380 lines): `Colors` (25+ hex constants + tier colours), `Emojis` (40+ named emoji), `EmbedBuilder` static factory — typed shortcuts: `success`, `error`, `warning`, `info`, `economy`, `game`, `leveling`, `music`; `leaderboard` (medals + top-10), `profile`, `progress_bar`, `format_number`, `tier_color`; module-level quick-access functions
+  - **`performance.py`** (~60 lines): `ConfigCache` with 5-minute TTL; methods `get`, `invalidate`, `clear`; global `config_cache` singleton; caches parsed dict (not mtime-based)
+  - **`card_visuals.py`** (646 lines): PIL card renderer; assets at `assets/cards/{deck}/{rank}_{suit}.png` (Polish filenames); `CARD_IMAGE_CACHE` dict; low-level: `get_font`, `parse_card`, `draw_card`, `draw_card_string`; high-level renderers returning `discord.File`: `create_hand_image`, `create_table_image`, `create_comparison_image`, `create_blackjack_image`, `create_war_image`, `create_poker_table_image` (full Hold'em table with player boxes, status colours, pot display)
+  - **~12,000 words of documentation**
+#### **[🔗 PART 14: Integration Guide](documentation/FULL_DOCUMENTATION_PART14.md)** — How all cogs connect: bot.py startup, inter-cog communication, shared state, and data-flow
+  - `bot.py` (316 lines): startup sequence (`setup_hook` → `load_cogs` → slash sync), shared bot-level state (`bot.data_dir`, `bot.owner_ids`, `bot.active_games/lobbies/minigames/pending_rematches`), `BotCommandTree.interaction_check` (ServerConfig gate for all slash commands), `activity_worker` (BATCH_SIZE=50, BATCH_INTERVAL=2s batch-saves to `user_activity.json`)
+  - `get_cog()` pattern: per-call lookup (never cached at `__init__`), graceful degradation on `None`, fallback chains (e.g. TCG cog → psyvrse_tcg module)
+  - **Economy as central hub**: `add_coins`, `remove_coins`, `add_item`, `remove_item`, `get_balance`, `economy_data`, `shop_items`, `save_economy()` — called by 20+ cogs; sole authoritative source for PsyCoin balances
+  - **Profile as display layer**: per-user metadata written by gambling/reputation/farming/marriage; read by serverinfo via direct JSON bypass (no cog dependency)
+  - **BotLogger as passive observer**: `on_command_error` + `on_application_command_error` + `on_error` listeners catch all cog errors; active calls from globalevents + owner only
+  - **ServerConfig as permission gate**: `BotCommandTree` checks `disabled_commands[]` per-guild before every slash command; mining/farming read per-guild channel config
+  - **Blacklist as access gate**: fresh `_load()` on every `on_command` + `on_interaction`; gates all prefix and slash commands centrally
+  - **GameControl as cleanup**: reaches 6 in-memory dicts across 4 cogs via `get_cog()`; dict deletion = complete cleanup
+  - **GlobalEvents → Economy flow**: defeat_worldboss (tiers: 15k/7.5k/2.5k coins), war victory (10k/2k), hunt rewards; all via `add_coins(user_id, amount, source)`
+  - **Achievements**: triggered by boardgames + social; purely reactive (Achievements cog owns grant logic + deduplication)
+  - **GameStats**: recorded by chess_checkers + boardgames at every game conclusion path
+  - **GlobalLeaderboard**: calculated on-demand from Economy + LeaderboardManager + GlobalEvents + MiniGames; opt-in consent required
+  - **Farming ↔ FarmShop**: FarmShop bridges Farming inventory + Economy payments; neither maintains own coin state
+  - **Mafia custom roles bridge**: `apply_custom_roles_to_database()` uses `sys.modules['cogs.mafia']` to inject into module-level `ROLES_DATABASE` directly
+  - **utils/**: `user_storage` (per-user JSON, touched on every message), `database.py` (SQLite singleton, opt-in), `stat_hooks` (fire-and-forget recording), `card_visuals` (PIL card rendering for blackjack/poker), `embed_styles` (themed embed factory), `performance` (FileCache with mtime validation)
+  - Data file sharing risks: `serverinfo.py` direct reads of `economy.json` + `profiles.json` may lag behind cog in-memory state; `custom_roles.json` injected out-of-band via `sys.modules`
+  - Complete 18-section cross-cog dependency map
+  - **~14,000 words of documentation**
+#### **[🚀 PART 15: Deployment](documentation/FULL_DOCUMENTATION_PART15.md)** — All deployment methods, configuration, persistence, and operational procedures
+  - Prerequisites: Python 3.11, FFmpeg (system), 12 Python packages (`discord.py ≥2.6.4`, `yt-dlp`, `PyNaCl`, `aiohttp`, `python-dotenv`, `Pillow`, `aiofiles`, `chess`, `googletrans`, `fuzzywuzzy`, `python-Levenshtein`, `psycopg2-binary`)
+  - `config.json`: `prefix`, `owner_ids[]`, `emojiServerId[]`; `.env`: `LUDUS_TOKEN` (required), `RENDER_DISK_PATH` (optional)
+  - Local dev: `python start.py` or `python bot.py`; `start.py` validates token then subprocess-launches `bot.py`; data → `./data/`
+  - Docker: `python:3.11-slim` + FFmpeg install + `pip install --no-cache-dir`; `CMD ["python", "bot.py"]`; volume mount + `RENDER_DISK_PATH=/data` for persistence; docker-compose example
+  - Render.com: `render.yaml` (`type: web`, `region: oregon`, `plan: free`, `buildCommand` installs pip + ffmpeg, `startCommand: python bot.py`); set `LUDUS_TOKEN` manually in dashboard; attach persistent disk at `/var/data` → `RENDER_DISK_PATH` auto-set
+  - `start.sh`: pre-initializes 10 critical JSON files as `{}` before launching `bot.py`; use as `startCommand: bash start.sh` alternative
+  - Data persistence: 20 files must persist (economy, inventory, profiles, fishing, mining, pets, farms, gambling_stats, leaderboard_stats, quests, achievements, blacklist, confession_config, server_configs, custom_roles, stories, lottery, counting, starboard, global_consent); atomic write pattern via `.tmp` + `os.replace()`
+  - Discord setup: Message Content Intent (privileged, required), Server Members Intent (privileged, required), Presence Intent (optional); OAuth2 scope: `bot applications.commands`; 4 emoji server IDs for UNO/TCG asset hosting
+  - Full startup sequence diagram (process launch → `setup_hook` → cog loading → `on_ready` → slash sync)
+  - Operations: `L!reload <cog>` / `L!reloadall` for hot-reload; `L!restart` uses `os.execv` → `os._exit(0)` fallback; `migrate_users.py` for schema migrations; backup procedures for Render disk / Docker volumes
+  - Troubleshooting: offline bot, slash commands not appearing, cog load failures, data not persisting, Opus missing, fuzzywuzzy warnings
+  - **~12,000 words of documentation**
 
 ---
 
@@ -518,10 +569,13 @@ Ludus-Bot/ (50,000+ lines total)
 │       ├── perimeter_explicit.py (300 lines) - Explicit content
 │       └── professional_info.py (300 lines) - Professional data
 │
-├── 📦 Utils/ (3 files, ~500 lines)
-│   ├── embed_styles.py (200 lines) - Consistent embeds
-│   ├── user_storage.py (150 lines) - User data storage
-│   └── performance.py (150 lines) - Performance monitoring
+├── 📦 Utils/ (6 files, ~1,922 lines)
+│   ├── user_storage.py (421 lines) - Per-user JSON storage (async + thread-safe)
+│   ├── database.py     (270 lines) - SQLite singleton (opt-in alternative backend)
+│   ├── embed_styles.py (380 lines) - Colors / Emojis / EmbedBuilder factory
+│   ├── card_visuals.py (646 lines) - PIL card game image renderer
+│   ├── stat_hooks.py   (145 lines) - Fire-and-forget stat recording helpers
+│   └── performance.py  ( ~60 lines) - 5-minute JSON config cache
 │
 ├── 💾 Data/ (20+ JSON files)
 │   ├── economy.json - User balances
@@ -1031,6 +1085,6 @@ This project is proprietary. All rights reserved.
 **This documentation is a living document and will be updated as the project evolves.**
 
 Last Updated: 04.03.2026
-Total Documentation Size: 95,000+ words across 11 completed parts (Parts 1-11)
-Documentation Status: ✅ Parts 1-11 Complete | 🚧 Parts 12-15 Planned
+Total Documentation Size: 145,000+ words across 15 parts + Utils Reference
+Documentation Status: ✅ All 15 Parts + Utils Reference Complete
 The documentation was written by wilczek80.
