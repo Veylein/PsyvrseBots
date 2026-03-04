@@ -25,9 +25,18 @@ class Confessions(commands.Cog):
             self.config = {}
     
     def save_config(self):
-        """Save confession configuration"""
-        with open(self.config_file, 'w') as f:
-            json.dump(self.config, f, indent=4)
+        """Save confession configuration (atomic write)"""
+        tmp = self.config_file + ".tmp"
+        try:
+            with open(tmp, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=4)
+            os.replace(tmp, self.config_file)
+        except Exception as e:
+            print(f"[Confessions] Save error: {e}")
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
     
     def get_server_config(self, guild_id):
         """Get configuration for a specific server"""

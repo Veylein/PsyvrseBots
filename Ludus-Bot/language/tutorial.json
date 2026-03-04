@@ -1,5 +1,494 @@
 {
-  "tutorial": {
+  "en": {
+    "footer_page": "Page {page} / {total}",
+    "lang_name": "English",
+    "no_perm": "This tutorial isn't yours!",
+    "nav": {
+      "welcome":      "🏠 Welcome",
+      "economy":      "💰 Economy",
+      "gambling":     "🎰 Gambling",
+      "cards":        "🃏 Card Games",
+      "games":        "🎮 Games & Minigames",
+      "mining":       "⛏️ Mining",
+      "farming":      "🌾 Farming",
+      "business":     "🏪 Business",
+      "social":       "❤️ Social & Marriage",
+      "achievements": "🏆 Achievements",
+      "wizardwars":   "🧙 Wizard Wars",
+      "profile":      "📊 Profile & Stats",
+      "quickstart":   "🚀 Quick Start"
+    },
+    "nav_desc": {
+      "welcome":      "Start here!",
+      "economy":      "Earn, spend and grow your wealth",
+      "gambling":     "Slots, roulette, crash and more",
+      "cards":        "Blackjack, Poker, War, UNO, Chess…",
+      "games":        "100+ minigames, puzzles & arcade",
+      "mining":       "Minecraft-style mining adventure",
+      "farming":      "Plant and harvest crops",
+      "business":     "Create your cross-server shop",
+      "social":       "Guilds, pets, marriage, reputation",
+      "achievements": "200+ goals to unlock",
+      "wizardwars":   "Spell-based MMO strategy",
+      "profile":      "Track your progress",
+      "quickstart":   "Get started now!"
+    },
+    "nav_placeholder": "Jump to section...",
+    "btn_prev": "◀ Previous",
+    "btn_next": "Next ▶",
+    "pages": {
+      "welcome": {
+        "title": "✨ Welcome to Ludus!",
+        "color": "PRIMARY",
+        "description": "**The Ultimate Discord Bot Experience**\n\nLudus is a complete world inside Discord:\n🪙 **Economy** — `/daily`, `/balance`, `/shop`\n🎰 **Gambling** — `/slots`, `/crash`, `/roulette` and 6 more\n🃏 **Card Games** — Blackjack, Poker, War, UNO, Chess…\n⛏️ **Mining** — Procedural Minecraft-style adventure\n🌾 **Farming** — Plant, grow, harvest, profit\n🏪 **Business** — Cross-server player shops\n🏆 **200+ Achievements** — Unlock goals & earn coins\n❤️ **Social** — Marriage, pets, guilds, reputation\n\n━━━━━━━━━━━━━━━━━━━━\n\nUse the **menu** or **◀ ▶ buttons** to explore!",
+        "fields": [
+          {
+            "name": "🚀 First 3 Commands",
+            "value": "`/daily` — Claim free coins\n`/balance` — Check your money\n`/minigames` — Pick a game to play",
+            "inline": true
+          },
+          {
+            "name": "📌 Useful Shortcuts",
+            "value": "`L!profile` — Your full profile\n`/help` — Command categories",
+            "inline": true
+          }
+        ],
+        "footer": "Every action earns coins and XP — nothing goes untracked!"
+      },
+      "economy": {
+        "title": "💰 Economy System Guide",
+        "color": "WARNING",
+        "description": "**All economy commands are now Slash Commands (`/`)!**\n\nPsyCoins are the currency — use them for everything.",
+        "fields": [
+          {
+            "name": "💵 Core Commands",
+            "value": "`/daily` — 100–500 coins + streak bonuses\n`/balance` — Check your PsyCoin balance\n`/shop` — Browse the PsyCoin shop\n`/buy <item>` — Purchase an item\n`/inventory` — View what you own\n`/use <item>` — Use an item\n`/give @user <amount>` — Send coins to someone\n`/leaderboard` — Top coin holders",
+            "inline": false
+          },
+          {
+            "name": "🌍 Multiple Currencies",
+            "value": "`/currencies` — See all your currency balances\n`/convert <amount> <from> <to>` — Convert currencies\n\n💡 Extra currencies drop from special events!",
+            "inline": true
+          },
+          {
+            "name": "💡 Earn More Coins",
+            "value": "`L!work` — Work shift (prefix only)\n`L!claim` — Claim rewards\n`L!calendar` — Monthly bonus calendar\n`L!streaks` — Streak overview\n\nGames, fishing, farming & business also pay out!",
+            "inline": true
+          }
+        ],
+        "footer": "Pro Tip: Daily streak bonuses multiply fast — don't miss a day!"
+      },
+      "gambling": {
+        "title": "🎰 Gambling Games Guide",
+        "color": "ERROR",
+        "description": "**All gambling commands are Slash Commands!**\n\nBets range: **10 – 10,000 coins** (mines: 10–5,000)\n\n⚠️ Gamble responsibly — house edge is real!",
+        "fields": [
+          {
+            "name": "🎰 Slot Machine",
+            "value": "`/slots <bet>` — Spin 3 reels\nMatch symbols for multiplied payouts\nJackpot = 50× bet!",
+            "inline": true
+          },
+          {
+            "name": "🪙 Coin Flip",
+            "value": "`/coinflip <bet>` — Double or nothing\n50/50 chance — simplest gamble",
+            "inline": true
+          },
+          {
+            "name": "🎡 Roulette",
+            "value": "`/roulette <bet> <choice>` — Spin the wheel\nBet on color, odd/even, or specific number",
+            "inline": true
+          },
+          {
+            "name": "📈 Crash",
+            "value": "`/crash <bet>` — Multiplier rises…then crashes\nCash out before it crashes!\nUp to 100× if you dare",
+            "inline": true
+          },
+          {
+            "name": "💣 Mines",
+            "value": "`/mines <bet>` — Minesweeper gambling\n10–5,000 coins\nReveal safe tiles for multipliers",
+            "inline": true
+          },
+          {
+            "name": "🎴 Higher or Lower",
+            "value": "`/higherlower <bet>` — Guess next card\nBuild streaks for bigger multipliers",
+            "inline": true
+          },
+          {
+            "name": "🎲 Dice",
+            "value": "`/dicegamble <bet>` — Bet on dice outcome\nChoose under/over/exact rolls",
+            "inline": true
+          },
+          {
+            "name": "📊 Stats & Info",
+            "value": "`/gambling_stats` — Your win/loss history\n`/odds` — House edge for each game\n`/strategy` — Tips per game",
+            "inline": true
+          }
+        ],
+        "footer": "View win odds before playing: /odds"
+      },
+      "cards": {
+        "title": "🃏 Card Games Guide",
+        "color": "PRIMARY",
+        "description": "**Ludus has a full card game suite!**\n\nAll card games are free — no bets required (except Blackjack & Poker).",
+        "fields": [
+          {
+            "name": "♠️ Blackjack",
+            "value": "`/blackjack` — Beat the dealer\nStandard and Fast modes\nBet 10–50,000 coins",
+            "inline": true
+          },
+          {
+            "name": "🃏 Poker",
+            "value": "`/poker` — Texas Hold'em\nUp to 6 players\nStandard & Fast mode",
+            "inline": true
+          },
+          {
+            "name": "⚔️ War",
+            "value": "`L!war [@user]` — Card flipping battle\n10 rounds, highest card wins each\nChallenge a friend or vs Bot!",
+            "inline": true
+          },
+          {
+            "name": "🎣 Go Fish",
+            "value": "`/gofish` — Classic Go Fish vs Bot\nCollect sets of 4 to win\nVisual card hand display",
+            "inline": true
+          },
+          {
+            "name": "🎴 UNO",
+            "value": "`/uno` — Launch UNO lobby\nMultiplayer, custom rules, bots\nEN/PL language support",
+            "inline": true
+          },
+          {
+            "name": "♟️ Chess & Checkers",
+            "value": "`/chess` — Full chess vs human or AI\n`/checkers` — Classic draughts\nVisual board rendered each move",
+            "inline": true
+          },
+          {
+            "name": "🧩 More Board Games",
+            "value": "`/tictactoe` — Tic-Tac-Toe with AI\n`/hangman` — Hangman with hints\n`/scrabble` — Word building game\n`/backgammon` — Classic strategy\n`/tetris` — Single-player Tetris\n`/monopoly` — Full Monopoly board",
+            "inline": false
+          },
+          {
+            "name": "🧭 Navigation",
+            "value": "`/uno` — Launch UNO\n`/boardgames` — Board games list",
+            "inline": true
+          }
+        ],
+        "footer": "Equip custom card deck skins with /equipdeck!"
+      },
+      "games": {
+        "title": "🎮 Games & Minigames Guide",
+        "color": "PRIMARY",
+        "description": "**100+ games across 4 hubs!**\n\nEvery game rewards coins and XP.",
+        "fields": [
+          {
+            "name": "🕹️ Game Hubs",
+            "value": "`/minigames` — Main hub with game picker\n`/arcade` — Arcade-style games\n`/game` — Puzzle & mystery games\n`/boardgames` — Board game list",
+            "inline": false
+          },
+          {
+            "name": "🧠 Word & Puzzle Games",
+            "value": "`/game` — Puzzle & mystery games hub\n`/counting` — Number counting game\n`/anagram` — Unscramble words",
+            "inline": true
+          },
+          {
+            "name": "🎯 Action Games",
+            "value": "`/akinator` — 20 questions AI\n`/wizardwars` — Spell-based MMO strategy",
+            "inline": true
+          },
+          {
+            "name": "🤝 Multiplayer",
+            "value": "`/mafia` — Social deduction (Mafia/Werewolf)\nMultiplayer card & board games",
+            "inline": true
+          },
+          {
+            "name": "🏆 Challenges & Tracking",
+            "value": "`/challenges` — Daily & weekly goals\n`/streak` — Current win streak\n`/gamestats` — Full game history",
+            "inline": true
+          },
+          {
+            "name": "⚔️ Special Modes",
+            "value": "`L!heist` — Co-op coin heist\n`L!event` — Global faction events\n`L!attack` — Attack in world events\n`L!joinfaction` — Join a side",
+            "inline": true
+          }
+        ],
+        "footer": "Pro Tip: Complete daily challenges for bonus coin rewards!"
+      },
+      "mining": {
+        "title": "⛏️ Mining Adventure Guide",
+        "color": "WARNING",
+        "description": "**Procedurally generated Minecraft-style mining!**\n\n`/mine` — Start your mining session\n\nDig deeper for rarer ores and bigger rewards — but watch out for creatures!",
+        "fields": [
+          {
+            "name": "🗺️ Biomes by Depth",
+            "value": "**0–9 Surface** — Dirt, Stone, Coal\n**10–24 Underground** — Stone, Coal, Iron\n**25–49 Deep Caves** — Iron, Gold, Redstone\n**50–74 Mineral Depths** — Gold, Diamond ✨\n**75–99 Ancient Depths** — Diamond, Emerald ✨\n**100+ Abyss** — Netherite 🔱",
+            "inline": false
+          },
+          {
+            "name": "⚗️ Ore Modifiers",
+            "value": "**Cracked ores** — 50% yield\n**Irradiated ores** — Costs half your current energy",
+            "inline": true
+          },
+          {
+            "name": "🧟 Creatures",
+            "value": "Zombie, Skeleton, Spider, Creeper 💥\nEnderman, Mole (harmless), Giant Worm\n\nCreepers explode and damage your tunnel!\nKill them for rare drops.",
+            "inline": true
+          },
+          {
+            "name": "🏆 Mining Achievements",
+            "value": "⛏️ First Steps — Mine first block (+50)\n🕳️ Going Deeper — Reach depth 10 (+100)\n🦅 Deep Diver — Reach depth 50 (+500)\n🔱 Abyss Walker — Reach depth 100 (+1,000)\n💎 Diamonds! — Find first diamond (+200)\n💚 Emerald Hunter — Find first emerald (+300)",
+            "inline": false
+          },
+          {
+            "name": "💡 Mining Tips",
+            "value": "• Dig diagonally to find more ores\n• Kill creatures before they tunnel\n• Manage energy — Abyss drains it fast\n• Netherite sells for 1,000 coins per block!",
+            "inline": false
+          }
+        ],
+        "footer": "Use /mine to start — every session is unique!"
+      },
+      "farming": {
+        "title": "🌾 Farming System Guide",
+        "color": "SUCCESS",
+        "description": "**Two farming systems — classic plots & simulation!**",
+        "fields": [
+          {
+            "name": "🌱 Classic Farm (Prefix Commands)",
+            "value": "`L!farm` — View your plots\n`L!seeds` — Browse available crops\n`L!plant <crop> <plot>` — Plant seeds\n`L!harvest <plot>` — Collect crops\n`L!farmupgrade` — View upgrades\n`L!buyupgrade <name>` — Buy an upgrade",
+            "inline": false
+          },
+          {
+            "name": "🚜 Farm Simulator",
+            "value": "`/farm` — Full interactive farming sim\nTools, animals, more mechanics!\n`/farmshop` — Buy seeds & create farm shops\n`/icecream` — Build a sundae (fun!)",
+            "inline": true
+          },
+          {
+            "name": "🌿 Crop Guide",
+            "value": "**Fast (20–30m):** Lettuce, Wheat, Carrot\n**Medium (40–60m):** Potato, Corn, Tomato\n**Slow (90–120m):** Watermelon, Pumpkin\n💡 Seasonal crops earn more!",
+            "inline": true
+          },
+          {
+            "name": "⚙️ Farm Upgrades",
+            "value": "🟫 More plots\n💧 Sprinkler (−20% grow time)\n💩 Fertilizer (+50% sell price)\n🏠 Greenhouse (ignore seasons)",
+            "inline": true
+          },
+          {
+            "name": "💰 Profit Strategy",
+            "value": "1. Harvest fast crops → sell immediately\n2. Buy sprinkler upgrade ASAP\n3. Stock crops in your business shop\n4. Check season for price bonuses",
+            "inline": true
+          }
+        ],
+        "footer": "Pro Tip: Seasonal crops sell for more — check L!season!"
+      },
+      "business": {
+        "title": "🏪 Business System Guide",
+        "color": "SUCCESS",
+        "description": "**Create a cross-server player shop!**\n\nSell items to players on ANY server Ludus is in.",
+        "fields": [
+          {
+            "name": "🏗️ Setup Your Shop",
+            "value": "`L!work` — Earn baseline income\n`L!npcshop` — Browse NPC wholesale\n`L!npcbuy <item>` — Buy from NPC\n`L!marketplace` or `L!market` — Player marketplace\n`L!sell <item>` — List item on market\n`L!ship <item> @user` — Ship direct to player",
+            "inline": false
+          },
+          {
+            "name": "🛒 Shopping",
+            "value": "`/shop` — PsyCoin shop (slash)\n`/buy <item>` — Buy from shop\n`/inventory` — View your items\n`/use <item>` — Use an item\n`L!buyuser <item> @user` — Buy from player shop",
+            "inline": true
+          },
+          {
+            "name": "💼 Fees & Finance",
+            "value": "`L!feebalance` — Check fee wallet\n`L!feeset <rate>` — Set listing fee rate\n`L!feewithdraw <amount>` — Withdraw fees\n`/currencies` — All currency balances\n`/convert` — Currency converter",
+            "inline": true
+          },
+          {
+            "name": "📈 Tips",
+            "value": "• Price 10–20% above NPC shops\n• Stock fish + crops (high demand)\n• Use `L!work` daily for passive income\n• Shipping items builds reputation",
+            "inline": false
+          }
+        ],
+        "footer": "Pro Tip: Cross-server reach = much bigger customer base!"
+      },
+      "social": {
+        "title": "❤️ Social, Marriage & Reputation",
+        "color": "PRIMARY",
+        "description": "**Connect, Collaborate, Compete, and Fall in Love!**",
+        "fields": [
+          {
+            "name": "💍 Marriage",
+            "value": "`L!propose @user` — Pop the question 💍\n`L!spouse` — View your partner\n`L!divorce` — End the marriage 💔\n`L!couplequests` — Joint goals with rewards",
+            "inline": true
+          },
+          {
+            "name": "⭐ Reputation System",
+            "value": "Give `+1` or `-1` rep to other users (24h cooldown per pair).\nRep affects prices and rewards across the whole bot!",
+            "inline": false
+          },
+          {
+            "name": "📊 Tiers",
+            "value": "🌟 Legendary `100+` · ⭐ Excellent `50+` · 💎 Great `25+`\n✨ Good `10+` · 👤 Neutral · ⚠️ Questionable `-10`\n❌ Bad `-25` · ☠️ Notorious `-100`",
+            "inline": true
+          },
+          {
+            "name": "💡 Effects",
+            "value": "**High rep**: up to -20% shop prices, +10% rewards\n**Low rep**: up to +20% prices, -10% rewards\n`/leaderboard` → Server & Global Reputation",
+            "inline": true
+          },
+          {
+            "name": "💬 Rep Commands",
+            "value": "`L!rep @user` — View score\n`L!rep give @user [reason]` — Give +1\n`L!rep remove @user [reason]` — Give -1\n`L!rep history [@user]` — Recent events",
+            "inline": false
+          },
+          {
+            "name": "🤗 Social Actions (Slash)",
+            "value": "`/hug @user` — Give a warm hug 🤗\n`/kiss @user` — Give a kiss 😘\n`/slap @user` — Slap someone 👋\n`/petpet @user` — Animated petpet GIF\n`/ship @user1 @user2` — Compatibility score 💞",
+            "inline": false
+          },
+          {
+            "name": "💬 Social Actions (Prefix)",
+            "value": "`L!compliment @user` — Spread love\n`L!roast @user` — Friendly banter\n`L!pray @user` — Divine blessing\n`L!curse @user` — Dark magic\n`L!avatar @user` — View avatar\n`L!socialprofile` — Social stats",
+            "inline": true
+          },
+          {
+            "name": "👥 Guilds",
+            "value": "`L!guild create <name>` (1,000 coins)\n`L!guild join <name>` — Join guild\n`L!guild info` — View stats\n`L!guild deposit <amount>` — Donate\n`L!guild top` — Guild rankings",
+            "inline": true
+          },
+          {
+            "name": "🐾 Pets",
+            "value": "`/pet` — Open pet dashboard\nFeed, play, walk your pet\nHappy pet = passive bonuses!",
+            "inline": true
+          },
+          {
+            "name": "🎉 Events & Confessions",
+            "value": "`L!event` — View active global event\n`L!joinfaction` — Join a side\n`L!attack` — Attack in world events\n`L!confess` — Anonymous server confession",
+            "inline": true
+          }
+        ],
+        "footer": "Pro Tip: High reputation earns passive coin bonuses every day!"
+      },
+      "achievements": {
+        "title": "🏆 Achievements & Quests Guide",
+        "color": "WARNING",
+        "description": "**200+ achievements + daily/weekly quests = tons of bonus coins!**",
+        "fields": [
+          {
+            "name": "🏅 Achievements",
+            "value": "`/achievements` — Browse all achievements\n`L!myachievements` — Your progress\n`L!achleaderboard` — Top hunters\n\nCategories: Economy, Gambling, Gaming, TCG, Social, Fishing, Quests, Events, Board Games, Milestones",
+            "inline": false
+          },
+          {
+            "name": "📜 Quests",
+            "value": "`L!quests` — View active quests\n`/questshelp` — Quest system guide\n\nDaily & Weekly quests give large coin + XP rewards!\nComplete early to stack bonuses.",
+            "inline": true
+          },
+          {
+            "name": "🎯 Challenges",
+            "value": "`/challenges` — Daily & weekly game goals\n`/streak` — Current win streak\n\nChallenge streaks multiply rewards!",
+            "inline": true
+          },
+          {
+            "name": "🎁 Achievement Rewards",
+            "value": "Every achievement gives:\n• PsyCoin bonuses (10–5,000)\n• Achievement points\n• Special profile titles\n• Unlock cosmetics",
+            "inline": false
+          }
+        ],
+        "footer": "Pro Tip: Every action auto-tracks — achievements unlock without doing anything special!"
+      },
+      "wizardwars": {
+        "title": "🧙 Wizard Wars — Spell-Based MMO",
+        "color": "PURPLE",
+        "description": "**Build your wizard. Master spells. Conquer territories.**\n\nWizard Wars is a full MMO-lite system inside Ludus. Use `/ww` or `/wizardwars` to get started.",
+        "fields": [
+          {
+            "name": "🧙 Getting Started",
+            "value": "`/ww create` — Create your wizard\n`/ww profile` — View your stats, rank & gold\n`/ww spellbook` — See all your spells\n\nNew wizards start with **3 starter spells** and rank **Apprentice**.",
+            "inline": false
+          },
+          {
+            "name": "💰 Spell Shop",
+            "value": "`/ww shop` — Opens the interactive spell shop\n\nSpells grouped by school:\n🌊 **Elemental** — Fire, Water, Thunder, Ice, Wind, Earth\n🌌 **Cosmic** — Gravity, Space, Time\n☠️ **Forbidden** — Blood, Shadow, Curse\n✨ **Divine** — Light, Holy\n\nPrices = Power × 100 Gold",
+            "inline": true
+          },
+          {
+            "name": "⚔️ Combat & Dueling",
+            "value": "`/ww duel` — Fight an AI wizard\nChoose **2 equipped spells** each turn\nLand **Spell Combos** for bonus damage\n\nWin → earn Gold + XP\nLose → lose a little Gold",
+            "inline": true
+          },
+          {
+            "name": "🔮 Spell Combos",
+            "value": "Use 2 spells together for devastating effects:\n🔥+💨 Flame Burst + Gale Twist → **Inferno Cyclone** (×12)\n❄️+⚡ Frost Nova + Lightning Strike → **Glacial Shock** (×11)\n🌑+🩸 Shadow Veil + Blood Drain → **Vampiric Shadow** (×10)\n🌀+⚫ Gravity Well + Black Hole → **Singularity** (×15)\n⭐ 6 combos total — discover them all!",
+            "inline": false
+          },
+          {
+            "name": "🏰 Guilds & Territories",
+            "value": "`/ww guild` — Join or create a wizard guild\n`/ww territories` — View & conquer territories\n\n12 territories including Crystal Peaks, Void Nexus & Arcane Citadel\nGuild members share territory bonuses!",
+            "inline": true
+          },
+          {
+            "name": "📊 Ranks & Progression",
+            "value": "Apprentice → Mage → Sorcerer → Archmage\n\nGain XP by winning duels\nLevel up = more spell slots + bonus stats\n`/ww leaderboard` — Top wizards server-wide",
+            "inline": true
+          }
+        ],
+        "footer": "Pro Tip: Equip your strongest combo spells before a duel — Singularity (×15) is the most powerful!"
+      },
+      "profile": {
+        "title": "📊 Profile & Stats Guide",
+        "color": "PRIMARY",
+        "description": "**Your profile tracks everything — 60+ stats!**",
+        "fields": [
+          {
+            "name": "📋 View Your Profile",
+            "value": "`/profile` or `L!profile` / `L!p` — Full profile\n`L!energy` — Energy level only\n`/balance` — Coins only\n`/inventory` — Items only\n`/gamestats` — Game stats only",
+            "inline": false
+          },
+          {
+            "name": "📊 Profile Pages",
+            "value": "📊 **Overview** — Energy, level, top stats\n🎮 **Gaming** — Win rates for every game\n💰 **Economy** — Earned, spent, transactions\n👥 **Social** — Community engagement",
+            "inline": true
+          },
+          {
+            "name": "🌍 Global Stats",
+            "value": "`/globalleaderboard` — Cross-server rankings\n`L!global` — All leaderboards\n`/leaderboard` — Coin rankings\n`L!streakleaderboard` — Streak rankings\n`L!globalconsent` — Opt into global boards",
+            "inline": true
+          },
+          {
+            "name": "🔋 Energy System",
+            "value": "Used for: Fishing, Planting, Battles\n**Default:** 100/100\n`L!energy` — Check current level\n\n**Restore Energy:**\n`/shop` → Cafe section\n☕ Coffee — 10 energy (15 coins)\n🥪 Sandwich — 20 energy (25 coins)\n🥤 Smoothie — 25 energy (30 coins)\n\nEnergy auto-regenerates over time!",
+            "inline": false
+          }
+        ],
+        "footer": "Pro Tip: Use /profile to find which games you're winning most!"
+      },
+      "quickstart": {
+        "title": "🚀 Quick Start Guide",
+        "color": "SUCCESS",
+        "description": "**Get productive in under 10 minutes!**",
+        "fields": [
+          {
+            "name": "✅ Today's Priority List",
+            "value": "1️⃣ `/daily` — Free coins\n2️⃣ `/balance` — Check balance\n3️⃣ `/minigames` — Pick a game → earn coins\n4️⃣ `/challenges` — Grab daily goals\n5️⃣ `L!profile` — See your starting stats\n6️⃣ `/fish` — First fishing trip\n7️⃣ `L!farm` — Plant first crop\n8️⃣ `/pet` — Meet your pet!",
+            "inline": false
+          },
+          {
+            "name": "🎯 Week 1 Goals",
+            "value": "**Day 2:** `/fish`, `/gambling_stats`, `/pet`\n**Day 3:** `L!work`, `L!marketplace`, `L!sell <fish>`\n**Day 4:** `L!plant wheat 0`, `L!harvest`, stock crops\n**Day 5:** `L!guild join` or create, `/achievements`\n**Day 6:** `/mine` — Try the mining adventure!\n**Day 7:** `/poker` or `/blackjack` with friends",
+            "inline": false
+          },
+          {
+            "name": "🎮 Best Coin Earners",
+            "value": "💰 `/daily` + streak (baseline)\n🎣 `/fish` (high skill = big fish)\n⛏️ `/mine` (deep biomes = huge ore value)\n🃏 `/blackjack` (skill-based)\n🎰 `/slots` (luck-based)\n📜 Completing daily quests (`L!quests`)",
+            "inline": true
+          },
+          {
+            "name": "🛠️ Must-Know Commands",
+            "value": "`/help` — Category browser\n`L!tutorial pl` — Switch to Polish\n`/stop` — Cancel active game\n`/gamestats` — Full game history",
+            "inline": true
+          }
+        ],
+        "footer": "Tip: Start /mine early — deep biomes unlock huge coin rewards!"
+      }
+    }
+  },
+  "pl": {
     "footer_page": "Strona {page} / {total}",
     "lang_name": "Polski",
     "no_perm": "Ten tutorial nie jest dla Ciebie!",

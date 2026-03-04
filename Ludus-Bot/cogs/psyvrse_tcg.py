@@ -25,7 +25,7 @@ def app_owner_check() -> Callable:
 
     return app_commands.check(predicate)
 
-DATA_DIR = os.path.join(os.getcwd(), "Ludus", "data", "tcg")
+DATA_DIR = os.path.join(os.getenv("RENDER_DISK_PATH", "data"), "tcg")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 CRAFTED_FILE = os.path.join(DATA_DIR, "crafted.json")
 TRADES_FILE = os.path.join(DATA_DIR, "trades.json")

@@ -1750,6 +1750,7 @@ class Owner(commands.Cog):
         embed.add_field(
             name="🔧 Server Management",
             value="```\n"
+                  "L!blacklist - Open blacklist manager (UI)\n"
                   "L!purge [amount] - Delete messages\n"
                   "L!announce <#channel> <msg> - Send announcement\n"
                   "L!dm @user <message> - DM a user\n"

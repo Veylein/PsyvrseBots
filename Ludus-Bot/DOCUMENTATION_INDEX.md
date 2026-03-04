@@ -2,7 +2,7 @@
 
 > **COMPLETE ENGLISH DOCUMENTATION** for the entire Ludus Discord Bot project  
 > 50,000+ lines of code | 90+ Python files | 600+ commands | 450+ games  
-> **Parts 1-7, 9 Complete** ✅ | ~70,000 words documented
+> **Parts 1-11, 13 Complete** ✅ | ~95,000+ words documented
 
 ---
 
@@ -242,12 +242,40 @@ Complete analysis of minigames.py (1,070 lines):
 
 ---
 
-- **PART 8: RPG Systems** (D&D, Wizard Wars, Quests)
+#### **[⚔️ PART 8: RPG Systems](documentation/FULL_DOCUMENTATION_PART8.md)**
+Complete analysis of dnd.py, dnd_gate1_fantasy.py, wizardwars.py, quests.py (~13,386 lines total — **LARGEST PART BY FAR**):
+- **Infinity Adventure (dnd.py — 2,229 lines + dnd_gate1_fantasy.py — 9,902 lines):**
+  - Bilingual RPG (EN/PL) — 80+ UI strings in `TRANSLATIONS` dict, `t(lang, key, **kwargs)` helper
+  - `PlayerData` class — cosmic stats (influence, deaths, worlds_changed), dimension states, NPC relationships, artefacts (survive death)
+  - `CurrentCharacter` class — name + class + combat stats (HP/mana/stamina) + D&D attributes (STR/INT/CHR/LCK)
+  - `InfinityView` — `discord.ui.LayoutView` state machine (7 states: language → mode → tutorial → cape → char_creation → story → death)
+  - 9 gate dimensions with unique themes, rulers, and class lists (Fantasy, Steampunk, Dieselpunk, Cyberpunk, Post-Apocalypse, Sci-Fi, Space Opera, Surreal, Cosmic Horror)
+  - Party mode: multi-user sessions, turn-based action system, join-lobby UI
+  - Save/Load: `data/saves/infinity_adventure.json` (keyed by user_id)
+  - **Gate 1 Fantasy (9,902 lines — LARGEST FILE IN PROJECT):** `Gate1WorldState` (4 faction HP bars, 25+ quest flags, NPC alive/dead), 50+ branching scenes, `get_gate1_scene()` engine, 5 entry points, full consequence system
+  - Anti-cheat death tracking
+- **Wizard Wars (wizardwars.py — 855 lines):**
+  - 32 spells across 4 schools (Elemental 14 / Cosmic 6 / Forbidden 6 / Divine 6)
+  - 14 spell types with distinct effects (damage, shield, heal, freeze, lifesteal, execute, revive…)
+  - 6 spell combos (e.g. Gravity Well + Black Hole = Singularity, power 15)
+  - 12 territories for guild conquest
+  - `ShopView` — dropdown preview + buy button; auto-refreshes after purchase; shows remaining unowned spells
+  - AI duel: random AI wizard ±1 level, 20-turn combat loop, XP + Gold rewards, TCG card drop on win
+  - Gold economy separate from PsyCoins (spells cost `power × 100` Gold)
+  - `/wizardwars` + `/ww` (alias) slash commands, 10 action choices each
+- **Quests & Achievements (quests.py — ~400 lines):**
+  - 5 daily quest types (random assigned, 24h reset via `@tasks.loop(hours=24)`)
+  - 10 permanent achievements (first_win → millionaire, 50–500 coin rewards)
+  - `update_quest_progress(user_id, quest_type, amount)` — API for other cogs to report events
+  - TCG card reward on quest completion AND achievement unlock (via DM)
+  - Progress bar renderer (`_create_progress_bar` — `█░` blocks)
+  - `L!quests` / `L!achievements [member]` / `/questshelp` (PaginatedHelpView)
+- **~15,000 words of documentation**
 
 ### Social & Utility Systems
 
 #### **[🐾 PART 9: Social Features](documentation/FULL_DOCUMENTATION_PART9.md)**
-Complete analysis of pets.py, marriage.py, reputation.py, profile.py, social.py, actions.py, trading.py (5,102 lines total):
+Complete analysis of pets.py, marriage.py, reputation.py, profile.py, social.py, trading.py (5,102 lines total):
 - **Pets System (pets.py — 741 lines):**
   - 16 pets across 5 rarities (Common 55% / Uncommon 28% / Rare 12% / Epic 4% / Legendary 1%)
   - Weighted random adoption — first pet FREE, subsequent 10,000 PsyCoins
@@ -281,10 +309,6 @@ Complete analysis of pets.py, marriage.py, reputation.py, profile.py, social.py,
   - GIF reaction commands via nekos.best API: `/hug`, `/kiss`, `/slap`, `/petpet` (some-random-api), `/ship`
   - `/ship` — deterministic `(id1+id2) % 101` score, 6 tiers, animated GIF
   - `L!pray` (+10–50 coins blessing), `L!curse` (10% backfire), `L!avatar`
-- **Action Commands (actions.py — 311 lines):**
-  - 7 actions: slap, punch, kick, kiss, dance, stab, shoot
-  - 10 GIFs + 10 message templates per action type
-  - Auto-embed via Discord link preview (no explicit Embed object)
 - **Trading System (trading.py — 1,289 lines):**
   - P2P `TradeSession` with add/remove/confirm/cancel flow
   - Confirmation resets on any offer change (bait-and-switch prevention)
@@ -296,12 +320,78 @@ Complete analysis of pets.py, marriage.py, reputation.py, profile.py, social.py,
   - Trade history logged to `data/trade_history.json` + `data/users/{id}.json`
 - **~11,500 words of documentation**
 
-- **PART 10: Server Management** (Starboard, Counting, Confessions, Events)
-- **PART 11: Utility Commands** (Help, Info, Utilities)
+#### **[🛡️ PART 10: Server Management](documentation/FULL_DOCUMENTATION_PART10.md)**
+Complete analysis of starboard.py, counting.py, confessions.py, globalevents.py (~1,700 lines total):
+- **Starboard System (starboard.py — 449 lines):**
+  - Up to 5 independent starboards per server (each tracks a different emoji)
+  - Configurable reaction threshold, self-star prevention, per-emoji channel
+  - Visual scaling: color `gold → orange → red` and icon `✨ → ⭐ → 🌟` based on popularity ratio
+  - Rich embeds: image relay, attachment links, reply context, jump-to-message
+  - `/starboard create/edit/remove/list` slash group + `L!starboard` prefix group
+  - Uses raw reaction events so old (uncached) messages are handled correctly
+  - In-place editing of existing posts; posts removed when reactions drop below threshold
+- **Counting Game (counting.py — ~350 lines):**
+  - Designated counting channel per guild; non-numeric messages deleted silently
+  - Anti-consecutive rule: same user can't count twice in a row
+  - PsyCoins: 2 coins per 4 counts + milestone bonuses (25→1000 counts: 10–500 coins)
+  - Milestone roles auto-created: `Counter 25`, `Counter 50`, …, `Counter 25000`
+  - Delete detection: bot announces when a user deletes their counted number
+  - Leaderboard integration: `counting_peak` tracked via `leaderboard_manager`
+- **Confessions System (confessions.py — ~230 lines):**
+  - Users type in confession channel; bot deletes original and reposts anonymously
+  - Sequential numbering: `🔒 CONFESSION #X`
+  - Admin log channel records username, user ID, avatar, and full message content
+  - Commands pass-through guard (L!, /, ! prefixes skip the confession flow)
+  - Atomic `save_config()` with `.tmp` + `os.replace()` pattern
+- **Global Events (globalevents.py — 675 lines):**
+  - Owner-only event launcher; broadcasts to all guilds simultaneously
+  - **WAR Event:** 4 factions (Iron Legion, Ashborn, Voidwalkers, Skybound); users join with `L!joinfaction`; winning faction earns 10,000 coins each; `add_war_points()` API for other cogs
+  - **World Boss:** 4 bosses (50M–100M HP); button + prefix attack; 30s per-user cooldown; enrage at 75% HP lost (×1.5 dmg); top 10 + last-hit bonuses; `L!bossstats` for live HP
+  - **Target Hunt:** Background task fires challenges every 1–3 minutes across all servers
+  - **Chaos Festival:** Stub (planned for future update)
+  - Economy integration: `add_coins()` for all reward payouts; BotLogger integration for spawn/end events
+- **~8,500 words of documentation**
+
+#### **[📚 PART 11: Utility & Help Systems](documentation/FULL_DOCUMENTATION_PART11.md)**
+Complete analysis of help.py, help_system.py, about.py, utilities.py, serverinfo.py (~1,325 lines total):
+- **Help System (help.py — 466 lines):**
+  - 16 manually curated categories + 1 owner-only category (17 total)
+  - `CategorySelect` dropdown — `discord.ui.Select` with key-based values, shown on main help page
+  - Fuzzy category matching: exact key, substring, normalized text
+  - `FakeCtx` bridge: wraps slash `Interaction` so prefix-based `owner_help` can be called from `/help owner`
+  - Section-header rows: entries starting with `—` render as `▸ SECTION HEADER` dividers
+  - Both `L!help [category]` and `/help [category]` fully supported
+  - `CategoryView` timeout: 60 seconds
+- **Help Framework (help_system.py — ~115 lines):**
+  - `HelpView` — reusable paginator (Prev/Next, modulo wrap, 120s timeout) used by `minigames.py`
+  - `CAT_LIST` — 14-entry `(name, emoji)` list drives `/help_cat main` autocomplete
+  - `/help_cat main [category]` with `@autocomplete` for the category parameter
+  - Delegation bridge: `help_prefix()` hands off to `Help._send_category_help()` when richer cog is loaded
+  - Setup guard prevents double-registration on cog reload
+- **About Guide (about.py — 258 lines):**
+  - 9 curated pages covering every major system (Economy, Gambling, Simulators, Board/Card Games, RPG, Global Events, Pets/Social, Tips)
+  - `AboutView` — requester-only checks, Prev/Next/Close buttons, auto-disables at start/end
+  - DM delivery: `_send_dm()` opens DM channel, sends paginator, replies ephemeral in server
+  - `discord.Forbidden` handler tells user to enable DMs
+  - `L!about` + `/about`; both slash and prefix supported
+- **Utilities (utilities.py — ~220 lines):**
+  - `Paginator` view — requester-only ◀️/▶️/❌ pagination with author check
+  - `check_reminders` background task (60s loop) — delivers DM reminder embeds, `_parse_ts()` for tz-safe comparison
+  - `L!ping` — WebSocket heartbeat latency in ms
+  - `L!setup` — multi-section quick-start guide embed (6 fields: Quick Start / Economy / Games / Simulators / Events / Admin)
+  - `L!say` — echo command restricted to 3 hardcoded user IDs (`ALLOWED_SAY_USER_ID`)
+  - `L!feedback` — posts to hardcoded channel, omits user ID for privacy
+- **Server & User Info (serverinfo.py — 267 lines):**
+  - `BADGE_MAP` — 11 Discord badges mapped from `public_flags` attribute names to `(emoji, label)` pairs
+  - `VERIFICATION_LABELS` / `STATUS_ICONS` — display maps for guild security levels and presence status
+  - `_build_serverinfo_embed()` — members (humans/bots/online/total), channels, boosts, security, guild features (up to 8 with emoji, `+N more`)
+  - `_build_userinfo_embed()` — account created/joined dates, status+activity type detection (Spotify/Game/Streaming/Custom), badges, roles (sorted by position, cap 20), **Ludus Stats** from direct JSON reads (`economy.json` + `profiles.json` — no cog dependency)
+  - Commands: `L!serverinfo` (aliases: server, si), `L!userinfo` (aliases: ui, whois, memberinfo), `/serverinfo`, `/userinfo [member]`; all `@guild_only()`
+- **~7,500 words of documentation**
 
 ### Technical Reference
 - **PART 12: Admin & Owner Commands**
-- **PART 13: Data Structures** (JSON files, data schemas)
+- **[📦 PART 13: Data Structures](documentation/FULL_DOCUMENTATION_PART13.md)** — 25+ JSON files fully documented with field-level schemas, types, defaults, and cross-file relationships
 - **PART 14: Integration Guide** (How cogs interact)
 - **PART 15: Deployment** (Docker, Render.com, setup)
 
@@ -386,7 +476,6 @@ Ludus-Bot/ (50,000+ lines total)
 │   │   ├── social.py (998 lines) - Roasts, WYR, story maker, GIF reactions
 │   │   ├── marriage.py (456 lines) - Proposals, shared bank, couple quests
 │   │   ├── reputation.py (396 lines) - Rep tiers, price/reward modifiers
-│   │   ├── actions.py (311 lines) - GIF action commands (slap/punch/kick/etc.)
 │   │   └── psyvrse_tcg.py (~600 lines) - Trading card game
 │   │
 │   ├── 🔧 Utility & Fun (8 files, ~3,000 lines)
@@ -941,7 +1030,7 @@ This project is proprietary. All rights reserved.
 
 **This documentation is a living document and will be updated as the project evolves.**
 
-Last Updated: 03.03.2026
-Total Documentation Size: 58,500+ words across 7 completed parts (Parts 1-7)
-Documentation Status: ✅ Parts 1-7 Complete | 🚧 Parts 8-15 Planned
+Last Updated: 04.03.2026
+Total Documentation Size: 95,000+ words across 11 completed parts (Parts 1-11)
+Documentation Status: ✅ Parts 1-11 Complete | 🚧 Parts 12-15 Planned
 The documentation was written by wilczek80.

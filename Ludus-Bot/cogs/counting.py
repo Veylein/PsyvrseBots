@@ -69,6 +69,9 @@ class Counting(commands.Cog):
         if message.author.bot:
             return
 
+        if not message.guild:
+            return
+
         guild_id = str(message.guild.id)
 
         if guild_id not in self.count_data:

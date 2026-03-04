@@ -162,15 +162,71 @@ class Utilities(commands.Cog):
     # ---------- Setup Embed ----------
     def create_setup_embed(self):
         embed = discord.Embed(
-            title="🎮 Welcome to Ludus!",
-            description="Your ultimate Discord MMO universe. Use `L!` prefix or `/` commands.",
-            color=Colors.PRIMARY
+            title="🎮 Welcome to Ludus — Quick Setup Guide",
+            description=(
+                "Ludus is a full Discord MMO. Here's everything you need to get started.\n"
+                "Prefix: **`L!`**  ·  Slash: **`/`**"
+            ),
+            color=discord.Color.gold(),
         )
-        embed.add_field(name="💰 Economy", value="Check balance, daily rewards, shop, inventory.", inline=False)
-        embed.add_field(name="🎲 Games", value="Board games, card games, minigames, TCG.", inline=False)
-        embed.add_field(name="🎵 Music", value="Play music in voice channels.", inline=False)
-        embed.add_field(name="⚙️ Admin", value="Setup leveling, starboard, counting channels.", inline=False)
-        embed.set_footer(text="Ludus - Full Discord MMO")
+        embed.add_field(
+            name="🚀 Quick Start (do these first)",
+            value=(
+                "`L!daily` — Claim your daily coins\n"
+                "`L!balance` — Check your wallet\n"
+                "`L!shop` — Browse the item shop\n"
+                "`L!quests` — Pick up daily quests\n"
+                "`/fish cast` — Try fishing for free"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="💰 Economy",
+            value=(
+                "`L!balance` · `L!leaderboard` · `L!inventory`\n"
+                "`L!shop` · `L!buy <item>` · `L!sell <item>`\n"
+                "Sub-currencies: 🐟 FishCoins · ⛏️ MineCoins · 🌾 FarmCoins"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🎲 Games & Casino",
+            value=(
+                "`L!ttt` · `L!connect4` · `L!chess`\n"
+                "`/blackjack` · `/poker` · `/slots` · `/roulette`\n"
+                "`/uno start` · `/monopoly start` (2–10 players)"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🎣⛏️🚜 Simulators",
+            value=(
+                "`/fish cast` — Fishing (5 zones, upgrade rods)\n"
+                "`/mine` — Mining (ores → sell for MineCoins)\n"
+                "`/farm view` · `/farm plant <crop>` — Farming"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🌍 Global Events",
+            value=(
+                "`L!event war` — Faction War (cross-server)\n"
+                "`L!event worldboss` — World Boss (shared global HP)\n"
+                "`L!event hunt` — Target Hunt\n"
+                "`L!joinfaction <iron/ash/void/sky>`"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="⚙️ Server Admin Setup",
+            value=(
+                "`/starboard set #channel` — Set starboard channel\n"
+                "`/server_config counting #channel` — Enable counting\n"
+                "`/server_config welcome #channel` — Welcome messages"
+            ),
+            inline=False,
+        )
+        embed.set_footer(text="L!help [category] or /help for full command list  ·  Ludus Bot")
         return embed
 
 # ---------- Cog Setup ----------

@@ -1,7 +1,7 @@
 ﻿"""
 cogs/tutorial.py - Interactive bilingual tutorial for Ludus.
 Languages: EN English / PL Polski
-Translations loaded from: language/en.json, language/pl.json
+Translations loaded from: language/tutorial.json
 """
 
 from __future__ import annotations
@@ -22,13 +22,16 @@ _LANGS: dict = {}
 
 def _load_langs() -> None:
     global _LANGS
-    for code in ("en", "pl"):
-        path = _LANG_DIR / f"{code}.json"
-        if path.exists():
-            with open(path, "r", encoding="utf-8") as f:
-                _LANGS[code] = json.load(f)
-        else:
-            _LANGS[code] = {}
+    path = _LANG_DIR / "tutorial.json"
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Map each top-level language key to {"tutorial": <content>}
+        # so the rest of the cog can access _LANGS[lang]["tutorial"][...]
+        for code, content in data.items():
+            _LANGS[code] = {"tutorial": content}
+    else:
+        _LANGS = {"en": {}, "pl": {}}
 
 _load_langs()
 
@@ -55,7 +58,7 @@ def _t(lang: str, *keys: str, **fmt) -> str:
 
 PAGES = [
     "welcome", "economy", "gambling", "cards", "games",
-    "mining", "farming", "business", "social", "achievements",
+    "mining", "farming", "business", "social", "achievements", "wizardwars",
     "profile", "quickstart",
 ]
 

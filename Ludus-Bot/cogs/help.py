@@ -138,14 +138,26 @@ class Help(commands.Cog):
             },
             "🌍 Global Events": {
                 "key": "events",
-                "desc": "Server vs Server competitions (Owner starts)",
+                "desc": "Cross-server events — Owner starts, everyone joins",
                 "commands": [
-                    ("event war <hours>", "Server faction war"),
-                    ("joinfaction <name>", "Join faction"),
-                    ("warleaderboard", "War standings"),
-                    ("pet play", "Play with pet"),
-                    ("pet walk", "Walk your pet"),
-                    ("pet rename <name>", "Rename pet"),
+                    ("— WAR EVENT —", "Faction-based server competition"),
+                    ("event war [hours]", "🔴 Start a global faction war (Owner only, default 24h)"),
+                    ("joinfaction <iron/ash/void/sky>", "Join a faction: ⚔️ Iron Legion · 🔥 Ashborn · 🌑 Voidwalkers · 🌬️ Skybound"),
+                    ("warleaderboard", "View live faction standings & member/server counts"),
+                    ("— WORLD BOSS —", "Cross-server raid on a giant boss"),
+                    ("event worldboss [boss]", "🔴 Spawn a world boss (Owner only)  •  bosses: void_titan · storm_king · shadow_lord · chaos_beast"),
+                    ("attack", "⚔️ Attack the active World Boss (30s cooldown) — or click the Attack button"),
+                    ("bossstats", "View boss HP bar, top damage servers & total attacker count"),
+                    ("— TARGET HUNT —", "Speed challenges broadcast to all servers"),
+                    ("event hunt [minutes]", "🔴 Start a global scavenger hunt (Owner only, default 30min)"),
+                    ("— ADMIN —", "Owner-only management commands (🔴 = owner only)"),
+                    ("event list", "🔴 List all currently active global events"),
+                    ("event end <type>", "🔴 Force-end an event (war / worldboss / hunt / chaos)"),
+                    ("— REWARDS —", "Coins awarded at event end"),
+                    ("war victory", "🏆 10 000 coins for winning faction members"),
+                    ("worldboss participation", "5 000 coins base + bonus per damage dealt"),
+                    ("worldboss top 10", "Up to +10 000 coins extra for top damage dealers"),
+                    ("worldboss last hit", "15 000 coin bonus for the killing blow"),
                 ]
             },
             "📜 Quests": {
@@ -200,7 +212,6 @@ class Help(commands.Cog):
                 "key": "utility",
                 "desc": "Helpful tools",
                 "commands": [
-                    ("guide [category]", "This help menu"),
                     ("about", "Full bot guide (DM)"),
                     ("setup", "Bot setup guide"),
                     ("ping", "Check bot latency"),
@@ -218,6 +229,7 @@ class Help(commands.Cog):
                     ("/starboard <emoji> <channel> <amt>", "Setup starboard"),
                     ("serverconfig", "Configuration menu"),
                     ("purge <amount>", "Delete messages"),
+                    ("confession", "Setup anonymous confession channel"),
                 ]
             },
         }
@@ -308,6 +320,7 @@ class Help(commands.Cog):
                        "Select a category to view detailed commands:\n"
                        "Usage: `L!help <category>` or `/help <category>`\n\n"
                        "**Quick Start:**\n"
+                       "• `L!tutorial` - Start the tutorial\n"
                        "• `L!daily` - Claim daily reward\n"
                        "• `L!balance` - Check coins\n"
                        "• `L!slots 100` - Try your luck!",
@@ -419,6 +432,14 @@ class Help(commands.Cog):
         
         # Add commands
         for cmd, desc in category_data['commands']:
+            # Section header rows: name starts with — (separator / category header)
+            if cmd.startswith('—'):
+                embed.add_field(
+                    name=f"▸ {cmd.strip('— ').strip()}",
+                    value=desc if desc else "\u200b",
+                    inline=False
+                )
+                continue
             # Format command with proper prefix
             if cmd.startswith('/'):
                 cmd_display = cmd
@@ -427,7 +448,7 @@ class Help(commands.Cog):
             
             embed.add_field(
                 name=cmd_display,
-                value=desc,
+                value=desc if desc else "\u200b",
                 inline=False
             )
         
