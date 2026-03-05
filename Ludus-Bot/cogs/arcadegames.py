@@ -651,6 +651,796 @@ class BombDefuseView(discord.ui.View):
             await self.original_interaction.response.send_message(embed=embed, file=file, view=self)
             self.message = await self.original_interaction.original_response()
 
+class SnakeGame:
+    """Classic Snake Game"""
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.width = 15
+        self.height = 15
+        self.block_size = 32
+        
+        # Start in middle
+        self.snake = [(7, 7), (7, 8), (7, 9)] # Head, Body, Tail
+        self.direction = "up" # up, down, left, right
+        self.food = (5, 5) # Temp init
+        self.spawn_food()
+        self.score = 0
+        self.state = "playing" # playing, game_over, win
+
+    def spawn_food(self):
+        while True:
+            x, y = random.randint(0, self.width-1), random.randint(0, self.height-1)
+            if (x, y) not in self.snake:
+                self.food = (x, y)
+                break
+
+    def move(self, direction):
+        if self.state != "playing": return
+        
+        # Prevent 180 turns
+        opposites = {"up": "down", "down": "up", "left": "right", "right": "left"}
+        if opposites.get(direction) == self.direction:
+             # Ignore 180 turn, keep current direction? 
+             # Or just ignore input. Let's effectively ignore input but we must advance?
+             # Actually classic snake advances automatically. Here user forces advance.
+             # So if user presses Down while going Up, we should probably ignore it OR Game Over?
+             # Standard is ignore. So we use self.direction
+             pass
+        else:
+            self.direction = direction
+        
+        # Calculate new head
+        head_x, head_y = self.snake[0]
+        dx, dy = 0, 0
+        if self.direction == "up": dy = -1
+        elif self.direction == "down": dy = 1
+        elif self.direction == "left": dx = -1
+        elif self.direction == "right": dx = 1
+        
+        new_head = (head_x + dx, head_y + dy)
+        
+        # Check collisions logic
+        if not (0 <= new_head[0] < self.width and 0 <= new_head[1] < self.height):
+            self.state = "game_over"
+            return
+            
+        if new_head in self.snake[:-1]: 
+            self.state = "game_over"
+            return
+            
+        self.snake.insert(0, new_head)
+        
+        if new_head == self.food:
+            self.score += 10
+            self.spawn_food()
+            if len(self.snake) >= self.width * self.height:
+                self.state = "win"
+        else:
+            self.snake.pop()
+
+    def render(self):
+        w, h = self.width * self.block_size, self.height * self.block_size
+        img = Image.new('RGB', (w, h), color=(20, 20, 20))
+        draw = ImageDraw.Draw(img)
+        
+        # Draw Border
+        draw.rectangle([0, 0, w-1, h-1], outline=(50, 50, 50), width=1)
+
+        # Draw Food
+        fx, fy = self.food[0] * self.block_size, self.food[1] * self.block_size
+        draw.ellipse([fx+4, fy+4, fx+28, fy+28], fill=(255, 50, 50))
+        
+        # Draw Snake
+        for idx, (x, y) in enumerate(self.snake):
+            sx, sy = x * self.block_size, y * self.block_size
+            rect = [sx+1, sy+1, sx+31, sy+31]
+            color = (50, 255, 50) if idx == 0 else (0, 200, 0) # Head brighter
+            draw.rectangle(rect, fill=color)
+            
+            # Eyes on head
+            if idx == 0:
+                eye_color = (0, 0, 0)
+                if self.direction == "up":
+                    draw.rectangle([sx+6, sy+6, sx+10, sy+10], fill=eye_color)
+                    draw.rectangle([sx+22, sy+6, sx+26, sy+10], fill=eye_color)
+                elif self.direction == "down":
+                    draw.rectangle([sx+6, sy+22, sx+10, sy+26], fill=eye_color)
+                    draw.rectangle([sx+22, sy+22, sx+26, sy+26], fill=eye_color)
+                elif self.direction == "left":
+                    draw.rectangle([sx+6, sy+6, sx+10, sy+10], fill=eye_color)
+                    draw.rectangle([sx+6, sy+22, sx+10, sy+26], fill=eye_color)
+                elif self.direction == "right":
+                    draw.rectangle([sx+22, sy+6, sx+26, sy+10], fill=eye_color)
+                    draw.rectangle([sx+22, sy+22, sx+26, sy+26], fill=eye_color)
+
+        # Game Over Overlay
+        if self.state != "playing":
+            overlay = Image.new('RGBA', (w, h), (0, 0, 0, 180))
+            img = img.convert("RGBA")
+            img = Image.alpha_composite(img, overlay)
+            img = img.convert("RGB")
+            draw = ImageDraw.Draw(img)
+            text = "GAME OVER" if self.state == "game_over" else "YOU WIN!"
+            color = (255, 50, 50) if self.state == "game_over" else (50, 255, 50)
+            # Centering roughly
+            draw.text((w//2 - 40, h//2 - 10), text, fill=color)
+            draw.text((w//2 - 50, h//2 + 10), f"Score: {self.score}", fill=(255, 255, 255))
+            
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        return buffer
+
+class SnakeView(discord.ui.View):
+    def __init__(self, game, interaction, cog):
+        super().__init__(timeout=120)
+        self.game = game
+        self.original_interaction = interaction
+        self.cog = cog
+        self.message = None
+
+    async def update_board(self, interaction=None):
+        file = discord.File(self.game.render(), filename="snake.png")
+        desc = f"Score: {self.game.score} | Length: {len(self.game.snake)}"
+        color = discord.Color.green()
+        
+        if self.game.state != "playing":
+             if self.game.state == "win":
+                 desc += "\n**YOU WON!**"
+                 reward = 500
+             else:
+                 desc += "\n**GAME OVER**"
+                 reward = self.game.score // 2 
+                 color = discord.Color.red()
+             
+             # Stats
+             if _arc_mg:
+                 try:
+                     _arc_mg(self.game.user_id, 'snake', 'win' if self.game.state == 'win' else 'loss', reward)
+                     if self.game.state == 'win': _arc_inc(self.game.user_id, 'arcade_wins')
+                 except Exception: pass
+            
+             self.clear_items()
+             b_restart = discord.ui.Button(label="🔄 Restart", style=discord.ButtonStyle.success, custom_id="restart")
+             b_restart.callback = self.restart_callback
+             self.add_item(b_restart)
+             
+             b_menu = discord.ui.Button(label="🏠 Menu", style=discord.ButtonStyle.secondary, custom_id="menu")
+             b_menu.callback = self.menu_callback
+             self.add_item(b_menu)
+
+             desc += f"\n**+{reward} PsyCoins** 🪙"
+
+        embed = discord.Embed(title="🐍 Snake Arcade", description=desc, color=color)
+        embed.set_image(url="attachment://snake.png")
+        
+        if interaction:
+            await interaction.response.edit_message(embed=embed, attachments=[file], view=self)
+        elif self.message:
+            await self.message.edit(embed=embed, attachments=[file], view=self)
+        else:
+            await self.original_interaction.response.send_message(embed=embed, file=file, view=self)
+            self.message = await self.original_interaction.original_response()
+
+    async def check_auth(self, interaction):
+        if interaction.user.id != self.game.user_id:
+            await interaction.response.send_message("Not your game!", ephemeral=True)
+            return False
+        return True
+
+    async def restart_callback(self, interaction):
+        if not await self.check_auth(interaction): return
+        await self.cog.start_snake(interaction)
+
+    async def menu_callback(self, interaction):
+        if not await self.check_auth(interaction): return
+        await self.cog.show_arcade_menu(interaction)
+
+    @discord.ui.button(label="⬆️", style=discord.ButtonStyle.primary, row=0)
+    async def up(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move("up")
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="⬇️", style=discord.ButtonStyle.primary, row=1)
+    async def down(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move("down")
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.primary, row=1)
+    async def left(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move("left")
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="➡️", style=discord.ButtonStyle.primary, row=1)
+    async def right(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move("right")
+        await self.update_board(interaction)
+
+class TetrisGame:
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.width = 10
+        self.height = 20
+        self.block_size = 24
+        self.grid = [[0 for _ in range(self.width)] for _ in range(self.height)]
+        self.score = 0
+        self.state = "playing"
+        
+        self.shapes = [
+            [[1, 1, 1, 1]], # I
+            [[1, 1], [1, 1]], # O
+            [[0, 1, 0], [1, 1, 1]], # T
+            [[1, 0, 0], [1, 1, 1]], # L
+            [[0, 0, 1], [1, 1, 1]], # J
+            [[0, 1, 1], [1, 1, 0]], # S
+            [[1, 1, 0], [0, 1, 1]]  # Z
+        ]
+        self.colors = [
+            (0, 255, 255), (255, 255, 0), (128, 0, 128), 
+            (255, 165, 0), (0, 0, 255), (0, 255, 0), (255, 0, 0)
+        ]
+        
+        self.current_piece = self.new_piece()
+        self.piece_x = 3
+        self.piece_y = 0
+
+    def new_piece(self):
+        shape = random.choice(self.shapes)
+        color = self.colors[self.shapes.index(shape)]
+        return {"shape": shape, "color": color}
+
+    def check_collision(self, dx=0, dy=0, shape=None):
+        if shape is None: shape = self.current_piece["shape"]
+        for y, row in enumerate(shape):
+            for x, cell in enumerate(row):
+                if cell:
+                    nx, ny = self.piece_x + x + dx, self.piece_y + y + dy
+                    if nx < 0 or nx >= self.width or ny >= self.height:
+                        return True
+                    if ny >= 0 and self.grid[ny][nx]:
+                        return True
+        return False
+
+    def merge_piece(self):
+        for y, row in enumerate(self.current_piece["shape"]):
+            for x, cell in enumerate(row):
+                if cell:
+                    if self.piece_y + y >= 0:
+                        self.grid[self.piece_y + y][self.piece_x + x] = self.current_piece["color"]
+        self.clear_lines()
+        self.current_piece = self.new_piece()
+        self.piece_x = 3
+        self.piece_y = 0
+        if self.check_collision():
+            self.state = "game_over"
+
+    def clear_lines(self):
+        lines_to_clear = [i for i, row in enumerate(self.grid) if all(row)]
+        for i in lines_to_clear:
+            del self.grid[i]
+            self.grid.insert(0, [0 for _ in range(self.width)])
+            self.score += 100 * len(lines_to_clear) # Standard scoring is better but simple for now
+
+    def rotate_piece(self):
+        shape = self.current_piece["shape"]
+        # Rotate matrix
+        new_shape = [list(row) for row in zip(*shape[::-1])]
+        if not self.check_collision(shape=new_shape):
+            self.current_piece["shape"] = new_shape
+
+    def move(self, dx, dy):
+        if not self.check_collision(dx, dy):
+            self.piece_x += dx
+            self.piece_y += dy
+            return True
+        elif dy > 0: # Hit bottom or stack
+            self.merge_piece()
+            return False
+        return False
+
+    def drop(self):
+        while self.move(0, 1): pass
+
+    def render(self):
+        w, h = self.width * self.block_size, self.height * self.block_size
+        img = Image.new('RGB', (w + 100, h), color=(20, 20, 30)) # Extra width for UI
+        draw = ImageDraw.Draw(img)
+        
+        # Grid area
+        draw.rectangle([0, 0, w, h], fill=(0, 0, 0))
+        
+        # Draw Stack
+        for y, row in enumerate(self.grid):
+            for x, val in enumerate(row):
+                if val:
+                    rx, ry = x * self.block_size, y * self.block_size
+                    draw.rectangle([rx+1, ry+1, rx+self.block_size-1, ry+self.block_size-1], fill=val)
+        
+        # Draw Current Piece
+        if self.state == "playing":
+            for y, row in enumerate(self.current_piece["shape"]):
+                for x, val in enumerate(row):
+                    if val:
+                        rx, ry = (self.piece_x + x) * self.block_size, (self.piece_y + y) * self.block_size
+                        if ry >= 0:
+                            draw.rectangle([rx+1, ry+1, rx+self.block_size-1, ry+self.block_size-1], fill=self.current_piece["color"])
+        
+        # UI
+        draw.text((w + 10, 20), "SCORE", fill=(200, 200, 200))
+        draw.text((w + 10, 40), str(self.score), fill=(255, 255, 255))
+        
+        if self.state == "game_over":
+             draw.text((w + 10, 100), "GAME", fill=(255, 50, 50))
+             draw.text((w + 10, 120), "OVER", fill=(255, 50, 50))
+
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        return buffer
+
+class TetrisView(discord.ui.View):
+    def __init__(self, game, interaction, cog):
+        super().__init__(timeout=180)
+        self.game = game
+        self.original_interaction = interaction
+        self.cog = cog
+        self.message = None
+
+    async def update_board(self, interaction=None):
+        file = discord.File(self.game.render(), filename="tetris.png")
+        desc = f"Score: {self.game.score}"
+        
+        if self.game.state == "game_over":
+             desc += "\n**GAME OVER**"
+             self.clear_items()
+             b_restart = discord.ui.Button(label="🔄 Restart", style=discord.ButtonStyle.success, custom_id="restart")
+             b_restart.callback = self.restart_callback
+             self.add_item(b_restart)
+             b_menu = discord.ui.Button(label="🏠 Menu", style=discord.ButtonStyle.secondary, custom_id="menu")
+             b_menu.callback = self.menu_callback
+             self.add_item(b_menu)
+             
+             if _arc_mg:
+                 try:
+                     _arc_mg(self.game.user_id, 'tetris', 'loss', self.game.score)
+                 except Exception: pass
+
+        embed = discord.Embed(title="🧱 Tetris Arcade", description=desc, color=discord.Color.blue())
+        embed.set_image(url="attachment://tetris.png")
+        
+        if interaction:
+            await interaction.response.edit_message(embed=embed, attachments=[file], view=self)
+        elif self.message:
+            await self.message.edit(embed=embed, attachments=[file], view=self)
+        else:
+            await self.original_interaction.response.send_message(embed=embed, file=file, view=self)
+            self.message = await self.original_interaction.original_response()
+
+    async def check_auth(self, interaction):
+        if interaction.user.id != self.game.user_id:
+            await interaction.response.send_message("Not your game!", ephemeral=True)
+            return False
+        return True
+
+    async def restart_callback(self, interaction):
+        if not await self.check_auth(interaction): return
+        await self.cog.start_tetris(interaction)
+
+    async def menu_callback(self, interaction):
+        if not await self.check_auth(interaction): return
+        await self.cog.show_arcade_menu(interaction)
+
+    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.primary, row=0)
+    async def left(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move(-1, 0)
+        # Auto fall 1 step per move? Maybe not, allow positioning
+        # But games need progress. Let's make Down the progress.
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="⬇️", style=discord.ButtonStyle.primary, row=0)
+    async def down(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move(0, 1)
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="➡️", style=discord.ButtonStyle.primary, row=0)
+    async def right(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move(1, 0)
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="🔄", style=discord.ButtonStyle.secondary, row=1)
+    async def rotate(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.rotate_piece()
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="⏬", style=discord.ButtonStyle.danger, row=1)
+    async def drop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.drop()
+        await self.update_board(interaction)
+
+class SpaceInvadersGame:
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.width = 15
+        self.height = 12
+        self.block_size = 24
+        
+        self.player_x = self.width // 2
+        self.bullets = [] # List of {"x": x, "y": y, "dir": -1 (up) or 1 (down)}
+        self.aliens = [] # List of {"x": x, "y": y}
+        
+        self.score = 0
+        self.state = "playing"
+        self.level = 1
+        self.alien_direction = 1 # 1 for right, -1 for left
+        
+        self.spawn_aliens()
+
+    def spawn_aliens(self):
+        self.aliens = []
+        rows = 3
+        cols = 8
+        start_x = (self.width - cols) // 2
+        for r in range(rows):
+            for c in range(cols):
+                self.aliens.append({"x": start_x + c, "y": r + 1})
+
+    def move_player(self, dx):
+        self.player_x = max(0, min(self.width - 1, self.player_x + dx))
+        self.update_game_state() # Advance game on player move? Or just move player?
+        # Turn based: Player moves, Aliens move?
+        # Let's say: Player action -> Aliens Move -> Resolve
+        
+    def shoot(self):
+        # Only 1 bullet at a time? Or multiple?
+        # Let's say max 2 player bullets
+        p_bullets = [b for b in self.bullets if b["dir"] == -1]
+        if len(p_bullets) < 2:
+            self.bullets.append({"x": self.player_x, "y": self.height - 2, "dir": -1})
+        self.update_game_state()
+
+    def update_game_state(self):
+        # 1. Move Bullets
+        for b in self.bullets[:]:
+            b["y"] += b["dir"]
+            # Out of bounds
+            if b["y"] < 0 or b["y"] >= self.height:
+                self.bullets.remove(b)
+        
+        # 2. Check Bullet Collisions
+        for b in self.bullets[:]:
+            if b["dir"] == -1: # Player bullet
+                # Check hit alien
+                hit = False
+                for alien in self.aliens[:]:
+                    if b["x"] == alien["x"] and b["y"] == alien["y"]:
+                        self.aliens.remove(alien)
+                        self.score += 50
+                        hit = True
+                        break
+                if hit and b in self.bullets: self.bullets.remove(b)
+            
+            # TODO: Alien bullets hitting player
+        
+        # 3. Move Aliens
+        # Move periodically based on level speed
+        if random.random() < 0.4 + (self.level * 0.05):
+            should_move_down = False
+            next_dir = self.alien_direction
+            
+            # Check edge collision
+            for a in self.aliens:
+                next_x = a["x"] + self.alien_direction
+                if next_x < 0 or next_x >= self.width:
+                    should_move_down = True
+                    next_dir = -self.alien_direction
+                    break
+            
+            if should_move_down:
+                for a in self.aliens:
+                    a["y"] += 1
+                    if a["y"] >= self.height - 1:
+                        self.state = "game_over"
+                self.alien_direction = next_dir
+            else:
+                for a in self.aliens:
+                    a["x"] += self.alien_direction
+        
+        # 4. Alien Shoot
+        # Random alien shoots
+        if random.random() < 0.2:
+             # Pick random bottom alien
+             if self.aliens:
+                 shooter = random.choice(self.aliens)
+                 self.bullets.append({"x": shooter["x"], "y": shooter["y"] + 1, "dir": 1})
+        
+        # 5. Check Player Hit
+        for b in self.bullets:
+            if b["dir"] == 1:
+                if b["x"] == self.player_x and b["y"] == self.height - 1:
+                    self.state = "game_over"
+
+        # 6. Check Win (No aliens)
+        if not self.aliens:
+            self.level += 1
+            self.score += 1000
+            self.spawn_aliens()
+
+    def render(self):
+        w, h = self.width * self.block_size, self.height * self.block_size
+        img = Image.new('RGB', (w, h), color=(10, 10, 20))
+        draw = ImageDraw.Draw(img)
+        
+        # Draw Player
+        px, py = self.player_x * self.block_size, (self.height - 1) * self.block_size
+        draw.polygon([(px+12, py), (px+4, py+20), (px+20, py+20)], fill=(50, 255, 50))
+        
+        # Draw Aliens
+        for a in self.aliens:
+            ax, ay = a["x"] * self.block_size, a["y"] * self.block_size
+            draw.rectangle([ax+4, ay+4, ax+20, ay+20], fill=(255, 50, 50))
+            # Eyes
+            draw.point((ax+8, ay+8), fill=(0,0,0))
+            draw.point((ax+16, ay+8), fill=(0,0,0))
+            
+        # Draw Bullets
+        for b in self.bullets:
+            bx, by = b["x"] * self.block_size, b["y"] * self.block_size
+            color = (255, 255, 0) if b["dir"] == -1 else (255, 100, 100)
+            draw.rectangle([bx+10, by+6, bx+14, by+18], fill=color)
+
+        if self.state == "game_over":
+             # draw game over
+             draw.text((w//2-30, h//2), "GAME OVER", fill=(255, 255, 255))
+             
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        return buffer
+
+class SpaceInvadersView(discord.ui.View):
+    def __init__(self, game, interaction, cog):
+        super().__init__(timeout=120)
+        self.game = game
+        self.original_interaction = interaction
+        self.cog = cog
+        self.message = None
+
+    async def update_board(self, interaction=None):
+        file = discord.File(self.game.render(), filename="invaders.png")
+        desc = f"Score: {self.game.score} | Level: {self.game.level}"
+        
+        if self.game.state == "game_over":
+             desc += "\n**GAME OVER**"
+             self.clear_items()
+             b_restart = discord.ui.Button(label="🔄 Restart", style=discord.ButtonStyle.success, custom_id="restart")
+             b_restart.callback = self.restart_callback
+             self.add_item(b_restart)
+             b_menu = discord.ui.Button(label="🏠 Menu", style=discord.ButtonStyle.secondary, custom_id="menu")
+             b_menu.callback = self.menu_callback
+             self.add_item(b_menu)
+             
+             if _arc_mg:
+                 try:
+                     _arc_mg(self.game.user_id, 'invaders', 'loss', self.game.score)
+                 except Exception: pass
+
+        embed = discord.Embed(title="👾 Space Invaders Arcade", description=desc, color=discord.Color.dark_blue())
+        embed.set_image(url="attachment://invaders.png")
+        
+        if interaction:
+            await interaction.response.edit_message(embed=embed, attachments=[file], view=self)
+        elif self.message:
+            await self.message.edit(embed=embed, attachments=[file], view=self)
+        else:
+            await self.original_interaction.response.send_message(embed=embed, file=file, view=self)
+            self.message = await self.original_interaction.original_response()
+
+    async def check_auth(self, interaction):
+        if interaction.user.id != self.game.user_id:
+            await interaction.response.send_message("Not your game!", ephemeral=True)
+            return False
+        return True
+    
+    async def restart_callback(self, interaction):
+         if not await self.check_auth(interaction): return
+         await self.cog.start_invaders(interaction)
+
+    async def menu_callback(self, interaction):
+         if not await self.check_auth(interaction): return
+         await self.cog.show_arcade_menu(interaction)
+
+    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.primary, row=0)
+    async def left(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move_player(-1)
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="🔫 SHOOT", style=discord.ButtonStyle.danger, row=0)
+    async def shoot(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.shoot()
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="➡️", style=discord.ButtonStyle.primary, row=0)
+    async def right(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move_player(1)
+        await self.update_board(interaction)
+
+class PongGame:
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.width = 600
+        self.height = 400
+        self.paddle_h = 60
+        self.paddle_w = 10
+        self.ball_size = 10
+        
+        self.p1_y = self.height // 2 - self.paddle_h // 2
+        self.ai_y = self.height // 2 - self.paddle_h // 2
+        
+        self.ball_x = self.width // 2
+        self.ball_y = self.height // 2
+        self.ball_dx = 15 # Speed
+        self.ball_dy = random.choice([-10, 10])
+        
+        self.score_p1 = 0
+        self.score_ai = 0
+        self.state = "playing"
+
+    def move_player(self, dy):
+        self.p1_y = max(0, min(self.height - self.paddle_h, self.p1_y + dy))
+        self.update_game()
+
+    def update_game(self):
+        # Move Ball
+        self.ball_x += self.ball_dx
+        self.ball_y += self.ball_dy
+        
+        # Wall Collision (Top/Bottom)
+        if self.ball_y <= 0 or self.ball_y >= self.height - self.ball_size:
+            self.ball_dy *= -1
+            
+        # Paddle Collision
+        # P1 (Left)
+        if self.ball_x <= 20 + self.paddle_w:
+            if self.p1_y < self.ball_y + self.ball_size and self.p1_y + self.paddle_h > self.ball_y:
+                self.ball_dx *= -1
+                self.ball_dx += 2 # Speed up
+            elif self.ball_x < 0:
+                self.score_ai += 1
+                self.reset_ball()
+        
+        # AI (Right)
+        if self.ball_x >= self.width - 20 - self.paddle_w - self.ball_size:
+            if self.ai_y < self.ball_y + self.ball_size and self.ai_y + self.paddle_h > self.ball_y:
+                self.ball_dx *= -1
+                self.ball_dx -= 2 # Speed up (negative)
+            elif self.ball_x > self.width:
+                self.score_p1 += 1
+                self.reset_ball()
+                
+        # AI Movement
+        # Simple tracking with error/speed limit
+        target_y = self.ball_y - self.paddle_h // 2
+        if target_y > self.ai_y:
+            self.ai_y += min(20, target_y - self.ai_y)
+        elif target_y < self.ai_y:
+            self.ai_y -= min(20, self.ai_y - target_y)
+        self.ai_y = max(0, min(self.height - self.paddle_h, self.ai_y))
+        
+        # Win Condition
+        if self.score_p1 >= 5: self.state = "win"
+        elif self.score_ai >= 5: self.state = "game_over"
+
+    def reset_ball(self):
+        self.ball_x = self.width // 2
+        self.ball_y = self.height // 2
+        self.ball_dx = random.choice([-15, 15]) 
+        self.ball_dy = random.choice([-10, 10])
+
+    def render(self):
+        img = Image.new('RGB', (self.width, self.height), color=(0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        # Center Line
+        for y in range(0, self.height, 40):
+            draw.rectangle([self.width//2 - 2, y, self.width//2 + 2, y + 20], fill=(100, 100, 100))
+            
+        # Draw Paddles
+        draw.rectangle([20, self.p1_y, 20 + self.paddle_w, self.p1_y + self.paddle_h], fill=(50, 255, 50))
+        draw.rectangle([self.width - 20 - self.paddle_w, self.ai_y, self.width - 20, self.ai_y + self.paddle_h], fill=(255, 50, 50))
+        
+        # Draw Ball
+        draw.rectangle([self.ball_x, self.ball_y, self.ball_x + self.ball_size, self.ball_y + self.ball_size], fill=(255, 255, 255))
+        
+        # Scores
+        draw.text((self.width//4, 20), str(self.score_p1), fill=(255, 255, 255), font=None)
+        draw.text((3*self.width//4, 20), str(self.score_ai), fill=(255, 255, 255), font=None)
+        
+        if self.state != "playing":
+            text = "YOU WIN!" if self.state == "win" else "YOU LOSE!"
+            draw.text((self.width//2 - 30, self.height//2), text, fill=(255, 255, 0))
+
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        return buffer
+
+class PongView(discord.ui.View):
+    def __init__(self, game, interaction, cog):
+        super().__init__(timeout=120)
+        self.game = game
+        self.original_interaction = interaction
+        self.cog = cog
+        self.message = None
+
+    async def update_board(self, interaction=None):
+        file = discord.File(self.game.render(), filename="pong.png")
+        desc = f"Player: {self.game.score_p1} | AI: {self.game.score_ai}"
+        
+        if self.game.state != "playing":
+             self.clear_items()
+             b_restart = discord.ui.Button(label="🔄 Restart", style=discord.ButtonStyle.success, custom_id="restart")
+             b_restart.callback = self.restart_callback
+             self.add_item(b_restart)
+             b_menu = discord.ui.Button(label="🏠 Menu", style=discord.ButtonStyle.secondary, custom_id="menu")
+             b_menu.callback = self.menu_callback
+             self.add_item(b_menu)
+             
+             if self.game.state == "win":
+                 if _arc_mg:
+                     try:
+                         _arc_mg(self.game.user_id, 'pong', 'win', 300)
+                         _arc_inc(self.game.user_id, 'arcade_wins')
+                     except Exception: pass
+        
+        embed = discord.Embed(title="🏓 Pong Arcade", description=desc, color=discord.Color.dark_grey())
+        embed.set_image(url="attachment://pong.png")
+        
+        if interaction:
+            await interaction.response.edit_message(embed=embed, attachments=[file], view=self)
+        elif self.message:
+            await self.message.edit(embed=embed, attachments=[file], view=self)
+        else:
+            await self.original_interaction.response.send_message(embed=embed, file=file, view=self)
+            self.message = await self.original_interaction.original_response()
+
+    async def check_auth(self, interaction):
+        if interaction.user.id != self.game.user_id:
+            await interaction.response.send_message("Not your game!", ephemeral=True)
+            return False
+        return True
+
+    async def restart_callback(self, interaction):
+        if not await self.check_auth(interaction): return
+        await self.cog.start_pong(interaction)
+
+    async def menu_callback(self, interaction):
+        if not await self.check_auth(interaction): return
+        await self.cog.show_arcade_menu(interaction)
+
+    @discord.ui.button(label="⬆️", style=discord.ButtonStyle.primary, row=0)
+    async def up(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move_player(-30)
+        await self.update_board(interaction)
+
+    @discord.ui.button(label="⬇️", style=discord.ButtonStyle.primary, row=1)
+    async def down(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_auth(interaction): return
+        self.game.move_player(30)
+        await self.update_board(interaction)
+
 class MainArcadeMenu(discord.ui.View):
     def __init__(self, cog):
         super().__init__(timeout=None)
@@ -666,19 +1456,19 @@ class MainArcadeMenu(discord.ui.View):
 
     @discord.ui.button(label="🐍 Snake", style=discord.ButtonStyle.success, row=1)
     async def snake(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🐍 Snake is coming soon!", ephemeral=True)
+        await self.cog.start_snake(interaction)
 
     @discord.ui.button(label="🧱 Tetris", style=discord.ButtonStyle.primary, row=1)
     async def tetris(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🧱 Tetris is coming soon!", ephemeral=True)
+        await self.cog.start_tetris(interaction)
 
     @discord.ui.button(label="👾 Space Invaders", style=discord.ButtonStyle.secondary, row=2)
     async def space(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("👾 Space Invaders is coming soon!", ephemeral=True)
+        await self.cog.start_invaders(interaction)
         
     @discord.ui.button(label="🏓 Pong", style=discord.ButtonStyle.secondary, row=2)
     async def pong(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🏓 Pong is coming soon!", ephemeral=True)
+        await self.cog.start_pong(interaction)
 
 
 class PacManView(discord.ui.View):
@@ -847,7 +1637,7 @@ class ArcadeGames(commands.Cog):
             except Exception:
                 pass
 
-    async def start_  (self, interaction: discord.Interaction):
+    async def start_bomb(self, interaction: discord.Interaction):
         """Bomb defuser game - New Visual Version"""
         game = BombDefuseGame(interaction.user.id)
         view = BombDefuseView(game, interaction, self)
@@ -863,41 +1653,50 @@ class ArcadeGames(commands.Cog):
                 pass
 
 
-    async def arcade_snake_action(self, interaction: discord.Interaction):
-        """Snake game (Placeholder)"""
-        embed = discord.Embed(
-            title="🐍 Snake (Coming Soon!)",
-            description="This game is currently under development. Check back later!",
-            color=discord.Color.green()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    async def start_snake(self, interaction: discord.Interaction):
+        """Snake game - New Visual Version"""
+        game = SnakeGame(interaction.user.id)
+        view = SnakeView(game, interaction, self)
+        await view.update_board(interaction)
+        
+        if _arc_inc:
+            try:
+                _arc_inc(interaction.user.id, 'arcade_played')
+            except Exception: pass
 
-    async def arcade_tetris_action(self, interaction: discord.Interaction):
-        """Tetris game (Placeholder)"""
-        embed = discord.Embed(
-            title="🧱 Tetris (Coming Soon!)",
-            description="This game is currently under development. Check back later!",
-            color=discord.Color.purple()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    async def start_tetris(self, interaction: discord.Interaction):
+        """Tetris game"""
+        game = TetrisGame(interaction.user.id)
+        # Assuming TetrisGame and TetrisView are defined similarly
+        view = TetrisView(game, interaction, self)
+        await view.update_board(interaction)
+        
+        if _arc_inc:
+            try:
+                _arc_inc(interaction.user.id, 'arcade_played')
+            except Exception: pass
 
-    async def arcade_space_invaders_action(self, interaction: discord.Interaction):
-        """Space Invaders game (Placeholder)"""
-        embed = discord.Embed(
-            title="👾 Space Invaders (Coming Soon!)",
-            description="This game is currently under development. Check back later!",
-            color=discord.Color.blue()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    async def start_invaders(self, interaction: discord.Interaction):
+        """Space Invaders game"""
+        game = SpaceInvadersGame(interaction.user.id)
+        view = SpaceInvadersView(game, interaction, self)
+        await view.update_board(interaction)
+        
+        if _arc_inc:
+            try:
+                _arc_inc(interaction.user.id, 'arcade_played')
+            except Exception: pass
 
-    async def arcade_pong_action(self, interaction: discord.Interaction):
-        """Pong game (Placeholder)"""
-        embed = discord.Embed(
-            title="🏓 Pong (Coming Soon!)",
-            description="This game is currently under development. Check back later!",
-            color=discord.Color.dark_grey()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    async def start_pong(self, interaction: discord.Interaction):
+        """Pong game"""
+        game = PongGame(interaction.user.id)
+        view = PongView(game, interaction, self)
+        await view.update_board(interaction)
+        
+        if _arc_inc:
+            try:
+                _arc_inc(interaction.user.id, 'arcade_played')
+            except Exception: pass
 
 async def setup(bot):
     await bot.add_cog(ArcadeGames(bot))

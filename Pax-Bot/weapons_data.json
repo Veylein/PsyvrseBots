@@ -47,6 +47,71 @@
         "wood": 2
       },
       "found_in": ["Wizard's Tower", "Loot Chest"]
+    },
+    {
+      "id": "dagger_001",
+      "name": "Shadow Dagger",
+      "emoji": "🗡️",
+      "description": "A sleek dagger that strikes from the shadows.",
+      "damage": 12,
+      "durability": 60,
+      "rarity": "uncommon",
+      "type": "melee",
+      "special_effect": "poison",
+      "crafting_recipe": {
+        "iron_ingots": 2,
+        "poison_vial": 1
+      },
+      "found_in": ["Assassin's Guild", "Loot Chest"]
+    },
+    {
+      "id": "axe_001",
+      "name": "Battle Axe",
+      "emoji": "🪓",
+      "description": "A heavy axe that delivers powerful blows.",
+      "damage": 20,
+      "durability": 70,
+      "rarity": "uncommon",
+      "type": "melee",
+      "special_effect": null,
+      "crafting_recipe": {
+        "iron_ingots": 4,
+        "wood": 1
+      },
+      "found_in": ["Blacksmith", "Loot Chest"]
+    },
+    {
+      "id": "crossbow_001",
+      "name": "Sniper Crossbow",
+      "emoji": "🏹",
+      "description": "A crossbow designed for long-range precision.",
+      "damage": 18,
+      "durability": 60,
+      "rarity": "rare",
+      "type": "ranged",
+      "special_effect": "piercing",
+      "crafting_recipe": {
+        "wood": 3,
+        "string": 2,
+        "iron_ingots": 1
+      },
+      "found_in": ["Forest", "Loot Chest"]
+    },
+    {
+      "id": "wand_001",
+      "name": "Enchanted Wand",
+      "emoji": "🪄",
+      "description": "A wand that channels magical energy.",
+      "damage": 15,
+      "durability": 40,
+      "rarity": "rare",
+      "type": "magic",
+      "special_effect": "freeze",
+      "crafting_recipe": {
+        "magic_crystals": 3,
+        "wood": 1
+      },
+      "found_in": ["Wizard's Tower", "Loot Chest"]
     }
   ]
 }
