@@ -37,35 +37,35 @@
     "items": [
         {
             "item_id": "R1",
-            "name": "1 Level",
+            "name": "*Coming Soon* - Rebirth Exclusive Role",
             "cost": 1,
             "type": "default",
             "realm": "Pandian Realm"
         },
         {
             "item_id": "R2",
-            "name": "Custom Role",
+            "name": "*Coming Soon* - Custom Role",
             "cost": 2,
             "type": "default",
             "realm": "Pandian Realm"
         },
         {
             "item_id": "R3",
-            "name": "Server Booster Pack",
+            "name": "*Coming Soon* - Server Booster Pack",
             "cost": 2,
             "type": "default",
             "realm": "Pandian Realm"
         },
         {
             "item_id": "R4",
-            "name": "Mythic Weapon Skin",
+            "name": "*Coming Soon* - Mythic Weapon Skin",
             "cost": 3,
             "type": "default",
             "realm": "Pandian Realm"
         },
         {
             "item_id": "R5",
-            "name": "4 Levels",
+            "name": "*Coming Soon* - 4 Levels",
             "cost": 2,
             "type": "default",
             "realm": "Pandian Realm"
