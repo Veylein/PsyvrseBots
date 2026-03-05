@@ -136,33 +136,25 @@ async def run_bot(folder: Path, entry: Path):
     return proc
 
 
-async def main():
+async def launch_all_bots() -> list:
+    """Start all bots in order. Returns list of started processes."""
     processes = []
-
     dir_folders = [f for f in BASE_DIR.iterdir() if f.is_dir()]
 
     def find_folder_by_name(target: str):
         t = target.lower()
-        # exact match first
         for f in dir_folders:
             if f.name.lower() == t:
                 return f
-        # common suffix/prefix variants
         for f in dir_folders:
             if t in f.name.lower():
                 return f
-        # not found
         return None
 
-    # Keep track of which folders we've already attempted to start
     started = set()
-    abort_startups = False
 
-    # First, start the curated BOT_ORDER so important services come up first
+    # Start bots in the defined order
     for bot_name in BOT_ORDER:
-        if abort_startups:
-            break
-
         folder = find_folder_by_name(bot_name)
         if not folder:
             print(f"[skip] {bot_name} not found")
@@ -177,75 +169,83 @@ async def main():
         processes.append(proc)
         started.add(folder.name.lower())
 
-        # Check for early crash (e.g. Rate Limit / 429)
-        # Give the bot a few seconds to initialize (increased to catch delayed start failures)
-        check_delay = 40
+        # Check for very fast crash (first 10s only — likely a config/token error, not rate limit)
+        check_delay = 10
         try:
             await asyncio.wait_for(proc.wait(), timeout=check_delay)
-            # If we get here, the process exited (crashed) within check_delay seconds
-            if proc.returncode != 0:
-                print(f"[warning] {bot_name} crashed immediately with code {proc.returncode}. Aborting further startups to prevent rate-limit spam.")
-                # Don't remove from processes list so we can cleanup if needed, 
-                # but stop starting new ones
-                abort_startups = True
-                break 
+            print(f"[warning] {bot_name} exited within {check_delay}s (code {proc.returncode}). Continuing with remaining bots.")
         except asyncio.TimeoutError:
-            # Process is still running after check_delay seconds, which is good.
+            # Still running — good
             pass
         except Exception as e:
-            print(f"[error] Error while checking specific bot startup: {e}")
+            print(f"[error] Startup check error for {bot_name}: {e}")
 
-        # If we didn't break, wait the rest of the START_DELAY
+        # Stagger startups to avoid rate-limit spikes
         msg_delay = max(0, START_DELAY - check_delay)
         if msg_delay > 0:
             await asyncio.sleep(msg_delay)
 
-    # Then, scan all other directories and start any that have a valid entry but weren't in BOT_ORDER
-    if not abort_startups:
-        for folder in dir_folders:
-            name_l = folder.name.lower()
-            if name_l in started:
-                continue
-            # skip hidden or git/venv folders
-            if folder.name.startswith('.') or folder.name.lower() in ('.git', '.venv', 'venv'):
-                continue
+    # Start any extra directories not in BOT_ORDER
+    for folder in dir_folders:
+        name_l = folder.name.lower()
+        if name_l in started:
+            continue
+        if folder.name.startswith('.') or name_l in ('.git', '.venv', 'venv', 'logs', 'scripts'):
+            continue
 
-            entry = find_entry(folder)
-            if not entry:
-                # nothing to start here
-                continue
+        entry = find_entry(folder)
+        if not entry:
+            continue
 
-            print(f"[info] Starting extra folder: {folder.name}")
+        print(f"[info] Starting extra folder: {folder.name}")
         proc = await run_bot(folder, entry)
         processes.append(proc)
         started.add(name_l)
         await asyncio.sleep(START_DELAY)
 
-    if not processes and not abort_startups:
-        print("No bots were started.")
-        return
+    return processes
 
-    if abort_startups:
-        print("\nAll startups aborted due to early crash. Monitoring remaining processes (if any) or waiting before exit...")
-    else:
-        print("\nAll bots launched. Monitoring...\n")
 
-    try:
-        if processes:
+async def main():
+    # Outer backoff loop — keeps launcher alive instead of exiting (which would
+    # trigger an immediate platform restart and create a tight restart loop).
+    BASE_BACKOFF = 300   # 5 minutes
+    MAX_BACKOFF  = 3600  # 1 hour cap
+    cycle = 0
+
+    while True:
+        if cycle > 0:
+            backoff = min(BASE_BACKOFF * (2 ** (cycle - 1)), MAX_BACKOFF)
+            print(f"\n[launcher] Cycle #{cycle}. Waiting {backoff}s before restarting bots...")
+            await asyncio.sleep(backoff)
+
+        cycle += 1
+        print(f"\n[launcher] === Launch cycle #{cycle} ===")
+
+        try:
+            processes = await launch_all_bots()
+        except Exception as e:
+            print(f"[launcher] Fatal error during launch: {e}")
+            continue
+
+        if not processes:
+            print("[launcher] No bots were started. Will retry after backoff.")
+            continue
+
+        print(f"\n[launcher] All bots launched ({len(processes)}). Monitoring...\n")
+
+        try:
             await asyncio.gather(*(p.wait() for p in processes))
-        else:
-             print("No processes running.")
+        except KeyboardInterrupt:
+            print("\n[launcher] Shutdown signal received. Terminating bots...")
+            for p in processes:
+                try:
+                    p.terminate()
+                except Exception:
+                    pass
+            return
 
-        # If we reach here, all bots have stopped (crashed or exited).
-        # We should sleep before exiting to prevent tight restart loops on the platform
-        # which would hammer the API if we're rate-limited.
-        print("\nAll bots have stopped. Sleeping for 5 minutes before exiting to prevent rate-limit loops...")
-        await asyncio.sleep(300)
-
-    except KeyboardInterrupt:
-        print("\nShutdown signal received. Terminating bots...")
-        for p in processes:
-            p.terminate()
+        print("\n[launcher] All bots have stopped. Entering backoff before next cycle...")
 
 
 if __name__ == "__main__":
