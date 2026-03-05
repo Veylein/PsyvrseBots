@@ -2,7 +2,7 @@
 
 > **COMPLETE ENGLISH DOCUMENTATION** for the entire Ludus Discord Bot project  
 > 50,000+ lines of code | 90+ Python files | 600+ commands | 450+ games  
-> **Parts 1-15 + Utils Reference Complete** ✅ | ~145,000+ words documented
+> **Parts 1-16 + Utils Reference Complete** ✅ | ~153,000+ words documented
 
 ---
 
@@ -28,7 +28,7 @@ Complete analysis of economy.py (1,206 lines):
 - Daily rewards with streak bonuses
 - Boost system (double_coins, xp_boost, luck_charm)
 - Currency conversion: `/convert` — FishCoins, MineCoins, FarmCoins ↔ PsyCoins
-- `/currencies` display command; `/equipdeck` for cosmetic card decks
+- `/currencies` display command;
 - Leaderboards & rankings
 - Atomic write system & data persistence
 - All 15+ commands documented
@@ -446,6 +446,19 @@ Complete analysis of help.py, help_system.py, about.py, utilities.py, serverinfo
   - Troubleshooting: offline bot, slash commands not appearing, cog load failures, data not persisting, Opus missing, fuzzywuzzy warnings
   - **~12,000 words of documentation**
 
+#### **[🤖 PART 16: Bot Intelligence & Personality System](documentation/FULL_DOCUMENTATION_PART16.md)** — Full analysis of `personality.py` (1,504 lines) and `intelligence.py.disabled` (182 lines — legacy/disabled)
+  - `LudusPersonality` cog: 5 personality profiles (default, snappy, jester, fps, peaceful), 30+ keyword triggers, custom emoji map (28 entries)
+  - 3-tier content safety system: HATE_WORDS / SEXUAL_WORDS / HARASS_WORDS with leet-speak normalization and safe-context whitelist
+  - Knowledge base Q&A engine: 5-tier lookup chain (favorites → user_taught → faq → identity → general_knowledge), fuzzy matching via `difflib.get_close_matches` (cutoff 0.78)
+  - Self-teaching: when unanswered question detected, starts 60-second learning conversation; stores answers in `user_taught` with `asyncio.Lock`
+  - on_message pipeline: Wordle answer fetching (NYT API), AST-safe math evaluator, yes/no/or question handler (deterministic hash-based answers), "How are you Ludus?" status-aware replies
+  - Rare event system: 1% per-command chance, 5 event types (Lucky Day, Mystical Shroom, Ludus Blessing, Cosmic Key, Cloud Nine) — economy integration pending
+  - Slash `/personality` + prefix `L!setpersonalitychannels`, `L!personality`, `L!vibe`, `L!easter`, `L!mood`
+  - `Intelligence` cog (disabled): flat knowledge base, `googletrans` multilingual support, `fuzzywuzzy` matching — superseded by `LudusPersonality`
+  - **`knowledge.json` deep-dive** (1,263 lines): 5 sections — `identity` (~90 favorites, full persona), `faq` (~150+ Q&A pairs: elements, world capitals, literature, Discord usage, capabilities), `general_knowledge` (formulas, lists, physics/chemistry/biology), `user_taught` (runtime-learned, starts empty, async-locked writes), `conversations` (greeting pools); hot-reload via mtime check; JSON syntax bug identified on line ~128
+  - **Undocumented cogs audit**: `simulations.py`, `onboarding.py`, `perimeter_explicit.py`, `professional_info.py` identified as missing from Parts 1–15
+  - **~8,000 words of documentation**
+
 ---
 
 ## 🏗️ PROJECT ARCHITECTURE OVERVIEW
@@ -536,7 +549,8 @@ Ludus-Bot/ (50,000+ lines total)
 │   │   ├── meme.py (300 lines) - Meme generator
 │   │   ├── quotes.py (200 lines) - Quote system
 │   │   ├── akinator_enhanced.py (600 lines) - Akinator game
-│   │   ├── personality.py (300 lines) - Personality quiz
+│   │   ├── personality.py (1,504 lines) - Bot personality & AI chat system (LudusPersonality)
+│   │   ├── intelligence.py.disabled (182 lines) - Legacy AI cog (disabled, superseded by personality.py)
 │   │   └── seasonal.py (400 lines) - Seasonal events
 │   │
 │   ├── 🛡️ Server Management (7 files, ~2,500 lines)
@@ -1084,7 +1098,7 @@ This project is proprietary. All rights reserved.
 
 **This documentation is a living document and will be updated as the project evolves.**
 
-Last Updated: 04.03.2026
-Total Documentation Size: 145,000+ words across 15 parts + Utils Reference
-Documentation Status: ✅ All 15 Parts + Utils Reference Complete
+Last Updated: 05.03.2026
+Total Documentation Size: 153,000+ words across 16 parts + Utils Reference
+Documentation Status: ✅ All 16 Parts + Utils Reference Complete
 The documentation was written by wilczek80.

@@ -205,7 +205,7 @@ class Help(commands.Cog):
                     ("gif <search>", "Search GIFs"),
                     ("poll <question>", "Create poll"),
                     ("8ball <question>", "Magic 8-ball"),
-                    ("tarot", "Tarot card reading"),
+                    ("/tarot", "Tarot card reading"),
                 ]
             },
             "⚙️ Utility": {
